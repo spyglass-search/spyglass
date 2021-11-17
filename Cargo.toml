@@ -1,0 +1,7 @@
+[package]
+name = "cartographer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
+
+[dependencies]
