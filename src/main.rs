@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     let conn = Connection::open_with_flags(&HISTORY_DB, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     println!("Connected to db...");
 
-    let mut stmt = conn.prepare("SELECT id, url FROM moz_places LIMIT 10")?;
+    let mut stmt = conn.prepare("SELECT id, url FROM moz_places where hidden = 0 LIMIT 10")?;
     let place_iter = stmt.query_map(params![], |row| {
         Ok(Place {
             id: row.get(0)?,
