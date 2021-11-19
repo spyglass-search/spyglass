@@ -5,3 +5,5 @@ edition = "2021"
 authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 
 [dependencies]
+rusqlite = "0.26.1"
+reqwest = "0.11.6"
