@@ -1,6 +1,7 @@
 use directories::ProjectDirs;
 use dirs::home_dir;
 use rusqlite::{params, Connection, OpenFlags, Result};
+use url::{Url};
 use std::{env, fs, io, path::PathBuf};
 
 mod carto;
@@ -63,14 +64,17 @@ fn main() -> Result<()> {
 
         let mut stmt = conn.prepare("SELECT id, url FROM moz_places where hidden = 0 LIMIT 10")?;
         let place_iter = stmt.query_map(params![], |row| {
+            let url_str: String = row.get(1)?;
+            let url = Url::parse(&url_str).unwrap();
             Ok(Place {
                 id: row.get(0)?,
-                url: row.get(1)?,
+                url,
             })
         })?;
 
         for place in place_iter {
-            println!("Found place {:?}", place.unwrap());
+            let place = place.unwrap();
+            println!("Found place {:?} - {:?}", place.url.host_str(), place.url.path());
         }
     }
 

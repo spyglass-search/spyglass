@@ -51,6 +51,7 @@ dependencies = [
  "dirs",
  "reqwest",
  "rusqlite",
+ "url",
 ]
 
 [[package]]
