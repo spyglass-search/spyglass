@@ -1,8 +1,8 @@
 use directories::ProjectDirs;
 use dirs::home_dir;
 use rusqlite::{params, Connection, OpenFlags, Result};
-use url::{Url};
-use std::{env, fs, io, path::PathBuf};
+use std::{env, fs, io, path::{Path, PathBuf}};
+use url::Url;
 
 mod carto;
 use crate::carto::models::Place;
@@ -21,13 +21,11 @@ fn default_profile_path() -> Result<PathBuf, &'static str> {
 fn detect_profiles() -> Vec<PathBuf> {
     let mut path_results = Vec::new();
     if let Ok(path) = default_profile_path() {
-        for path in fs::read_dir(path).unwrap() {
-            if let Ok(path) = path {
-                if path.path().is_dir() {
-                    let db_path = path.path().join("places.sqlite");
-                    if db_path.exists() {
-                        path_results.push(db_path);
-                    }
+        for path in fs::read_dir(path).unwrap().flatten() {
+            if path.path().is_dir() {
+                let db_path = path.path().join("places.sqlite");
+                if db_path.exists() {
+                    path_results.push(db_path);
                 }
             }
         }
@@ -36,7 +34,7 @@ fn detect_profiles() -> Vec<PathBuf> {
     path_results
 }
 
-fn check_and_copy_history(path: &PathBuf) -> Result<PathBuf, io::Error> {
+fn check_and_copy_history(path: &Path) -> Result<PathBuf, io::Error> {
     let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
     let data_dir = proj_dirs.data_dir();
 
@@ -58,7 +56,7 @@ fn main() -> Result<()> {
     let profiles = detect_profiles();
     let db_path = profiles.first().expect("No Firefox history detected");
 
-    if let Ok(db_path) = check_and_copy_history(&db_path) {
+    if let Ok(db_path) = check_and_copy_history(db_path) {
         let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         println!("Connected to db...");
 
@@ -74,7 +72,11 @@ fn main() -> Result<()> {
 
         for place in place_iter {
             let place = place.unwrap();
-            println!("Found place {:?} - {:?}", place.url.host_str(), place.url.path());
+            println!(
+                "Found place {:?} - {:?}",
+                place.url.host_str(),
+                place.url.path()
+            );
         }
     }
 
