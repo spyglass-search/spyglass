@@ -1,11 +1,15 @@
 use directories::ProjectDirs;
 use dirs::home_dir;
 use rusqlite::{params, Connection, OpenFlags, Result};
-use std::{env, fs, io, path::{Path, PathBuf}};
+use simple_logger::SimpleLogger;
+use std::{
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 use url::Url;
 
 mod carto;
-use crate::carto::models::Place;
+use crate::carto::{models::Place, Carto};
 
 /// Get the default profile path for Firefox
 fn default_profile_path() -> Result<PathBuf, &'static str> {
@@ -51,7 +55,18 @@ fn check_and_copy_history(path: &Path) -> Result<PathBuf, io::Error> {
     Ok(data_path)
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logging system
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Info)
+        .with_utc_timestamps()
+        .init()
+        .unwrap();
+
+    // Initialize crawler
+    let carto = Carto::init();
+
     // Detect profiles
     let profiles = detect_profiles();
     let db_path = profiles.first().expect("No Firefox history detected");
@@ -72,11 +87,7 @@ fn main() -> Result<()> {
 
         for place in place_iter {
             let place = place.unwrap();
-            println!(
-                "Found place {:?} - {:?}",
-                place.url.host_str(),
-                place.url.path()
-            );
+            carto.fetch(&place).await;
         }
     }
 
