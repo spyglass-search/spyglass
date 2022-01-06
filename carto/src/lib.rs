@@ -1,9 +1,9 @@
-use crate::carto::models::Place;
 use directories::ProjectDirs;
 use reqwest::StatusCode;
 use std::{fs, path::PathBuf};
 
 pub mod models;
+use models::Place;
 
 pub struct Carto {
     data_dir: PathBuf,
@@ -19,6 +19,7 @@ impl Carto {
         Carto { data_dir }
     }
 
+    // TODO: Load web indexing as a plugin?
     pub async fn fetch(&self, place: &Place) {
         // Make sure cache directory exists for this domain
         let url = &place.url;

@@ -1,25 +1,10 @@
 [package]
-name = "carto-cli"
+name = "carto"
 version = "0.1.0"
 edition = "2021"
 authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 
-[workspace]
-members = [
-    "carto",
-    "carto-indexer"
-]
-
-[[bin]]
-name = "indexer"
-path = "carto-indexer/src/main.rs"
-
-[[bin]]
-name = "searcher"
-path = "carto-searcher/src/main.rs"
-
 [dependencies]
-carto = { path = "./carto" }
 directories = "4.0.1"
 dirs = "4.0.0"
 log = "0.4.14"

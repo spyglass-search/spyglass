@@ -8,8 +8,7 @@ use std::{
 };
 use url::Url;
 
-mod carto;
-use crate::carto::{models::Place, Carto};
+use carto::{models::Place, Carto};
 
 /// Get the default profile path for Firefox
 fn default_profile_path() -> Result<PathBuf, &'static str> {

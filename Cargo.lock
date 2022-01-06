@@ -55,7 +55,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
-name = "cartographer"
+name = "carto"
 version = "0.1.0"
 dependencies = [
  "directories",
@@ -67,6 +67,25 @@ dependencies = [
  "tokio",
  "url",
 ]
+
+[[package]]
+name = "carto-cli"
+version = "0.1.0"
+dependencies = [
+ "carto",
+ "directories",
+ "dirs",
+ "log",
+ "reqwest",
+ "rusqlite",
+ "simple_logger",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "carto-indexer"
+version = "0.1.0"
 
 [[package]]
 name = "cc"
