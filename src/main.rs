@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
         let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         println!("Connected to db...");
 
-        let mut stmt = conn.prepare("SELECT id, url FROM moz_places where hidden = 0 LIMIT 10")?;
+        let mut stmt = conn.prepare("SELECT id, url FROM moz_places where hidden = 0 LIMIT 1")?;
         let place_iter = stmt.query_map(params![], |row| {
             let url_str: String = row.get(1)?;
             let url = Url::parse(&url_str).unwrap();
@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
 
         for place in place_iter {
             let place = place.unwrap();
-            carto.fetch(&place).await;
+            carto.fetch(&place).await.expect("unable to fetch");
         }
     }
 

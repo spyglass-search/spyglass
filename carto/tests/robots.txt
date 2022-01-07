@@ -1,0 +1,106 @@
+User-Agent: *
+Disallow: /api.php
+Disallow: /cors/
+Disallow: /geoip$
+Disallow: /rest_v1/
+Disallow: /w/Property:
+Disallow: /w/Property%3A
+Disallow: /w/property:
+Disallow: /*?title=Property:
+Disallow: /*?title=Property%3A
+Disallow: /*?*&title=Property:
+Disallow: /*?*&title=Property%3A
+Disallow: /w/Special:
+Disallow: /w/Special%3A
+Disallow: /w/special:
+Disallow: /*?title=Special:
+Disallow: /*?title=Special%3A
+Disallow: /*?*&title=Special:
+Disallow: /*?*&title=Special%3A
+Disallow: /w/Especial:
+Disallow: /w/Especial%3A
+Disallow: /w/especial:
+Disallow: /*?title=Especial:
+Disallow: /*?title=Especial%3A
+Disallow: /*?*&title=Especial:
+Disallow: /*?*&title=Especial%3A
+Disallow: /*?action=
+Disallow: /*?*&action=
+Disallow: /*?feed=
+Disallow: /*?*&feed=
+Disallow: /*?from=
+Disallow: /*?*&from=
+Disallow: /*?mobileaction=
+Disallow: /*?*&mobileaction=
+Disallow: /*?oldid=
+Disallow: /*?*&oldid=
+Disallow: /*?printable=
+Disallow: /*?*&printable=
+Disallow: /*?redirect=
+Disallow: /*?*&redirect=
+Disallow: /*?uselang=
+Disallow: /*?*&uselang=
+Disallow: /*?useskin=
+Disallow: /*?*&useskin=
+Disallow: /*?veaction=
+Disallow: /*?*&veaction=
+Disallow: /*?filefrom=
+Disallow: /*?*&filefrom=
+Disallow: /*?fileuntil=
+Disallow: /*?*&fileuntil=
+Disallow: /*?navbox=
+Disallow: /*?*&navbox=
+Disallow: /*?pageuntil=
+Disallow: /*?*&pageuntil=
+Disallow: /*?pagefrom=
+Disallow: /*?*&pagefrom=
+Disallow: /*?diff=
+Disallow: /*?*&diff=
+Disallow: /*?curid=
+Disallow: /*?*&curid=
+
+# SEO bot
+User-agent: AhrefsBot
+Disallow: /
+
+# SEO bot
+User-agent: DotBot
+Disallow: /
+
+# Unknown
+User-agent: Mauibot
+Disallow: /
+
+# SEO bot
+User-agent: MJ12bot
+Disallow: /
+
+# Huawei's web crawler. Ignores Disallow and gets caught in loops accessing special pages. Produces the majority of uncachable requests.
+User-agent: PetalBot
+Disallow: /
+
+# SEO bot
+User-agent: SemrushBot
+Disallow: /
+
+# SEO bot
+User-agent: DataForSeoBot
+Disallow: /
+
+# SEO bot
+User-agent: Neevabot
+Disallow: /
+
+# SEO bot
+User-agent: MegaIndex
+Disallow: /
+
+# SEO bot
+User-agent: Seekport
+Disallow: /
+
+# SEO bot
+User-agent: Barkrowler
+Disallow: /
+
+Sitemap: https://oldschool.runescape.wiki/images/sitemaps/index.xml
