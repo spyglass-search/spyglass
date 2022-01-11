@@ -6,11 +6,14 @@ authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 
 [dependencies]
 chrono = "0.4"
+digest = "0.10"
 directories = "4.0.1"
+hex = "0.4.3"
 log = "0.4.14"
 regex = "1"
 reqwest = "0.11.8"
 rusqlite = { version = "0.26.1", features = ["chrono"] }
+sha2 = "0.10.0"
 simple_logger = "1.16.0"
 tokio = { version = "1", features = ["full"] }
 url = "2.2.2"

@@ -3,13 +3,6 @@
 use chrono::prelude::*;
 use regex::Regex;
 use rusqlite::{params, Connection};
-use url::Url;
-
-#[derive(Debug)]
-pub struct Place {
-    pub id: i32,
-    pub url: Url,
-}
 
 #[derive(Debug)]
 pub struct ResourceRule {
@@ -78,8 +71,8 @@ impl ResourceRule {
                 id: Some(row.get(0)?),
                 domain: row.get(1)?,
                 rule: Regex::new(&rule_str).unwrap(),
-                no_index: row.get::<usize, String>(3)? == "true",
-                allow_crawl: row.get::<usize, String>(4)? == "true",
+                no_index: row.get(3)?,
+                allow_crawl: row.get(4)?,
                 created_at: row.get(5)?,
                 updated_at: row.get(6)?,
             })
@@ -103,12 +96,7 @@ impl ResourceRule {
         db.execute(
             "INSERT INTO resource_rules (domain, rule, no_index, allow_crawl)
             VALUES (?1, ?2, ?3, ?4)",
-            [
-                domain,
-                rule,
-                &no_index.to_string(),
-                &allow_crawl.to_string(),
-            ],
+            params![domain, rule, no_index, allow_crawl,],
         )?;
 
         Ok(())
@@ -118,11 +106,11 @@ impl ResourceRule {
         db.execute(
             "INSERT INTO resource_rules (domain, rule, no_index, allow_crawl)
             VALUES (?1, ?2, ?3, ?4)",
-            [
+            params![
                 &rule.domain,
                 &rule.rule.to_string(),
-                &rule.no_index.to_string(),
-                &rule.allow_crawl.to_string(),
+                rule.no_index,
+                rule.allow_crawl,
             ],
         )?;
 
@@ -130,40 +118,27 @@ impl ResourceRule {
     }
 }
 
-/// When a URL was last fetched. Also used as a queue for the indexer to determine
-/// what paths to index next.
-#[derive(Debug)]
-pub struct FetchHistory {
-    /// Arbitrary id for this.
-    id: u64,
-    /// URL fetched.
-    url: Url,
-    /// Hash used to check for changes.
-    hash: u64,
-    /// HTTP status when last fetching this page.
-    status: u8,
-    /// Ignore this URL in the future.
-    no_index: bool,
-    /// When this was first added to our fetch history
-    created_at: DateTime<Utc>,
-    /// When this URL was last fetched.
-    updated_at: DateTime<Utc>,
-}
+#[cfg(test)]
+mod test {
+    use crate::models::ResourceRule;
+    use rusqlite::Connection;
 
-impl FetchHistory {
-    pub fn init_table(db: &Connection) {
-        db.execute(
-            "CREATE TABLE IF NOT EXISTS fetch_history (
-                id INTEGER PRIMARY KEY,
-                url TEXT UNIQUE,
-                hash TEXT,
-                status INTEGER,
-                no_index BOOLEAN,
-                created_at DATETIME,
-                updated_at DATETIME
-            )",
-            [],
-        )
-        .expect("Unable to init `fetch_history` table");
+    #[test]
+    fn test_init() {
+        let db = Connection::open_in_memory().unwrap();
+        ResourceRule::init_table(&db);
+    }
+
+    #[test]
+    fn test_insert() {
+        let db = Connection::open_in_memory().unwrap();
+        ResourceRule::init_table(&db);
+
+        let res = ResourceRule::insert(&db, "oldschool.runescape.wiki", "/", false, true);
+        assert!(res.is_ok());
+
+        let rules =
+            ResourceRule::find(&db, "oldschool.runescape.wiki").expect("Unable to find rules");
+        assert_eq!(rules.len(), 1);
     }
 }

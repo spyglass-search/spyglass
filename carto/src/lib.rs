@@ -1,6 +1,9 @@
+use chrono::prelude::*;
+use chrono::Duration;
 use directories::ProjectDirs;
 use reqwest::StatusCode;
 use rusqlite::{Connection, OpenFlags, Result};
+use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf};
 use url::Url;
 
@@ -8,6 +11,14 @@ pub mod models;
 pub mod robots;
 use models::{FetchHistory, Place, ResourceRule};
 use robots::parse;
+
+// TODO: Make this configurable by domain
+const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
+
+struct CrawlResult {
+    status: u16,
+    content_hash: Option<String>,
+}
 
 pub struct Carto {
     db: Connection,
@@ -42,7 +53,7 @@ impl Carto {
         carto
     }
 
-    async fn crawl(&self, url: &Url) {
+    async fn crawl(&self, url: &Url) -> CrawlResult {
         // Create a data directory for this domain
         let domain = url.host_str().unwrap();
         let domain_dir = self.data_dir.join(domain);
@@ -54,12 +65,27 @@ impl Carto {
         log::info!("Fetching page: {}", url.as_str());
         let res = reqwest::get(url.as_str()).await.unwrap();
         log::info!("Status: {}", res.status());
-        if res.status() == StatusCode::OK {
+        let status = res.status();
+        if status == StatusCode::OK {
             // TODO: Save headers
             // log::info!("Headers:\n{:?}", res.headers());
             let body = res.text().await.unwrap();
             let file_path = domain_dir.join("raw.html");
-            fs::write(file_path, body).expect("Unable to save html");
+            fs::write(file_path, &body).expect("Unable to save html");
+
+            // Hash the body contents
+            let mut hasher = Sha256::new();
+            hasher.update(&body.as_bytes());
+            let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+            return CrawlResult {
+                status: status.as_u16(),
+                content_hash,
+            };
+        }
+
+        CrawlResult {
+            status: status.as_u16(),
+            content_hash: None,
         }
     }
 
@@ -84,7 +110,7 @@ impl Carto {
             }
         }
 
-        // Check path against rules
+        // Check path against rules, if we find any matches that disallow
         for res_rule in rules.iter() {
             if res_rule.rule.is_match(path) && !res_rule.allow_crawl {
                 return Ok(false);
@@ -98,7 +124,19 @@ impl Carto {
     pub async fn fetch(&self, place: &Place) -> Result<(), rusqlite::Error> {
         // Make sure cache directory exists for this domain
         let url = &place.url;
+
         let domain = url.host_str().unwrap();
+        let path = url.path();
+        let url_base = format!("{}{}", domain, path);
+
+        let history = FetchHistory::find(&self.db, &url_base)?;
+        if let Some(history) = history {
+            let since_last_fetch = Utc::now() - history.updated_at;
+            if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
+                log::info!("Recently fetched, skipping");
+                return Ok(());
+            }
+        }
 
         // Check for robots.txt of this domain
         if !self.is_crawl_allowed(domain, url.path()).await? {
@@ -106,7 +144,10 @@ impl Carto {
         }
 
         // Crawl & save the data
-        self.crawl(url).await;
+        let result = self.crawl(url).await;
+        // Update the fetch history for this path
+        log::info!("Updated fetch history");
+        FetchHistory::insert(&self.db, &url_base, result.content_hash, result.status)?;
 
         Ok(())
     }

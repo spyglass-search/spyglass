@@ -3,10 +3,11 @@
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
 ///
+/// TODO: Convert allow/disallow paths into proper regexes.
 use crate::models::ResourceRule;
 use regex::Regex;
 
-const BOT_AGENT_NAME: &'static str = "carto";
+const BOT_AGENT_NAME: &str = "carto";
 
 pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
     let mut rules = Vec::new();
@@ -59,5 +60,4 @@ mod test {
 
         assert_eq!(matches.len(), 37);
     }
-
 }
