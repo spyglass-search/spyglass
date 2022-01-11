@@ -1,5 +1,12 @@
+/// Parse robots.txt blobs
+/// See the following for more details about robots.txt files:
+/// - https://developers.google.com/search/docs/advanced/robots/intro
+/// - https://www.robotstxt.org/robotstxt.html
+///
 use crate::models::ResourceRule;
 use regex::Regex;
+
+const BOT_AGENT_NAME: &'static str = "carto";
 
 pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
     let mut rules = Vec::new();
@@ -12,8 +19,9 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
             user_agent = Some(ua.to_string());
         }
 
+        // A User-Agent will proceded any rules for that domain
         if let Some(user_agent) = &user_agent {
-            if user_agent == "*" || user_agent == "carto" {
+            if user_agent == "*" || user_agent == BOT_AGENT_NAME {
                 if line.starts_with("disallow:") {
                     let regex = line.strip_prefix("disallow:").unwrap().trim();
                     if let Ok(regex) = Regex::new(regex) {
@@ -30,4 +38,26 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
     }
 
     rules
+}
+
+#[cfg(test)]
+mod test {
+    use crate::robots::parse;
+
+    #[test]
+    fn test_parse() {
+        let robots_txt = include_str!("../../fixtures/robots.txt");
+        let matches = parse("oldschool.runescape.wiki", robots_txt);
+
+        assert_eq!(matches.len(), 59);
+    }
+
+    #[test]
+    fn test_parse_with_blanks() {
+        let robots_txt = include_str!("../../fixtures/robots_2.txt");
+        let matches = parse("www.reddit.com", robots_txt);
+
+        assert_eq!(matches.len(), 37);
+    }
+
 }
