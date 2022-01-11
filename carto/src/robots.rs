@@ -54,10 +54,18 @@ mod test {
     }
 
     #[test]
-    fn test_parse_with_blanks() {
+    fn test_parse_large() {
         let robots_txt = include_str!("../../fixtures/robots_2.txt");
         let matches = parse("www.reddit.com", robots_txt);
 
         assert_eq!(matches.len(), 37);
+    }
+
+    #[test]
+    fn test_parse_blanks() {
+        let robots_txt = include_str!("../../fixtures/robots_crates_io.txt");
+        let matches = parse("crates.io", robots_txt);
+
+        assert_eq!(matches.len(), 1);
     }
 }
