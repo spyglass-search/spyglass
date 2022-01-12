@@ -2,13 +2,6 @@
 
 use chrono::prelude::*;
 use rusqlite::{params, Connection};
-use url::Url;
-
-#[derive(Debug)]
-pub struct Place {
-    pub id: i32,
-    pub url: Url,
-}
 
 /// When a URL was last fetched. Also used as a queue for the indexer to determine
 /// what paths to index next.

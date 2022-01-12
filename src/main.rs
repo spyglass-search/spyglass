@@ -1,8 +1,7 @@
-use rusqlite::{params, Connection, OpenFlags, Result};
+use rusqlite::Result;
 use simple_logger::SimpleLogger;
-use url::Url;
 
-use carto::{models::Place, Carto};
+use carto::Carto;
 
 mod config;
 mod importer;
@@ -22,29 +21,14 @@ async fn main() -> Result<()> {
     log::info!("config: {:?}", config);
 
     // Initialize crawler
-    let carto = Carto::init();
+    let carto = Carto::init(&config.data_dir);
 
-    // Detect profiles, do we need to import data?
+    // Import data from Firefox
+    // TODO: Ask user what browser/profiles to import on first startup.
     let importer = FirefoxImporter::new(&config);
-    if let Ok(db_path) = importer.import() {
-        let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        println!("Connected to db...");
+    let _ = importer.import(&carto);
 
-        let mut stmt = conn.prepare("SELECT id, url FROM moz_places where hidden = 0 LIMIT 1")?;
-        let place_iter = stmt.query_map(params![], |row| {
-            let url_str: String = row.get(1)?;
-            let url = Url::parse(&url_str).unwrap();
-            Ok(Place {
-                id: row.get(0)?,
-                url,
-            })
-        })?;
-
-        for place in place_iter {
-            let place = place.unwrap();
-            carto.fetch(&place).await.expect("unable to fetch");
-        }
-    }
+    carto.run().await;
 
     Ok(())
 }

@@ -1,5 +1,8 @@
 use dirs::home_dir;
 use std::{env, fs, io, path::PathBuf};
+use rusqlite::{params, Connection, OpenFlags, Result};
+
+use carto::Carto;
 
 use crate::config::Config;
 
@@ -49,13 +52,43 @@ impl FirefoxImporter {
         path_results
     }
 
-    pub fn import(&self) -> Result<PathBuf, io::Error> {
+    /// Add Firefox history into our crawl queue.
+    fn copy_history(&self, carto: &Carto) -> Result<(), rusqlite::Error> {
+        log::info!("Importing history");
+
+        let conn = Connection::open_with_flags(&self.imported_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let mut stmt = conn.prepare(
+            "SELECT id, url
+                FROM moz_places
+                WHERE hidden = 0
+                ORDER BY visit_count DESC"
+        )?;
+
+        let mapped_rows = stmt.query_map(params![], |row| {
+            let url: String = row.get(1)?;
+            Ok(url)
+        })?;
+
+        let mut count = 0;
+        for row in mapped_rows {
+            let row = row.unwrap();
+            carto.enqueue(&row)?;
+            count += 1;
+        }
+
+        log::info!("imported {} urls", count);
+
+        Ok(())
+    }
+
+    pub fn import(&self, carto: &Carto) -> Result<PathBuf, io::Error> {
         let profiles = self.detect_profiles();
         let path = profiles.first().expect("No Firefox history detected");
 
         // TODO: Check when the file was last updated and copy if newer.
         if !self.imported_path.exists() {
             fs::copy(path, &self.imported_path)?;
+            self.copy_history(carto).unwrap();
         }
 
         Ok(self.imported_path.clone())
@@ -64,11 +97,13 @@ impl FirefoxImporter {
 
 #[cfg(test)]
 mod test {
+    use crate::config::Config;
     use crate::importer::FirefoxImporter;
 
     #[test]
     fn test_detect_profiles() {
-        let importer = FirefoxImporter::new();
+        let config = Config::new();
+        let importer = FirefoxImporter::new(&config);
         let profiles = importer.detect_profiles();
         assert!(profiles.len() > 0);
     }

@@ -1,15 +1,15 @@
 use chrono::prelude::*;
 use chrono::Duration;
-use directories::ProjectDirs;
 use reqwest::StatusCode;
 use rusqlite::{Connection, OpenFlags, Result};
 use sha2::{Digest, Sha256};
-use std::{fs, path::PathBuf};
+use std::{fs, path::{Path, PathBuf}};
+use tokio::time::sleep;
 use url::Url;
 
 pub mod models;
 pub mod robots;
-use models::{FetchHistory, Place, ResourceRule};
+use models::{CrawlQueue, FetchHistory, ResourceRule};
 use robots::parse;
 
 // TODO: Make this configurable by domain
@@ -22,32 +22,29 @@ struct CrawlResult {
 
 pub struct Carto {
     db: Connection,
-    data_dir: PathBuf,
+    crawl_dir: PathBuf,
 }
 
 impl Carto {
+    /// Initialize db tables
     pub fn init_db(&self) {
-        // Initialize robots table
+        CrawlQueue::init_table(&self.db);
         ResourceRule::init_table(&self.db);
-        // Initialize fetch history table
         FetchHistory::init_table(&self.db);
     }
 
-    pub fn init() -> Self {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
-        let data_dir = proj_dirs.data_dir().join("crawls");
-
+    pub fn init(data_dir: &Path) -> Self {
+        let crawl_dir = data_dir.join("crawls");
         fs::create_dir_all(&data_dir).expect("Unable to create crawl folder");
 
-        let db_path = proj_dirs.data_dir().join("db.sqlite");
-        dbg!(&db_path);
+        let db_path = data_dir.join("db.sqlite");
         let db = Connection::open_with_flags(
             &db_path,
             OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
         )
         .unwrap();
 
-        let carto = Carto { db, data_dir };
+        let carto = Carto { db, crawl_dir };
         carto.init_db();
 
         carto
@@ -56,7 +53,7 @@ impl Carto {
     async fn crawl(&self, url: &Url) -> CrawlResult {
         // Create a data directory for this domain
         let domain = url.host_str().unwrap();
-        let domain_dir = self.data_dir.join(domain);
+        let domain_dir = self.crawl_dir.join(domain);
         if !domain_dir.exists() {
             fs::create_dir(&domain_dir).expect("Unable to create dir");
         }
@@ -120,10 +117,15 @@ impl Carto {
         Ok(true)
     }
 
+    /// Add url to the crawl queue
+    pub fn enqueue(&self, url: &str) -> Result<(), rusqlite::Error> {
+        CrawlQueue::insert(&self.db, url)
+    }
+
     // TODO: Load web indexing as a plugin?
-    pub async fn fetch(&self, place: &Place) -> Result<(), rusqlite::Error> {
+    pub async fn fetch(&self, url: &str) -> Result<(), rusqlite::Error> {
         // Make sure cache directory exists for this domain
-        let url = &place.url;
+        let url = Url::parse(url).unwrap();
 
         let domain = url.host_str().unwrap();
         let path = url.path();
@@ -144,11 +146,26 @@ impl Carto {
         }
 
         // Crawl & save the data
-        let result = self.crawl(url).await;
+        let result = self.crawl(&url).await;
         // Update the fetch history for this path
         log::info!("Updated fetch history");
         FetchHistory::insert(&self.db, &url_base, result.content_hash, result.status)?;
 
         Ok(())
+    }
+
+    pub async fn run(&self) {
+        log::info!("crawler running");
+        loop {
+            log::info!("Checking for expired/new fetches");
+            for _ in 0..1 {
+                let _ = self.fetch("https://oldschool.runescape.wiki").await;
+                // tokio::spawn(async move {
+                //     self.fetch("https://oldschool.runescape.wiki");
+                // });
+            }
+
+            sleep(tokio::time::Duration::from_millis(1000)).await;
+        }
     }
 }
