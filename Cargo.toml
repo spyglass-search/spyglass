@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 
 [dependencies]
+anyhow = "1.0"
 chrono = "0.4"
 digest = "0.10"
 directories = "4.0"
@@ -13,8 +14,8 @@ hex = "0.4"
 log = "0.4"
 regex = "1"
 reqwest = "0.11"
-rusqlite = { version = "0.26", features = ["chrono"] }
 sha2 = "0.10"
 simple_logger = "1.16"
+sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono"] }
 tokio = { version = "1", features = ["full"] }
 url = "2.2"

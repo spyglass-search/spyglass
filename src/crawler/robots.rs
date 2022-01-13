@@ -43,7 +43,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
 
 #[cfg(test)]
 mod test {
-    use crate::robots::parse;
+    use crate::crawler::robots::parse;
 
     #[test]
     fn test_parse() {

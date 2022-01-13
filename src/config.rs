@@ -21,7 +21,7 @@ impl Config {
 
         Config {
             data_dir: data_dir.to_path_buf(),
-            prefs_dir: prefs_dir.to_path_buf()
+            prefs_dir: prefs_dir.to_path_buf(),
         }
     }
 }

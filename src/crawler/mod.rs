@@ -1,14 +1,17 @@
 use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::StatusCode;
-use rusqlite::{Connection, OpenFlags, Result};
 use sha2::{Digest, Sha256};
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use tokio::time::sleep;
 use url::Url;
 
 pub mod robots;
-use crate::models::{CrawlQueue, FetchHistory, ResourceRule};
+
+use crate::models::{CrawlQueue, DbPool, FetchHistory, ResourceRule};
 use robots::parse;
 
 // TODO: Make this configurable by domain
@@ -20,31 +23,27 @@ struct CrawlResult {
 }
 
 pub struct Carto {
-    db: Connection,
+    db: DbPool,
     crawl_dir: PathBuf,
 }
 
 impl Carto {
     /// Initialize db tables
-    pub fn init_db(&self) {
-        CrawlQueue::init_table(&self.db);
-        ResourceRule::init_table(&self.db);
-        FetchHistory::init_table(&self.db);
+    pub async fn init_db(&self) {
+        CrawlQueue::init_table(&self.db).await.unwrap();
+        ResourceRule::init_table(&self.db).await.unwrap();
+        FetchHistory::init_table(&self.db).await.unwrap();
     }
 
-    pub fn init(data_dir: &Path) -> Self {
+    pub async fn init(data_dir: &Path, db: &DbPool) -> Self {
         let crawl_dir = data_dir.join("crawls");
         fs::create_dir_all(&data_dir).expect("Unable to create crawl folder");
 
-        let db_path = data_dir.join("db.sqlite");
-        let db = Connection::open_with_flags(
-            &db_path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
-        )
-        .unwrap();
-
-        let carto = Carto { db, crawl_dir };
-        carto.init_db();
+        let carto = Carto {
+            db: db.clone(),
+            crawl_dir,
+        };
+        carto.init_db().await;
 
         carto
     }
@@ -86,8 +85,8 @@ impl Carto {
     }
 
     /// Checks whether we're allow to crawl this domain + path
-    async fn is_crawl_allowed(&self, domain: &str, path: &str) -> Result<bool, rusqlite::Error> {
-        let mut rules = ResourceRule::find(&self.db, domain)?;
+    async fn is_crawl_allowed(&self, domain: &str, path: &str) -> anyhow::Result<bool> {
+        let mut rules = ResourceRule::find(&self.db, domain).await?;
         log::info!("Found {} rules", rules.len());
 
         if rules.is_empty() {
@@ -101,7 +100,7 @@ impl Carto {
                 log::info!("Found {} rules", rules.len());
 
                 for rule in rules.iter() {
-                    ResourceRule::insert_rule(&self.db, rule)?;
+                    ResourceRule::insert_rule(&self.db, rule).await?;
                 }
             }
         }
@@ -117,12 +116,12 @@ impl Carto {
     }
 
     /// Add url to the crawl queue
-    pub fn enqueue(&self, url: &str) -> Result<(), rusqlite::Error> {
-        CrawlQueue::insert(&self.db, url)
+    pub async fn enqueue(&self, url: &str) -> anyhow::Result<(), sqlx::Error> {
+        CrawlQueue::insert(&self.db, url).await
     }
 
     // TODO: Load web indexing as a plugin?
-    pub async fn fetch(&self, url: &str) -> Result<(), rusqlite::Error> {
+    pub async fn fetch(&self, url: &str) -> anyhow::Result<()> {
         // Make sure cache directory exists for this domain
         let url = Url::parse(url).unwrap();
 
@@ -130,7 +129,7 @@ impl Carto {
         let path = url.path();
         let url_base = format!("{}{}", domain, path);
 
-        let history = FetchHistory::find(&self.db, &url_base)?;
+        let history = FetchHistory::find(&self.db, &url_base).await?;
         if let Some(history) = history {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
@@ -148,7 +147,7 @@ impl Carto {
         let result = self.crawl(&url).await;
         // Update the fetch history for this path
         log::info!("Updated fetch history");
-        FetchHistory::insert(&self.db, &url_base, result.content_hash, result.status)?;
+        FetchHistory::insert(&self.db, &url_base, result.content_hash, result.status).await?;
 
         Ok(())
     }

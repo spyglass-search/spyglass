@@ -1,6 +1,6 @@
 use dirs::home_dir;
-use std::{env, fs, io, path::PathBuf};
-use rusqlite::{params, Connection, OpenFlags, Result};
+use sqlx::sqlite::SqlitePoolOptions;
+use std::{env, fs, path::PathBuf};
 
 use crate::config::Config;
 use crate::crawler::Carto;
@@ -9,7 +9,6 @@ pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,
     pub imported_path: PathBuf,
 }
-
 
 impl FirefoxImporter {
     /// Get the default profile path for Firefox
@@ -32,7 +31,10 @@ impl FirefoxImporter {
         }
 
         let imported_path = config.data_dir.join("firefox.sqlite");
-        FirefoxImporter { profile_path, imported_path }
+        FirefoxImporter {
+            profile_path,
+            imported_path,
+        }
     }
 
     pub fn detect_profiles(&self) -> Vec<PathBuf> {
@@ -52,26 +54,28 @@ impl FirefoxImporter {
     }
 
     /// Add Firefox history into our crawl queue.
-    fn copy_history(&self, carto: &Carto) -> Result<(), rusqlite::Error> {
+    async fn copy_history(&self, carto: &Carto) -> anyhow::Result<()> {
         log::info!("Importing history");
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect(&format!(
+                "sqlite://{}",
+                self.imported_path.to_str().unwrap()
+            ))
+            .await?;
 
-        let conn = Connection::open_with_flags(&self.imported_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        let mut stmt = conn.prepare(
+        let rows: Vec<(i64, String)> = sqlx::query_as(
             "SELECT id, url
                 FROM moz_places
                 WHERE hidden = 0
-                ORDER BY visit_count DESC"
-        )?;
-
-        let mapped_rows = stmt.query_map(params![], |row| {
-            let url: String = row.get(1)?;
-            Ok(url)
-        })?;
+                ORDER BY visit_count DESC",
+        )
+        .fetch_all(&pool)
+        .await?;
 
         let mut count = 0;
-        for row in mapped_rows {
-            let row = row.unwrap();
-            carto.enqueue(&row)?;
+        for (_, url) in rows.iter() {
+            carto.enqueue(url).await?;
             count += 1;
         }
 
@@ -80,14 +84,14 @@ impl FirefoxImporter {
         Ok(())
     }
 
-    pub fn import(&self, carto: &Carto) -> Result<PathBuf, io::Error> {
+    pub async fn import(&self, carto: &Carto) -> anyhow::Result<PathBuf> {
         let profiles = self.detect_profiles();
         let path = profiles.first().expect("No Firefox history detected");
 
         // TODO: Check when the file was last updated and copy if newer.
         if !self.imported_path.exists() {
             fs::copy(path, &self.imported_path)?;
-            self.copy_history(carto).unwrap();
+            self.copy_history(carto).await?;
         }
 
         Ok(self.imported_path.clone())

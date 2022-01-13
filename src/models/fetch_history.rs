@@ -1,14 +1,16 @@
 #![allow(dead_code)]
-
 use chrono::prelude::*;
-use rusqlite::{params, Connection};
+use sqlx::sqlite::SqliteRow;
+use sqlx::Row;
+
+use crate::models::DbPool;
 
 /// When a URL was last fetched. Also used as a queue for the indexer to determine
 /// what paths to index next.
 #[derive(Debug)]
 pub struct FetchHistory {
     /// Arbitrary id for this.
-    pub id: Option<u64>,
+    pub id: Option<i64>,
     /// URL fetched.
     pub url: String,
     /// Hash used to check for changes.
@@ -24,8 +26,10 @@ pub struct FetchHistory {
 }
 
 impl FetchHistory {
-    pub fn init_table(db: &Connection) {
-        db.execute(
+    pub async fn init_table(db: &DbPool) -> anyhow::Result<(), sqlx::Error> {
+        let mut conn = db.acquire().await?;
+
+        sqlx::query(
             "CREATE TABLE IF NOT EXISTS fetch_history (
                 id INTEGER PRIMARY KEY,
                 url TEXT UNIQUE,
@@ -35,13 +39,17 @@ impl FetchHistory {
                 created_at DATETIME default CURRENT_TIMESTAMP,
                 updated_at DATETIME default CURRENT_TIMESTAMP
             )",
-            [],
         )
-        .expect("Unable to init `fetch_history` table");
+        .execute(&mut conn)
+        .await?;
+
+        Ok(())
     }
 
-    pub fn find(db: &Connection, url: &str) -> Result<Option<FetchHistory>, rusqlite::Error> {
-        let mut stmt = db.prepare(
+    pub async fn find(db: &DbPool, url: &str) -> anyhow::Result<Option<FetchHistory>, sqlx::Error> {
+        let mut conn = db.acquire().await?;
+
+        let row: Option<SqliteRow> = sqlx::query(
             "SELECT
                 id,
                 url,
@@ -51,42 +59,49 @@ impl FetchHistory {
                 created_at,
                 updated_at
                 FROM fetch_history WHERE url = ?",
-        )?;
+        )
+        .bind(url)
+        .fetch_optional(&mut conn)
+        .await?;
 
-        if !stmt.exists(params![url])? {
-            return Ok(None);
+        if let Some(row) = row {
+            return Ok(Some(FetchHistory {
+                id: row.get::<Option<i64>, _>(0),
+                url: row.get::<String, _>(1),
+                hash: row.get::<Option<String>, _>(2),
+                status: row.get::<u16, _>(3),
+                no_index: row.get(4),
+                created_at: row.get(5),
+                updated_at: row.get(6),
+            }));
         }
 
-        let row = stmt.query_row(params![url], |row| {
-            Ok(FetchHistory {
-                id: Some(row.get(0)?),
-                url: row.get(1)?,
-                hash: row.get(2)?,
-                status: row.get(3)?,
-                no_index: row.get(4)?,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
-            })
-        })?;
-
-        Ok(Some(row))
+        Ok(None)
     }
 
-    pub fn insert(
-        db: &Connection,
+    pub async fn insert(
+        db: &DbPool,
         url: &str,
         hash: Option<String>,
         status: u16,
-    ) -> Result<(), rusqlite::Error> {
-        db.execute(
+    ) -> anyhow::Result<(), sqlx::Error> {
+        let mut conn = db.acquire().await?;
+
+        sqlx::query(
             "INSERT INTO fetch_history (url, hash, status, no_index)
-                VALUES (?1, ?2, ?3, ?4)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     updated_at = CURRENT_TIMESTAMP,
-                    hash = ?2
+                    hash = ?
                 ",
-            params![url, hash, status, false],
-        )?;
+        )
+        .bind(url)
+        .bind(&hash)
+        .bind(status)
+        .bind(false)
+        .bind(&hash)
+        .execute(&mut conn)
+        .await?;
 
         Ok(())
     }
@@ -94,25 +109,27 @@ impl FetchHistory {
 
 #[cfg(test)]
 mod test {
-    use crate::models::FetchHistory;
-    use rusqlite::Connection;
+    use crate::config::Config;
+    use crate::models::{create_connection, FetchHistory};
+    use std::path::Path;
 
-    #[test]
-    fn test_init() {
-        let db = Connection::open_in_memory().unwrap();
-        FetchHistory::init_table(&db);
-    }
+    #[tokio::test]
+    async fn test_insert() {
+        let config = Config {
+            data_dir: Path::new("/tmp").to_path_buf(),
+            prefs_dir: Path::new("/tmp").to_path_buf(),
+        };
 
-    #[test]
-    fn test_insert() {
-        let db = Connection::open_in_memory().unwrap();
-        FetchHistory::init_table(&db);
+        let db = create_connection(&config).await.unwrap();
+        FetchHistory::init_table(&db).await.unwrap();
 
         let hash = "this is a hash".to_string();
-        FetchHistory::insert(&db, "oldschool.runescape.wiki/", Some(hash.clone()), 200).unwrap();
+        FetchHistory::insert(&db, "oldschool.runescape.wiki/", Some(hash.clone()), 200)
+            .await
+            .unwrap();
 
         let url = "oldschool.runescape.wiki/";
-        let history = FetchHistory::find(&db, url).unwrap().unwrap();
+        let history = FetchHistory::find(&db, url).await.unwrap().unwrap();
         assert_eq!(history.url, url);
         assert_eq!(history.hash.unwrap(), hash);
     }
