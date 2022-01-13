@@ -1,11 +1,13 @@
 use rusqlite::Result;
 use simple_logger::SimpleLogger;
 
-use carto::Carto;
-
 mod config;
+mod crawler;
 mod importer;
+mod models;
+
 use crate::config::Config;
+use crate::crawler::Carto;
 use crate::importer::FirefoxImporter;
 
 #[tokio::main]

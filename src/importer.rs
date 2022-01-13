@@ -2,9 +2,8 @@ use dirs::home_dir;
 use std::{env, fs, io, path::PathBuf};
 use rusqlite::{params, Connection, OpenFlags, Result};
 
-use carto::Carto;
-
 use crate::config::Config;
+use crate::crawler::Carto;
 
 pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,

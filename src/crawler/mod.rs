@@ -7,9 +7,8 @@ use std::{fs, path::{Path, PathBuf}};
 use tokio::time::sleep;
 use url::Url;
 
-pub mod models;
 pub mod robots;
-use models::{CrawlQueue, FetchHistory, ResourceRule};
+use crate::models::{CrawlQueue, FetchHistory, ResourceRule};
 use robots::parse;
 
 // TODO: Make this configurable by domain
