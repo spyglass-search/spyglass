@@ -1,4 +1,6 @@
 use chrono::prelude::*;
+use sqlx::sqlite::SqliteRow;
+use sqlx::Row;
 
 use crate::models::DbPool;
 
@@ -36,5 +38,29 @@ impl CrawlQueue {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn next(db: &DbPool) -> anyhow::Result<Option<String>, sqlx::Error> {
+        let mut conn = db.begin().await?;
+        let row: Option<SqliteRow> =
+            sqlx::query("SELECT id, url FROM crawl_queue ORDER BY created_at ASC LIMIT 1")
+                .fetch_optional(&mut conn)
+                .await?;
+
+        if let Some(row) = row {
+            let id: i64 = row.get(0);
+            let url: String = row.get(1);
+
+            sqlx::query("DELETE FROM crawl_queue WHERE id = ?")
+                .bind(id)
+                .execute(&mut conn)
+                .await?;
+
+            conn.commit().await?;
+            return Ok(Some(url));
+        }
+
+        conn.commit().await?;
+        Ok(None)
     }
 }

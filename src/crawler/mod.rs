@@ -2,16 +2,14 @@ use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
-use tokio::time::sleep;
+use std::fs;
 use url::Url;
 
 pub mod robots;
 
 use crate::models::{CrawlQueue, DbPool, FetchHistory, ResourceRule};
+use crate::state::AppState;
+
 use robots::parse;
 
 // TODO: Make this configurable by domain
@@ -22,36 +20,14 @@ struct CrawlResult {
     content_hash: Option<String>,
 }
 
-pub struct Carto {
-    db: DbPool,
-    crawl_dir: PathBuf,
-}
+#[derive(Copy, Clone)]
+pub struct Carto;
 
 impl Carto {
-    /// Initialize db tables
-    pub async fn init_db(&self) {
-        CrawlQueue::init_table(&self.db).await.unwrap();
-        ResourceRule::init_table(&self.db).await.unwrap();
-        FetchHistory::init_table(&self.db).await.unwrap();
-    }
-
-    pub async fn init(data_dir: &Path, db: &DbPool) -> Self {
-        let crawl_dir = data_dir.join("crawls");
-        fs::create_dir_all(&data_dir).expect("Unable to create crawl folder");
-
-        let carto = Carto {
-            db: db.clone(),
-            crawl_dir,
-        };
-        carto.init_db().await;
-
-        carto
-    }
-
-    async fn crawl(&self, url: &Url) -> CrawlResult {
+    async fn crawl(url: &Url) -> CrawlResult {
         // Create a data directory for this domain
         let domain = url.host_str().unwrap();
-        let domain_dir = self.crawl_dir.join(domain);
+        let domain_dir = AppState::crawl_dir().join(domain);
         if !domain_dir.exists() {
             fs::create_dir(&domain_dir).expect("Unable to create dir");
         }
@@ -85,8 +61,8 @@ impl Carto {
     }
 
     /// Checks whether we're allow to crawl this domain + path
-    async fn is_crawl_allowed(&self, domain: &str, path: &str) -> anyhow::Result<bool> {
-        let mut rules = ResourceRule::find(&self.db, domain).await?;
+    async fn is_crawl_allowed(db: &DbPool, domain: &str, path: &str) -> anyhow::Result<bool> {
+        let mut rules = ResourceRule::find(db, domain).await?;
         log::info!("Found {} rules", rules.len());
 
         if rules.is_empty() {
@@ -100,7 +76,7 @@ impl Carto {
                 log::info!("Found {} rules", rules.len());
 
                 for rule in rules.iter() {
-                    ResourceRule::insert_rule(&self.db, rule).await?;
+                    ResourceRule::insert_rule(db, rule).await?;
                 }
             }
         }
@@ -116,12 +92,14 @@ impl Carto {
     }
 
     /// Add url to the crawl queue
-    pub async fn enqueue(&self, url: &str) -> anyhow::Result<(), sqlx::Error> {
-        CrawlQueue::insert(&self.db, url).await
+    pub async fn enqueue(db: &DbPool, url: &str) -> anyhow::Result<(), sqlx::Error> {
+        CrawlQueue::insert(db, url).await
     }
 
     // TODO: Load web indexing as a plugin?
-    pub async fn fetch(&self, url: &str) -> anyhow::Result<()> {
+    pub async fn fetch(db: &DbPool, url: &str) -> anyhow::Result<()> {
+        log::info!("Fetching URL: {:?}", url);
+
         // Make sure cache directory exists for this domain
         let url = Url::parse(url).unwrap();
 
@@ -129,7 +107,7 @@ impl Carto {
         let path = url.path();
         let url_base = format!("{}{}", domain, path);
 
-        let history = FetchHistory::find(&self.db, &url_base).await?;
+        let history = FetchHistory::find(db, &url_base).await?;
         if let Some(history) = history {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
@@ -139,31 +117,16 @@ impl Carto {
         }
 
         // Check for robots.txt of this domain
-        if !self.is_crawl_allowed(domain, url.path()).await? {
+        if !Carto::is_crawl_allowed(db, domain, url.path()).await? {
             return Ok(());
         }
 
         // Crawl & save the data
-        let result = self.crawl(&url).await;
+        let result = Carto::crawl(&url).await;
         // Update the fetch history for this path
         log::info!("Updated fetch history");
-        FetchHistory::insert(&self.db, &url_base, result.content_hash, result.status).await?;
+        FetchHistory::insert(db, &url_base, result.content_hash, result.status).await?;
 
         Ok(())
-    }
-
-    pub async fn run(&self) {
-        log::info!("crawler running");
-        loop {
-            log::info!("Checking for expired/new fetches");
-            for _ in 0..1 {
-                let _ = self.fetch("https://oldschool.runescape.wiki").await;
-                // tokio::spawn(async move {
-                //     self.fetch("https://oldschool.runescape.wiki");
-                // });
-            }
-
-            sleep(tokio::time::Duration::from_millis(1000)).await;
-        }
     }
 }

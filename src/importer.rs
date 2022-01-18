@@ -4,6 +4,7 @@ use std::{env, fs, path::PathBuf};
 
 use crate::config::Config;
 use crate::crawler::Carto;
+use crate::state::AppState;
 
 pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,
@@ -54,7 +55,7 @@ impl FirefoxImporter {
     }
 
     /// Add Firefox history into our crawl queue.
-    async fn copy_history(&self, carto: &Carto) -> anyhow::Result<()> {
+    async fn copy_history(&self, state: &AppState) -> anyhow::Result<()> {
         log::info!("Importing history");
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
@@ -75,7 +76,7 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            carto.enqueue(url).await?;
+            Carto::enqueue(&state.conn, url).await?;
             count += 1;
         }
 
@@ -84,14 +85,14 @@ impl FirefoxImporter {
         Ok(())
     }
 
-    pub async fn import(&self, carto: &Carto) -> anyhow::Result<PathBuf> {
+    pub async fn import(&self, state: &AppState) -> anyhow::Result<PathBuf> {
         let profiles = self.detect_profiles();
         let path = profiles.first().expect("No Firefox history detected");
 
         // TODO: Check when the file was last updated and copy if newer.
         if !self.imported_path.exists() {
             fs::copy(path, &self.imported_path)?;
-            self.copy_history(carto).await?;
+            self.copy_history(state).await?;
         }
 
         Ok(self.imported_path.clone())
