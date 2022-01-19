@@ -22,6 +22,7 @@ async fn main() {
     // Initialize logging system
     SimpleLogger::new()
         .with_level(log::LevelFilter::Info)
+        .with_module_level("sqlx::query", log::LevelFilter::Warn)
         .with_utc_timestamps()
         .init()
         .unwrap();
@@ -63,6 +64,8 @@ async fn main() {
                     eprintln!("connection task shutdown");
                     return;
                 }
+            } else {
+                log::info!("nothing to crawl");
             }
 
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
