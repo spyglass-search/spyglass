@@ -5,6 +5,7 @@ mod config;
 mod crawler;
 mod importer;
 mod models;
+mod scraper;
 mod state;
 
 use crate::crawler::Carto;
