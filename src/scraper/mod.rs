@@ -1,21 +1,21 @@
-use scraper::{Html, Selector};
+mod element;
+mod html;
+
+use crate::scraper::html::Html;
 
 fn html_to_text(doc: &str) {
-    let parsed = Html::parse_document(doc);
-    let selector = Selector::parse("body").unwrap();
-
-    let root = parsed.select(&selector).next().unwrap();
-
-    for node in root.text() {
-        let stripped = node.trim();
-        if stripped.is_empty() {
-            continue;
-        }
-
-        println!("{}", stripped);
-    }
+    let parsed = Html::parse(doc);
 }
 
+/// # fn main() {
+/// # let document = "";
+/// use html5ever::driver::{self, ParseOpts};
+/// use scraper::Html;
+/// use tendril::TendrilSink;
+///
+/// let parser = driver::parse_document(Html::new_document(), ParseOpts::default());
+/// let html = parser.one(document);
+/// # }
 #[cfg(test)]
 mod test {
     use crate::scraper::html_to_text;

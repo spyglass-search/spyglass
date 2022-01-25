@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate html5ever;
+
 use simple_logger::SimpleLogger;
 use tokio::sync::mpsc;
 
