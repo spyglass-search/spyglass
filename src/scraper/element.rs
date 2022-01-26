@@ -109,6 +109,20 @@ impl Element {
             attrs,
         }
     }
+
+    pub fn name(&self) -> String {
+        self.name.local.to_string()
+    }
+}
+
+impl fmt::Debug for Element {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "<{}", self.name.local)?;
+        for (key, value) in self.attrs.iter() {
+            write!(f, " {}={:?}", key.local, value)?;
+        }
+        write!(f, ">")
+    }
 }
 
 /// HTML text.
@@ -212,6 +226,20 @@ impl Node {
         match *self {
             Node::ProcessingInstruction(ref pi) => Some(pi),
             _ => None,
+        }
+    }
+}
+
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            Node::Document => write!(f, "Document"),
+            Node::Fragment => write!(f, "Fragment"),
+            Node::Doctype(ref d) => write!(f, "Doctype({:?})", d),
+            Node::Comment(ref c) => write!(f, "Comment({:?})", c),
+            Node::Text(ref t) => write!(f, "Text({:?})", t),
+            Node::Element(ref e) => write!(f, "Element({:?})", e),
+            Node::ProcessingInstruction(ref pi) => write!(f, "ProcessingInstruction({:?})", pi),
         }
     }
 }

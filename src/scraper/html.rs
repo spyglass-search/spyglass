@@ -27,18 +27,19 @@ impl Html {
 
     pub fn parse(html: &str) -> Self {
         let parser = driver::parse_document(Self::new(), ParseOpts::default());
-
         parser.one(html)
     }
 }
 
 /// Note: does not support the `<template>` element.
 impl TreeSink for Html {
-    type Output = Self;
+    // A reference to a DOM node.
     type Handle = NodeId;
+    // Overall result of parsing
+    type Output = Self;
 
+    // Consume this sink and return the overall result of parsing
     fn finish(self) -> Self {
-        println!("parse finished");
         self
     }
 
@@ -91,7 +92,6 @@ impl TreeSink for Html {
             .tree
             .orphan(Node::Element(Element::new(name.clone(), attrs)));
 
-        println!("creating element: {:?}", name);
         if name.expanded() == expanded_name!(html "template") {
             node.append(Node::Fragment);
         }
@@ -133,6 +133,11 @@ impl TreeSink for Html {
             }
 
             NodeOrText::AppendText(text) => {
+                // Skip over whitespace nodes
+                if text.trim().is_empty() {
+                    return;
+                }
+
                 let can_concat = parent
                     .last_child()
                     .map_or(false, |mut n| n.value().is_text());
