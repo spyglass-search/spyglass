@@ -9,6 +9,7 @@ mod crawler;
 mod importer;
 mod models;
 mod scraper;
+mod search;
 mod state;
 
 use crate::crawler::Carto;

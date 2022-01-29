@@ -21,8 +21,13 @@ impl AppState {
         Config::data_dir().join("crawls")
     }
 
+    pub fn index_dir() -> PathBuf {
+        Config::data_dir().join("index")
+    }
+
     pub async fn init_data_folders(&self) {
         fs::create_dir_all(AppState::crawl_dir()).expect("Unable to create crawl folder");
+        fs::create_dir_all(AppState::index_dir()).expect("Unable to create index folder");
     }
 
     pub async fn new() -> Self {

@@ -1,8 +1,8 @@
 mod element;
 mod html;
 
-use std::collections::HashSet;
 use ego_tree::NodeRef;
+use std::collections::HashSet;
 
 use crate::scraper::element::Node;
 use crate::scraper::html::Html;
@@ -13,7 +13,7 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, ignore_list: &HashS
         let node = child.value();
         if node.is_text() {
             println!("{}", node.as_text().unwrap().to_string());
-            doc.push_str("\n");
+            doc.push('\n');
             doc.push_str(node.as_text().unwrap());
         } else if child.has_children() && node.is_element() {
             // Ignore certain elements
@@ -32,18 +32,16 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, ignore_list: &HashS
 /// Filters a DOM tree into a text document used for indexing
 fn html_to_text(doc: &str) -> String {
     // TODO: move to config file? turn into a whitelist?
-    let ignore_list = HashSet::from(
-        [
-            // TODO: Parse meta tags
-            "head".into(),
-            // Ignore elements that often don't cantain relevant info
-            "header".into(),
-            "footer".into(),
-            "nav".into(),
-            "script".into(),
-            "noscript".into()
-        ]
-    );
+    let ignore_list = HashSet::from([
+        // TODO: Parse meta tags
+        "head".into(),
+        // Ignore elements that often don't cantain relevant info
+        "header".into(),
+        "footer".into(),
+        "nav".into(),
+        "script".into(),
+        "noscript".into(),
+    ]);
 
     let parsed = Html::parse(doc);
     let root = parsed.tree.root();
