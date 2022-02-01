@@ -3,10 +3,12 @@ use std::path::PathBuf;
 
 use crate::config::Config;
 use crate::models::{create_connection, CrawlQueue, DbPool, FetchHistory, ResourceRule};
+use crate::search::{IndexPath, Searcher};
 
 pub struct AppState {
     pub conn: DbPool,
     pub config: Config,
+    pub index: Searcher,
 }
 
 impl AppState {
@@ -38,7 +40,13 @@ impl AppState {
             .await
             .expect("Unable to connect to database");
 
-        let app = AppState { conn, config };
+        let index = Searcher::with_index(&IndexPath::LocalPath(Self::index_dir()));
+
+        let app = AppState {
+            conn,
+            config,
+            index,
+        };
         app.init_db().await;
         app.init_data_folders().await;
 

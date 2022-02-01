@@ -1,10 +1,11 @@
 use chrono::prelude::*;
+use serde::Serialize;
 use sqlx::sqlite::SqliteRow;
 use sqlx::Row;
 
 use crate::models::DbPool;
 
-#[derive(Debug, sqlx::Type)]
+#[derive(Debug, Serialize, sqlx::Type)]
 pub enum CrawlStatus {
     Queued,
     Processing,
@@ -12,8 +13,9 @@ pub enum CrawlStatus {
     Failed,
 }
 
+#[derive(Serialize)]
 pub struct CrawlQueue {
-    pub id: Option<u64>,
+    pub id: Option<i64>,
     /// URL to crawl
     pub url: String,
     /// When this was first added to the crawl queue
@@ -49,6 +51,27 @@ impl CrawlQueue {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn list(db: &DbPool) -> anyhow::Result<Vec<CrawlQueue>, sqlx::Error> {
+        let mut conn = db.acquire().await?;
+
+        let results = sqlx::query(
+            "SELECT id, url, status, created_at FROM crawl_queue LIMIT 100"
+        ).fetch_all(&mut conn)
+        .await?;
+
+        let parsed = results
+            .iter()
+            .map(|row| CrawlQueue {
+                id: row.get( 0),
+                url: row.get::<String, _>(1),
+                status: row.get(2),
+                created_at: row.get(3),
+            })
+            .collect();
+
+        Ok(parsed)
     }
 
     pub async fn next(db: &DbPool) -> anyhow::Result<Option<String>, sqlx::Error> {

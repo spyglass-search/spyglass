@@ -6,7 +6,7 @@ authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 
 [dependencies]
 anyhow = "1.0"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 digest = "0.10"
 directories = "4.0"
 dirs = "4.0"
@@ -16,7 +16,8 @@ html5ever = "0.25"
 log = "0.4"
 regex = "1"
 reqwest = "0.11"
-rocket = "0.5.0-rc.1"
+rocket = { version = "0.5.0-rc.1", features = [ "json" ] }
+serde = "1.0"
 sha2 = "0.10"
 simple_logger = "2.1"
 sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono"] }

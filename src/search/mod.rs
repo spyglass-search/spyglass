@@ -17,10 +17,10 @@ pub enum IndexPath {
 }
 
 pub struct Searcher {
-    index: Index,
-    schema: Schema,
-    reader: IndexReader,
-    writer: IndexWriter,
+    pub index: Index,
+    pub schema: Schema,
+    pub reader: IndexReader,
+    pub writer: IndexWriter,
 }
 
 impl Searcher {

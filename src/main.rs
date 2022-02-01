@@ -57,7 +57,7 @@ async fn main() {
     ));
 
     // Gracefully handle shutdowns
-    let server = init_rocket().await;
+    let server = init_rocket(&state.conn, &state.index.reader).await;
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");

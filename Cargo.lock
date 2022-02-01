@@ -189,6 +189,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rocket",
+ "serde",
  "sha2 0.10.1",
  "simple_logger",
  "sqlx",
@@ -225,6 +226,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
+ "serde",
  "time 0.1.44",
  "winapi",
 ]
@@ -1799,6 +1801,7 @@ dependencies = [
  "rocket_codegen",
  "rocket_http",
  "serde",
+ "serde_json",
  "state",
  "tempfile",
  "time 0.2.27",
