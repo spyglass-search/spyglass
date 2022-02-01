@@ -6,7 +6,7 @@ use tantivy::IndexReader;
 
 use crate::models::DbPool;
 
-pub async fn init_rocket(pool: &DbPool, search: &IndexReader) -> rocket::Shutdown {
+pub async fn start_api(pool: &DbPool, search: &IndexReader) -> rocket::Shutdown {
     let config = Config {
         port: 7777,
         ..Config::debug_default()

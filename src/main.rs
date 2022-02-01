@@ -17,8 +17,7 @@ mod search;
 mod state;
 mod task;
 
-use crate::api::init_rocket;
-use crate::crawler::Carto;
+use crate::api::start_api;
 use crate::importer::FirefoxImporter;
 use crate::state::AppState;
 use crate::task::AppShutdown;
@@ -57,7 +56,7 @@ async fn main() {
     ));
 
     // Gracefully handle shutdowns
-    let server = init_rocket(&state.conn, &state.index.reader).await;
+    let server = start_api(&state.conn, &state.index.reader).await;
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");
