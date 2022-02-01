@@ -57,14 +57,19 @@ impl CrawlQueue {
         let mut conn = db.acquire().await?;
 
         let results = sqlx::query(
-            "SELECT id, url, status, created_at FROM crawl_queue LIMIT 100"
-        ).fetch_all(&mut conn)
+            "SELECT
+                id, url, status, created_at
+            FROM crawl_queue
+            ORDER BY created_at ASC
+            LIMIT 100",
+        )
+        .fetch_all(&mut conn)
         .await?;
 
         let parsed = results
             .iter()
             .map(|row| CrawlQueue {
-                id: row.get( 0),
+                id: row.get(0),
                 url: row.get::<String, _>(1),
                 status: row.get(2),
                 created_at: row.get(3),

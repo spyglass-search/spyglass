@@ -1,5 +1,5 @@
-use rocket::serde::Serialize;
 use crate::models::CrawlQueue;
+use rocket::serde::Serialize;
 
 #[derive(Serialize)]
 pub struct ListQueue {

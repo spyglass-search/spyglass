@@ -1,20 +1,39 @@
+use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use rocket::State;
-use rocket::response::status::BadRequest;
+use serde::Deserialize;
 use tantivy::IndexReader;
 
-use crate::models::{CrawlQueue, DbPool};
 use super::response;
+use crate::models::{CrawlQueue, DbPool};
 
 /// Show the list of URLs in the queue and their status
 #[get("/queue")]
-pub async fn list_queue(pool: &State<DbPool>) -> Result<Json<response::ListQueue>, BadRequest<String>> {
-    let queue = CrawlQueue::list(pool)
-        .await;
+pub async fn list_queue(
+    pool: &State<DbPool>,
+) -> Result<Json<response::ListQueue>, BadRequest<String>> {
+    let queue = CrawlQueue::list(pool).await;
 
     match queue {
         Ok(queue) => Ok(Json(response::ListQueue { queue })),
-        Err(err) => Err(BadRequest(Some(err.to_string())))
+        Err(err) => Err(BadRequest(Some(err.to_string()))),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QueueItem<'r> {
+    pub url: &'r str,
+}
+
+/// Add url to queue
+#[post("/queue", data = "<queue_item>")]
+pub async fn add_queue(
+    pool: &State<DbPool>,
+    queue_item: Json<QueueItem<'_>>,
+) -> Result<&'static str, BadRequest<String>> {
+    match CrawlQueue::insert(pool, queue_item.url).await {
+        Ok(()) => Ok("ok"),
+        Err(err) => Err(BadRequest(Some(err.to_string()))),
     }
 }
 

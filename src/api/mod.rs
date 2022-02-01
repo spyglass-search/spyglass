@@ -15,7 +15,16 @@ pub async fn init_rocket(pool: &DbPool, search: &IndexReader) -> rocket::Shutdow
     let rocket = rocket::custom(&config)
         .manage::<DbPool>(pool.clone())
         .manage::<IndexReader>(search.clone())
-        .mount("/api", routes![route::list_queue, route::app_stats])
+        .mount(
+            "/api",
+            routes![
+                // queue routes
+                route::add_queue,
+                route::list_queue,
+                // app stats
+                route::app_stats
+            ],
+        )
         .ignite()
         .await
         .unwrap();

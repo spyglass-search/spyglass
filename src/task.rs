@@ -19,14 +19,17 @@ pub async fn manager_task(
     queue: mpsc::Sender<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
+    log::info!("manager started");
     loop {
-        // Do stuff
-        if let Ok(_) = shutdown_rx.recv().await {
-            log::info!("Shutting down manager");
-            return;
-        }
+        let next_url = tokio::select! {
+            res = CrawlQueue::next(&pool) => res.unwrap(),
+            _ = shutdown_rx.recv() => {
+                log::info!("Shutting down manager");
+                return;
+            }
+        };
 
-        if let Ok(Some(url)) = CrawlQueue::next(&pool).await {
+        if let Some(url) = next_url {
             let cmd = Command::Fetch(url.to_string());
             // Send the GET request
             log::info!("sending fetch");
@@ -35,7 +38,7 @@ pub async fn manager_task(
                 return;
             }
         } else {
-            log::info!("nothing to crawl");
+            log::info!("nothing in queue");
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -48,13 +51,18 @@ pub async fn worker_task(
     mut queue: mpsc::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
+    log::info!("worker started");
     loop {
-        if let Ok(_) = shutdown_rx.recv().await {
-            log::info!("Shutting down worker");
-            return;
-        }
+        let next_cmd = tokio::select! {
+            res = queue.recv() => res,
+            _ = shutdown_rx.recv() => {
+                log::info!("Shutting down worker");
+                return;
+            }
+        };
 
-        if let Some(cmd) = queue.recv().await {
+        if let Some(cmd) = next_cmd {
+            log::info!("received cmd: {:?}", cmd);
             match cmd {
                 Command::Fetch(url) => {
                     println!("fetching: {}", url);
