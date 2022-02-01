@@ -30,15 +30,13 @@ pub async fn manager_task(
         };
 
         if let Some(url) = next_url {
-            let cmd = Command::Fetch(url.to_string());
+            let cmd = Command::Fetch(url.to_string(), false);
             // Send the GET request
             log::info!("sending fetch");
             if queue.send(cmd).await.is_err() {
                 eprintln!("connection task shutdown");
                 return;
             }
-        } else {
-            log::info!("nothing in queue");
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -64,7 +62,7 @@ pub async fn worker_task(
         if let Some(cmd) = next_cmd {
             log::info!("received cmd: {:?}", cmd);
             match cmd {
-                Command::Fetch(url) => {
+                Command::Fetch(url, force_crawl) => {
                     println!("fetching: {}", url);
                     let _ = Carto::fetch(&pool, &url).await;
                     // todo: parse + index document.

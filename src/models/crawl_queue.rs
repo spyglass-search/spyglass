@@ -2,6 +2,7 @@ use chrono::prelude::*;
 use serde::Serialize;
 use sqlx::sqlite::SqliteRow;
 use sqlx::Row;
+use std::fmt;
 
 use crate::models::DbPool;
 
@@ -13,14 +14,32 @@ pub enum CrawlStatus {
     Failed,
 }
 
+impl fmt::Display for CrawlStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CrawlStatus::Queued => write!(f, "Queued"),
+            CrawlStatus::Processing => write!(f, "Processing"),
+            CrawlStatus::Completed => write!(f, "Completed"),
+            CrawlStatus::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct CrawlQueue {
     pub id: Option<i64>,
-    /// URL to crawl
+    /// URL to crawl.
     pub url: String,
-    /// When this was first added to the crawl queue
-    pub created_at: DateTime<Utc>,
+    /// Task status.
     pub status: CrawlStatus,
+    /// Number of retries for this task.
+    pub num_retries: u8,
+    /// Ignore crawl settings for this URL/domain and push to crawler.
+    pub force_crawl: bool,
+    /// When this was first added to the crawl queue.
+    pub created_at: DateTime<Utc>,
+    /// When this task was last updated.
+    pub updated_at: DateTime<Utc>,
 }
 
 impl CrawlQueue {
@@ -28,11 +47,15 @@ impl CrawlQueue {
         let mut conn = db.acquire().await?;
 
         sqlx::query(
-            "CREATE TABLE IF NOT EXISTS crawl_queue (
+            "CREATE TABLE IF NOT EXISTS
+            crawl_queue (
                 id INTEGER PRIMARY KEY,
                 url TEXT UNIQUE,
                 status TEXT,
-                created_at DATETIME default CURRENT_TIMESTAMP
+                num_retries INTEGER,
+                force_crawl BOOL,
+                created_at DATETIME default CURRENT_TIMESTAMP,
+                updated_at DATETIME default CURRENT_TIMESTAMP
             )",
         )
         .execute(&mut conn)
@@ -41,28 +64,57 @@ impl CrawlQueue {
         Ok(())
     }
 
-    pub async fn insert(db: &DbPool, url: &str) -> anyhow::Result<(), sqlx::Error> {
+    pub async fn insert(
+        db: &DbPool,
+        url: &str,
+        force_crawl: bool,
+    ) -> anyhow::Result<(), sqlx::Error> {
         let mut conn = db.acquire().await?;
 
-        sqlx::query("INSERT OR IGNORE INTO crawl_queue (url, status) VALUES (?, ?)")
-            .bind(url)
-            .bind(CrawlStatus::Queued)
-            .execute(&mut conn)
-            .await?;
+        sqlx::query(
+            "INSERT OR IGNORE
+            INTO crawl_queue (
+                url,
+                status,
+                num_retries,
+                force_crawl
+            )
+            VALUES (?, ?, 0, ?)",
+        )
+        .bind(url)
+        .bind(CrawlStatus::Queued)
+        .bind(force_crawl)
+        .execute(&mut conn)
+        .await?;
 
         Ok(())
     }
 
-    pub async fn list(db: &DbPool) -> anyhow::Result<Vec<CrawlQueue>, sqlx::Error> {
+    pub async fn list(
+        db: &DbPool,
+        status: Option<CrawlStatus>,
+    ) -> anyhow::Result<Vec<CrawlQueue>, sqlx::Error> {
         let mut conn = db.acquire().await?;
+
+        let mut filter_status: Vec<String> = Vec::new();
+        if status.is_none() {
+            filter_status.push(CrawlStatus::Queued.to_string());
+        } else {
+            filter_status.push(CrawlStatus::Completed.to_string());
+            filter_status.push(CrawlStatus::Failed.to_string());
+            filter_status.push(CrawlStatus::Processing.to_string());
+            filter_status.push(CrawlStatus::Queued.to_string());
+        }
 
         let results = sqlx::query(
             "SELECT
-                id, url, status, created_at
+                id, url, status, force_crawl, created_at
             FROM crawl_queue
+            WHERE status IN (?)
             ORDER BY created_at ASC
             LIMIT 100",
         )
+        .bind(filter_status.join(","))
         .fetch_all(&mut conn)
         .await?;
 
@@ -72,7 +124,10 @@ impl CrawlQueue {
                 id: row.get(0),
                 url: row.get::<String, _>(1),
                 status: row.get(2),
-                created_at: row.get(3),
+                num_retries: row.get(3),
+                force_crawl: row.get(4),
+                created_at: row.get(5),
+                updated_at: row.get(6),
             })
             .collect();
 
@@ -108,5 +163,15 @@ impl CrawlQueue {
 
         conn.commit().await?;
         Ok(None)
+    }
+
+    /// Find tasks that have been processing for a while and retry
+    pub async fn clean_stale(db: &DbPool) {
+        todo!();
+    }
+
+    /// Mark job as done
+    pub async fn mark_done(db: &DbPool, id: i64) {
+        todo!();
     }
 }

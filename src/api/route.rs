@@ -12,7 +12,7 @@ use crate::models::{CrawlQueue, DbPool};
 pub async fn list_queue(
     pool: &State<DbPool>,
 ) -> Result<Json<response::ListQueue>, BadRequest<String>> {
-    let queue = CrawlQueue::list(pool).await;
+    let queue = CrawlQueue::list(pool, None).await;
 
     match queue {
         Ok(queue) => Ok(Json(response::ListQueue { queue })),
@@ -23,6 +23,7 @@ pub async fn list_queue(
 #[derive(Debug, Deserialize)]
 pub struct QueueItem<'r> {
     pub url: &'r str,
+    pub force_crawl: bool,
 }
 
 /// Add url to queue
@@ -31,7 +32,7 @@ pub async fn add_queue(
     pool: &State<DbPool>,
     queue_item: Json<QueueItem<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
-    match CrawlQueue::insert(pool, queue_item.url).await {
+    match CrawlQueue::insert(pool, queue_item.url, queue_item.force_crawl).await {
         Ok(()) => Ok("ok"),
         Err(err) => Err(BadRequest(Some(err.to_string()))),
     }
