@@ -3,7 +3,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, fs, path::PathBuf};
 
 use crate::config::Config;
-use crate::crawler::Carto;
+use crate::crawler::Crawler;
 use crate::state::AppState;
 
 pub struct FirefoxImporter {
@@ -76,7 +76,7 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            Carto::enqueue(&state.conn, url).await?;
+            Crawler::enqueue(&state.conn, url).await?;
             count += 1;
         }
 

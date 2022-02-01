@@ -21,9 +21,9 @@ struct CrawlResult {
 }
 
 #[derive(Copy, Clone)]
-pub struct Carto;
+pub struct Crawler;
 
-impl Carto {
+impl Crawler {
     async fn crawl(url: &Url) -> CrawlResult {
         // Create a data directory for this domain
         let domain = url.host_str().unwrap();
@@ -93,7 +93,7 @@ impl Carto {
 
     /// Add url to the crawl queue
     pub async fn enqueue(db: &DbPool, url: &str) -> anyhow::Result<(), sqlx::Error> {
-        CrawlQueue::insert(db, url).await
+        CrawlQueue::insert(db, url, false).await
     }
 
     // TODO: Load web indexing as a plugin?
@@ -117,12 +117,12 @@ impl Carto {
         }
 
         // Check for robots.txt of this domain
-        if !Carto::is_crawl_allowed(db, domain, url.path()).await? {
+        if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
             return Ok(());
         }
 
         // Crawl & save the data
-        let result = Carto::crawl(&url).await;
+        let result = Crawler::crawl(&url).await;
         // Update the fetch history for this path
         log::info!("Updated fetch history");
         FetchHistory::insert(db, &url_base, result.content_hash, result.status).await?;

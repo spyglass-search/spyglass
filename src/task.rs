@@ -1,11 +1,11 @@
 use tokio::sync::{broadcast, mpsc};
 
-use crate::crawler::Carto;
+use crate::crawler::Crawler;
 use crate::models::{CrawlQueue, DbPool};
 
 #[derive(Debug)]
 pub enum Command {
-    Fetch(String),
+    Fetch(String, bool),
 }
 
 #[derive(Clone, Debug)]
@@ -64,7 +64,7 @@ pub async fn worker_task(
             match cmd {
                 Command::Fetch(url, force_crawl) => {
                     println!("fetching: {}", url);
-                    let _ = Carto::fetch(&pool, &url).await;
+                    let _ = Crawler::fetch(&pool, &url).await;
                     // todo: parse + index document.
                 }
             }
