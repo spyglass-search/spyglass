@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use chrono::prelude::*;
 use serde::Serialize;
 use sqlx::sqlite::SqliteRow;
@@ -166,12 +168,12 @@ impl CrawlQueue {
     }
 
     /// Find tasks that have been processing for a while and retry
-    pub async fn clean_stale(db: &DbPool) {
+    pub async fn clean_stale(_db: &DbPool) {
         todo!();
     }
 
     /// Mark job as done
-    pub async fn mark_done(db: &DbPool, id: i64) {
+    pub async fn mark_done(_db: &DbPool, _id: i64) {
         todo!();
     }
 }

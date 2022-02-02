@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::borrow::Cow;
 
 use ego_tree::{NodeId, Tree};

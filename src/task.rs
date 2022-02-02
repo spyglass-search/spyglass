@@ -24,7 +24,7 @@ pub async fn manager_task(
         let next_url = tokio::select! {
             res = CrawlQueue::next(&pool) => res.unwrap(),
             _ = shutdown_rx.recv() => {
-                log::info!("Shutting down manager");
+                log::info!("🛑 Shutting down manager");
                 return;
             }
         };
@@ -54,7 +54,7 @@ pub async fn worker_task(
         let next_cmd = tokio::select! {
             res = queue.recv() => res,
             _ = shutdown_rx.recv() => {
-                log::info!("Shutting down worker");
+                log::info!("🛑 Shutting down worker");
                 return;
             }
         };
@@ -64,7 +64,7 @@ pub async fn worker_task(
             match cmd {
                 Command::Fetch(url, force_crawl) => {
                     println!("fetching: {}", url);
-                    let _ = Crawler::fetch(&pool, &url).await;
+                    let _ = Crawler::fetch(&pool, &url, force_crawl).await;
                     // todo: parse + index document.
                 }
             }

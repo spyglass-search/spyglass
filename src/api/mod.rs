@@ -21,6 +21,8 @@ pub async fn start_api(pool: &DbPool, search: &IndexReader) -> rocket::Shutdown 
                 // queue routes
                 route::add_queue,
                 route::list_queue,
+                // search
+                route::search,
                 // app stats
                 route::app_stats
             ],

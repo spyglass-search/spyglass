@@ -5,7 +5,28 @@ use serde::Deserialize;
 use tantivy::IndexReader;
 
 use super::response;
+use crate::crawler::Crawler;
 use crate::models::{CrawlQueue, DbPool};
+
+#[derive(Debug, Deserialize)]
+pub struct SearchReq<'r> {
+    pub term: &'r str
+}
+
+#[get("/search", data = "<search_req>")]
+pub async fn search(
+    _searcher: &State<IndexReader>,
+    search_req: Json<SearchReq<'_>>,
+) -> Result<Json<response::SearchResults>, BadRequest<String>> {
+    let results = Vec::new();
+    let meta = response::SearchMeta {
+        query: search_req.term.to_string(),
+        num_docs: 0,
+        wall_time_ms: 1000,
+    };
+
+    Ok(Json(response::SearchResults { results, meta }))
+}
 
 /// Show the list of URLs in the queue and their status
 #[get("/queue")]
@@ -32,7 +53,11 @@ pub async fn add_queue(
     pool: &State<DbPool>,
     queue_item: Json<QueueItem<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
-    match CrawlQueue::insert(pool, queue_item.url, queue_item.force_crawl).await {
+    //
+    // Add to queue instead of directly calling the fetch function
+    // CrawlQueue::insert(pool, queue_item.url, queue_item.force_crawl).await {
+    //
+    match Crawler::fetch(pool, queue_item.url, queue_item.force_crawl).await {
         Ok(()) => Ok("ok"),
         Err(err) => Err(BadRequest(Some(err.to_string()))),
     }
