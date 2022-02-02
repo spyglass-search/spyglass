@@ -42,21 +42,27 @@ async fn main() {
     let (tx, rx) = mpsc::channel(32);
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
 
-    tokio::spawn(task::manager_task(
+    let manager_handle = tokio::spawn(task::manager_task(
         state.conn.clone(),
         tx,
         shutdown_tx.subscribe(),
     ));
 
     // todo: spawn multiple worker tasks?
-    tokio::spawn(task::worker_task(
+    let worker_handle = tokio::spawn(task::worker_task(
         state.conn.clone(),
+        state.index.writer,
         rx,
         shutdown_tx.subscribe(),
     ));
 
     // Gracefully handle shutdowns
-    let server = start_api(&state.conn, &state.index.reader).await;
+    let server = start_api(
+        &state.conn,
+        &state.index.index,
+        &state.index.reader
+    ).await;
+
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");
@@ -69,4 +75,6 @@ async fn main() {
             shutdown_tx.send(AppShutdown::Now).unwrap();
         }
     }
+
+    let _ = tokio::join!(manager_handle, worker_handle);
 }

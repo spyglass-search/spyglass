@@ -2,26 +2,42 @@ use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
-use tantivy::IndexReader;
+use tantivy::{Index, IndexReader};
 
 use super::response;
-use crate::crawler::Crawler;
 use crate::models::{CrawlQueue, DbPool};
+use crate::search::Searcher;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchReq<'r> {
-    pub term: &'r str
+    pub term: &'r str,
 }
 
 #[get("/search", data = "<search_req>")]
 pub async fn search(
-    _searcher: &State<IndexReader>,
+    index: &State<Index>,
+    reader: &State<IndexReader>,
     search_req: Json<SearchReq<'_>>,
 ) -> Result<Json<response::SearchResults>, BadRequest<String>> {
-    let results = Vec::new();
+
+    let schema = Searcher::schema();
+    let title = schema.get_field("title").unwrap();
+
+    let searcher = reader.searcher();
+    let docs = Searcher::search(index, reader, search_req.term);
+
+    let mut results: Vec<String> = Vec::new();
+    for (_score, doc_addr) in docs {
+        let retrieved = searcher.doc(doc_addr).unwrap();
+        log::info!("search: {:?}", retrieved);
+        let title = retrieved.get_first(title).unwrap();
+        results.push(title.text().unwrap().to_string());
+    }
+
+
     let meta = response::SearchMeta {
         query: search_req.term.to_string(),
-        num_docs: 0,
+        num_docs: searcher.num_docs(),
         wall_time_ms: 1000,
     };
 
@@ -53,11 +69,7 @@ pub async fn add_queue(
     pool: &State<DbPool>,
     queue_item: Json<QueueItem<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
-    //
-    // Add to queue instead of directly calling the fetch function
-    // CrawlQueue::insert(pool, queue_item.url, queue_item.force_crawl).await {
-    //
-    match Crawler::fetch(pool, queue_item.url, queue_item.force_crawl).await {
+    match CrawlQueue::insert(pool, queue_item.url, queue_item.force_crawl).await {
         Ok(()) => Ok("ok"),
         Err(err) => Err(BadRequest(Some(err.to_string()))),
     }

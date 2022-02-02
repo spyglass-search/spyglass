@@ -136,11 +136,14 @@ impl CrawlQueue {
         Ok(parsed)
     }
 
-    pub async fn next(db: &DbPool) -> anyhow::Result<Option<String>, sqlx::Error> {
+    pub async fn next(db: &DbPool) -> anyhow::Result<Option<(String, bool)>, sqlx::Error> {
         let mut conn = db.begin().await?;
         let row: Option<SqliteRow> = sqlx::query(
             "
-                SELECT id, url
+                SELECT
+                    id,
+                    url,
+                    force_crawl
                 FROM crawl_queue
                 WHERE status = ?
                 ORDER BY created_at ASC LIMIT 1",
@@ -152,6 +155,7 @@ impl CrawlQueue {
         if let Some(row) = row {
             let id: i64 = row.get(0);
             let url: String = row.get(1);
+            let force_crawl: bool = row.get(2);
 
             sqlx::query("UPDATE crawl_queue SET status = ? WHERE id = ?")
                 .bind(CrawlStatus::Processing)
@@ -160,7 +164,7 @@ impl CrawlQueue {
                 .await?;
 
             conn.commit().await?;
-            return Ok(Some(url));
+            return Ok(Some((url, force_crawl)));
         }
 
         conn.commit().await?;

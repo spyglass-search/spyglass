@@ -8,6 +8,7 @@ use url::Url;
 pub mod robots;
 
 use crate::models::{CrawlQueue, DbPool, FetchHistory, ResourceRule};
+use crate::scraper::html_to_text;
 use crate::state::AppState;
 
 use robots::parse;
@@ -15,9 +16,11 @@ use robots::parse;
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
 
-struct CrawlResult {
-    status: u16,
-    content_hash: Option<String>,
+#[derive(Debug, Clone)]
+pub struct CrawlResult {
+    pub status: u16,
+    pub content: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 #[derive(Copy, Clone)]
@@ -33,29 +36,35 @@ impl Crawler {
         }
 
         // Fetch & store page data.
-        log::info!("Fetching page: {}", url.as_str());
         let res = reqwest::get(url.as_str()).await.unwrap();
         log::info!("Status: {}", res.status());
         let status = res.status();
         if status == StatusCode::OK {
             // TODO: Save headers
             // log::info!("Headers:\n{:?}", res.headers());
-            let body = res.text().await.unwrap();
+            let raw_body = res.text().await.unwrap();
             let file_path = domain_dir.join("raw.html");
-            fs::write(file_path, &body).expect("Unable to save html");
+            fs::write(file_path, &raw_body).expect("Unable to save html");
 
-            // Hash the body contents
+            // Parse the html.
+            let content = html_to_text(&raw_body);
+
+            // Hash the body content, used to detect changes (eventually).
             let mut hasher = Sha256::new();
-            hasher.update(&body.as_bytes());
+            hasher.update(&content.as_bytes());
             let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+
+            log::info!("content hash: {:?}", content_hash);
             return CrawlResult {
                 status: status.as_u16(),
+                content: Some(content),
                 content_hash,
             };
         }
 
         CrawlResult {
             status: status.as_u16(),
+            content: None,
             content_hash: None,
         }
     }
@@ -97,7 +106,11 @@ impl Crawler {
     }
 
     // TODO: Load web indexing as a plugin?
-    pub async fn fetch(db: &DbPool, url: &str) -> anyhow::Result<()> {
+    pub async fn fetch(
+        db: &DbPool,
+        url: &str,
+        force_crawl: bool,
+    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         log::info!("Fetching URL: {:?}", url);
 
         // Make sure cache directory exists for this domain
@@ -107,26 +120,31 @@ impl Crawler {
         let path = url.path();
         let url_base = format!("{}{}", domain, path);
 
-        let history = FetchHistory::find(db, &url_base).await?;
-        if let Some(history) = history {
-            let since_last_fetch = Utc::now() - history.updated_at;
-            if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
-                log::info!("Recently fetched, skipping");
-                return Ok(());
+        // Skip history check if we're trying to force this crawl.
+        if !force_crawl {
+            let history = FetchHistory::find(db, &url_base).await?;
+            if let Some(history) = history {
+                let since_last_fetch = Utc::now() - history.updated_at;
+                if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
+                    log::info!("Recently fetched, skipping");
+                    return Ok(None);
+                }
             }
         }
 
         // Check for robots.txt of this domain
         if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
-            return Ok(());
+            return Ok(None);
         }
 
         // Crawl & save the data
         let result = Crawler::crawl(&url).await;
-        // Update the fetch history for this path
-        log::info!("Updated fetch history");
-        FetchHistory::insert(db, &url_base, result.content_hash, result.status).await?;
+        log::info!("crawl result: {:?}", result);
 
-        Ok(())
+        // Update the fetch history & mark as done
+        log::trace!("updating fetch history");
+        FetchHistory::insert(db, &url_base, result.content_hash.clone(), result.status).await?;
+        CrawlQueue::mark_done(db, id).await?;
+        Ok(Some(result))
     }
 }

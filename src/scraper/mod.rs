@@ -32,7 +32,7 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, ignore_list: &HashS
 }
 
 /// Filters a DOM tree into a text document used for indexing
-fn html_to_text(doc: &str) -> String {
+pub fn html_to_text(doc: &str) -> String {
     // TODO: move to config file? turn into a whitelist?
     let ignore_list = HashSet::from([
         // TODO: Parse meta tags

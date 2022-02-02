@@ -2,11 +2,11 @@ mod response;
 mod route;
 
 use rocket::Config;
-use tantivy::IndexReader;
+use tantivy::{Index, IndexReader};
 
 use crate::models::DbPool;
 
-pub async fn start_api(pool: &DbPool, search: &IndexReader) -> rocket::Shutdown {
+pub async fn start_api(pool: &DbPool, index: &Index, reader: &IndexReader) -> rocket::Shutdown {
     let config = Config {
         port: 7777,
         ..Config::debug_default()
@@ -14,7 +14,8 @@ pub async fn start_api(pool: &DbPool, search: &IndexReader) -> rocket::Shutdown 
 
     let rocket = rocket::custom(&config)
         .manage::<DbPool>(pool.clone())
-        .manage::<IndexReader>(search.clone())
+        .manage::<Index>(index.clone())
+        .manage::<IndexReader>(reader.clone())
         .mount(
             "/api",
             routes![

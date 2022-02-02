@@ -20,15 +20,13 @@ pub enum IndexPath {
 
 pub struct Searcher {
     pub index: Index,
-    pub schema: Schema,
     pub reader: IndexReader,
     pub writer: IndexWriter,
 }
 
 impl Searcher {
-    pub fn with_index(index_path: &IndexPath) -> Self {
+    pub fn schema() -> Schema {
         let mut schema_builder = Schema::builder();
-
         // Our first field is title. We want:
         // - full-text search and
         // - to retrieve the document after the search
@@ -42,6 +40,11 @@ impl Searcher {
         schema_builder.add_text_field("body", TEXT);
 
         let schema = schema_builder.build();
+        schema
+    }
+
+    pub fn with_index(index_path: &IndexPath) -> Self {
+        let schema = Searcher::schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
                 let dir = MmapDirectory::open(path).unwrap();
@@ -66,46 +69,47 @@ impl Searcher {
 
         Searcher {
             index,
-            schema,
             reader,
             writer,
         }
     }
 
-    pub fn add_document(&mut self, title: &str, body: &str) -> tantivy::Result<()> {
-        let title_field = self.schema.get_field("title").unwrap();
-        let body_field = self.schema.get_field("body").unwrap();
+    pub fn add_document(writer: &mut IndexWriter, title: &str, body: &str) -> tantivy::Result<()> {
+        let schema = Searcher::schema();
+        let title_field = schema.get_field("title").unwrap();
+        let body_field = schema.get_field("body").unwrap();
 
         let mut doc = Document::default();
         doc.add_text(title_field, title);
         doc.add_text(body_field, body);
-        self.writer.add_document(doc);
+        writer.add_document(doc);
 
-        self.writer.commit()?;
+        writer.commit()?;
 
         Ok(())
     }
 
-    pub fn search(&self, query_string: &str) -> Vec<SearchResult> {
-        let searcher = self.reader.searcher();
+    pub fn search(index: &Index, reader: &IndexReader, query_string: &str) -> Vec<SearchResult> {
+        let schema = Searcher::schema();
+        let searcher = reader.searcher();
 
-        let title = self.schema.get_field("title").unwrap();
-        let body = self.schema.get_field("body").unwrap();
+        let title = schema.get_field("title").unwrap();
+        let body = schema.get_field("body").unwrap();
 
-        let query_parser = QueryParser::for_index(&self.index, vec![title, body]);
+        let query_parser = QueryParser::for_index(&index, vec![title, body]);
         let query = query_parser
             .parse_query(query_string)
             .expect("Unable to parse query");
 
-        println!("searching...");
         let top_docs = searcher
             .search(&query, &TopDocs::with_limit(10))
             .expect("Unable to execute query");
 
         log::info!(
-            "query `{}` returned {} results",
+            "query `{}` returned {} results from {} docs",
             query_string,
-            top_docs.len()
+            top_docs.len(),
+            searcher.num_docs(),
         );
         top_docs.into_iter().collect()
     }
@@ -118,11 +122,12 @@ mod test {
     #[test]
     pub fn test_indexer() {
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        let writer = &mut searcher.writer;
 
-        searcher
-            .add_document(
-                "Of Mice and Men",
-                "A few miles south of Soledad, the Salinas River drops in close to the hillside
+        Searcher::add_document(
+            writer,
+            "Of Mice and Men",
+            "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
             side of the river the golden foothill slopes curve up to the strong and rocky
@@ -130,13 +135,13 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            )
-            .expect("Unable to add doc");
+        )
+        .expect("Unable to add doc");
 
-        searcher
-            .add_document(
-                "Of Mice and Men",
-                "A few miles south of Soledad, the Salinas River drops in close to the hillside
+        Searcher::add_document(
+            writer,
+            "Of Mice and Men",
+            "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
             side of the river the golden foothill slopes curve up to the strong and rocky
@@ -144,22 +149,28 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            )
-            .expect("Unable to add doc");
-        searcher
-            .add_document(
-                "Frankenstein: The Modern Prometheus",
-                "You will rejoice to hear that no disaster has accompanied the commencement of an
+        )
+        .expect("Unable to add doc");
+
+        Searcher::add_document(
+            writer,
+            "Frankenstein: The Modern Prometheus",
+            "You will rejoice to hear that no disaster has accompanied the commencement of an
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-            )
-            .expect("Unable to add doc");
+        )
+        .expect("Unable to add doc");
 
         // add a small delay so that the documents can be properly committed
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        let results = searcher.search("gabilan mountains");
+        let results = Searcher::search(
+            &searcher.index,
+            &searcher.reader,
+            "gabilan mountains"
+        );
+
         assert_eq!(results.len(), 2);
     }
 }
