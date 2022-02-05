@@ -7,6 +7,7 @@ use sqlx::Row;
 use std::fmt;
 
 use crate::models::DbPool;
+use crate::task::CrawlTask;
 
 #[derive(Debug, Serialize, sqlx::Type)]
 pub enum CrawlStatus {
@@ -92,6 +93,35 @@ impl CrawlQueue {
         Ok(())
     }
 
+    pub async fn get(db: &DbPool, id: i64) -> anyhow::Result<CrawlQueue, sqlx::Error> {
+        let mut conn = db.acquire().await?;
+
+        let row = sqlx::query(
+            "SELECT
+                id,
+                url,
+                status,
+                num_retries,
+                force_crawl,
+                created_at,
+                updated_at
+            FROM crawl_queue WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(&mut conn)
+        .await?;
+
+        Ok(CrawlQueue {
+            id: row.get(0),
+            url: row.get(1),
+            status: row.get(2),
+            num_retries: row.get(3),
+            force_crawl: row.get(4),
+            created_at: row.get(5),
+            updated_at: row.get(6),
+        })
+    }
+
     pub async fn list(
         db: &DbPool,
         status: Option<CrawlStatus>,
@@ -136,15 +166,11 @@ impl CrawlQueue {
         Ok(parsed)
     }
 
-    pub async fn next(db: &DbPool) -> anyhow::Result<Option<(String, bool)>, sqlx::Error> {
+    pub async fn next(db: &DbPool) -> anyhow::Result<Option<CrawlTask>, sqlx::Error> {
         let mut conn = db.begin().await?;
         let row: Option<SqliteRow> = sqlx::query(
             "
-                SELECT
-                    id,
-                    url,
-                    force_crawl
-                FROM crawl_queue
+                SELECT id FROM crawl_queue
                 WHERE status = ?
                 ORDER BY created_at ASC LIMIT 1",
         )
@@ -154,9 +180,6 @@ impl CrawlQueue {
 
         if let Some(row) = row {
             let id: i64 = row.get(0);
-            let url: String = row.get(1);
-            let force_crawl: bool = row.get(2);
-
             sqlx::query("UPDATE crawl_queue SET status = ? WHERE id = ?")
                 .bind(CrawlStatus::Processing)
                 .bind(id)
@@ -164,7 +187,7 @@ impl CrawlQueue {
                 .await?;
 
             conn.commit().await?;
-            return Ok(Some((url, force_crawl)));
+            return Ok(Some(CrawlTask { id }));
         }
 
         conn.commit().await?;
@@ -177,7 +200,14 @@ impl CrawlQueue {
     }
 
     /// Mark job as done
-    pub async fn mark_done(_db: &DbPool, _id: i64) {
-        todo!();
+    pub async fn mark_done(db: &DbPool, id: i64) -> anyhow::Result<(), sqlx::Error> {
+        let mut conn = db.acquire().await?;
+        sqlx::query("UPDATE crawl_queue SET status = ? WHERE id = ?")
+            .bind(CrawlStatus::Completed)
+            .bind(id)
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
     }
 }

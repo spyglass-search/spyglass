@@ -106,22 +106,20 @@ impl Crawler {
     }
 
     // TODO: Load web indexing as a plugin?
-    pub async fn fetch(
-        db: &DbPool,
-        url: &str,
-        force_crawl: bool,
-    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        log::info!("Fetching URL: {:?}", url);
+    pub async fn fetch(db: &DbPool, id: i64) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        let crawl = CrawlQueue::get(db, id).await?;
+
+        log::info!("Fetching URL: {:?}", crawl.url);
 
         // Make sure cache directory exists for this domain
-        let url = Url::parse(url).unwrap();
+        let url = Url::parse(&crawl.url).unwrap();
 
         let domain = url.host_str().unwrap();
         let path = url.path();
         let url_base = format!("{}{}", domain, path);
 
         // Skip history check if we're trying to force this crawl.
-        if !force_crawl {
+        if !crawl.force_crawl {
             let history = FetchHistory::find(db, &url_base).await?;
             if let Some(history) = history {
                 let since_last_fetch = Utc::now() - history.updated_at;

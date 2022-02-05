@@ -39,8 +39,7 @@ impl Searcher {
         // Indexed but don't store for retreival
         schema_builder.add_text_field("body", TEXT);
 
-        let schema = schema_builder.build();
-        schema
+        schema_builder.build()
     }
 
     pub fn with_index(index_path: &IndexPath) -> Self {
@@ -48,9 +47,9 @@ impl Searcher {
         let index = match index_path {
             IndexPath::LocalPath(path) => {
                 let dir = MmapDirectory::open(path).unwrap();
-                Index::open_or_create(dir, schema.clone()).unwrap()
+                Index::open_or_create(dir, schema).unwrap()
             }
-            IndexPath::Memory => Index::create_in_ram(schema.clone()),
+            IndexPath::Memory => Index::create_in_ram(schema),
         };
 
         // Should only be one writer at a time. This single IndexWriter is already
@@ -96,7 +95,7 @@ impl Searcher {
         let title = schema.get_field("title").unwrap();
         let body = schema.get_field("body").unwrap();
 
-        let query_parser = QueryParser::for_index(&index, vec![title, body]);
+        let query_parser = QueryParser::for_index(index, vec![title, body]);
         let query = query_parser
             .parse_query(query_string)
             .expect("Unable to parse query");
@@ -165,11 +164,7 @@ mod test {
         // add a small delay so that the documents can be properly committed
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        let results = Searcher::search(
-            &searcher.index,
-            &searcher.reader,
-            "gabilan mountains"
-        );
+        let results = Searcher::search(&searcher.index, &searcher.reader, "gabilan mountains");
 
         assert_eq!(results.len(), 2);
     }

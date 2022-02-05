@@ -57,11 +57,7 @@ async fn main() {
     ));
 
     // Gracefully handle shutdowns
-    let server = start_api(
-        &state.conn,
-        &state.index.index,
-        &state.index.reader
-    ).await;
+    let server = start_api(&state.conn, &state.index.index, &state.index.reader).await;
 
     match signal::ctrl_c().await {
         Ok(()) => {

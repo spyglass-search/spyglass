@@ -19,7 +19,6 @@ pub async fn search(
     reader: &State<IndexReader>,
     search_req: Json<SearchReq<'_>>,
 ) -> Result<Json<response::SearchResults>, BadRequest<String>> {
-
     let schema = Searcher::schema();
     let title = schema.get_field("title").unwrap();
 
@@ -33,7 +32,6 @@ pub async fn search(
         let title = retrieved.get_first(title).unwrap();
         results.push(title.text().unwrap().to_string());
     }
-
 
     let meta = response::SearchMeta {
         query: search_req.term.to_string(),

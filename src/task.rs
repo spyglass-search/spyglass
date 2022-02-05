@@ -5,9 +5,14 @@ use crate::crawler::Crawler;
 use crate::models::{CrawlQueue, DbPool};
 use crate::search::Searcher;
 
+#[derive(Debug, Clone)]
+pub struct CrawlTask {
+    pub id: i64,
+}
+
 #[derive(Debug)]
 pub enum Command {
-    Fetch(String, bool),
+    Fetch(CrawlTask),
 }
 
 #[derive(Clone, Debug)]
@@ -31,16 +36,14 @@ pub async fn manager_task(
             }
         };
 
-        if let Some((url, force_crawl)) = next_url {
-            let cmd = Command::Fetch(url.to_string(), force_crawl);
+        if let Some(crawl_task) = next_url {
+            let cmd = Command::Fetch(crawl_task.clone());
             // Send the GET request
             log::info!("sending fetch");
             if queue.send(cmd).await.is_err() {
                 eprintln!("connection task shutdown");
                 return;
             }
-        } else {
-            log::info!("no work");
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -67,20 +70,18 @@ pub async fn worker_task(
         if let Some(cmd) = next_cmd {
             log::info!("received cmd: {:?}", cmd);
             match cmd {
-                Command::Fetch(url, force_crawl) => {
-                    match Crawler::fetch(&pool, &url, force_crawl).await {
-                        Ok(Some(crawl_result)) => {
-                            if let Some(content) = crawl_result.content {
-                                match Searcher::add_document(&mut index, "test document", &content) {
-                                    Ok(()) => log::info!("indexed document"),
-                                    Err(_) => log::error!("Unable to index {}", url),
-                                }
+                Command::Fetch(crawl) => match Crawler::fetch(&pool, crawl.id).await {
+                    Ok(Some(crawl_result)) => {
+                        if let Some(content) = crawl_result.content {
+                            match Searcher::add_document(&mut index, "test document", &content) {
+                                Ok(()) => log::info!("indexed document"),
+                                Err(_) => log::error!("Unable to index crawl id: {}", crawl.id),
                             }
                         }
-                        Err(err) => log::error!("Unable to crawl URL: {} - {:?}", url, err),
-                        _ => {}
                     }
-                }
+                    Err(err) => log::error!("Unable to crawl id: {} - {:?}", crawl.id, err),
+                    _ => {}
+                },
             }
         }
     }
