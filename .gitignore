@@ -3,5 +3,7 @@ _notebooks
 
 
 # Added by cargo
-
-/target
+target
+**/target
+node_modules
+dist
