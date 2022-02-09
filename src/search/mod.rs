@@ -24,6 +24,13 @@ pub struct Searcher {
     pub writer: IndexWriter,
 }
 
+pub struct DocFields {
+    pub content: Field,
+    pub description: Field,
+    pub title: Field,
+    pub url: Field,
+}
+
 impl Searcher {
     pub fn schema() -> Schema {
         let mut schema_builder = Schema::builder();
@@ -36,10 +43,23 @@ impl Searcher {
         //      key-value store. This store is useful to reconstruct the documents that
         //      were selected during the search phase.
         schema_builder.add_text_field("title", TEXT | STORED);
+        schema_builder.add_text_field("description", TEXT | STORED);
+        schema_builder.add_text_field("url", TEXT | STORED);
         // Indexed but don't store for retreival
-        schema_builder.add_text_field("body", TEXT);
+        schema_builder.add_text_field("content", TEXT);
 
         schema_builder.build()
+    }
+
+    pub fn doc_fields() -> DocFields {
+        let schema = Searcher::schema();
+
+        DocFields {
+            content: schema.get_field("content").unwrap(),
+            description: schema.get_field("description").unwrap(),
+            title: schema.get_field("title").unwrap(),
+            url: schema.get_field("url").unwrap(),
+        }
     }
 
     pub fn with_index(index_path: &IndexPath) -> Self {
@@ -73,14 +93,20 @@ impl Searcher {
         }
     }
 
-    pub fn add_document(writer: &mut IndexWriter, title: &str, body: &str) -> tantivy::Result<()> {
-        let schema = Searcher::schema();
-        let title_field = schema.get_field("title").unwrap();
-        let body_field = schema.get_field("body").unwrap();
+    pub fn add_document(
+        writer: &mut IndexWriter,
+        title: &str,
+        description: &str,
+        url: &str,
+        content: &str,
+    ) -> tantivy::Result<()> {
+        let fields = Searcher::doc_fields();
 
         let mut doc = Document::default();
-        doc.add_text(title_field, title);
-        doc.add_text(body_field, body);
+        doc.add_text(fields.content, content);
+        doc.add_text(fields.description, description);
+        doc.add_text(fields.title, title);
+        doc.add_text(fields.url, url);
         writer.add_document(doc);
 
         writer.commit()?;
@@ -89,13 +115,14 @@ impl Searcher {
     }
 
     pub fn search(index: &Index, reader: &IndexReader, query_string: &str) -> Vec<SearchResult> {
-        let schema = Searcher::schema();
+        let fields = Searcher::doc_fields();
         let searcher = reader.searcher();
 
-        let title = schema.get_field("title").unwrap();
-        let body = schema.get_field("body").unwrap();
+        let query_parser = QueryParser::for_index(
+            index,
+            vec![fields.title, fields.description, fields.content],
+        );
 
-        let query_parser = QueryParser::for_index(index, vec![title, body]);
         let query = query_parser
             .parse_query(query_string)
             .expect("Unable to parse query");
@@ -126,6 +153,8 @@ mod test {
         Searcher::add_document(
             writer,
             "Of Mice and Men",
+            "Of Mice and Men passage",
+            "https://example.com/mice_and_men",
             "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
@@ -140,6 +169,8 @@ mod test {
         Searcher::add_document(
             writer,
             "Of Mice and Men",
+            "Of Mice and Men passage",
+            "https://example.com/mice_and_men",
             "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
@@ -154,6 +185,8 @@ mod test {
         Searcher::add_document(
             writer,
             "Frankenstein: The Modern Prometheus",
+            "A passage from Frankenstein",
+            "https://example.com/frankenstein",
             "You will rejoice to hear that no disaster has accompanied the commencement of an
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
