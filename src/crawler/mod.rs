@@ -16,11 +16,14 @@ use robots::parse;
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct CrawlResult {
-    pub status: u16,
-    pub content: Option<String>,
     pub content_hash: Option<String>,
+    pub content: Option<String>,
+    pub description: Option<String>,
+    pub status: u16,
+    pub title: Option<String>,
+    pub url: Option<String>,
 }
 
 #[derive(Copy, Clone)]
@@ -47,25 +50,38 @@ impl Crawler {
             fs::write(file_path, &raw_body).expect("Unable to save html");
 
             // Parse the html.
-            let content = html_to_text(&raw_body);
+            let parse_result = html_to_text(&raw_body);
+            // Grab description from meta tags
+            // TODO: Should we weight OpenGraph meta attrs more than others?
+            let description = {
+                if parse_result.meta.contains_key("description") {
+                    Some(parse_result.meta.get("description").unwrap().to_string())
+                } else if parse_result.meta.contains_key("og:description") {
+                    Some(parse_result.meta.get("og:description").unwrap().to_string())
+                } else {
+                    None
+                }
+            };
 
             // Hash the body content, used to detect changes (eventually).
             let mut hasher = Sha256::new();
-            hasher.update(&content.as_bytes());
+            hasher.update(&parse_result.content.as_bytes());
             let content_hash = Some(hex::encode(&hasher.finalize()[..]));
 
             log::info!("content hash: {:?}", content_hash);
             return CrawlResult {
-                status: status.as_u16(),
-                content: Some(content),
                 content_hash,
+                content: Some(parse_result.content),
+                description,
+                status: status.as_u16(),
+                title: Some("title".to_string()),
+                url: Some(url.to_string()),
             };
         }
 
         CrawlResult {
             status: status.as_u16(),
-            content: None,
-            content_hash: None,
+            ..Default::default()
         }
     }
 

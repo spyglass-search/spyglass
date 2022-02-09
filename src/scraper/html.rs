@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::{NodeId, NodeRef, Tree};
 
 use html5ever::driver::{self, ParseOpts};
 use html5ever::tendril::StrTendril;
@@ -18,6 +19,52 @@ pub struct Html {
     pub tree: Tree<Node>,
 }
 
+fn _find_meta(root: &NodeRef<Node>, depth: usize, map: &mut HashMap<String, String>) {
+    if depth > 2 {
+        return;
+    }
+
+    let name_key = QualName::new(None, ns!(), local_name!("name"));
+    let property_key = QualName::new(None, ns!(), local_name!("property"));
+    let content_key = QualName::new(None, ns!(), local_name!("content"));
+
+    for child in root.children() {
+        let node = child.value();
+        if !node.is_element() {
+            continue;
+        }
+
+        if let Some(element) = node.as_element() {
+            if element.name() == "head" {
+                for head_node in child.children() {
+                    if !head_node.value().is_element() {
+                        continue;
+                    }
+
+                    let head_element = head_node.value().as_element().unwrap();
+                    if head_element.name() == "meta" {
+                        if head_element.attrs.contains_key(&name_key) {
+                            let key = head_element.attrs.get(&name_key).unwrap().to_string();
+                            let value = head_element.attrs.get(&content_key).unwrap().to_string();
+                            map.insert(key, value);
+                        } else if head_element.attrs.contains_key(&property_key) {
+                            let key = head_element.attrs.get(&property_key).unwrap().to_string();
+                            let value = head_element.attrs.get(&content_key).unwrap().to_string();
+                            map.insert(key, value);
+                        }
+                    }
+                }
+
+                return;
+            }
+        }
+
+        if child.has_children() && node.is_element() {
+            _find_meta(&child, depth + 1, map);
+        }
+    }
+}
+
 impl Html {
     pub fn new() -> Self {
         Html {
@@ -30,6 +77,17 @@ impl Html {
     pub fn parse(html: &str) -> Self {
         let parser = driver::parse_document(Self::new(), ParseOpts::default());
         parser.one(html)
+    }
+
+    /// Returns a map of meta attributes from the header
+    /// This specifically looks for meta tags with a "name" or "property" attr
+    /// and an accompanying "content" attr.
+    pub fn meta(&self) -> HashMap<String, String> {
+        let root = self.tree.root();
+        let mut map = HashMap::new();
+        _find_meta(&root, 0, &mut map);
+
+        map
     }
 }
 
