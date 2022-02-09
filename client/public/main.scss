@@ -1,0 +1,37 @@
+@import "normalize";
+
+body {
+    padding: 0;
+    margin: 0;
+    background: #2d2d2d;
+    color: white;
+    font-family: Helvetica;
+}
+
+.search-box {
+    font-size: 48px;
+    padding: 16px;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+a {
+    color: white;
+}
+
+.result-item {
+    border-bottom: 1px solid #EEE;
+    padding: 16px;
+
+    h2.result-title {
+        font-size: 18px;
+        padding: 4px 0;
+        margin: 0;
+    }
+
+    .result-description {
+        line-height: 1.5;
+        font-size: 14px;
+    }
+}

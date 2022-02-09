@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::window;
+use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
-use serde::{Deserialize, Serialize};
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -14,7 +14,6 @@ extern "C" {
 fn main() {
     yew::start_app::<App>();
 }
-
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 struct SearchResult {
@@ -39,15 +38,42 @@ pub fn app() -> Html {
         );
     }
 
-    let results = search.iter().map(|res| html! {
-        <p>{res.title.clone()}</p>
-    }).collect::<Html>();
+    let results = search
+        .iter()
+        .map(|res| {
+            html! {
+                <div class={"result-item"}>
+                    <div class={"result-url"}>
+                        <a href={res.url.clone()}>{format!("{}", res.url.clone())}</a>
+                    </div>
+                    <h2 class={"result-title"}>{res.title.clone()}</h2>
+                    <div class={"result-description"}>{res.description.clone()}</div>
+                </div>
+            }
+        })
+        .collect::<Html>();
+
+    let onkeyup = {
+        let query = query.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+            query.set(input.value());
+        })
+    };
 
     html! {
         <div>
-            <h2 class={"heading"}>{"Hello, World!"}</h2>
-            <h3>{"Results"}</h3>
-            { results }
+            <input
+                type={"text"}
+                class={"search-box"}
+                placeholder={"Spyglass Search"}
+                value={(*query).clone()}
+                {onkeyup}
+                spellcheck={"false"}
+            />
+            <div class={"search-results-list"}>
+                { results }
+            </div>
         </div>
     }
 }
@@ -58,10 +84,11 @@ fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
             Ok(results) => {
                 let results: Vec<SearchResult> = results.into_serde().unwrap();
                 handle.set(results);
-            },
+            }
             Err(e) => {
                 let window = window().unwrap();
-                window.alert_with_message(&format!("Error: {:?}", e))
+                window
+                    .alert_with_message(&format!("Error: {:?}", e))
                     .unwrap();
             }
         }
