@@ -19,52 +19,6 @@ pub struct Html {
     pub tree: Tree<Node>,
 }
 
-fn _find_meta(root: &NodeRef<Node>, depth: usize, map: &mut HashMap<String, String>) {
-    if depth > 2 {
-        return;
-    }
-
-    let name_key = QualName::new(None, ns!(), local_name!("name"));
-    let property_key = QualName::new(None, ns!(), local_name!("property"));
-    let content_key = QualName::new(None, ns!(), local_name!("content"));
-
-    for child in root.children() {
-        let node = child.value();
-        if !node.is_element() {
-            continue;
-        }
-
-        if let Some(element) = node.as_element() {
-            if element.name() == "head" {
-                for head_node in child.children() {
-                    if !head_node.value().is_element() {
-                        continue;
-                    }
-
-                    let head_element = head_node.value().as_element().unwrap();
-                    if head_element.name() == "meta" {
-                        if head_element.attrs.contains_key(&name_key) {
-                            let key = head_element.attrs.get(&name_key).unwrap().to_string();
-                            let value = head_element.attrs.get(&content_key).unwrap().to_string();
-                            map.insert(key, value);
-                        } else if head_element.attrs.contains_key(&property_key) {
-                            let key = head_element.attrs.get(&property_key).unwrap().to_string();
-                            let value = head_element.attrs.get(&content_key).unwrap().to_string();
-                            map.insert(key, value);
-                        }
-                    }
-                }
-
-                return;
-            }
-        }
-
-        if child.has_children() && node.is_element() {
-            _find_meta(&child, depth + 1, map);
-        }
-    }
-}
-
 impl Html {
     pub fn new() -> Self {
         Html {
@@ -79,15 +33,99 @@ impl Html {
         parser.one(html)
     }
 
+    fn html(&self) -> Option<NodeRef<Node>> {
+        let root = self.tree.root();
+        for child in root.children() {
+            let node = child.value();
+            if !node.is_element() {
+                continue;
+            }
+
+            if let Some(element) = node.as_element() {
+                if element.name() == "html" {
+                    return Some(child);
+                }
+            }
+        }
+
+        None
+    }
+
+    fn head(&self) -> Option<NodeRef<Node>> {
+        let root = self.html().unwrap();
+        for child in root.children() {
+            let node = child.value();
+            if !node.is_element() {
+                continue;
+            }
+
+            println!("self.head: {:?}", node);
+            if let Some(element) = node.as_element() {
+                if element.name() == "head" {
+                    return Some(child);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn title(&self) -> Option<String> {
+        if let Some(head) = self.head() {
+            for child in head.children() {
+                let node = child.value();
+                if let Some(element) = node.as_element() {
+                    if element.name() == "title" {
+                        let title = child.children().into_iter().next();
+                        if let Some(title) = title {
+                            return Some(title.value().as_text().unwrap().trim().to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     /// Returns a map of meta attributes from the header
     /// This specifically looks for meta tags with a "name" or "property" attr
     /// and an accompanying "content" attr.
     pub fn meta(&self) -> HashMap<String, String> {
-        let root = self.tree.root();
         let mut map = HashMap::new();
-        _find_meta(&root, 0, &mut map);
+        self._find_meta(&mut map);
 
         map
+    }
+
+    fn _find_meta(&self, map: &mut HashMap<String, String>) {
+        // Meta tags we're looking for
+        let name_key = QualName::new(None, ns!(), local_name!("name"));
+        let property_key = QualName::new(None, ns!(), local_name!("property"));
+        let content_key = QualName::new(None, ns!(), local_name!("content"));
+
+        // Loop through elements in the header and find the matching meta tags
+        let root = self.head().unwrap();
+        for child in root.children() {
+            let node = child.value();
+            if !node.is_element() {
+                continue;
+            }
+
+            if let Some(element) = node.as_element() {
+                if element.name() == "meta" {
+                    if element.attrs.contains_key(&name_key) {
+                        let key = element.attrs.get(&name_key).unwrap().to_string();
+                        let value = element.attrs.get(&content_key).unwrap().to_string();
+                        map.insert(key, value);
+                    } else if element.attrs.contains_key(&property_key) {
+                        let key = element.attrs.get(&property_key).unwrap().to_string();
+                        let value = element.attrs.get(&content_key).unwrap().to_string();
+                        map.insert(key, value);
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -75,18 +75,21 @@ impl CrawlQueue {
         let mut conn = db.acquire().await?;
 
         sqlx::query(
-            "INSERT OR IGNORE
-            INTO crawl_queue (
+            "INSERT INTO crawl_queue (
                 url,
                 status,
                 num_retries,
                 force_crawl
             )
-            VALUES (?, ?, 0, ?)",
+            VALUES (?, ?, 0, ?)
+            ON CONFLICT(url) DO UPDATE SET
+                updated_at = CURRENT_TIMESTAMP,
+                status = ?",
         )
         .bind(url)
         .bind(CrawlStatus::Queued)
         .bind(force_crawl)
+        .bind(CrawlStatus::Queued)
         .execute(&mut conn)
         .await?;
 

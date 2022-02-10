@@ -74,7 +74,7 @@ impl Crawler {
                 content: Some(parse_result.content),
                 description,
                 status: status.as_u16(),
-                title: Some("title".to_string()),
+                title: parse_result.title,
                 url: Some(url.to_string()),
             };
         }
@@ -109,6 +109,12 @@ impl Crawler {
         // Check path against rules, if we find any matches that disallow
         for res_rule in rules.iter() {
             if res_rule.rule.is_match(path) && !res_rule.allow_crawl {
+                log::info!(
+                    "Unable to crawl {} due to rule: {}:{}",
+                    domain,
+                    res_rule.rule,
+                    res_rule.allow_crawl
+                );
                 return Ok(false);
             }
         }
@@ -148,12 +154,18 @@ impl Crawler {
 
         // Check for robots.txt of this domain
         if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
+            CrawlQueue::mark_done(db, id).await?;
             return Ok(None);
         }
 
         // Crawl & save the data
         let result = Crawler::crawl(&url).await;
-        log::info!("crawl result: {:?}", result);
+        log::info!(
+            "crawl result: {:?} - {:?}\n{:?}",
+            result.title,
+            result.url,
+            result.description,
+        );
 
         // Update the fetch history & mark as done
         log::trace!("updating fetch history");

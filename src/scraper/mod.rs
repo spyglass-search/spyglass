@@ -10,6 +10,7 @@ use crate::scraper::element::Node;
 use crate::scraper::html::Html;
 
 pub struct ScrapeResult {
+    pub title: Option<String>,
     pub meta: HashMap<String, String>,
     pub content: String,
 }
@@ -50,11 +51,16 @@ pub fn html_to_text(doc: &str) -> ScrapeResult {
     let parsed = Html::parse(doc);
     let root = parsed.tree.root();
     let meta = parsed.meta();
+    let title = parsed.title();
 
     let mut content = String::from("");
     filter_text_nodes(&root, &mut content, &ignore_list);
 
-    ScrapeResult { meta, content }
+    ScrapeResult {
+        title,
+        meta,
+        content,
+    }
 }
 
 #[cfg(test)]
@@ -65,6 +71,7 @@ mod test {
     fn test_html_to_text() {
         let html = include_str!("../../fixtures/raw.html");
         let doc = html_to_text(html);
+        assert_eq!(doc.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(doc.meta.len(), 9);
         assert!(doc.content.len() > 0);
     }

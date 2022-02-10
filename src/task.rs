@@ -73,7 +73,13 @@ pub async fn worker_task(
                 Command::Fetch(crawl) => match Crawler::fetch(&pool, crawl.id).await {
                     Ok(Some(crawl_result)) => {
                         if let Some(content) = crawl_result.content {
-                            match Searcher::add_document(&mut index, "test document", &content) {
+                            match Searcher::add_document(
+                                &mut index,
+                                &crawl_result.title.unwrap_or_default(),
+                                &crawl_result.description.unwrap_or_default(),
+                                &crawl_result.url.unwrap_or_default(),
+                                &content,
+                            ) {
                                 Ok(()) => log::info!("indexed document"),
                                 Err(_) => log::error!("Unable to index crawl id: {}", crawl.id),
                             }

@@ -19,8 +19,7 @@ pub async fn search(
     reader: &State<IndexReader>,
     search_req: Json<SearchReq<'_>>,
 ) -> Result<Json<response::SearchResults>, BadRequest<String>> {
-    let schema = Searcher::schema();
-    let title = schema.get_field("title").unwrap();
+    let fields = Searcher::doc_fields();
 
     let searcher = reader.searcher();
     let docs = Searcher::search(index, reader, search_req.term);
@@ -29,7 +28,7 @@ pub async fn search(
     for (_score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
         log::info!("search: {:?}", retrieved);
-        let title = retrieved.get_first(title).unwrap();
+        let title = retrieved.get_first(fields.title).unwrap();
         results.push(title.text().unwrap().to_string());
     }
 
