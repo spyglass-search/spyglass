@@ -1,5 +1,5 @@
 use crate::models::CrawlQueue;
-use rocket::serde::Serialize;
+use rocket::serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 pub struct ListQueue {
@@ -11,15 +11,22 @@ pub struct AppStats {
     pub num_docs: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,
     pub num_docs: u64,
     pub wall_time_ms: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
+pub struct SearchResult {
+    pub title: String,
+    pub description: String,
+    pub url: String,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct SearchResults {
-    pub results: Vec<String>,
+    pub results: Vec<SearchResult>,
     pub meta: SearchMeta,
 }

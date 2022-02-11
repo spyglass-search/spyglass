@@ -5,15 +5,15 @@ use serde::Deserialize;
 use tantivy::{Index, IndexReader};
 
 use super::response;
+use crate::api::response::SearchResult;
 use crate::models::{CrawlQueue, DbPool};
 use crate::search::Searcher;
-
 #[derive(Debug, Deserialize)]
 pub struct SearchReq<'r> {
     pub term: &'r str,
 }
 
-#[get("/search", data = "<search_req>")]
+#[post("/search", data = "<search_req>")]
 pub async fn search(
     index: &State<Index>,
     reader: &State<IndexReader>,
@@ -24,12 +24,21 @@ pub async fn search(
     let searcher = reader.searcher();
     let docs = Searcher::search(index, reader, search_req.term);
 
-    let mut results: Vec<String> = Vec::new();
+    let mut results: Vec<SearchResult> = Vec::new();
     for (_score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
-        log::info!("search: {:?}", retrieved);
+
         let title = retrieved.get_first(fields.title).unwrap();
-        results.push(title.text().unwrap().to_string());
+        let description = retrieved.get_first(fields.description).unwrap();
+        let url = retrieved.get_first(fields.url).unwrap();
+
+        let result = SearchResult {
+            title: title.text().unwrap().to_string(),
+            description: description.text().unwrap().to_string(),
+            url: url.text().unwrap().to_string(),
+        };
+
+        results.push(result);
     }
 
     let meta = response::SearchMeta {

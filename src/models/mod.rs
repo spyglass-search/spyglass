@@ -1,3 +1,4 @@
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use sqlx::sqlite::{Sqlite, SqlitePoolOptions};
 use sqlx::Pool;
 
@@ -14,6 +15,21 @@ pub use resource_rule::*;
 use crate::config::Config;
 
 pub type DbPool = Pool<Sqlite>;
+
+// TODO: Switch to sea-orm from raw SQL
+pub async fn _create_connection_orm(config: &Config) -> anyhow::Result<DatabaseConnection> {
+    let db_uri = format!(
+        "sqlite://{}?mode=rwc",
+        config.data_dir.join("db.sqlite").to_str().unwrap()
+    );
+
+    // See https://www.sea-ql.org/SeaORM/docs/install-and-config/connection
+    // for more connection options
+    let mut opt = ConnectOptions::new(db_uri);
+    opt.max_connections(5).sqlx_logging(false);
+
+    Ok(Database::connect(opt).await?)
+}
 
 pub async fn create_connection(config: &Config) -> anyhow::Result<DbPool> {
     let db_uri = format!(
