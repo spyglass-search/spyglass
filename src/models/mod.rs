@@ -3,10 +3,12 @@ use sqlx::Pool;
 
 mod crawl_queue;
 mod fetch_history;
+mod indexed_document;
 mod resource_rule;
 // Flatten out models to `models::*` namespace.
 pub use crawl_queue::*;
 pub use fetch_history::*;
+pub use indexed_document::*;
 pub use resource_rule::*;
 
 use crate::config::Config;

@@ -2,7 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::config::Config;
-use crate::models::{create_connection, CrawlQueue, DbPool, FetchHistory, ResourceRule};
+use crate::models::{
+    create_connection, CrawlQueue, DbPool, FetchHistory, IndexedDocument, ResourceRule,
+};
 use crate::search::{IndexPath, Searcher};
 
 pub struct AppState {
@@ -15,8 +17,9 @@ impl AppState {
     /// Initialize db tables
     pub async fn init_db(&self) {
         CrawlQueue::init_table(&self.conn).await.unwrap();
-        ResourceRule::init_table(&self.conn).await.unwrap();
         FetchHistory::init_table(&self.conn).await.unwrap();
+        IndexedDocument::init_table(&self.conn).await.unwrap();
+        ResourceRule::init_table(&self.conn).await.unwrap();
     }
 
     pub fn crawl_dir() -> PathBuf {
