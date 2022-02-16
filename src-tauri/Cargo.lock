@@ -362,6 +362,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo_toml"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e270ef0cd868745878982f7ce470aa898d0d4bb248af67f0cf66f54617913ef"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "toml",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3319,9 +3330,9 @@ dependencies = [
 
 [[package]]
 name = "tauri"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05cd4bbdc3d855aa78bad4c7c39bf425d51f09d614d75fff2493c70aa89e16f4"
+checksum = "3571de0bcfd1f4f7599cbb3fe42f28ea9f52c3e89914ff04eaba68b5ee36bb51"
 dependencies = [
  "attohttpc",
  "bincode",
@@ -3369,13 +3380,12 @@ dependencies = [
 
 [[package]]
 name = "tauri-build"
-version = "1.0.0-beta.4"
+version = "1.0.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c9c9a9bea25b9d6f5845b8662e18447e17218f99860cab37e39e2b57a9fcd49"
+checksum = "b4dab79d01b8e429cb5bd98d9da90cbc1bedbd87d536d16adcf269c584bf6ae0"
 dependencies = [
  "anyhow",
- "proc-macro2",
- "quote",
+ "cargo_toml",
  "serde_json",
  "tauri-utils",
  "winres",
@@ -3383,9 +3393,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-codegen"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a52763b36186053eeede537589a7373d8a253de5ac4c6235ad104c2c971343ce"
+checksum = "7d06ecdbd6beaf7348259f82885742f013c0c96ac139445ec7c4b8050cd18349"
 dependencies = [
  "base64",
  "blake3",
@@ -3404,9 +3414,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-macros"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5493f2bcfc0634e77ace91d83820d4f7f597b94ff2314cd4b3431caf020a5558"
+checksum = "ba9ab86a4e81b31b227800c120b452dae137754e06d75b75c41c06cd06d301e2"
 dependencies = [
  "heck 0.4.0",
  "proc-macro2",
@@ -3418,9 +3428,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-runtime"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be5d4967753541a0d1ac324c50c2c381811fbdc3e743ad0a8b6132f55143ace5"
+checksum = "c683b979ec4841b86048a282cd86afbc13b418a0f546904b27fad06e882ad5d7"
 dependencies = [
  "gtk",
  "http",
@@ -3437,9 +3447,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-runtime-wry"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61854d1fb4ebf92044a9885cf64e04e515fa1d50daa9390a8ab373b7b2a2b21c"
+checksum = "ec025e7c906451fd7ff9e46d106a2e1b5b73e48013d13d52ffce614212b63fdc"
 dependencies = [
  "gtk",
  "ico",
@@ -3455,11 +3465,12 @@ dependencies = [
 
 [[package]]
 name = "tauri-utils"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "355ec32fbbc19eadc28adc24a90882e5dac111d779fda60cb05c02b56080df5f"
+checksum = "abcbfec197c4cb959376607ac2fd99cecca02bd6d52b794bd882959501e34533"
 dependencies = [
  "ctor",
+ "glob",
  "heck 0.4.0",
  "html5ever",
  "json-patch",
@@ -3473,6 +3484,7 @@ dependencies = [
  "serialize-to-javascript",
  "thiserror",
  "url",
+ "walkdir",
  "zstd",
 ]
 

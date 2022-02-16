@@ -3,10 +3,11 @@
     windows_subsystem = "windows"
 )]
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tauri::{
-    CustomMenuItem, Menu, MenuItem, Submenu, SystemTray, SystemTrayMenu, SystemTrayMenuItem,
+    CustomMenuItem, Manager, Menu, MenuItem, Submenu, SystemTray, SystemTrayEvent, SystemTrayMenu,
+    SystemTrayMenuItem,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -29,14 +30,13 @@ pub struct SearchResults {
     pub meta: SearchMeta,
 }
 
-
 fn main() {
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let hide = CustomMenuItem::new("hide".to_string(), "Hide");
+    let hide = CustomMenuItem::new("toggle".to_string(), "Hide");
     let tray_menu = SystemTrayMenu::new()
-        .add_item(quit)
+        .add_item(hide)
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(hide);
+        .add_item(quit);
 
     let tray = SystemTray::new().with_menu(tray_menu);
 
@@ -54,6 +54,29 @@ fn main() {
             )),
         )
         .system_tray(tray)
+        .on_system_tray_event(move |app, event| match event {
+            SystemTrayEvent::MenuItemClick { id, .. } => {
+                let item_handle = app.tray_handle().get_item(&id);
+                match id.as_str() {
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    "toggle" => {
+                        let window = app.get_window("main").unwrap();
+                        let new_title = if window.is_visible().unwrap() {
+                            window.hide().unwrap();
+                            "Show"
+                        } else {
+                            window.show().unwrap();
+                            "Hide"
+                        };
+                        item_handle.set_title(new_title).unwrap();
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        })
         .run(ctx)
         .expect("error while running tauri application");
 }
@@ -67,9 +90,11 @@ async fn search(query: &str) -> Result<Vec<SearchResult>, String> {
         .post("http://localhost:7777/api/search")
         .json(&map)
         .send()
-        .await.unwrap()
+        .await
+        .unwrap()
         .json()
-        .await.unwrap();
+        .await
+        .unwrap();
 
     println!("{:?}", res);
 
