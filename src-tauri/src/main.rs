@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::{
-    CustomMenuItem, Manager, Menu, MenuItem, Submenu, SystemTray, SystemTrayEvent, SystemTrayMenu,
-    SystemTrayMenuItem,
+    CustomMenuItem, LogicalSize, Manager, Menu, MenuItem, Size, Submenu, SystemTray,
+    SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -82,7 +82,13 @@ fn main() {
 }
 
 #[tauri::command]
-async fn search(query: &str) -> Result<Vec<SearchResult>, String> {
+async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>, String> {
+    if query.len() > 0 {
+        window.set_size(Size::Logical(LogicalSize { width: 640.0, height: 640.0 })).unwrap();
+    } else {
+        window.set_size(Size::Logical(LogicalSize { width: 640.0, height: 96.0 })).unwrap();
+    }
+
     let mut map = HashMap::new();
     map.insert("term", query);
 

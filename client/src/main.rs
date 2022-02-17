@@ -25,7 +25,7 @@ struct SearchResult {
 #[function_component(App)]
 pub fn app() -> Html {
     let search = use_state_eq(|| Vec::new());
-    let query = use_state_eq(|| "query".to_string());
+    let query = use_state_eq(|| "".to_string());
 
     {
         let search = search.clone();
