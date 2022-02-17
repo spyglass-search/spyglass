@@ -8,7 +8,7 @@ use yew::prelude::*;
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
     #[wasm_bindgen(js_name = invokeSearch, catch)]
-    pub async fn search(query: String) -> Result<JsValue, JsValue>;
+    pub async fn run_search(query: String) -> Result<JsValue, JsValue>;
 }
 
 fn main() {
@@ -24,21 +24,21 @@ struct SearchResult {
 
 #[function_component(App)]
 pub fn app() -> Html {
-    let search = use_state_eq(|| Vec::new());
+    let search_results = use_state_eq(|| Vec::new());
     let query = use_state_eq(|| "".to_string());
 
     {
-        let search = search.clone();
+        let search_results = search_results.clone();
         use_effect_with_deps(
             move |query| {
-                update_results(search, query.clone());
+                update_results(search_results, query.clone());
                 || ()
             },
             (*query).clone(),
         );
     }
 
-    let results = search
+    let results = search_results
         .iter()
         .map(|res| {
             html! {
@@ -79,8 +79,12 @@ pub fn app() -> Html {
 }
 
 fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
+    if query.len() < 2 {
+        return;
+    }
+
     spawn_local(async move {
-        match search(query).await {
+        match run_search(query).await {
             Ok(results) => {
                 let results: Vec<SearchResult> = results.into_serde().unwrap();
                 handle.set(results);
