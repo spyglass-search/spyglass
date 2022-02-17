@@ -1,8 +1,10 @@
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
+
 use tantivy::IndexWriter;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::crawler::Crawler;
-use crate::models::{CrawlQueue, DbPool};
+use crate::models::{crawl_queue, indexed_document};
 use crate::search::Searcher;
 
 #[derive(Debug, Clone)]
@@ -22,22 +24,25 @@ pub enum AppShutdown {
 
 /// Manages the crawl queue
 pub async fn manager_task(
-    pool: DbPool,
+    db: DatabaseConnection,
     queue: mpsc::Sender<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
     loop {
         let next_url = tokio::select! {
-            res = CrawlQueue::next(&pool) => res.unwrap(),
+            res = crawl_queue::Entity::find()
+                .filter(crawl_queue::Column::Status.contains(&crawl_queue::CrawlStatus::Queued.to_string()))
+                .order_by_asc(crawl_queue::Column::CreatedAt)
+                .one(&db) => res.unwrap(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 return;
             }
         };
 
-        if let Some(crawl_task) = next_url {
-            let cmd = Command::Fetch(crawl_task.clone());
+        if let Some(task) = next_url {
+            let cmd = Command::Fetch(CrawlTask { id: task.id });
             // Send the GET request
             log::info!("sending fetch");
             if queue.send(cmd).await.is_err() {
@@ -52,7 +57,7 @@ pub async fn manager_task(
 
 /// Grabs a task
 pub async fn worker_task(
-    pool: DbPool,
+    db: DatabaseConnection,
     mut index: IndexWriter,
     mut queue: mpsc::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
@@ -70,18 +75,41 @@ pub async fn worker_task(
         if let Some(cmd) = next_cmd {
             log::info!("received cmd: {:?}", cmd);
             match cmd {
-                Command::Fetch(crawl) => match Crawler::fetch(&pool, crawl.id).await {
+                Command::Fetch(crawl) => match Crawler::fetch(&db, crawl.id).await {
                     Ok(Some(crawl_result)) => {
                         if let Some(content) = crawl_result.content {
-                            match Searcher::add_document(
-                                &mut index,
-                                &crawl_result.title.unwrap_or_default(),
-                                &crawl_result.description.unwrap_or_default(),
-                                &crawl_result.url.unwrap_or_default(),
-                                &content,
-                            ) {
-                                Ok(()) => log::info!("indexed document"),
-                                Err(_) => log::error!("Unable to index crawl id: {}", crawl.id),
+                            let url = crawl_result.url.unwrap_or_default();
+
+                            // Add / Update search index
+                            let existing = indexed_document::Entity::find()
+                                .filter(indexed_document::Column::Url.contains(&url))
+                                .one(&db)
+                                .await
+                                .unwrap();
+
+                            if let Some(_) = existing {
+                                // TODO: Update index instead of adding
+                            } else {
+                                match Searcher::add_document(
+                                    &mut index,
+                                    &crawl_result.title.unwrap_or_default(),
+                                    &crawl_result.description.unwrap_or_default(),
+                                    &url,
+                                    &content,
+                                ) {
+                                    Ok(()) => log::info!("indexed document"),
+                                    Err(_) => log::error!("Unable to index crawl id: {}", crawl.id),
+                                }
+
+                                let new_doc = indexed_document::ActiveModel {
+                                    url: sea_orm::Set(url),
+                                    ..Default::default()
+                                };
+
+                                indexed_document::Entity::insert(new_doc)
+                                    .exec(&db)
+                                    .await
+                                    .unwrap();
                             }
                         }
                     }

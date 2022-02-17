@@ -1,3 +1,6 @@
+use sea_orm::prelude::*;
+use sea_orm::{DatabaseConnection, Set};
+
 use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::StatusCode;
@@ -7,7 +10,7 @@ use url::Url;
 
 pub mod robots;
 
-use crate::models::{CrawlQueue, DbPool, FetchHistory, ResourceRule};
+use crate::models::{crawl_queue, fetch_history, resource_rule};
 use crate::scraper::html_to_text;
 use crate::state::AppState;
 
@@ -86,8 +89,16 @@ impl Crawler {
     }
 
     /// Checks whether we're allow to crawl this domain + path
-    async fn is_crawl_allowed(db: &DbPool, domain: &str, path: &str) -> anyhow::Result<bool> {
-        let mut rules = ResourceRule::find(db, domain).await?;
+    async fn is_crawl_allowed(
+        db: &DatabaseConnection,
+        domain: &str,
+        _path: &str,
+    ) -> anyhow::Result<bool> {
+        let rules = resource_rule::Entity::find()
+            .filter(resource_rule::Column::Domain.eq(domain))
+            .all(db)
+            .await?;
+
         log::info!("Found {} rules", rules.len());
 
         if rules.is_empty() {
@@ -97,39 +108,56 @@ impl Crawler {
             if res.status() == StatusCode::OK {
                 let body = res.text().await.unwrap();
 
-                rules = parse(domain, &body);
+                let parsed_rules = parse(domain, &body);
                 log::info!("Found {} rules", rules.len());
 
-                for rule in rules.iter() {
-                    ResourceRule::insert_rule(db, rule).await?;
+                for rule in parsed_rules.iter() {
+                    let new_rule = resource_rule::ActiveModel {
+                        domain: Set(rule.domain.to_owned()),
+                        rule: Set(rule.regex.to_owned()),
+                        no_index: Set(rule.no_index),
+                        allow_crawl: Set(rule.allow_crawl),
+                        ..Default::default()
+                    };
+                    new_rule.insert(db).await?;
                 }
             }
         }
 
         // Check path against rules, if we find any matches that disallow
-        for res_rule in rules.iter() {
-            if res_rule.rule.is_match(path) && !res_rule.allow_crawl {
-                log::info!(
-                    "Unable to crawl {} due to rule: {}:{}",
-                    domain,
-                    res_rule.rule,
-                    res_rule.allow_crawl
-                );
-                return Ok(false);
-            }
-        }
+        // TODO: DO THIS CORRECTLY
+        // for res_rule in rules.iter() {
+        //     if res_rule.rule.is_match(path) && !res_rule.allow_crawl {
+        //         log::info!(
+        //             "Unable to crawl {} due to rule: {}:{}",
+        //             domain,
+        //             res_rule.rule,
+        //             res_rule.allow_crawl
+        //         );
+        //         return Ok(false);
+        //     }
+        // }
 
         Ok(true)
     }
 
     /// Add url to the crawl queue
-    pub async fn enqueue(db: &DbPool, url: &str) -> anyhow::Result<(), sqlx::Error> {
-        CrawlQueue::insert(db, url, false).await
+    pub async fn enqueue(db: &DatabaseConnection, url: &str) -> anyhow::Result<(), sea_orm::DbErr> {
+        let new_task = crawl_queue::ActiveModel {
+            url: Set(url.to_owned()),
+            ..Default::default()
+        };
+        new_task.insert(db).await?;
+
+        Ok(())
     }
 
     // TODO: Load web indexing as a plugin?
-    pub async fn fetch(db: &DbPool, id: i64) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let crawl = CrawlQueue::get(db, id).await?;
+    pub async fn fetch(
+        db: &DatabaseConnection,
+        id: i64,
+    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
 
         log::info!("Fetching URL: {:?}", crawl.url);
 
@@ -142,7 +170,11 @@ impl Crawler {
 
         // Skip history check if we're trying to force this crawl.
         if !crawl.force_crawl {
-            let history = FetchHistory::find(db, &url_base).await?;
+            let history = fetch_history::Entity::find()
+                .filter(fetch_history::Column::Url.eq(url_base.to_string()))
+                .one(db)
+                .await?;
+
             if let Some(history) = history {
                 let since_last_fetch = Utc::now() - history.updated_at;
                 if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
@@ -154,7 +186,10 @@ impl Crawler {
 
         // Check for robots.txt of this domain
         if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
-            CrawlQueue::mark_done(db, id).await?;
+            let mut updated: crawl_queue::ActiveModel = crawl.into();
+            updated.status = Set(crawl_queue::CrawlStatus::Completed);
+            updated.update(db).await?;
+
             return Ok(None);
         }
 
@@ -169,8 +204,12 @@ impl Crawler {
 
         // Update the fetch history & mark as done
         log::trace!("updating fetch history");
-        FetchHistory::insert(db, &url_base, result.content_hash.clone(), result.status).await?;
-        CrawlQueue::mark_done(db, id).await?;
+        fetch_history::upsert(db, &url_base, result.content_hash.clone(), result.status).await?;
+
+        let mut updated: crawl_queue::ActiveModel = crawl.into();
+        updated.status = Set(crawl_queue::CrawlStatus::Completed);
+        updated.update(db).await?;
+
         Ok(Some(result))
     }
 }

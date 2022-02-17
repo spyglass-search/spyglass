@@ -1,27 +1,25 @@
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
-use sqlx::sqlite::{Sqlite, SqlitePoolOptions};
-use sqlx::Pool;
 
-mod crawl_queue;
-mod fetch_history;
-mod indexed_document;
-mod resource_rule;
-// Flatten out models to `models::*` namespace.
-pub use crawl_queue::*;
-pub use fetch_history::*;
-pub use indexed_document::*;
-pub use resource_rule::*;
+pub mod crawl_queue;
+pub mod fetch_history;
+pub mod indexed_document;
+pub mod resource_rule;
 
 use crate::config::Config;
 
-pub type DbPool = Pool<Sqlite>;
-
 // TODO: Switch to sea-orm from raw SQL
-pub async fn _create_connection_orm(config: &Config) -> anyhow::Result<DatabaseConnection> {
-    let db_uri = format!(
-        "sqlite://{}?mode=rwc",
-        config.data_dir.join("db.sqlite").to_str().unwrap()
-    );
+pub async fn create_connection(
+    config: &Config,
+    is_test: bool,
+) -> anyhow::Result<DatabaseConnection> {
+    let db_uri: String = if is_test {
+        "sqlite::memory:".to_string()
+    } else {
+        format!(
+            "sqlite://{}?mode=rwc",
+            config.data_dir.join("db.sqlite").to_str().unwrap()
+        )
+    };
 
     // See https://www.sea-ql.org/SeaORM/docs/install-and-config/connection
     // for more connection options
@@ -29,18 +27,6 @@ pub async fn _create_connection_orm(config: &Config) -> anyhow::Result<DatabaseC
     opt.max_connections(5).sqlx_logging(false);
 
     Ok(Database::connect(opt).await?)
-}
-
-pub async fn create_connection(config: &Config) -> anyhow::Result<DbPool> {
-    let db_uri = format!(
-        "sqlite://{}?mode=rwc",
-        config.data_dir.join("db.sqlite").to_str().unwrap()
-    );
-
-    Ok(SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(&db_uri)
-        .await?)
 }
 
 #[cfg(test)]
@@ -51,7 +37,7 @@ mod test {
     #[tokio::test]
     async fn test_create_connection() {
         let config = Config::new();
-        let res = create_connection(&config).await;
+        let res = create_connection(&config, true).await;
         assert!(res.is_ok());
     }
 }

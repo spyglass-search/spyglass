@@ -4,12 +4,18 @@
 /// - https://www.robotstxt.org/robotstxt.html
 ///
 /// TODO: Convert allow/disallow paths into proper regexes.
-use crate::models::ResourceRule;
 use regex::Regex;
+
+pub struct ParsedRule {
+    pub domain: String,
+    pub regex: String,
+    pub no_index: bool,
+    pub allow_crawl: bool,
+}
 
 const BOT_AGENT_NAME: &str = "carto";
 
-pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
+pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
     let mut rules = Vec::new();
 
     let mut user_agent: Option<String> = None;
@@ -26,12 +32,22 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ResourceRule> {
                 if line.starts_with("disallow:") {
                     let regex = line.strip_prefix("disallow:").unwrap().trim();
                     if let Ok(regex) = Regex::new(regex) {
-                        rules.push(ResourceRule::new(domain, &regex, false, false));
+                        rules.push(ParsedRule {
+                            domain: domain.to_string(),
+                            regex: regex.to_string(),
+                            no_index: false,
+                            allow_crawl: false,
+                        });
                     }
                 } else if line.starts_with("allow:") {
                     let regex = line.strip_prefix("allow:").unwrap().trim();
                     if let Ok(regex) = Regex::new(regex) {
-                        rules.push(ResourceRule::new(domain, &regex, false, true));
+                        rules.push(ParsedRule {
+                            domain: domain.to_string(),
+                            regex: regex.to_string(),
+                            no_index: false,
+                            allow_crawl: true,
+                        });
                     }
                 }
             }

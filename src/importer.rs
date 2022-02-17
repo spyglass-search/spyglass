@@ -76,7 +76,7 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            Crawler::enqueue(&state.conn, url).await?;
+            Crawler::enqueue(&state.db, url).await?;
             count += 1;
         }
 

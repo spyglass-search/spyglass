@@ -1,9 +1,9 @@
-use crate::models::CrawlQueue;
+use crate::models::crawl_queue;
 use rocket::serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 pub struct ListQueue {
-    pub queue: Vec<CrawlQueue>,
+    pub queue: Vec<crawl_queue::Model>,
 }
 
 #[derive(Serialize)]

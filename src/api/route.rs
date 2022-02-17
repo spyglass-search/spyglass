@@ -1,3 +1,6 @@
+use sea_orm::prelude::*;
+use sea_orm::{DatabaseConnection, Set};
+
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use rocket::State;
@@ -6,7 +9,7 @@ use tantivy::{Index, IndexReader};
 
 use super::response;
 use crate::api::response::SearchResult;
-use crate::models::{CrawlQueue, DbPool};
+use crate::models::crawl_queue;
 use crate::search::Searcher;
 #[derive(Debug, Deserialize)]
 pub struct SearchReq<'r> {
@@ -53,9 +56,10 @@ pub async fn search(
 /// Show the list of URLs in the queue and their status
 #[get("/queue")]
 pub async fn list_queue(
-    pool: &State<DbPool>,
+    db: &State<DatabaseConnection>,
 ) -> Result<Json<response::ListQueue>, BadRequest<String>> {
-    let queue = CrawlQueue::list(pool, None).await;
+    let db = db.inner();
+    let queue = crawl_queue::Entity::find().all(db).await;
 
     match queue {
         Ok(queue) => Ok(Json(response::ListQueue { queue })),
@@ -72,11 +76,19 @@ pub struct QueueItem<'r> {
 /// Add url to queue
 #[post("/queue", data = "<queue_item>")]
 pub async fn add_queue(
-    pool: &State<DbPool>,
+    db: &State<DatabaseConnection>,
     queue_item: Json<QueueItem<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
-    match CrawlQueue::insert(pool, queue_item.url, queue_item.force_crawl).await {
-        Ok(()) => Ok("ok"),
+    let db = db.inner();
+
+    let new_task = crawl_queue::ActiveModel {
+        url: Set(queue_item.url.to_owned()),
+        force_crawl: Set(queue_item.force_crawl),
+        ..Default::default()
+    };
+
+    match new_task.insert(db).await {
+        Ok(_) => Ok("ok"),
         Err(err) => Err(BadRequest(Some(err.to_string()))),
     }
 }
