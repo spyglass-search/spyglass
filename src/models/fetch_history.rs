@@ -76,8 +76,6 @@ pub async fn upsert(
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
-
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, ConnectionTrait, Schema, Set};
 
@@ -86,10 +84,7 @@ mod test {
 
     #[tokio::test]
     async fn test_insert() {
-        let config = Config {
-            data_dir: Path::new("/tmp").to_path_buf(),
-            prefs_dir: Path::new("/tmp").to_path_buf(),
-        };
+        let config = Config::new();
 
         // Create table
         let db = create_connection(&config, true).await.unwrap();

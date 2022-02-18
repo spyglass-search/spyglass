@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "resource_rules")]
@@ -22,110 +23,50 @@ impl RelationTrait for Relation {
     }
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+impl ActiveModelBehavior for ActiveModel {
+    fn new() -> Self {
+        Self {
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..ActiveModelTrait::default()
+        }
+    }
+}
 
-// impl ResourceRule {
-//     pub async fn find(db: &DbPool, domain: &str) -> anyhow::Result<Vec<ResourceRule>, sqlx::Error> {
-//         let mut conn = db.acquire().await?;
+#[cfg(test)]
+mod test {
+    use sea_orm::prelude::*;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, Set};
 
-//         let rows = sqlx::query(
-//             "SELECT
-//                 id,
-//                 domain,
-//                 rule,
-//                 no_index,
-//                 allow_crawl,
-//                 created_at,
-//                 updated_at
-//             FROM resource_rules
-//             WHERE domain = ?",
-//         )
-//         .bind(domain)
-//         .try_map(|row: SqliteRow| {
-//             let rule_str = row.get(2);
-//             let rule = ResourceRule {
-//                 id: row.get::<Option<i64>, _>(0),
-//                 domain: row.get(1),
-//                 rule: Regex::new(rule_str).unwrap(),
-//                 no_index: row.get(3),
-//                 allow_crawl: row.get(4),
-//                 created_at: row.get(5),
-//                 updated_at: row.get(6),
-//             };
+    use crate::config::Config;
+    use crate::models::{create_connection, resource_rule, setup_schema};
 
-//             Ok(rule)
-//         })
-//         .fetch_all(&mut conn)
-//         .await?;
+    #[tokio::test]
+    async fn test_insert() -> anyhow::Result<(), sea_orm::DbErr> {
+        let config = Config::new();
+        let db = create_connection(&config, true).await.unwrap();
+        setup_schema(&db).await.expect("Unable to create tables");
 
-//         Ok(rows)
-//     }
+        let domain = "oldschool.runescape.wiki";
+        let rule = "/";
 
-//     pub async fn insert(
-//         db: &DbPool,
-//         domain: &str,
-//         rule: &str,
-//         no_index: bool,
-//         allow_crawl: bool,
-//     ) -> Result<(), sqlx::Error> {
-//         let mut conn = db.acquire().await?;
+        let new_rule = resource_rule::ActiveModel {
+            domain: Set(domain.to_owned()),
+            rule: Set(rule.to_owned()),
+            no_index: Set(false),
+            allow_crawl: Set(true),
+            ..Default::default()
+        };
+        new_rule.insert(&db).await.expect("Unable to insert");
 
-//         sqlx::query(
-//             "INSERT INTO resource_rules (domain, rule, no_index, allow_crawl)
-//             VALUES (?, ?, ?, ?)",
-//         )
-//         .bind(domain)
-//         .bind(rule)
-//         .bind(no_index)
-//         .bind(allow_crawl)
-//         .execute(&mut conn)
-//         .await?;
+        let query = resource_rule::Entity::find()
+            .filter(resource_rule::Column::Domain.eq(domain))
+            .all(&db)
+            .await
+            .expect("Unable to run query");
 
-//         Ok(())
-//     }
+        assert_eq!(query.len(), 1);
 
-//     pub async fn insert_rule(db: &DbPool, rule: &ResourceRule) -> Result<(), sqlx::Error> {
-//         let mut conn = db.acquire().await?;
-
-//         sqlx::query(
-//             "INSERT INTO resource_rules (domain, rule, no_index, allow_crawl)
-//             VALUES (?1, ?2, ?3, ?4)",
-//         )
-//         .bind(&rule.domain)
-//         .bind(&rule.rule.to_string())
-//         .bind(rule.no_index)
-//         .bind(rule.allow_crawl)
-//         .execute(&mut conn)
-//         .await?;
-
-//         Ok(())
-//     }
-// }
-
-// #[cfg(test)]
-// mod test {
-//     use crate::config::Config;
-//     use crate::models::{create_connection, ResourceRule};
-//     use std::path::Path;
-
-//     #[tokio::test]
-//     async fn test_insert() -> anyhow::Result<(), sqlx::Error> {
-//         let config = Config {
-//             data_dir: Path::new("/tmp").to_path_buf(),
-//             prefs_dir: Path::new("/tmp").to_path_buf(),
-//         };
-
-//         let db = create_connection(&config).await.unwrap();
-//         ResourceRule::init_table(&db).await?;
-
-//         let res = ResourceRule::insert(&db, "oldschool.runescape.wiki", "/", false, true).await;
-//         assert!(res.is_ok());
-
-//         let rules = ResourceRule::find(&db, "oldschool.runescape.wiki")
-//             .await
-//             .expect("Unable to find rules");
-//         assert_eq!(rules.len(), 1);
-
-//         Ok(())
-//     }
-// }
+        Ok(())
+    }
+}
