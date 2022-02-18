@@ -213,3 +213,88 @@ impl Crawler {
         Ok(Some(result))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use sea_orm::prelude::*;
+    use sea_orm::{ActiveModelTrait, Set};
+
+    use crate::crawler::Crawler;
+    use crate::models::{crawl_queue, resource_rule};
+    use crate::test::setup_test_db;
+
+    use url::Url;
+
+    #[tokio::test]
+    async fn test_crawl() {
+        let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
+        let result = Crawler::crawl(&url).await;
+
+        assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
+        assert_eq!(
+            result.url,
+            Some("https://oldschool.runescape.wiki/".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_is_crawl_allowed() {
+        let db = setup_test_db().await;
+
+        let domain = "oldschool.runescape.wiki";
+        let rule = "/";
+
+        // Add some fake rules
+        let allow = resource_rule::ActiveModel {
+            domain: Set(domain.to_owned()),
+            rule: Set(rule.to_owned()),
+            no_index: Set(false),
+            allow_crawl: Set(true),
+            ..Default::default()
+        };
+        allow
+            .insert(&db)
+            .await
+            .expect("Unable to insert allow rule");
+
+        let res = Crawler::is_crawl_allowed(&db, domain, rule).await.unwrap();
+        assert_eq!(res, true);
+    }
+
+    #[tokio::test]
+    async fn test_enqueue() {
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/";
+        Crawler::enqueue(&db, url).await.unwrap();
+
+        let crawl = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Url.eq(url.to_string()))
+            .all(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(crawl.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_fetch() {
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/";
+        let query = crawl_queue::ActiveModel {
+            url: Set(url.to_owned()),
+            ..Default::default()
+        };
+        let model = query.insert(&db).await.unwrap();
+
+        let crawl_result = Crawler::fetch(&db, model.id).await.unwrap();
+        assert!(crawl_result.is_some());
+
+        let result = crawl_result.unwrap();
+        assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
+        assert_eq!(
+            result.url,
+            Some("https://oldschool.runescape.wiki/".to_string())
+        );
+
+    }
+}

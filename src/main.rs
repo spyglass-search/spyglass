@@ -16,6 +16,7 @@ mod scraper;
 mod search;
 mod state;
 mod task;
+mod test;
 
 use crate::api::start_api;
 use crate::importer::FirefoxImporter;

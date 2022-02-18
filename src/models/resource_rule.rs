@@ -38,14 +38,12 @@ mod test {
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, ColumnTrait, Set};
 
-    use crate::config::Config;
-    use crate::models::{create_connection, resource_rule, setup_schema};
+    use crate::models::resource_rule;
+    use crate::test::setup_test_db;
 
     #[tokio::test]
     async fn test_insert() -> anyhow::Result<(), sea_orm::DbErr> {
-        let config = Config::new();
-        let db = create_connection(&config, true).await.unwrap();
-        setup_schema(&db).await.expect("Unable to create tables");
+        let db = setup_test_db().await;
 
         let domain = "oldschool.runescape.wiki";
         let rule = "/";
