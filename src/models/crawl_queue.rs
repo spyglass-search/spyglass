@@ -74,15 +74,12 @@ mod test {
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, Set};
 
-    use crate::config::Config;
-    use crate::models::{crawl_queue, create_connection, setup_schema};
+    use crate::models::crawl_queue;
+    use crate::test::setup_test_db;
 
     #[tokio::test]
     async fn test_insert() {
-        // Setup connection + table
-        let config = Config::new();
-        let db = create_connection(&config, true).await.unwrap();
-        setup_schema(&db).await.expect("Unable to create tables");
+        let db = setup_test_db().await;
 
         let url = "oldschool.runescape.wiki/";
         let crawl = crawl_queue::ActiveModel {

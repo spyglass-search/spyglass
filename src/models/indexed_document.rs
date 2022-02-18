@@ -25,23 +25,3 @@ impl RelationTrait for Relation {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-
-// impl IndexedDocument {
-//     pub async fn init_table(db: &DbPool) -> anyhow::Result<(), sqlx::Error> {
-//         let mut conn = db.acquire().await?;
-
-//         sqlx::query(
-//             "CREATE TABLE IF NOT EXISTS indexed_document (
-//                 id INTEGER PRIMARY KEY,
-//                 url TEXT UNIQUE,
-//                 doc_addr_segment INTEGER,
-//                 doc_addr_id INTEGER,
-//                 indexed_at DATETIME default CURRENT_TIMESTAMP
-//             )",
-//         )
-//         .execute(&mut conn)
-//         .await?;
-
-//         Ok(())
-//     }
-// }

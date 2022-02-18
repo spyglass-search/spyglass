@@ -77,21 +77,14 @@ pub async fn upsert(
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;
-    use sea_orm::{ActiveModelTrait, ConnectionTrait, Schema, Set};
+    use sea_orm::{ActiveModelTrait, Set};
 
-    use crate::config::Config;
-    use crate::models::{create_connection, fetch_history};
+    use crate::models::fetch_history;
+    use crate::test::setup_test_db;
 
     #[tokio::test]
     async fn test_insert() {
-        let config = Config::new();
-
-        // Create table
-        let db = create_connection(&config, true).await.unwrap();
-        let builder = db.get_database_backend();
-        let schema = Schema::new(builder);
-        let create = builder.build(&schema.create_table_from_entity(fetch_history::Entity));
-        db.execute(create).await.unwrap();
+        let db = setup_test_db().await;
 
         let hash = "this is a hash".to_string();
         let new = fetch_history::ActiveModel {
