@@ -108,11 +108,12 @@ impl Searcher {
         description: &str,
         url: &str,
         content: &str,
-    ) -> tantivy::Result<()> {
+    ) -> tantivy::Result<Uuid> {
         let fields = Searcher::doc_fields();
 
+        let doc_id = Uuid::new_v4();
         let mut doc = Document::default();
-        doc.add_text(fields.id, Uuid::new_v4());
+        doc.add_text(fields.id, doc_id);
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
         doc.add_text(fields.title, title);
@@ -121,7 +122,7 @@ impl Searcher {
 
         writer.commit()?;
 
-        Ok(())
+        Ok(doc_id)
     }
 
     pub fn search(index: &Index, reader: &IndexReader, query_string: &str) -> Vec<SearchResult> {
