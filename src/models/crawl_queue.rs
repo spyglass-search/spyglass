@@ -18,7 +18,7 @@ pub enum CrawlStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
-#[sea_orm(table_name = "indexed_document")]
+#[sea_orm(table_name = "crawl_queue")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
