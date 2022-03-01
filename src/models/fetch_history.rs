@@ -57,7 +57,7 @@ pub async fn upsert(
             let mut model: ActiveModel = res.into();
             model.hash = Set(hash.to_owned());
             model.status = Set(status);
-
+            model.updated_at = Set(chrono::Utc::now());
             Ok(model.update(db).await?)
         }
         // Doesn't exist, insert into db
