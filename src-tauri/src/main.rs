@@ -14,6 +14,7 @@ const INPUT_Y: f64 = 128.0;
 
 const RESULT_HEIGHT: f64 = 96.0;
 
+const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
@@ -42,8 +43,21 @@ fn main() {
         .invoke_handler(tauri::generate_handler![search])
         .menu(menu::get_app_menu())
         .setup(|app| {
+            // Register global shortcut
+            let mut shortcuts = app.global_shortcut_manager();
+            if !shortcuts.is_registered(SHORTCUT).unwrap() {
+                let handle = app.get_window("main").unwrap();
+                shortcuts.register(SHORTCUT, move || {
+                    if handle.is_visible().unwrap() {
+                        handle.hide().unwrap();
+                    } else {
+                        handle.show().unwrap();
+                    }
+                }).unwrap();
+            }
+
+            // Center window horizontally in the current screen
             let window = app.get_window("main").unwrap();
-            // Center horizontally in the current screen
             if let Some(monitor) = window.current_monitor().unwrap() {
                 let size = monitor.size();
                 let scale = monitor.scale_factor();
