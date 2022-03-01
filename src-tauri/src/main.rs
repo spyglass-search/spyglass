@@ -2,6 +2,11 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tauri::{LogicalSize, GlobalShortcutManager, Manager, Size, SystemTray, SystemTrayEvent};
+
+mod menu;
 
 const INPUT_WIDTH: f64 = 640.0;
 const INPUT_HEIGHT: f64 = 96.0;
@@ -9,12 +14,6 @@ const INPUT_Y: f64 = 128.0;
 
 const RESULT_HEIGHT: f64 = 96.0;
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tauri::{
-    CustomMenuItem, LogicalSize, Manager, Menu, MenuItem, Size, Submenu, SystemTray,
-    SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
-};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
@@ -37,28 +36,11 @@ pub struct SearchResults {
 }
 
 fn main() {
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let hide = CustomMenuItem::new("toggle".to_string(), "Hide");
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(hide)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit);
-
-    let tray = SystemTray::new().with_menu(tray_menu);
-
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![search])
-        .menu(
-            Menu::new().add_submenu(Submenu::new(
-                &ctx.package_info().name,
-                Menu::new()
-                    .add_native_item(MenuItem::Hide)
-                    .add_native_item(MenuItem::Separator)
-                    .add_native_item(MenuItem::Quit),
-            )),
-        )
+        .menu(menu::get_app_menu())
         .setup(|app| {
             let window = app.get_window("main").unwrap();
             // Center horizontally in the current screen
@@ -77,7 +59,7 @@ fn main() {
             }
             Ok(())
         })
-        .system_tray(tray)
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
         .on_system_tray_event(move |app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
