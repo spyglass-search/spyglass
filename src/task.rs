@@ -1,4 +1,5 @@
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::prelude::*;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set};
 
 use tantivy::IndexWriter;
 use tokio::sync::{broadcast, mpsc};
@@ -44,7 +45,15 @@ pub async fn manager_task(
         };
 
         if let Some(task) = next_url {
-            let cmd = Command::Fetch(CrawlTask { id: task.id });
+            // Mark in progress
+            let task_id = task.id;
+            let mut update: crawl_queue::ActiveModel = task.into();
+            update.status = Set(crawl_queue::CrawlStatus::Processing);
+            update.update(&db).await.unwrap();
+
+            // Send to worker
+            let cmd = Command::Fetch(CrawlTask { id: task_id });
+
             // Send the GET request
             log::info!("sending fetch");
             if queue.send(cmd).await.is_err() {
@@ -89,32 +98,36 @@ pub async fn worker_task(
                                 .await
                                 .unwrap();
 
-                            if let Some(doc) = existing {
-                                // Delete old document
-                                Searcher::delete(&index, doc.doc_id.to_string());
-                                "verify delete + update"
+                            // Delete old document
+                            if let Some(doc) = &existing {
+                                Searcher::delete(&mut index, &doc.doc_id).unwrap();
                             }
 
-                            match Searcher::add_document(
+                            // Add document to index
+                            let doc_id = Searcher::add_document(
                                 &mut index,
                                 &crawl_result.title.unwrap_or_default(),
                                 &crawl_result.description.unwrap_or_default(),
                                 &url,
                                 &content,
-                            ) {
-                                Ok(()) => log::info!("indexed document"),
-                                Err(_) => log::error!("Unable to index crawl id: {}", crawl.id),
-                            }
+                            )
+                            .unwrap();
 
-                            let new_doc = indexed_document::ActiveModel {
-                                url: sea_orm::Set(url),
-                                ..Default::default()
+                            // Update/create index reference in our database
+                            let indexed = if let Some(doc) = existing {
+                                let mut update: indexed_document::ActiveModel = doc.into();
+                                update.doc_id = Set(doc_id);
+                                update.updated_at = Set(chrono::Utc::now());
+                                update
+                            } else {
+                                indexed_document::ActiveModel {
+                                    url: Set(url),
+                                    doc_id: Set(doc_id),
+                                    ..Default::default()
+                                }
                             };
 
-                            indexed_document::Entity::insert(new_doc)
-                                .exec(&db)
-                                .await
-                                .unwrap();
+                            indexed.save(&db).await.unwrap();
                         }
                     }
                     Err(err) => log::error!("Unable to crawl id: {} - {:?}", crawl.id, err),

@@ -44,7 +44,7 @@ impl Searcher {
         // STORED: Means that the field will also be saved in a compressed, row oriented
         //      key-value store. This store is useful to reconstruct the documents that
         //      were selected during the search phase.
-        schema_builder.add_text_field("id", TEXT | STORED);
+        schema_builder.add_text_field("id", STRING | STORED);
         schema_builder.add_text_field("title", TEXT | STORED);
         schema_builder.add_text_field("description", TEXT | STORED);
         schema_builder.add_text_field("url", TEXT | STORED);
@@ -54,9 +54,12 @@ impl Searcher {
         schema_builder.build()
     }
 
-    pub fn delete(writer: &IndexWriter, id: String) {
+    pub fn delete(writer: &mut IndexWriter, id: &str) -> anyhow::Result<()> {
         let fields = Searcher::doc_fields();
-        writer.delete_term(Term::from_field_text(fields.id, &id));
+        writer.delete_term(Term::from_field_text(fields.id, id));
+        writer.commit()?;
+
+        Ok(())
     }
 
     pub fn doc_fields() -> DocFields {
@@ -108,12 +111,12 @@ impl Searcher {
         description: &str,
         url: &str,
         content: &str,
-    ) -> tantivy::Result<Uuid> {
+    ) -> tantivy::Result<String> {
         let fields = Searcher::doc_fields();
 
-        let doc_id = Uuid::new_v4();
+        let doc_id = Uuid::new_v4().to_hyphenated().to_string();
         let mut doc = Document::default();
-        doc.add_text(fields.id, doc_id);
+        doc.add_text(fields.id, &doc_id);
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
         doc.add_text(fields.title, title);

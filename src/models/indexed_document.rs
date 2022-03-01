@@ -9,7 +9,7 @@ pub struct Model {
     /// URL that was indexed
     pub url: String,
     /// Reference to the document in the index
-    pub doc_id: uuid::Uuid,
+    pub doc_id: String,
     /// When this was indexed
     pub created_at: DateTimeUtc,
     /// When this was last updated
