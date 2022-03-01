@@ -229,6 +229,7 @@ dependencies = [
  "tendril",
  "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]

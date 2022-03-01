@@ -1,18 +1,19 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "indexed_document")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
+    /// URL that was indexed
     pub url: String,
-
     /// Reference to the document in the index
-    pub doc_addr_segment: u32,
-    pub doc_addr_id: u32,
-    /// Location on disk
-    pub path: String,
-    pub indexed_at: DateTimeUtc,
+    pub doc_id: uuid::Uuid,
+    /// When this was indexed
+    pub created_at: DateTimeUtc,
+    /// When this was last updated
+    pub updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -24,4 +25,12 @@ impl RelationTrait for Relation {
     }
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+impl ActiveModelBehavior for ActiveModel {
+    fn new() -> Self {
+        Self {
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..ActiveModelTrait::default()
+        }
+    }
+}

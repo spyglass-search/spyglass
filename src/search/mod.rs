@@ -7,6 +7,7 @@ use tantivy::directory::MmapDirectory;
 use tantivy::query::QueryParser;
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
+use uuid::Uuid;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -25,6 +26,7 @@ pub struct Searcher {
 }
 
 pub struct DocFields {
+    pub id: Field,
     pub content: Field,
     pub description: Field,
     pub title: Field,
@@ -42,6 +44,7 @@ impl Searcher {
         // STORED: Means that the field will also be saved in a compressed, row oriented
         //      key-value store. This store is useful to reconstruct the documents that
         //      were selected during the search phase.
+        schema_builder.add_text_field("id", TEXT | STORED);
         schema_builder.add_text_field("title", TEXT | STORED);
         schema_builder.add_text_field("description", TEXT | STORED);
         schema_builder.add_text_field("url", TEXT | STORED);
@@ -51,10 +54,16 @@ impl Searcher {
         schema_builder.build()
     }
 
+    pub fn delete(writer: &IndexWriter, id: String) {
+        let fields = Searcher::doc_fields();
+        writer.delete_term(Term::from_field_text(fields.id, &id));
+    }
+
     pub fn doc_fields() -> DocFields {
         let schema = Searcher::schema();
 
         DocFields {
+            id: schema.get_field("id").unwrap(),
             content: schema.get_field("content").unwrap(),
             description: schema.get_field("description").unwrap(),
             title: schema.get_field("title").unwrap(),
@@ -103,6 +112,7 @@ impl Searcher {
         let fields = Searcher::doc_fields();
 
         let mut doc = Document::default();
+        doc.add_text(fields.id, Uuid::new_v4());
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
         doc.add_text(fields.title, title);

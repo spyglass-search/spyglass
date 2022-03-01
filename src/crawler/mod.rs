@@ -295,6 +295,5 @@ mod test {
             result.url,
             Some("https://oldschool.runescape.wiki/".to_string())
         );
-
     }
 }

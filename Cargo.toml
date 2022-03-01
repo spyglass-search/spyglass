@@ -25,4 +25,5 @@ sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono
 tantivy = "0.16"
 tendril = "0.4.2"
 tokio = { version = "1", features = ["full"] }
+uuid = { version = "0.8", features = ["serde", "v4"], default-features = false }
 url = "2.2"
