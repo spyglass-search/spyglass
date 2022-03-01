@@ -5,6 +5,8 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 
+const MIN_CHARS: usize = 2;
+
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
     #[wasm_bindgen(js_name = invokeSearch, catch)]
@@ -79,7 +81,7 @@ pub fn app() -> Html {
 }
 
 fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
-    if query.len() < 2 {
+    if query.len() <= MIN_CHARS {
         return;
     }
 

@@ -23,6 +23,8 @@ a {
 .result-item {
     border-bottom: 1px solid #EEE;
     padding: 16px;
+    height: 96px;
+    box-sizing: border-box;;
 
     h2.result-title {
         font-size: 18px;

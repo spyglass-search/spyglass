@@ -3,6 +3,12 @@
     windows_subsystem = "windows"
 )]
 
+const INPUT_WIDTH: f64 = 640.0;
+const INPUT_HEIGHT: f64 = 96.0;
+const INPUT_Y: f64 = 128.0;
+
+const RESULT_HEIGHT: f64 = 96.0;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::{
@@ -53,9 +59,27 @@ fn main() {
                     .add_native_item(MenuItem::Quit),
             )),
         )
+        .setup(|app| {
+            let window = app.get_window("main").unwrap();
+            // Center horizontally in the current screen
+            if let Some(monitor) = window.current_monitor().unwrap() {
+                let size = monitor.size();
+                let scale = monitor.scale_factor();
+
+                let middle = (size.width as f64 / (scale * 2.0)) - (INPUT_WIDTH / 2.0);
+
+                window
+                    .set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: middle,
+                        y: INPUT_Y,
+                    }))
+                    .unwrap();
+            }
+            Ok(())
+        })
         .system_tray(tray)
-        .on_system_tray_event(move |app, event| match event {
-            SystemTrayEvent::MenuItemClick { id, .. } => {
+        .on_system_tray_event(move |app, event| {
+            if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
                 match id.as_str() {
                     "quit" => {
@@ -75,7 +99,6 @@ fn main() {
                     _ => {}
                 }
             }
-            _ => {}
         })
         .run(ctx)
         .expect("error while running tauri application");
@@ -83,22 +106,6 @@ fn main() {
 
 #[tauri::command]
 async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>, String> {
-    if query.len() > 0 {
-        window
-            .set_size(Size::Logical(LogicalSize {
-                width: 640.0,
-                height: 640.0,
-            }))
-            .unwrap();
-    } else {
-        window
-            .set_size(Size::Logical(LogicalSize {
-                width: 640.0,
-                height: 96.0,
-            }))
-            .unwrap();
-    }
-
     let mut map = HashMap::new();
     map.insert("term", query);
 
@@ -114,6 +121,23 @@ async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>,
         .unwrap();
 
     println!("search: {:?}", res);
+    let num_results = res.results.len();
+
+    if num_results > 0 {
+        window
+            .set_size(Size::Logical(LogicalSize {
+                width: INPUT_WIDTH,
+                height: INPUT_HEIGHT + (num_results as f64 * RESULT_HEIGHT),
+            }))
+            .unwrap();
+    } else {
+        window
+            .set_size(Size::Logical(LogicalSize {
+                width: INPUT_WIDTH,
+                height: INPUT_HEIGHT,
+            }))
+            .unwrap();
+    }
 
     Ok(res.results)
 }
