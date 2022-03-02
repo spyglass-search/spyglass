@@ -241,7 +241,9 @@ impl fmt::Debug for Node {
             Node::Comment(ref c) => write!(f, "Comment({:?})", c),
             Node::Text(ref t) => write!(f, "Text({:?})", t),
             Node::Element(ref e) => write!(f, "Element({:?})", e),
-            Node::ProcessingInstruction(ref pi) => write!(f, "ProcessingInstruction({:?})", pi),
+            Node::ProcessingInstruction(ref pi) => {
+                write!(f, "ProcessingInstruction({:?})", pi)
+            }
         }
     }
 }

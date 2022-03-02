@@ -53,11 +53,8 @@ pub async fn manager_task(
 
             // Send to worker
             let cmd = Command::Fetch(CrawlTask { id: task_id });
-
-            // Send the GET request
-            log::info!("sending fetch");
             if queue.send(cmd).await.is_err() {
-                eprintln!("connection task shutdown");
+                eprintln!("unable to send command to worker");
                 return;
             }
         }

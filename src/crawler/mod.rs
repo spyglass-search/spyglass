@@ -9,12 +9,13 @@ use std::fs;
 use url::Url;
 
 pub mod robots;
+use robots::ParsedRule;
 
 use crate::models::{crawl_queue, fetch_history, resource_rule};
 use crate::scraper::html_to_text;
 use crate::state::AppState;
 
-use robots::parse;
+use robots::{filter_set, parse};
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
@@ -92,7 +93,7 @@ impl Crawler {
     async fn is_crawl_allowed(
         db: &DatabaseConnection,
         domain: &str,
-        _path: &str,
+        path: &str,
     ) -> anyhow::Result<bool> {
         let rules = resource_rule::Entity::find()
             .filter(resource_rule::Column::Domain.eq(domain))
@@ -125,18 +126,12 @@ impl Crawler {
         }
 
         // Check path against rules, if we find any matches that disallow
-        // TODO: DO THIS CORRECTLY
-        // for res_rule in rules.iter() {
-        //     if res_rule.rule.is_match(path) && !res_rule.allow_crawl {
-        //         log::info!(
-        //             "Unable to crawl {} due to rule: {}:{}",
-        //             domain,
-        //             res_rule.rule,
-        //             res_rule.allow_crawl
-        //         );
-        //         return Ok(false);
-        //     }
-        // }
+        let rules_into: Vec<ParsedRule> = rules.iter().map(|x| x.to_owned().into()).collect();
+        let filter_set = filter_set(&rules_into);
+        if filter_set.is_match(path) {
+            log::info!("Unable to crawl {} due to rule", domain);
+            return Ok(false);
+        }
 
         Ok(true)
     }

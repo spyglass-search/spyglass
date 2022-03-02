@@ -49,7 +49,6 @@ async fn main() {
         shutdown_tx.subscribe(),
     ));
 
-    // todo: spawn multiple worker tasks?
     let worker_handle = tokio::spawn(task::worker_task(
         state.db.clone(),
         state.index.writer,
