@@ -52,6 +52,7 @@ fn main() {
                         handle.hide().unwrap();
                     } else {
                         handle.show().unwrap();
+                        handle.set_focus().unwrap();
                     }
                 }).unwrap();
             }
@@ -74,6 +75,13 @@ fn main() {
             Ok(())
         })
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::Focused(is_focused) = event.event() {
+                if !is_focused {
+                    event.window().hide().unwrap();
+                }
+            }
+        })
         .on_system_tray_event(move |app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);

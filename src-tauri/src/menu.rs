@@ -16,8 +16,6 @@ pub fn get_app_menu() -> Menu {
     Menu::new().add_submenu(Submenu::new(
         &ctx.package_info().name,
         Menu::new()
-            .add_native_item(MenuItem::Hide)
-            .add_native_item(MenuItem::Separator)
             .add_native_item(MenuItem::Quit),
     ))
 }

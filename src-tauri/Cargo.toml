@@ -1,11 +1,11 @@
 [package]
-name = "app"
+name = "spyglass"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Personal Search Engine"
+authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 license = ""
 repository = ""
-default-run = "app"
+default-run = "spyglass"
 edition = "2018"
 build = "src/build.rs"
 
