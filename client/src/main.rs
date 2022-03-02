@@ -65,14 +65,17 @@ pub fn app() -> Html {
 
     html! {
         <div>
-            <input
-                type={"text"}
-                class={"search-box"}
-                placeholder={"Spyglass Search"}
-                value={(*query).clone()}
-                {onkeyup}
-                spellcheck={"false"}
-            />
+            <div class="query-container">
+                <span class="icon">{"🔍"}</span>
+                <input
+                    type={"text"}
+                    class={"search-box"}
+                    placeholder={"Spyglass Search"}
+                    value={(*query).clone()}
+                    {onkeyup}
+                    spellcheck={"false"}
+                />
+            </div>
             <div class={"search-results-list"}>
                 { results }
             </div>

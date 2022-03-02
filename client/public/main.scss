@@ -16,6 +16,20 @@ body {
     box-sizing: border-box;
 }
 
+.query-container {
+    position: relative;
+
+    > .icon {
+        position: absolute;
+        font-size: 56px;
+        padding: 16px;
+    }
+
+    .search-box {
+        padding-left: 80px;
+    }
+}
+
 a {
     color: white;
 }
