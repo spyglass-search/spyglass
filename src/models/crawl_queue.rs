@@ -69,6 +69,14 @@ impl fmt::Display for CrawlStatus {
     }
 }
 
+pub async fn mark_done(db: &DatabaseConnection, crawl: Model) -> anyhow::Result<()> {
+    let mut updated: ActiveModel = crawl.into();
+    updated.status = Set(CrawlStatus::Completed);
+    updated.update(db).await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;

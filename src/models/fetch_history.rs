@@ -1,13 +1,26 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
+use serde::Serialize;
+use url::Url;
+
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
+#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
+pub enum FetchProtocol {
+    #[sea_orm(string_value = "HTTP")]
+    Http,
+}
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "fetch_history")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    /// URL fetched.
-    pub url: String,
+    /// Protocol
+    pub protocol: FetchProtocol,
+    /// Domain
+    pub domain: String,
+    /// Path fetched at this URL
+    pub path: String,
     /// Hash used to check for changes.
     pub hash: Option<String>,
     /// HTTP status when last fetching this page.
@@ -33,6 +46,7 @@ impl RelationTrait for Relation {
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
+            protocol: Set(FetchProtocol::Http),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
             ..ActiveModelTrait::default()
@@ -40,14 +54,27 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
+pub async fn find_by_url(
+    db: &DatabaseConnection,
+    url: &Url,
+) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
+    Entity::find()
+        .filter(Column::Domain.eq(url.host_str().unwrap().to_string()))
+        .filter(Column::Path.eq(url.path()))
+        .one(db)
+        .await
+}
+
 pub async fn upsert(
     db: &DatabaseConnection,
-    url_base: &str,
+    domain: &str,
+    path: &str,
     hash: Option<String>,
     status: u16,
 ) -> anyhow::Result<Model, sea_orm::DbErr> {
     let history = Entity::find()
-        .filter(Column::Url.eq(url_base))
+        .filter(Column::Domain.eq(domain))
+        .filter(Column::Path.eq(path))
         .one(db)
         .await?;
 
@@ -63,7 +90,8 @@ pub async fn upsert(
         // Doesn't exist, insert into db
         None => {
             let new_hist = ActiveModel {
-                url: Set(url_base.to_owned()),
+                domain: Set(domain.to_owned()),
+                path: Set(path.to_owned()),
                 hash: Set(hash.to_owned()),
                 status: Set(status),
                 ..Default::default()
@@ -88,17 +116,21 @@ mod test {
 
         let hash = "this is a hash".to_string();
         let new = fetch_history::ActiveModel {
-            url: Set("oldschool.runescape.wiki/".to_owned()),
+            domain: Set("oldschool.runescape.wiki".to_owned()),
+            path: Set("/".to_owned()),
             hash: Set(Some(hash.to_owned())),
             status: Set(200),
             ..Default::default()
         };
-        println!("{:?}", new);
+
         new.insert(&db).await.unwrap();
 
-        let url = "oldschool.runescape.wiki/";
+        let domain = "oldschool.runescape.wiki";
+        let path = "/";
+
         let history = fetch_history::Entity::find()
-            .filter(fetch_history::Column::Url.eq(url.to_string()))
+            .filter(fetch_history::Column::Domain.eq(domain))
+            .filter(fetch_history::Column::Path.eq(path))
             .one(&db)
             .await
             .unwrap();
@@ -106,7 +138,8 @@ mod test {
         assert!(history.is_some());
 
         let res = history.unwrap();
-        assert_eq!(res.url, url);
+        assert_eq!(res.domain, domain);
+        assert_eq!(res.path, path);
         assert_eq!(res.hash.unwrap(), hash);
     }
 }

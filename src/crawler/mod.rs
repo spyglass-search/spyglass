@@ -5,7 +5,6 @@ use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
-use std::fs;
 use url::Url;
 
 pub mod robots;
@@ -13,7 +12,6 @@ use robots::ParsedRule;
 
 use crate::models::{crawl_queue, fetch_history, resource_rule};
 use crate::scraper::html_to_text;
-use crate::state::AppState;
 
 use robots::{filter_set, parse};
 
@@ -28,20 +26,18 @@ pub struct CrawlResult {
     pub status: u16,
     pub title: Option<String>,
     pub url: Option<String>,
+    /// Links found in the page to add to the queue.
+    pub links: Vec<String>,
+    /// Raw HTML data.
+    pub raw: Option<String>,
 }
 
 #[derive(Copy, Clone)]
 pub struct Crawler;
 
 impl Crawler {
+    /// Fetches and parses the content of a page.
     async fn crawl(url: &Url) -> CrawlResult {
-        // Create a data directory for this domain
-        let domain = url.host_str().unwrap();
-        let domain_dir = AppState::crawl_dir().join(domain);
-        if !domain_dir.exists() {
-            fs::create_dir(&domain_dir).expect("Unable to create dir");
-        }
-
         // Fetch & store page data.
         let res = reqwest::get(url.as_str()).await.unwrap();
         log::info!("Status: {}", res.status());
@@ -50,9 +46,6 @@ impl Crawler {
             // TODO: Save headers
             // log::info!("Headers:\n{:?}", res.headers());
             let raw_body = res.text().await.unwrap();
-            let file_path = domain_dir.join("raw.html");
-            fs::write(file_path, &raw_body).expect("Unable to save html");
-
             // Parse the html.
             let parse_result = html_to_text(&raw_body);
             // Grab description from meta tags
@@ -80,6 +73,8 @@ impl Crawler {
                 status: status.as_u16(),
                 title: parse_result.title,
                 url: Some(url.to_string()),
+                links: Vec::new(),
+                raw: Some(raw_body),
             };
         }
 
@@ -125,11 +120,11 @@ impl Crawler {
             }
         }
 
-        // Check path against rules, if we find any matches that disallow
+        // Check path against rules, if we find any matches that disallow, skip it
         let rules_into: Vec<ParsedRule> = rules.iter().map(|x| x.to_owned().into()).collect();
         let filter_set = filter_set(&rules_into);
         if filter_set.is_match(path) {
-            log::info!("Unable to crawl {} due to rule", domain);
+            log::info!("Unable to crawl {}|{} due to rule", domain, path);
             return Ok(false);
         }
 
@@ -148,6 +143,9 @@ impl Crawler {
     }
 
     // TODO: Load web indexing as a plugin?
+    /// Attempts to crawl a job from the crawl_queue specific by <id>
+    /// * Checks whether we can crawl using any saved rules or looking at the robots.txt
+    /// * Fetches & parses the page
     pub async fn fetch(
         db: &DatabaseConnection,
         id: i64,
@@ -155,25 +153,19 @@ impl Crawler {
         let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
 
         log::info!("Fetching URL: {:?}", crawl.url);
-
-        // Make sure cache directory exists for this domain
         let url = Url::parse(&crawl.url).unwrap();
 
+        // Break apart domain + path of the URL
         let domain = url.host_str().unwrap();
         let path = url.path();
-        let url_base = format!("{}{}", domain, path);
 
         // Skip history check if we're trying to force this crawl.
         if !crawl.force_crawl {
-            let history = fetch_history::Entity::find()
-                .filter(fetch_history::Column::Url.eq(url_base.to_string()))
-                .one(db)
-                .await?;
-
-            if let Some(history) = history {
+            if let Some(history) = fetch_history::find_by_url(db, &url).await? {
                 let since_last_fetch = Utc::now() - history.updated_at;
                 if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
                     log::info!("Recently fetched, skipping");
+                    crawl_queue::mark_done(db, crawl).await?;
                     return Ok(None);
                 }
             }
@@ -181,10 +173,7 @@ impl Crawler {
 
         // Check for robots.txt of this domain
         if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
-            let mut updated: crawl_queue::ActiveModel = crawl.into();
-            updated.status = Set(crawl_queue::CrawlStatus::Completed);
-            updated.update(db).await?;
-
+            crawl_queue::mark_done(db, crawl).await?;
             return Ok(None);
         }
 
@@ -199,12 +188,10 @@ impl Crawler {
 
         // Update the fetch history & mark as done
         log::trace!("updating fetch history");
-        fetch_history::upsert(db, &url_base, result.content_hash.clone(), result.status).await?;
+        fetch_history::upsert(db, domain, path, result.content_hash.clone(), result.status).await?;
 
-        let mut updated: crawl_queue::ActiveModel = crawl.into();
-        updated.status = Set(crawl_queue::CrawlStatus::Completed);
-        updated.update(db).await?;
-
+        // Mark crawl as done
+        crawl_queue::mark_done(db, crawl).await?;
         Ok(Some(result))
     }
 }
