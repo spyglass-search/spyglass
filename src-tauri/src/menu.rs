@@ -16,6 +16,13 @@ pub fn get_app_menu() -> Menu {
     Menu::new().add_submenu(Submenu::new(
         &ctx.package_info().name,
         Menu::new()
+            .add_native_item(MenuItem::About)
+            // Currently we need to include these so that the shortcuts for these
+            // actions work.
+            .add_native_item(MenuItem::Copy)
+            .add_native_item(MenuItem::Paste)
+            .add_native_item(MenuItem::SelectAll)
+            .add_native_item(MenuItem::Separator)
             .add_native_item(MenuItem::Quit),
     ))
 }
