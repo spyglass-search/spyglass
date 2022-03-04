@@ -3,8 +3,8 @@ use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, fs, path::PathBuf};
 
 use crate::config::Config;
-use crate::crawler::Crawler;
 use crate::state::AppState;
+use crate::models::crawl_queue;
 
 pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,
@@ -76,7 +76,7 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            Crawler::enqueue(&state.db, url).await?;
+            crawl_queue::enqueue(&state.db, url).await?;
             count += 1;
         }
 

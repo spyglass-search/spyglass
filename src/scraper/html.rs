@@ -59,7 +59,6 @@ impl Html {
                 continue;
             }
 
-            println!("self.head: {:?}", node);
             if let Some(element) = node.as_element() {
                 if element.name() == "head" {
                     return Some(child);

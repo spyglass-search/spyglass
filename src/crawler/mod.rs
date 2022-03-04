@@ -1,9 +1,10 @@
-use sea_orm::prelude::*;
-use sea_orm::{DatabaseConnection, Set};
+use std::collections::HashSet;
 
 use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::StatusCode;
+use sea_orm::prelude::*;
+use sea_orm::{DatabaseConnection, Set};
 use sha2::{Digest, Sha256};
 use url::Url;
 
@@ -25,9 +26,9 @@ pub struct CrawlResult {
     pub description: Option<String>,
     pub status: u16,
     pub title: Option<String>,
-    pub url: Option<String>,
+    pub url: String,
     /// Links found in the page to add to the queue.
-    pub links: Vec<String>,
+    pub links: HashSet<String>,
     /// Raw HTML data.
     pub raw: Option<String>,
 }
@@ -65,6 +66,20 @@ impl Crawler {
             hasher.update(&parse_result.content.as_bytes());
             let content_hash = Some(hex::encode(&hasher.finalize()[..]));
 
+            // Normalize links from scrape result. If the links start with "/" they should
+            // be appended to the current URL.
+            let normalized_links = parse_result.links
+                .iter()
+                .map(|link| {
+                    if link.starts_with('/') {
+                        url.join(link).unwrap().as_str().to_string()
+                    } else {
+                        link.to_owned()
+                    }
+                })
+                .collect();
+
+
             log::info!("content hash: {:?}", content_hash);
             return CrawlResult {
                 content_hash,
@@ -72,14 +87,15 @@ impl Crawler {
                 description,
                 status: status.as_u16(),
                 title: parse_result.title,
-                url: Some(url.to_string()),
-                links: Vec::new(),
+                url: url.to_string(),
+                links: normalized_links,
                 raw: Some(raw_body),
             };
         }
 
         CrawlResult {
             status: status.as_u16(),
+            url: url.to_string(),
             ..Default::default()
         }
     }
@@ -131,17 +147,6 @@ impl Crawler {
         Ok(true)
     }
 
-    /// Add url to the crawl queue
-    pub async fn enqueue(db: &DatabaseConnection, url: &str) -> anyhow::Result<(), sea_orm::DbErr> {
-        let new_task = crawl_queue::ActiveModel {
-            url: Set(url.to_owned()),
-            ..Default::default()
-        };
-        new_task.insert(db).await?;
-
-        Ok(())
-    }
-
     // TODO: Load web indexing as a plugin?
     /// Attempts to crawl a job from the crawl_queue specific by <id>
     /// * Checks whether we can crawl using any saved rules or looking at the robots.txt
@@ -165,7 +170,6 @@ impl Crawler {
                 let since_last_fetch = Utc::now() - history.updated_at;
                 if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
                     log::info!("Recently fetched, skipping");
-                    crawl_queue::mark_done(db, crawl).await?;
                     return Ok(None);
                 }
             }
@@ -173,7 +177,6 @@ impl Crawler {
 
         // Check for robots.txt of this domain
         if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
-            crawl_queue::mark_done(db, crawl).await?;
             return Ok(None);
         }
 
@@ -186,19 +189,15 @@ impl Crawler {
             result.description,
         );
 
-        // Update the fetch history & mark as done
-        log::trace!("updating fetch history");
+        // Update fetch history
         fetch_history::upsert(db, domain, path, result.content_hash.clone(), result.status).await?;
 
-        // Mark crawl as done
-        crawl_queue::mark_done(db, crawl).await?;
         Ok(Some(result))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, Set};
 
     use crate::crawler::Crawler;
@@ -215,8 +214,13 @@ mod test {
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(
             result.url,
-            Some("https://oldschool.runescape.wiki/".to_string())
+            "https://oldschool.runescape.wiki/".to_string()
         );
+
+        // All links should start w/ http
+        for link in result.links {
+            assert!(link.starts_with("https://"))
+        }
     }
 
     #[tokio::test]
@@ -244,21 +248,6 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_enqueue() {
-        let db = setup_test_db().await;
-        let url = "https://oldschool.runescape.wiki/";
-        Crawler::enqueue(&db, url).await.unwrap();
-
-        let crawl = crawl_queue::Entity::find()
-            .filter(crawl_queue::Column::Url.eq(url.to_string()))
-            .all(&db)
-            .await
-            .unwrap();
-
-        assert_eq!(crawl.len(), 1);
-    }
-
-    #[tokio::test]
     async fn test_fetch() {
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
@@ -275,7 +264,7 @@ mod test {
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(
             result.url,
-            Some("https://oldschool.runescape.wiki/".to_string())
+            "https://oldschool.runescape.wiki/".to_string()
         );
     }
 }

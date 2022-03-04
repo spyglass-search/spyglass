@@ -83,53 +83,64 @@ pub async fn worker_task(
         if let Some(cmd) = next_cmd {
             log::info!("received cmd: {:?}", cmd);
             match cmd {
-                Command::Fetch(crawl) => match Crawler::fetch(&db, crawl.id).await {
-                    Ok(Some(crawl_result)) => {
-                        if let Some(content) = crawl_result.content {
-                            let url = crawl_result.url.unwrap_or_default();
+                Command::Fetch(crawl) => {
+                    let result = Crawler::fetch(&db, crawl.id).await;
+                    // mark crawl as finished
+                    crawl_queue::mark_done(&db, crawl.id).await.unwrap();
 
-                            // Add / Update search index
-                            let existing = indexed_document::Entity::find()
-                                .filter(indexed_document::Column::Url.eq(url.as_str()))
-                                .one(&db)
-                                .await
-                                .unwrap();
-
-                            // Delete old document
-                            if let Some(doc) = &existing {
-                                Searcher::delete(&mut index, &doc.doc_id).unwrap();
+                    match result {
+                        Ok(Some(crawl_result)) => {
+                            // Add links found to crawl queue
+                            for link in crawl_result.links.iter(){
+                                crawl_queue::enqueue(&db, link).await.unwrap();
                             }
 
-                            // Add document to index
-                            let doc_id = Searcher::add_document(
-                                &mut index,
-                                &crawl_result.title.unwrap_or_default(),
-                                &crawl_result.description.unwrap_or_default(),
-                                &url,
-                                &content,
-                            )
-                            .unwrap();
+                            // Add / update search index w/ crawl result.
+                            if let Some(content) = crawl_result.content {
+                                let url = crawl_result.url;
 
-                            // Update/create index reference in our database
-                            let indexed = if let Some(doc) = existing {
-                                let mut update: indexed_document::ActiveModel = doc.into();
-                                update.doc_id = Set(doc_id);
-                                update.updated_at = Set(chrono::Utc::now());
-                                update
-                            } else {
-                                indexed_document::ActiveModel {
-                                    url: Set(url),
-                                    doc_id: Set(doc_id),
-                                    ..Default::default()
+                                let existing = indexed_document::Entity::find()
+                                    .filter(indexed_document::Column::Url.eq(url.as_str()))
+                                    .one(&db)
+                                    .await
+                                    .unwrap();
+
+                                // Delete old document, if any.
+                                if let Some(doc) = &existing {
+                                    Searcher::delete(&mut index, &doc.doc_id).unwrap();
                                 }
-                            };
 
-                            indexed.save(&db).await.unwrap();
+                                // Add document to index
+                                let doc_id = Searcher::add_document(
+                                    &mut index,
+                                    &crawl_result.title.unwrap_or_default(),
+                                    &crawl_result.description.unwrap_or_default(),
+                                    &url,
+                                    &content,
+                                )
+                                .unwrap();
+
+                                // Update/create index reference in our database
+                                let indexed = if let Some(doc) = existing {
+                                    let mut update: indexed_document::ActiveModel = doc.into();
+                                    update.doc_id = Set(doc_id);
+                                    update.updated_at = Set(chrono::Utc::now());
+                                    update
+                                } else {
+                                    indexed_document::ActiveModel {
+                                        url: Set(url),
+                                        doc_id: Set(doc_id),
+                                        ..Default::default()
+                                    }
+                                };
+
+                                indexed.save(&db).await.unwrap();
+                            }
                         }
+                        Err(err) => log::error!("Unable to crawl id: {} - {:?}", crawl.id, err),
+                        _ => {}
                     }
-                    Err(err) => log::error!("Unable to crawl id: {} - {:?}", crawl.id, err),
-                    _ => {}
-                },
+                }
             }
         }
     }

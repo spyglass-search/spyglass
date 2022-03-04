@@ -69,7 +69,20 @@ impl fmt::Display for CrawlStatus {
     }
 }
 
-pub async fn mark_done(db: &DatabaseConnection, crawl: Model) -> anyhow::Result<()> {
+/// Add url to the crawl queue
+pub async fn enqueue(db: &DatabaseConnection, url: &str) -> anyhow::Result<(), sea_orm::DbErr> {
+    let new_task = ActiveModel {
+        url: Set(url.to_owned()),
+        ..Default::default()
+    };
+    new_task.insert(db).await?;
+
+    Ok(())
+}
+
+pub async fn mark_done(db: &DatabaseConnection, id: i64) -> anyhow::Result<()> {
+    let crawl = Entity::find_by_id(id).one(db).await?.unwrap();
+
     let mut updated: ActiveModel = crawl.into();
     updated.status = Set(CrawlStatus::Completed);
     updated.update(db).await?;
@@ -106,5 +119,20 @@ mod test {
 
         let res = query.unwrap();
         assert_eq!(res.url, url);
+    }
+
+    #[tokio::test]
+    async fn test_enqueue() {
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/";
+        crawl_queue::enqueue(&db, url).await.unwrap();
+
+        let crawl = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Url.eq(url.to_string()))
+            .all(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(crawl.len(), 1);
     }
 }
