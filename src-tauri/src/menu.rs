@@ -16,7 +16,7 @@ pub fn get_app_menu() -> Menu {
     Menu::new().add_submenu(Submenu::new(
         &ctx.package_info().name,
         Menu::new()
-            .add_native_item(MenuItem::About)
+            .add_native_item(MenuItem::About(ctx.package_info().name.to_string()))
             // Currently we need to include these so that the shortcuts for these
             // actions work.
             .add_native_item(MenuItem::Copy)

@@ -1,9 +1,10 @@
-use serde::{Deserialize, Serialize};
-use std::cmp::PartialEq;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
+
+mod components;
+use components::{search_result_component, SearchResult};
 
 const MIN_CHARS: usize = 2;
 
@@ -11,22 +12,19 @@ const MIN_CHARS: usize = 2;
 extern "C" {
     #[wasm_bindgen(js_name = invokeSearch, catch)]
     pub async fn run_search(query: String) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_name = "onClearSearch")]
+    pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
 }
 
 fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
     yew::start_app::<App>();
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-struct SearchResult {
-    title: String,
-    description: String,
-    url: String,
 }
 
 #[function_component(App)]
 pub fn app() -> Html {
-    let search_results = use_state_eq(|| Vec::new());
+    let search_results = use_state_eq(Vec::new);
     let query = use_state_eq(|| "".to_string());
 
     {
@@ -40,19 +38,22 @@ pub fn app() -> Html {
         );
     }
 
+    // TODO: Is this the best way to handle calls from Tauri?
+    let query_ref = query.clone();
+    let results_ref = search_results.clone();
+    spawn_local(async move {
+        let cb = Closure::wrap(Box::new(move || {
+            query_ref.set("".to_string());
+            results_ref.set(Vec::new());
+        }) as Box<dyn Fn()>);
+
+        on_clear_search(&cb).await;
+        cb.forget();
+    });
+
     let results = search_results
         .iter()
-        .map(|res| {
-            html! {
-                <div class={"result-item"}>
-                    <div class={"result-url"}>
-                        <a href={res.url.clone()}>{format!("{}", res.url.clone())}</a>
-                    </div>
-                    <h2 class={"result-title"}>{res.title.clone()}</h2>
-                    <div class={"result-description"}>{res.description.clone()}</div>
-                </div>
-            }
-        })
+        .map(search_result_component)
         .collect::<Html>();
 
     let onkeyup = {

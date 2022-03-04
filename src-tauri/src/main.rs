@@ -43,6 +43,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![search])
         .menu(menu::get_app_menu())
         .setup(|app| {
+            app.get_window("main").unwrap().open_devtools();
+
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
             if !shortcuts.is_registered(SHORTCUT).unwrap() {
@@ -52,6 +54,12 @@ fn main() {
                         handle.hide().unwrap();
                     } else {
                         handle.show().unwrap();
+                        handle
+                            .set_size(Size::Logical(LogicalSize {
+                                width: INPUT_WIDTH,
+                                height: INPUT_HEIGHT,
+                            }))
+                            .unwrap();
                         handle.set_focus().unwrap();
                     }
                 }).unwrap();
@@ -79,6 +87,7 @@ fn main() {
             if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                 if !is_focused {
                     event.window().hide().unwrap();
+                    event.window().emit("clear_search", 1).unwrap();
                 }
             }
         })
