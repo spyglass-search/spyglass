@@ -12,3 +12,7 @@ export async function onClearSearch(callback) {
 export async function invokeSearch(query) {
     return await invoke("search", { query });
 }
+
+export async function openResult(url) {
+    return await invoke("open_result", { url });
+}

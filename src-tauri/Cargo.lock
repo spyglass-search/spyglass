@@ -3077,6 +3077,7 @@ dependencies = [
 name = "spyglass"
 version = "0.1.0"
 dependencies = [
+ "open",
  "reqwest",
  "serde",
  "serde_json",

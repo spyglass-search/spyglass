@@ -3,9 +3,9 @@ use yew::prelude::*;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct SearchResult {
-    title: String,
-    description: String,
-    url: String,
+    pub title: String,
+    pub description: String,
+    pub url: String,
 }
 
 pub fn search_result_component(res: &SearchResult, is_selected: bool) -> Html {

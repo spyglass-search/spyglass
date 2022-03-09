@@ -9,7 +9,7 @@ use tauri::{LogicalSize, GlobalShortcutManager, Manager, Size, SystemTray, Syste
 mod menu;
 
 const INPUT_WIDTH: f64 = 640.0;
-const INPUT_HEIGHT: f64 = 96.0;
+const INPUT_HEIGHT: f64 = 80.0;
 const INPUT_Y: f64 = 128.0;
 
 const RESULT_HEIGHT: f64 = 96.0;
@@ -40,7 +40,7 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![search])
+        .invoke_handler(tauri::generate_handler![search, open_result])
         .menu(menu::get_app_menu())
         .setup(|app| {
             app.get_window("main").unwrap().open_devtools();
@@ -115,6 +115,12 @@ fn main() {
         })
         .run(ctx)
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
+    open::that(url).unwrap();
+    Ok(())
 }
 
 #[tauri::command]

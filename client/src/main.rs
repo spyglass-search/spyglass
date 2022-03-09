@@ -17,6 +17,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "onClearSearch")]
     pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
+
+    #[wasm_bindgen(js_name = "openResult", catch)]
+    pub async fn open(url: String) -> Result<(), JsValue>;
 }
 
 fn main() {
@@ -32,6 +35,7 @@ pub fn app() -> Html {
 
     {
         let selected_idx = selected_idx.clone();
+        let search_results = search_results.clone();
         use_effect(move || {
             // Attach a keydown event listener to the document.
             let document = gloo::utils::document();
@@ -43,6 +47,10 @@ pub fn app() -> Html {
                 } else if event.key() == "ArrowUp" {
                     event.stop_propagation();
                     selected_idx.set((*selected_idx - 1).max(0));
+                } else if event.key() == "Enter" {
+                    let selected: &SearchResult = (*search_results).get(*selected_idx).unwrap();
+                    let url = selected.url.clone();
+                    spawn_local(async move { open(url).await.unwrap(); });
                 }
             });
             || drop(listener)
