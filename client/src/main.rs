@@ -1,4 +1,6 @@
+use gloo::events::EventListener;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
@@ -25,7 +27,27 @@ fn main() {
 #[function_component(App)]
 pub fn app() -> Html {
     let search_results = use_state_eq(Vec::new);
+    let selected_idx = use_state_eq(|| 0);
     let query = use_state_eq(|| "".to_string());
+
+    {
+        let selected_idx = selected_idx.clone();
+        use_effect(move || {
+            // Attach a keydown event listener to the document.
+            let document = gloo::utils::document();
+            let listener = EventListener::new(&document, "keydown", move |event| {
+                let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap_throw();
+                if event.key() == "ArrowDown" {
+                    event.stop_propagation();
+                    selected_idx.set((*selected_idx + 1).min(10));
+                } else if event.key() == "ArrowUp" {
+                    event.stop_propagation();
+                    selected_idx.set((*selected_idx - 1).max(0));
+                }
+            });
+            || drop(listener)
+        });
+    }
 
     {
         let search_results = search_results.clone();
@@ -53,7 +75,10 @@ pub fn app() -> Html {
 
     let results = search_results
         .iter()
-        .map(search_result_component)
+        .enumerate()
+        .map(|(idx, res)| {
+            search_result_component(res, idx == *selected_idx)
+        })
         .collect::<Html>();
 
     let onkeyup = {
@@ -67,7 +92,6 @@ pub fn app() -> Html {
     html! {
         <div>
             <div class="query-container">
-                <span class="icon">{"🔍"}</span>
                 <input
                     type={"text"}
                     class={"search-box"}
@@ -75,6 +99,7 @@ pub fn app() -> Html {
                     value={(*query).clone()}
                     {onkeyup}
                     spellcheck={"false"}
+                    tabindex={"0"}
                 />
             </div>
             <div class={"search-results-list"}>

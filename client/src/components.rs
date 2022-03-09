@@ -8,12 +8,17 @@ pub struct SearchResult {
     url: String,
 }
 
-pub fn search_result_component(res: &SearchResult) -> Html {
+pub fn search_result_component(res: &SearchResult, is_selected: bool) -> Html {
+    let mut selected: Option<String> = None;
+    if is_selected {
+        selected = Some("result-selected".to_string());
+    }
+
     html! {
-        <div class={"result-item"}>
+        <div class={vec![Some("result-item".to_string()), selected]}>
             <div class={"result-url"}>
                 <a href={res.url.clone()} target={"_blank"}>
-                    {res.url.clone()}
+                    {format!("🌐 {}", res.url.clone())}
                 </a>
             </div>
             <h2 class={"result-title"}>{res.title.clone()}</h2>
