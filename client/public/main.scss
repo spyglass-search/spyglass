@@ -1,53 +1,75 @@
 @import "normalize";
 
-body {
-    padding: 0;
+// Derived from Monokai
+$bg-color: #2e2e2e;
+$fg-color: #d6d6d6;
+$comment: #797979;
+$blue: #6c99bb;
+
+html, body {
     margin: 0;
-    background: #2d2d2d;
-    color: white;
-    font-family: Helvetica;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    background: $bg-color;
+    color: $fg-color;
+    font-family: "San Francisco", Helvetica;
+    font-size: 14px;
 }
 
 .search-box {
-    font-size: 48px;
-    padding: 16px;
+    font-size: 3em;
+    padding: 0.4em;
     margin: 0;
     width: 100%;
+    border: none;
     box-sizing: border-box;
+    background: $bg-color;
+    color: $fg-color;
+
+    &::placeholder {
+        color: $comment;
+    }
 }
 
 .query-container {
-    position: relative;
-
-    > .icon {
-        position: absolute;
-        font-size: 56px;
-        padding: 16px;
-    }
-
-    .search-box {
-        padding-left: 80px;
-    }
+    border-bottom: 1px solid $comment;
 }
 
-a {
-    color: white;
+.result-selected {
+    background: darken($blue, 25%);
+    .result-description, .result-url > a {
+        color: $fg-color !important;
+    }
 }
 
 .result-item {
-    border-bottom: 1px solid #EEE;
-    padding: 16px;
-    height: 96px;
-    box-sizing: border-box;;
+    border-bottom: 1px solid #444;
+    padding: 1.25em;
+    height: 9em;
+    box-sizing: border-box;
+
+    .result-url > a {
+        font-size: 0.9em;
+        text-decoration: none;
+        color: $blue;
+    }
 
     h2.result-title {
-        font-size: 18px;
-        padding: 4px 0;
-        margin: 0;
+        font-weight: normal;
+        font-size: 1.1em;
+        padding: 0;
+        margin: 0.5em 0;
     }
 
     .result-description {
-        line-height: 1.5;
-        font-size: 14px;
+        color: $comment;
+        line-height: 1.5em;
+        font-size: 1em;
+        overflow: hidden;
+        height: 3em;
     }
 }
