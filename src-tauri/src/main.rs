@@ -43,6 +43,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![search, open_result])
         .menu(menu::get_app_menu())
         .setup(|app| {
+            // hide from dock (also hides menu bar)
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             app.get_window("main").unwrap().open_devtools();
 
             // Register global shortcut
