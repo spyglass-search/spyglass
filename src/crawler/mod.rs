@@ -68,7 +68,8 @@ impl Crawler {
 
             // Normalize links from scrape result. If the links start with "/" they should
             // be appended to the current URL.
-            let normalized_links = parse_result.links
+            let normalized_links = parse_result
+                .links
                 .iter()
                 .map(|link| {
                     if link.starts_with('/') {
@@ -78,7 +79,6 @@ impl Crawler {
                     }
                 })
                 .collect();
-
 
             log::info!("content hash: {:?}", content_hash);
             return CrawlResult {
@@ -212,10 +212,7 @@ mod test {
         let result = Crawler::crawl(&url).await;
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
-        assert_eq!(
-            result.url,
-            "https://oldschool.runescape.wiki/".to_string()
-        );
+        assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
 
         // All links should start w/ http
         for link in result.links {
@@ -262,9 +259,6 @@ mod test {
 
         let result = crawl_result.unwrap();
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
-        assert_eq!(
-            result.url,
-            "https://oldschool.runescape.wiki/".to_string()
-        );
+        assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
     }
 }

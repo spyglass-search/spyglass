@@ -91,7 +91,7 @@ pub async fn worker_task(
                     match result {
                         Ok(Some(crawl_result)) => {
                             // Add links found to crawl queue
-                            for link in crawl_result.links.iter(){
+                            for link in crawl_result.links.iter() {
                                 crawl_queue::enqueue(&db, link).await.unwrap();
                             }
 
