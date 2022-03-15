@@ -17,8 +17,9 @@ log = "0.4"
 regex = "1"
 reqwest = "0.11"
 rocket = { version = "0.5.0-rc.1", features = [ "json" ] }
+ron = "0.7"
 sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 simple_logger = "2.1"
 sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono"] }

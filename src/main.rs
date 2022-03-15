@@ -33,11 +33,14 @@ async fn main() {
         .init()
         .unwrap();
 
+    // Initialize/Load user preferences
     let state = AppState::new().await;
-    // Import data from Firefox
-    // TODO: Ask user what browser/profiles to import on first startup.
-    let importer = FirefoxImporter::new(&state.config);
-    let _ = importer.import(&state).await;
+    if state.config.user_settings.run_wizard {
+        // Import data from Firefox
+        // TODO: Ask user what browser/profiles to import on first startup.
+        let importer = FirefoxImporter::new(&state.config);
+        let _ = importer.import(&state).await;
+    }
 
     // Startup manager, workers, & API server.
     let (tx, rx) = mpsc::channel(32);
