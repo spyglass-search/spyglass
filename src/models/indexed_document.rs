@@ -6,6 +6,8 @@ use sea_orm::Set;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
+    /// Domain for this document, used to implement per domain crawl limits.
+    pub domain: String,
     /// URL that was indexed
     pub url: String,
     /// Reference to the document in the index

@@ -48,12 +48,14 @@ async fn main() {
 
     let manager_handle = tokio::spawn(task::manager_task(
         state.db.clone(),
+        state.config.clone(),
         tx,
         shutdown_tx.subscribe(),
     ));
 
     let worker_handle = tokio::spawn(task::worker_task(
         state.db.clone(),
+        state.config.clone(),
         state.index.writer,
         rx,
         shutdown_tx.subscribe(),

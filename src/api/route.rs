@@ -6,6 +6,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
 use tantivy::{Index, IndexReader};
+use url::Url;
 
 use super::response;
 use crate::api::response::SearchResult;
@@ -81,7 +82,9 @@ pub async fn add_queue(
 ) -> Result<&'static str, BadRequest<String>> {
     let db = db.inner();
 
+    let parsed = Url::parse(queue_item.url).unwrap();
     let new_task = crawl_queue::ActiveModel {
+        domain: Set(parsed.host_str().unwrap().to_string()),
         url: Set(queue_item.url.to_owned()),
         force_crawl: Set(queue_item.force_crawl),
         ..Default::default()

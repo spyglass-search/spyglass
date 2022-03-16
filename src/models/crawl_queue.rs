@@ -1,8 +1,13 @@
+use std::collections::HashSet;
 use std::fmt;
 
 use sea_orm::entity::prelude::*;
-use sea_orm::Set;
+use sea_orm::{DbBackend, QueryOrder, Set, Statement};
 use serde::Serialize;
+use url::Url;
+
+use super::indexed_document;
+use crate::config::{Limit, UserSettings};
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
@@ -22,7 +27,10 @@ pub enum CrawlStatus {
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    /// URL to crawl.
+    /// Domain/host of the URL to be crawled
+    pub domain: String,
+    /// URL to crawl
+    #[sea_orm(unique)]
     pub url: String,
     /// Task status.
     pub status: CrawlStatus,
@@ -69,14 +77,99 @@ impl fmt::Display for CrawlStatus {
     }
 }
 
+/// Get the next url in the crawl queue
+pub async fn dequeue(
+    db: &DatabaseConnection,
+    limit: Limit,
+) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
+    if let Limit::Infinite = limit {
+        return Entity::find()
+            .filter(Column::Status.contains(&CrawlStatus::Queued.to_string()))
+            .order_by_asc(Column::CreatedAt)
+            .one(db)
+            .await;
+    } else if let Limit::Finite(num_domains) = limit {
+        let entity = Entity::find().from_raw_sql(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            r#"
+                SELECT
+                    cq.*
+                FROM crawl_queue cq
+                LEFT JOIN (
+                    SELECT
+                        domain,
+                        count(*) as count
+                    FROM indexed_document
+                    GROUP BY domain
+                ) as t on t.domain = cq.domain
+                WHERE
+                    COALESCE(t.count, 0) < ?
+                    AND status = ?
+            "#,
+            vec![num_domains.into(), CrawlStatus::Queued.to_string().into()],
+        ));
+
+        return entity.one(db).await;
+    }
+
+    Ok(None)
+}
+
 /// Add url to the crawl queue
-pub async fn enqueue(db: &DatabaseConnection, url: &str) -> anyhow::Result<(), sea_orm::DbErr> {
+pub async fn enqueue(db: &DatabaseConnection, url: &str, settings: &UserSettings) -> anyhow::Result<(), sea_orm::DbErr> {
+    let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
+
+    // Ignore invalid URLs
+    let parsed = Url::parse(url);
+    if parsed.is_err() {
+        log::info!("Url ignored: invalid URL - {}", url);
+        return Ok(());
+    }
+    let parsed = parsed.unwrap();
+
+    let domain = parsed.host_str();
+    // Ignore URLs w/ no domain/host strings
+    if domain.is_none() {
+        log::info!("Url ignored: invalid domain - {}", url);
+        return Ok(());
+    }
+
+    // Ignore domains in blocklist
+    let domain = domain.unwrap();
+    if block_list.contains(&domain.to_string()) {
+        log::info!("Url ignored: blocked domain - {}", url);
+        return Ok(());
+    }
+
+    let exists = Entity::find()
+        .filter(Column::Url.eq(url.to_string()))
+        .one(db)
+        .await?;
+
+    // ignore duplicate urls
+    if exists.is_some() {
+        log::info!("Url ignored: duplicate crawl - {}", url);
+        return Ok(());
+    }
+
+    // ignore already indexed docs
+    let already_indexed = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Url.eq(url.to_string()))
+        .one(db)
+        .await?
+        .is_some();
+
+    if already_indexed {
+        log::info!("Url ignored: already indexed - {}", url);
+        return Ok(());
+    }
+
     let new_task = ActiveModel {
+        domain: Set(domain.to_string()),
         url: Set(url.to_owned()),
         ..Default::default()
     };
     new_task.insert(db).await?;
-
     Ok(())
 }
 
@@ -94,8 +187,10 @@ pub async fn mark_done(db: &DatabaseConnection, id: i64) -> anyhow::Result<()> {
 mod test {
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, Set};
+    use url::Url;
 
-    use crate::models::crawl_queue;
+    use crate::config::{Limit, UserSettings};
+    use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
     #[tokio::test]
@@ -104,6 +199,7 @@ mod test {
 
         let url = "oldschool.runescape.wiki/";
         let crawl = crawl_queue::ActiveModel {
+            domain: Set("oldschool.runescape.wiki".to_string()),
             url: Set(url.to_owned()),
             ..Default::default()
         };
@@ -123,9 +219,10 @@ mod test {
 
     #[tokio::test]
     async fn test_enqueue() {
+        let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
-        crawl_queue::enqueue(&db, url).await.unwrap();
+        crawl_queue::enqueue(&db, url, &settings).await.unwrap();
 
         let crawl = crawl_queue::Entity::find()
             .filter(crawl_queue::Column::Url.eq(url.to_string()))
@@ -134,5 +231,39 @@ mod test {
             .unwrap();
 
         assert_eq!(crawl.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_dequeue() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/";
+        crawl_queue::enqueue(&db, url, &settings).await.unwrap();
+
+        let queue = crawl_queue::dequeue(&db, Limit::Infinite).await.unwrap();
+        assert!(queue.is_some());
+        assert_eq!(queue.unwrap().url, url);
+    }
+
+    #[tokio::test]
+    async fn test_dequeue_with_limit() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/";
+        let parsed = Url::parse(&url).unwrap();
+
+        crawl_queue::enqueue(&db, url, &settings).await.unwrap();
+        let doc = indexed_document::ActiveModel {
+            domain: Set(parsed.host_str().unwrap().to_string()),
+            url: Set(url.to_string()),
+            doc_id: Set("docid".to_string()),
+            ..Default::default()
+        };
+        doc.save(&db).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, Limit::Finite(2)).await.unwrap();
+        assert!(queue.is_some());
+
+        let queue = crawl_queue::dequeue(&db, Limit::Finite(1)).await.unwrap();
+        assert!(queue.is_none());
     }
 }

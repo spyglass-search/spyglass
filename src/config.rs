@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Config {
     pub data_dir: PathBuf,
     pub prefs_dir: PathBuf,
@@ -30,6 +30,10 @@ pub struct UserSettings {
     pub domain_crawl_limit: Limit,
     /// Should we run the setup wizard?
     pub run_wizard: bool,
+    /// Domains explicitly allowed, regardless of what's in the blocklist.
+    pub allow_list: Vec<String>,
+    /// Domains explicitly blocked from crawling.
+    pub block_list: Vec<String>,
 }
 
 impl Config {
@@ -56,7 +60,6 @@ impl Config {
         fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
 
         let prefs_path = Self::prefs_file();
-        println!("Prefs path: {:?}", prefs_path);
         let user_settings = if prefs_path.exists() {
             ron::from_str(&fs::read_to_string(prefs_path).unwrap())
                 .expect("Unable to read user preferences file.")

@@ -29,8 +29,6 @@ impl AppState {
 
     pub async fn new() -> Self {
         let config = Config::new();
-        log::info!("config: {:?}", config);
-
         let db = create_connection(&config, false)
             .await
             .expect("Unable to connect to database");
@@ -42,7 +40,9 @@ impl AppState {
             config,
             index,
         };
-        let _ = setup_schema(&db.clone()).await;
+        let _ = setup_schema(&db.clone())
+            .await
+            .expect("Unable to setup schema");
         app.init_data_folders().await;
 
         app

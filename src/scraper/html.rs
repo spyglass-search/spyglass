@@ -115,7 +115,12 @@ impl Html {
                 if element.name() == "meta" {
                     if element.attrs.contains_key(&name_key) {
                         let key = element.attrs.get(&name_key).unwrap().to_string();
-                        let value = element.attrs.get(&content_key).unwrap().to_string();
+                        let value = if let Some(value) = element.attrs.get(&content_key) {
+                            value.to_string()
+                        } else {
+                            "".to_string()
+                        };
+
                         map.insert(key, value);
                     } else if element.attrs.contains_key(&property_key) {
                         let key = element.attrs.get(&property_key).unwrap().to_string();

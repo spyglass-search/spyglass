@@ -9,6 +9,7 @@ use crate::state::AppState;
 pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,
     pub imported_path: PathBuf,
+    pub config: Config,
 }
 
 impl FirefoxImporter {
@@ -35,6 +36,7 @@ impl FirefoxImporter {
         FirefoxImporter {
             profile_path,
             imported_path,
+            config: config.clone(),
         }
     }
 
@@ -76,7 +78,7 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            crawl_queue::enqueue(&state.db, url).await?;
+            crawl_queue::enqueue(&state.db, url, &self.config.user_settings).await?;
             count += 1;
         }
 
