@@ -111,8 +111,6 @@ impl Crawler {
             .all(db)
             .await?;
 
-        log::info!("Found {} rules", rules.len());
-
         if rules.is_empty() {
             log::info!("No rules found for this domain, fetching robot.txt");
             let robots_url = format!("https://{}/robots.txt", domain);
@@ -121,8 +119,6 @@ impl Crawler {
                 let body = res.text().await.unwrap();
 
                 let parsed_rules = parse(domain, &body);
-                log::info!("Found {} rules", rules.len());
-
                 for rule in parsed_rules.iter() {
                     let new_rule = resource_rule::ActiveModel {
                         domain: Set(rule.domain.to_owned()),
