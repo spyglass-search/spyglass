@@ -216,6 +216,7 @@ dependencies = [
  "ego-tree",
  "hex",
  "html5ever",
+ "http",
  "log",
  "regex",
  "reqwest",

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use sea_orm::entity::prelude::*;
-use sea_orm::{DbBackend, QueryOrder, Set, Statement};
+use sea_orm::{sea_query, DbBackend, QueryOrder, Set, Statement};
 use serde::Serialize;
 use url::Url;
 
@@ -77,6 +77,20 @@ impl fmt::Display for CrawlStatus {
     }
 }
 
+pub async fn reset_processing(db: &DatabaseConnection) {
+    Entity::update_many()
+        .col_expr(
+            Column::Status,
+            sea_query::Expr::value(sea_query::Value::String(Some(Box::new(
+                CrawlStatus::Queued.to_string(),
+            )))),
+        )
+        .filter(Column::Status.contains(&CrawlStatus::Processing.to_string()))
+        .exec(db)
+        .await
+        .unwrap();
+}
+
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
@@ -84,7 +98,7 @@ pub async fn dequeue(
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     if let Limit::Infinite = limit {
         return Entity::find()
-            .filter(Column::Status.contains(&CrawlStatus::Queued.to_string()))
+            .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
             .order_by_asc(Column::CreatedAt)
             .one(db)
             .await;
@@ -116,7 +130,11 @@ pub async fn dequeue(
 }
 
 /// Add url to the crawl queue
-pub async fn enqueue(db: &DatabaseConnection, url: &str, settings: &UserSettings) -> anyhow::Result<(), sea_orm::DbErr> {
+pub async fn enqueue(
+    db: &DatabaseConnection,
+    url: &str,
+    settings: &UserSettings,
+) -> anyhow::Result<(), sea_orm::DbErr> {
     let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
 
     // Ignore invalid URLs

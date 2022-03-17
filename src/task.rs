@@ -72,6 +72,8 @@ pub async fn worker_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("worker started");
+    let crawler = Crawler::new();
+
     loop {
         let next_cmd = tokio::select! {
             res = queue.recv() => res,
@@ -85,7 +87,7 @@ pub async fn worker_task(
             log::info!("received cmd: {:?}", cmd);
             match cmd {
                 Command::Fetch(crawl) => {
-                    let result = Crawler::fetch(&db, crawl.id).await;
+                    let result = crawler.fetch_by_job(&db, crawl.id).await;
                     // mark crawl as finished
                     crawl_queue::mark_done(&db, crawl.id).await.unwrap();
 
@@ -93,7 +95,9 @@ pub async fn worker_task(
                         Ok(Some(crawl_result)) => {
                             // Add links found to crawl queue
                             for link in crawl_result.links.iter() {
-                                crawl_queue::enqueue(&db, link, &config.user_settings).await.unwrap();
+                                crawl_queue::enqueue(&db, link, &config.user_settings)
+                                    .await
+                                    .unwrap();
                             }
 
                             // Add / update search index w/ crawl result.

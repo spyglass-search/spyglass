@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use chrono::prelude::*;
 use chrono::Duration;
-use reqwest::StatusCode;
+use reqwest::{Client, StatusCode};
 use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, Set};
 use sha2::{Digest, Sha256};
@@ -18,6 +18,7 @@ use robots::{filter_set, parse};
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Default, Clone)]
 pub struct CrawlResult {
@@ -33,14 +34,27 @@ pub struct CrawlResult {
     pub raw: Option<String>,
 }
 
-#[derive(Copy, Clone)]
-pub struct Crawler;
+#[derive(Clone)]
+pub struct Crawler {
+    pub client: Client,
+}
 
 impl Crawler {
+    pub fn new() -> Self {
+        let client = Client::builder()
+            .user_agent(APP_USER_AGENT)
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .expect("Unable to create reqwest client");
+
+        Crawler { client }
+    }
+
     /// Fetches and parses the content of a page.
-    async fn crawl(url: &Url) -> CrawlResult {
+    async fn crawl(&self, url: &Url) -> CrawlResult {
         // Fetch & store page data.
-        let res = reqwest::get(url.as_str()).await.unwrap();
+        let res = self.client.get(url.as_str()).send().await.unwrap();
+
         log::info!("Status: {}", res.status());
         let status = res.status();
         if status == StatusCode::OK {
@@ -102,9 +116,11 @@ impl Crawler {
 
     /// Checks whether we're allow to crawl this domain + path
     async fn is_crawl_allowed(
+        &self,
         db: &DatabaseConnection,
         domain: &str,
         path: &str,
+        full_url: &str,
     ) -> anyhow::Result<bool> {
         let rules = resource_rule::Entity::find()
             .filter(resource_rule::Column::Domain.eq(domain))
@@ -113,21 +129,27 @@ impl Crawler {
 
         if rules.is_empty() {
             log::info!("No rules found for this domain, fetching robot.txt");
-            let robots_url = format!("https://{}/robots.txt", domain);
-            let res = reqwest::get(robots_url).await.unwrap();
-            if res.status() == StatusCode::OK {
-                let body = res.text().await.unwrap();
 
-                let parsed_rules = parse(domain, &body);
-                for rule in parsed_rules.iter() {
-                    let new_rule = resource_rule::ActiveModel {
-                        domain: Set(rule.domain.to_owned()),
-                        rule: Set(rule.regex.to_owned()),
-                        no_index: Set(rule.no_index),
-                        allow_crawl: Set(rule.allow_crawl),
-                        ..Default::default()
-                    };
-                    new_rule.insert(db).await?;
+            let robots_url = format!("https://{}/robots.txt", domain);
+            let res = self.client.get(robots_url).send().await;
+            match res {
+                Err(err) => log::error!("Unable to check robots.txt {}", err.to_string()),
+                Ok(res) => {
+                    if res.status() == StatusCode::OK {
+                        let body = res.text().await.unwrap();
+
+                        let parsed_rules = parse(domain, &body);
+                        for rule in parsed_rules.iter() {
+                            let new_rule = resource_rule::ActiveModel {
+                                domain: Set(rule.domain.to_owned()),
+                                rule: Set(rule.regex.to_owned()),
+                                no_index: Set(rule.no_index),
+                                allow_crawl: Set(rule.allow_crawl),
+                                ..Default::default()
+                            };
+                            new_rule.insert(db).await?;
+                        }
+                    }
                 }
             }
         }
@@ -140,6 +162,29 @@ impl Crawler {
             return Ok(false);
         }
 
+        // Check the content-type of the URL, only crawl HTML pages for now
+        let res = self.client.head(full_url).send().await;
+
+        match res {
+            Err(err) => {
+                log::info!("Unable to check content-type: {}", err.to_string());
+                return Ok(false);
+            }
+            Ok(res) => {
+                let headers = res.headers();
+                if !headers.contains_key(http::header::CONTENT_TYPE) {
+                    return Ok(false);
+                } else {
+                    let value = headers.get(http::header::CONTENT_TYPE).unwrap();
+                    let value = value.to_str().unwrap();
+                    if !value.to_string().contains(&"text/html") {
+                        log::info!("Unable to crawl: content-type =/= text/html");
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+
         Ok(true)
     }
 
@@ -147,7 +192,8 @@ impl Crawler {
     /// Attempts to crawl a job from the crawl_queue specific by <id>
     /// * Checks whether we can crawl using any saved rules or looking at the robots.txt
     /// * Fetches & parses the page
-    pub async fn fetch(
+    pub async fn fetch_by_job(
+        &self,
         db: &DatabaseConnection,
         id: i64,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
@@ -172,12 +218,15 @@ impl Crawler {
         }
 
         // Check for robots.txt of this domain
-        if !Crawler::is_crawl_allowed(db, domain, url.path()).await? {
+        if !self
+            .is_crawl_allowed(db, domain, url.path(), url.as_str())
+            .await?
+        {
             return Ok(None);
         }
 
         // Crawl & save the data
-        let result = Crawler::crawl(&url).await;
+        let result = self.crawl(&url).await;
         log::info!(
             "crawl result: {:?} - {:?}\n{:?}",
             result.title,
@@ -204,8 +253,9 @@ mod test {
 
     #[tokio::test]
     async fn test_crawl() {
+        let crawler = Crawler::new();
         let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
-        let result = Crawler::crawl(&url).await;
+        let result = crawler.crawl(&url).await;
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
@@ -218,6 +268,7 @@ mod test {
 
     #[tokio::test]
     async fn test_is_crawl_allowed() {
+        let crawler = Crawler::new();
         let db = setup_test_db().await;
 
         let domain = "oldschool.runescape.wiki";
@@ -236,12 +287,14 @@ mod test {
             .await
             .expect("Unable to insert allow rule");
 
-        let res = Crawler::is_crawl_allowed(&db, domain, rule).await.unwrap();
+        let res = crawler.is_crawl_allowed(&db, domain, rule).await.unwrap();
         assert_eq!(res, true);
     }
 
     #[tokio::test]
     async fn test_fetch() {
+        let crawler = Crawler::new();
+
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
         let query = crawl_queue::ActiveModel {
@@ -250,7 +303,7 @@ mod test {
         };
         let model = query.insert(&db).await.unwrap();
 
-        let crawl_result = Crawler::fetch(&db, model.id).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();

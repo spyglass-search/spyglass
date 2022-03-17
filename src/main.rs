@@ -20,6 +20,7 @@ mod test;
 
 use crate::api::start_api;
 use crate::importer::FirefoxImporter;
+use crate::models::crawl_queue;
 use crate::state::AppState;
 use crate::task::AppShutdown;
 
@@ -41,6 +42,9 @@ async fn main() {
         let importer = FirefoxImporter::new(&state.config);
         let _ = importer.import(&state).await;
     }
+
+    // Initialize crawl_queue, set all in-flight tasks to queued.
+    crawl_queue::reset_processing(&state.db).await;
 
     // Startup manager, workers, & API server.
     let (tx, rx) = mpsc::channel(32);
