@@ -34,6 +34,23 @@ pub struct CrawlResult {
     pub raw: Option<String>,
 }
 
+fn _normalize_href(url: &Url, href: &str) -> Option<String> {
+    if href.starts_with("//") {
+        // schema relative url
+        if let Ok(url) = Url::parse(&format!("{}:{}", url.scheme(), href)) {
+            return Some(url.to_string());
+        }
+    } else {
+        // origin or directory relative url
+        if let Ok(url) = url.join(href) {
+            return Some(url.to_string());
+        }
+    }
+
+    log::debug!("Unable to normalize href: {} - {}", url.to_string(), href);
+    None
+}
+
 #[derive(Clone)]
 pub struct Crawler {
     pub client: Client,
@@ -80,18 +97,12 @@ impl Crawler {
             hasher.update(&parse_result.content.as_bytes());
             let content_hash = Some(hex::encode(&hasher.finalize()[..]));
 
-            // Normalize links from scrape result. If the links start with "/" they should
-            // be appended to the current URL.
+            // Normalize links from scrape result. If the links start with "/" they
+            // should be appended to the current URL.
             let normalized_links = parse_result
                 .links
                 .iter()
-                .map(|link| {
-                    if link.starts_with('/') {
-                        url.join(link).unwrap().as_str().to_string()
-                    } else {
-                        link.to_owned()
-                    }
-                })
+                .filter_map(|link| _normalize_href(url, link))
                 .collect();
 
             log::info!("content hash: {:?}", content_hash);
@@ -245,7 +256,7 @@ impl Crawler {
 mod test {
     use sea_orm::{ActiveModelTrait, Set};
 
-    use crate::crawler::Crawler;
+    use crate::crawler::{Crawler, _normalize_href};
     use crate::models::{crawl_queue, resource_rule};
     use crate::test::setup_test_db;
 
@@ -271,6 +282,7 @@ mod test {
         let crawler = Crawler::new();
         let db = setup_test_db().await;
 
+        let url = "https://oldschool.runescape.wiki/";
         let domain = "oldschool.runescape.wiki";
         let rule = "/";
 
@@ -287,7 +299,10 @@ mod test {
             .await
             .expect("Unable to insert allow rule");
 
-        let res = crawler.is_crawl_allowed(&db, domain, rule).await.unwrap();
+        let res = crawler
+            .is_crawl_allowed(&db, domain, rule, url)
+            .await
+            .unwrap();
         assert_eq!(res, true);
     }
 
@@ -296,9 +311,10 @@ mod test {
         let crawler = Crawler::new();
 
         let db = setup_test_db().await;
-        let url = "https://oldschool.runescape.wiki/";
+        let url = Url::parse("https://oldschool.runescape.wiki/").unwrap();
         let query = crawl_queue::ActiveModel {
-            url: Set(url.to_owned()),
+            domain: Set(url.host_str().unwrap().to_owned()),
+            url: Set(url.to_string()),
             ..Default::default()
         };
         let model = query.insert(&db).await.unwrap();
@@ -309,5 +325,36 @@ mod test {
         let result = crawl_result.unwrap();
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
+    }
+
+    #[test]
+    fn test_normalize_href() {
+        let url = Url::parse("https://example.com").unwrap();
+
+        assert_eq!(
+            _normalize_href(&url, "https://foo.com"),
+            Some("https://foo.com/".into())
+        );
+        assert_eq!(
+            _normalize_href(&url, "//foo.com"),
+            Some("https://foo.com/".into())
+        );
+        assert_eq!(
+            _normalize_href(&url, "/foo.html"),
+            Some("https://example.com/foo.html".into())
+        );
+        assert_eq!(
+            _normalize_href(&url, "/foo"),
+            Some("https://example.com/foo".into())
+        );
+        assert_eq!(
+            _normalize_href(&url, "foo.html"),
+            Some("https://example.com/foo.html".into())
+        );
+
+        assert_eq!(
+            _normalize_href(&url, "ftp://blah.com/file.exe"),
+            Some("ftp://blah.com/file.exe".into())
+        );
     }
 }
