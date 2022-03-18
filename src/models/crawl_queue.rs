@@ -99,7 +99,7 @@ pub async fn dequeue(
     if let Limit::Infinite = limit {
         return Entity::find()
             .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
-            .order_by_asc(Column::CreatedAt)
+            .order_by_asc(Column::UpdatedAt)
             .one(db)
             .await;
     } else if let Limit::Finite(num_domains) = limit {
@@ -119,6 +119,7 @@ pub async fn dequeue(
                 WHERE
                     COALESCE(t.count, 0) < ?
                     AND status = ?
+                ORDER BY cq.updated_at ASC
             "#,
             vec![num_domains.into(), CrawlStatus::Queued.to_string().into()],
         ));
