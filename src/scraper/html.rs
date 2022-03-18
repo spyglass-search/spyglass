@@ -124,8 +124,11 @@ impl Html {
                         map.insert(key, value);
                     } else if element.attrs.contains_key(&property_key) {
                         let key = element.attrs.get(&property_key).unwrap().to_string();
-                        let value = element.attrs.get(&content_key).unwrap().to_string();
-                        map.insert(key, value);
+                        if let Some(value) = element.attrs.get(&content_key) {
+                            map.insert(key, value.to_string());
+                        } else {
+                            map.insert(key, "".to_string());
+                        }
                     }
                 }
             }
