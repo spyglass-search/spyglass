@@ -5,6 +5,10 @@ if (window.__TAURI__) {
     listen = window.__TAURI__.event.listen;
 }
 
+export async function escape() {
+    return await invoke("escape");
+}
+
 export async function onClearSearch(callback) {
     await listen('clear_search', callback);
 }

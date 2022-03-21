@@ -20,6 +20,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = "escape", catch)]
+    pub async fn escape() -> Result<(), JsValue>;
 }
 
 fn main() {
@@ -50,7 +53,13 @@ pub fn app() -> Html {
                 } else if event.key() == "Enter" {
                     let selected: &SearchResult = (*search_results).get(*selected_idx).unwrap();
                     let url = selected.url.clone();
-                    spawn_local(async move { open(url).await.unwrap(); });
+                    spawn_local(async move {
+                        open(url).await.unwrap();
+                    });
+                } else if event.key() == "Escape" {
+                    spawn_local(async move {
+                        escape().await.unwrap();
+                    });
                 }
             });
             || drop(listener)
@@ -84,9 +93,7 @@ pub fn app() -> Html {
     let results = search_results
         .iter()
         .enumerate()
-        .map(|(idx, res)| {
-            search_result_component(res, idx == *selected_idx)
-        })
+        .map(|(idx, res)| search_result_component(res, idx == *selected_idx))
         .collect::<Html>();
 
     let onkeyup = {

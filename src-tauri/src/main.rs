@@ -40,7 +40,7 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![search, open_result])
+        .invoke_handler(tauri::generate_handler![escape, search, open_result])
         .menu(menu::get_app_menu())
         .setup(|app| {
             // hide from dock (also hides menu bar)
@@ -119,6 +119,12 @@ fn main() {
         })
         .run(ctx)
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+async fn escape(window: tauri::Window) -> Result<(), String> {
+    window.hide().unwrap();
+    Ok(())
 }
 
 #[tauri::command]
