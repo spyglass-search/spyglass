@@ -37,9 +37,9 @@ pub async fn search(
         let url = retrieved.get_first(fields.url).unwrap();
 
         let result = SearchResult {
-            title: title.text().unwrap().to_string(),
-            description: description.text().unwrap().to_string(),
-            url: url.text().unwrap().to_string(),
+            title: title.as_text().unwrap().to_string(),
+            description: description.as_text().unwrap().to_string(),
+            url: url.as_text().unwrap().to_string(),
         };
 
         results.push(result);

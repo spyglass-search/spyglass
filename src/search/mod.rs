@@ -27,6 +27,7 @@ pub struct Searcher {
 
 pub struct DocFields {
     pub id: Field,
+    pub domain: Field,
     pub content: Field,
     pub description: Field,
     pub title: Field,
@@ -39,12 +40,17 @@ impl Searcher {
         // Our first field is title. We want:
         // - full-text search and
         // - to retrieve the document after the search
-        // TEXT: Means the field should be tokenized and indexed, along with its term
-        //      frequency and term positions.
-        // STORED: Means that the field will also be saved in a compressed, row oriented
-        //      key-value store. This store is useful to reconstruct the documents that
-        //      were selected during the search phase.
+        //
+        // TEXT:    Means the field should be tokenized and indexed, along with its term
+        //          frequency and term positions.
+        // STRING:  Means the field will be untokenized and indexed unlike above
+        //
+        // STORED:  Means that the field will also be saved in a compressed, row oriented
+        //          key-value store. This store is useful to reconstruct the documents that
+        //          were selected during the search phase.
         schema_builder.add_text_field("id", STRING | STORED);
+        schema_builder.add_text_field("domain", STRING | STORED);
+
         schema_builder.add_text_field("title", TEXT | STORED);
         schema_builder.add_text_field("description", TEXT | STORED);
         schema_builder.add_text_field("url", TEXT | STORED);
@@ -67,6 +73,7 @@ impl Searcher {
 
         DocFields {
             id: schema.get_field("id").unwrap(),
+            domain: schema.get_field("domain").unwrap(),
             content: schema.get_field("content").unwrap(),
             description: schema.get_field("description").unwrap(),
             title: schema.get_field("title").unwrap(),
@@ -109,6 +116,7 @@ impl Searcher {
         writer: &mut IndexWriter,
         title: &str,
         description: &str,
+        domain: &str,
         url: &str,
         content: &str,
     ) -> tantivy::Result<String> {
@@ -117,11 +125,12 @@ impl Searcher {
         let doc_id = Uuid::new_v4().to_hyphenated().to_string();
         let mut doc = Document::default();
         doc.add_text(fields.id, &doc_id);
+        doc.add_text(fields.domain, domain);
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
         doc.add_text(fields.title, title);
         doc.add_text(fields.url, url);
-        writer.add_document(doc);
+        writer.add_document(doc)?;
 
         writer.commit()?;
 
@@ -132,10 +141,7 @@ impl Searcher {
         let fields = Searcher::doc_fields();
         let searcher = reader.searcher();
 
-        let query_parser = QueryParser::for_index(
-            index,
-            vec![fields.title, fields.description, fields.content],
-        );
+        let query_parser = QueryParser::for_index(index, vec![fields.title, fields.content]);
 
         let query = query_parser
             .parse_query(query_string)
@@ -168,6 +174,7 @@ mod test {
             writer,
             "Of Mice and Men",
             "Of Mice and Men passage",
+            "example.com",
             "https://example.com/mice_and_men",
             "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
@@ -184,6 +191,7 @@ mod test {
             writer,
             "Of Mice and Men",
             "Of Mice and Men passage",
+            "example.com",
             "https://example.com/mice_and_men",
             "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
@@ -200,6 +208,7 @@ mod test {
             writer,
             "Frankenstein: The Modern Prometheus",
             "A passage from Frankenstein",
+            "example.com",
             "https://example.com/frankenstein",
             "You will rejoice to hear that no disaster has accompanied the commencement of an
              enterprise which you have regarded with such evil forebodings.  I arrived here

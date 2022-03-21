@@ -102,7 +102,7 @@ pub async fn worker_task(
 
                             // Add / update search index w/ crawl result.
                             if let Some(content) = crawl_result.content {
-                                let url = crawl_result.url;
+                                let url = Url::parse(&crawl_result.url).unwrap();
 
                                 let existing = indexed_document::Entity::find()
                                     .filter(indexed_document::Column::Url.eq(url.as_str()))
@@ -120,7 +120,8 @@ pub async fn worker_task(
                                     &mut index,
                                     &crawl_result.title.unwrap_or_default(),
                                     &crawl_result.description.unwrap_or_default(),
-                                    &url,
+                                    url.host_str().unwrap(),
+                                    &url.as_str(),
                                     &content,
                                 )
                                 .unwrap();
@@ -132,10 +133,9 @@ pub async fn worker_task(
                                     update.updated_at = Set(chrono::Utc::now());
                                     update
                                 } else {
-                                    let parsed = Url::parse(&url).unwrap();
                                     indexed_document::ActiveModel {
-                                        domain: Set(parsed.host_str().unwrap().to_string()),
-                                        url: Set(url),
+                                        domain: Set(url.host_str().unwrap().to_string()),
+                                        url: Set(url.as_str().to_string()),
                                         doc_id: Set(doc_id),
                                         ..Default::default()
                                     }
