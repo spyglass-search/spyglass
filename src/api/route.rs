@@ -10,6 +10,7 @@ use url::Url;
 
 use super::response;
 use crate::api::response::SearchResult;
+use crate::config::Config;
 use crate::models::crawl_queue;
 use crate::search::Searcher;
 #[derive(Debug, Deserialize)]
@@ -19,6 +20,7 @@ pub struct SearchReq<'r> {
 
 #[post("/search", data = "<search_req>")]
 pub async fn search(
+    config: &State<Config>,
     index: &State<Index>,
     reader: &State<IndexReader>,
     search_req: Json<SearchReq<'_>>,
@@ -26,7 +28,7 @@ pub async fn search(
     let fields = Searcher::doc_fields();
 
     let searcher = reader.searcher();
-    let docs = Searcher::search(index, reader, search_req.term);
+    let docs = Searcher::search_with_lense(&config.lenses, index, reader, search_req.term);
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (_score, doc_addr) in docs {
