@@ -121,7 +121,7 @@ pub async fn worker_task(
                                     &crawl_result.title.unwrap_or_default(),
                                     &crawl_result.description.unwrap_or_default(),
                                     url.host_str().unwrap(),
-                                    &url.as_str(),
+                                    url.as_str(),
                                     &content,
                                 )
                                 .unwrap();

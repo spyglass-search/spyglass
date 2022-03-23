@@ -47,16 +47,13 @@ pub async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm
     Ok(())
 }
 
-pub async fn create_connection(
-    config: &Config,
-    is_test: bool,
-) -> anyhow::Result<DatabaseConnection> {
+pub async fn create_connection(is_test: bool) -> anyhow::Result<DatabaseConnection> {
     let db_uri: String = if is_test {
         "sqlite::memory:".to_string()
     } else {
         format!(
             "sqlite://{}?mode=rwc",
-            config.data_dir.join("db.sqlite").to_str().unwrap()
+            Config::data_dir().join("db.sqlite").to_str().unwrap()
         )
     };
 
@@ -70,13 +67,11 @@ pub async fn create_connection(
 
 #[cfg(test)]
 mod test {
-    use crate::config::Config;
     use crate::models::create_connection;
 
     #[tokio::test]
     async fn test_create_connection() {
-        let config = Config::new();
-        let res = create_connection(&config, true).await;
+        let res = create_connection(true).await;
         assert!(res.is_ok());
     }
 }

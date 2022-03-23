@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use dashmap::DashMap;
 use sea_orm::DatabaseConnection;
 
 use crate::config::Config;
@@ -9,6 +10,7 @@ use crate::search::{IndexPath, Searcher};
 
 pub struct AppState {
     pub db: DatabaseConnection,
+    pub app_state: DashMap<String, String>,
     pub config: Config,
     pub index: Searcher,
 }
@@ -29,7 +31,7 @@ impl AppState {
 
     pub async fn new() -> Self {
         let config = Config::new();
-        let db = create_connection(&config, false)
+        let db = create_connection(false)
             .await
             .expect("Unable to connect to database");
 
@@ -37,6 +39,7 @@ impl AppState {
 
         let app = AppState {
             db: db.clone(),
+            app_state: Default::default(),
             config,
             index,
         };

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -6,9 +7,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub data_dir: PathBuf,
-    pub prefs_dir: PathBuf,
     pub user_settings: UserSettings,
+    pub lenses: HashMap<String, Lense>,
+}
+
+/// Contexts are a set of domains/URLs/etc. that restricts a search space to
+/// improve results.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Lense {
+    pub name: String,
+    pub domains: Vec<String>,
+    pub urls: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -52,12 +61,19 @@ impl Config {
         Self::prefs_dir().join("settings.ron")
     }
 
+    pub fn lenses_dir() -> PathBuf {
+        Self::data_dir().join("lenses")
+    }
+
     pub fn new() -> Self {
         let data_dir = Config::data_dir();
         fs::create_dir_all(&data_dir).expect("Unable to create data folder");
 
         let prefs_dir = Config::prefs_dir();
         fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
+
+        let lenses_dir = Config::lenses_dir();
+        fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
         let prefs_path = Self::prefs_file();
         let user_settings = if prefs_path.exists() {
@@ -75,8 +91,7 @@ impl Config {
         };
 
         Config {
-            data_dir,
-            prefs_dir,
+            lenses: HashMap::new(),
             user_settings,
         }
     }
