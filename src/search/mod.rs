@@ -1,13 +1,16 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::QueryParser;
+use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
+
+use crate::config::Lense;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -33,6 +36,8 @@ pub struct DocFields {
     pub title: Field,
     pub url: Field,
 }
+
+type QueryVec = Vec<(Occur, Box<dyn Query>)>;
 
 impl Searcher {
     pub fn schema() -> Schema {
@@ -159,17 +164,94 @@ impl Searcher {
         );
         top_docs.into_iter().collect()
     }
+
+    pub fn search_with_lense(
+        lenses: &HashMap<String, Lense>,
+        _index: &Index,
+        reader: &IndexReader,
+        query_string: &str,
+    ) -> Vec<SearchResult> {
+        let fields = Searcher::doc_fields();
+        let searcher = reader.searcher();
+
+        // Tokenize query string
+        let mut lense_refs: Vec<String> = Vec::new();
+        let mut terms = Vec::new();
+
+        for term in query_string.split(' ') {
+            // remove whitespace
+            let term = term.trim();
+            if term.starts_with("::") && term.ends_with("::") {
+                let lense = term.strip_prefix("::").unwrap().strip_suffix("::").unwrap();
+                lense_refs.push(lense.to_string());
+            } else {
+                terms.push(term);
+            }
+        }
+
+        log::info!("lenses: {:?}", lense_refs);
+        log::info!("terms: {:?}", terms);
+
+        let mut lense_queries: QueryVec = Vec::new();
+        for lense in lense_refs {
+            if lenses.contains_key(&lense) {
+                let lense = lenses.get(&lense).unwrap();
+                for domain in &lense.domains {
+                    lense_queries.push((
+                        Occur::Should,
+                        Box::new(TermQuery::new(
+                            Term::from_field_text(fields.domain, domain),
+                            IndexRecordOption::Basic,
+                        )),
+                    ));
+                }
+            }
+        }
+
+        let mut term_query: QueryVec = Vec::new();
+        for term in terms {
+            term_query.push((
+                Occur::Should,
+                Box::new(FuzzyTermQuery::new(
+                    Term::from_field_text(fields.content, term),
+                    1,
+                    true,
+                )),
+            ))
+        }
+
+        let mut nested_query: QueryVec =
+            vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
+        if lense_queries.len() > 0 {
+            nested_query.push((Occur::Must, Box::new(BooleanQuery::new(lense_queries))));
+        }
+
+        log::debug!("QUERY: {:?}", nested_query);
+
+        let query = BooleanQuery::new(nested_query);
+        let top_docs = searcher
+            .search(&query, &TopDocs::with_limit(10))
+            .expect("Unable to execute query");
+
+        log::info!(
+            "query `{}` returned {} results from {} docs",
+            query_string,
+            top_docs.len(),
+            searcher.num_docs(),
+        );
+
+        top_docs.into_iter().collect()
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::config::Lense;
     use crate::search::{IndexPath, Searcher};
+    use std::collections::HashMap;
 
-    #[test]
-    pub fn test_indexer() {
-        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+    fn _build_test_index(searcher: &mut Searcher) {
         let writer = &mut searcher.writer;
-
         Searcher::add_document(
             writer,
             "Of Mice and Men",
@@ -191,8 +273,8 @@ mod test {
             writer,
             "Of Mice and Men",
             "Of Mice and Men passage",
-            "example.com",
-            "https://example.com/mice_and_men",
+            "en.wikipedia.org",
+            "https://en.wikipedia.org/mice_and_men",
             "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
@@ -201,6 +283,22 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
+        )
+        .expect("Unable to add doc");
+
+        Searcher::add_document(
+            writer,
+            "Of Cheese and Crackers",
+            "Of Cheese and Crackers Passage",
+            "en.wikipedia.org",
+            "https://en.wikipedia.org/cheese_and_crackers",
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
+            tellus tortor, varius sit amet fermentum a, finibus porttitor erat. Proin
+            suscipit, dui ac posuere vulputate, justo est faucibus est, a bibendum
+            nulla nulla sed elit. Vivamus et libero a tortor ultricies feugiat in vel
+            eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
+            ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
+            mattis ipsum, a lacinia nunc semper vitae.",
         )
         .expect("Unable to add doc");
 
@@ -208,7 +306,7 @@ mod test {
             writer,
             "Frankenstein: The Modern Prometheus",
             "A passage from Frankenstein",
-            "example.com",
+            "monster.com",
             "https://example.com/frankenstein",
             "You will rejoice to hear that no disaster has accompanied the commencement of an
              enterprise which you have regarded with such evil forebodings.  I arrived here
@@ -219,9 +317,34 @@ mod test {
 
         // add a small delay so that the documents can be properly committed
         std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    #[test]
+    pub fn test_indexer() {
+        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        _build_test_index(&mut searcher);
 
         let results = Searcher::search(&searcher.index, &searcher.reader, "gabilan mountains");
-
         assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    pub fn test_basic_lense_search() {
+        let lense = Lense {
+            name: "wiki".to_string(),
+            domains: vec!["en.wikipedia.org".to_string()],
+            urls: Vec::new(),
+        };
+
+        let mut lenses = HashMap::new();
+        lenses.insert("wiki".to_string(), lense.clone());
+
+        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        _build_test_index(&mut searcher);
+
+        let query = "::wiki:: salinas";
+        let results =
+            Searcher::search_with_lense(&lenses, &searcher.index, &searcher.reader, query);
+        assert_eq!(results.len(), 1);
     }
 }
