@@ -46,6 +46,43 @@ pub struct UserSettings {
 }
 
 impl Config {
+    fn _load_user_settings() -> UserSettings {
+        let prefs_path = Self::prefs_file();
+        if prefs_path.exists() {
+            ron::from_str(&fs::read_to_string(prefs_path).unwrap())
+                .expect("Unable to read user preferences file.")
+        } else {
+            let settings = UserSettings::default();
+            // Write out default settings
+            fs::write(
+                prefs_path,
+                ron::ser::to_string_pretty(&settings, Default::default()).unwrap(),
+            )
+            .expect("Unable to save user preferences file.");
+            settings
+        }
+    }
+
+    fn _load_lenses() -> anyhow::Result<HashMap<String, Lense>> {
+        let mut lenses = HashMap::new();
+
+        let lense_dir = Self::lenses_dir();
+        for entry in (fs::read_dir(lense_dir)?).flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                match ron::from_str::<Lense>(&fs::read_to_string(path).unwrap()) {
+                    Err(err) => log::error!("Unable to load lense {:?}: {}", entry.path(), err),
+                    Ok(lense) => {
+                        log::info!("Loaded lense {}", lense.name);
+                        lenses.insert(lense.name.clone(), lense);
+                    }
+                }
+            }
+        }
+
+        Ok(lenses)
+    }
+
     pub fn data_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
         proj_dirs.data_dir().to_path_buf()
@@ -75,24 +112,20 @@ impl Config {
         let lenses_dir = Config::lenses_dir();
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
-        let prefs_path = Self::prefs_file();
-        let user_settings = if prefs_path.exists() {
-            ron::from_str(&fs::read_to_string(prefs_path).unwrap())
-                .expect("Unable to read user preferences file.")
-        } else {
-            let settings = UserSettings::default();
-            // Write out default settings
-            fs::write(
-                prefs_path,
-                ron::ser::to_string_pretty(&settings, Default::default()).unwrap(),
-            )
-            .expect("Unable to save user preferences file.");
-            settings
-        };
-
         Config {
-            lenses: HashMap::new(),
-            user_settings,
+            lenses: Self::_load_lenses().expect("Unable to load lenses"),
+            user_settings: Self::_load_user_settings(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::config::Config;
+
+    #[test]
+    pub fn test_load_lenses() {
+        let res = Config::_load_lenses();
+        assert!(!res.is_err());
     }
 }
