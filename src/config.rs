@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct Config {
     pub user_settings: UserSettings,
-    pub lenses: HashMap<String, Lense>,
+    pub lenses: HashMap<String, Lens>,
 }
 
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Lense {
+pub struct Lens {
     pub name: String,
     pub domains: Vec<String>,
     pub urls: Vec<String>,
@@ -63,18 +63,18 @@ impl Config {
         }
     }
 
-    fn _load_lenses() -> anyhow::Result<HashMap<String, Lense>> {
+    fn _load_lenses() -> anyhow::Result<HashMap<String, Lens>> {
         let mut lenses = HashMap::new();
 
         let lense_dir = Self::lenses_dir();
         for entry in (fs::read_dir(lense_dir)?).flatten() {
             let path = entry.path();
             if path.is_file() {
-                match ron::from_str::<Lense>(&fs::read_to_string(path).unwrap()) {
-                    Err(err) => log::error!("Unable to load lense {:?}: {}", entry.path(), err),
-                    Ok(lense) => {
-                        log::info!("Loaded lense {}", lense.name);
-                        lenses.insert(lense.name.clone(), lense);
+                match ron::from_str::<Lens>(&fs::read_to_string(path).unwrap()) {
+                    Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
+                    Ok(lens) => {
+                        log::info!("Loaded lens {}", lens.name);
+                        lenses.insert(lens.name.clone(), lens);
                     }
                 }
             }

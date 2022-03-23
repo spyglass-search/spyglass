@@ -10,7 +10,7 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use crate::config::Lense;
+use crate::config::Lens;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -165,8 +165,8 @@ impl Searcher {
         top_docs.into_iter().collect()
     }
 
-    pub fn search_with_lense(
-        lenses: &HashMap<String, Lense>,
+    pub fn search_with_lens(
+        lenses: &HashMap<String, Lens>,
         _index: &Index,
         reader: &IndexReader,
         query_string: &str,
@@ -182,8 +182,8 @@ impl Searcher {
             // remove whitespace
             let term = term.trim();
             if term.starts_with("::") && term.ends_with("::") {
-                let lense = term.strip_prefix("::").unwrap().strip_suffix("::").unwrap();
-                lense_refs.push(lense.to_string());
+                let lens = term.strip_prefix("::").unwrap().strip_suffix("::").unwrap();
+                lense_refs.push(lens.to_string());
             } else {
                 terms.push(term);
             }
@@ -193,10 +193,10 @@ impl Searcher {
         log::info!("terms: {:?}", terms);
 
         let mut lense_queries: QueryVec = Vec::new();
-        for lense in lense_refs {
-            if lenses.contains_key(&lense) {
-                let lense = lenses.get(&lense).unwrap();
-                for domain in &lense.domains {
+        for lens in lense_refs {
+            if lenses.contains_key(&lens) {
+                let lens = lenses.get(&lens).unwrap();
+                for domain in &lens.domains {
                     lense_queries.push((
                         Occur::Should,
                         Box::new(TermQuery::new(
@@ -222,7 +222,7 @@ impl Searcher {
 
         let mut nested_query: QueryVec =
             vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
-        if lense_queries.len() > 0 {
+        if !lense_queries.is_empty() {
             nested_query.push((Occur::Must, Box::new(BooleanQuery::new(lense_queries))));
         }
 
@@ -330,21 +330,20 @@ mod test {
 
     #[test]
     pub fn test_basic_lense_search() {
-        let lense = Lense {
+        let lens = Lense {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
             urls: Vec::new(),
         };
 
         let mut lenses = HashMap::new();
-        lenses.insert("wiki".to_string(), lense.clone());
+        lenses.insert("wiki".to_string(), lens.clone());
 
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "::wiki:: salinas";
-        let results =
-            Searcher::search_with_lense(&lenses, &searcher.index, &searcher.reader, query);
+        let results = Searcher::search_with_lens(&lenses, &searcher.index, &searcher.reader, query);
         assert_eq!(results.len(), 1);
     }
 }

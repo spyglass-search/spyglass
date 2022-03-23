@@ -28,7 +28,7 @@ pub async fn search(
     let fields = Searcher::doc_fields();
 
     let searcher = reader.searcher();
-    let docs = Searcher::search_with_lense(&config.lenses, index, reader, search_req.term);
+    let docs = Searcher::search_with_lens(&config.lenses, index, reader, search_req.term);
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (_score, doc_addr) in docs {
