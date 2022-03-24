@@ -141,7 +141,7 @@ pub async fn enqueue(
     // Ignore invalid URLs
     let parsed = Url::parse(url);
     if parsed.is_err() {
-        log::info!("Url ignored: invalid URL - {}", url);
+        log::debug!("Url ignored: invalid URL - {}", url);
         return Ok(());
     }
     let parsed = parsed.unwrap();
@@ -149,14 +149,14 @@ pub async fn enqueue(
     let domain = parsed.host_str();
     // Ignore URLs w/ no domain/host strings
     if domain.is_none() {
-        log::info!("Url ignored: invalid domain - {}", url);
+        log::debug!("Url ignored: invalid domain - {}", url);
         return Ok(());
     }
 
     // Ignore domains in blocklist
     let domain = domain.unwrap();
     if block_list.contains(&domain.to_string()) {
-        log::info!("Url ignored: blocked domain - {}", url);
+        log::debug!("Url ignored: blocked domain - {}", url);
         return Ok(());
     }
 
@@ -167,7 +167,7 @@ pub async fn enqueue(
 
     // ignore duplicate urls
     if exists.is_some() {
-        log::info!("Url ignored: duplicate crawl - {}", url);
+        log::debug!("Url ignored: duplicate crawl - {}", url);
         return Ok(());
     }
 
