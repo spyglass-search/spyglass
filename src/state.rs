@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use sea_orm::DatabaseConnection;
@@ -8,11 +9,12 @@ use crate::config::Config;
 use crate::models::{create_connection, setup_schema};
 use crate::search::{IndexPath, Searcher};
 
+#[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub app_state: DashMap<String, String>,
     pub config: Config,
-    pub index: Searcher,
+    pub index: Arc<Mutex<Searcher>>,
 }
 
 impl AppState {
@@ -36,12 +38,14 @@ impl AppState {
             .expect("Unable to connect to database");
 
         let index = Searcher::with_index(&IndexPath::LocalPath(Self::index_dir()));
+        let app_state = DashMap::new();
+        app_state.insert("paused".to_string(), "true".to_string());
 
         let app = AppState {
             db: db.clone(),
-            app_state: Default::default(),
+            app_state,
             config,
-            index,
+            index: Arc::new(Mutex::new(index)),
         };
         let _ = setup_schema(&db.clone())
             .await

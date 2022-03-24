@@ -51,28 +51,19 @@ async fn main() {
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
 
     let manager_handle = tokio::spawn(task::manager_task(
-        state.db.clone(),
-        state.config.clone(),
+        state.clone(),
         tx,
         shutdown_tx.subscribe(),
     ));
 
     let worker_handle = tokio::spawn(task::worker_task(
-        state.db.clone(),
-        state.config.clone(),
-        state.index.writer,
+        state.clone(),
         rx,
         shutdown_tx.subscribe(),
     ));
 
     // Gracefully handle shutdowns
-    let server = start_api(
-        state.db.clone(),
-        &state.config,
-        &state.index.index,
-        &state.index.reader,
-    )
-    .await;
+    let server = start_api(state.clone()).await;
 
     match signal::ctrl_c().await {
         Ok(()) => {

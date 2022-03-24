@@ -1,27 +1,16 @@
 mod response;
 mod route;
 
-use sea_orm::DatabaseConnection;
-use tantivy::{Index, IndexReader};
+use crate::state::AppState;
 
-use crate::config::Config;
-
-pub async fn start_api(
-    db: DatabaseConnection,
-    config: &Config,
-    index: &Index,
-    reader: &IndexReader,
-) -> rocket::Shutdown {
+pub async fn start_api(state: AppState) -> rocket::Shutdown {
     let api_config = rocket::Config {
         port: 7777,
         ..rocket::Config::debug_default()
     };
 
     let rocket = rocket::custom(&api_config)
-        .manage::<Config>(config.clone())
-        .manage::<DatabaseConnection>(db)
-        .manage::<Index>(index.clone())
-        .manage::<IndexReader>(reader.clone())
+        .manage::<AppState>(state.clone())
         .mount(
             "/api",
             routes![

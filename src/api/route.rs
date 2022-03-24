@@ -1,18 +1,19 @@
 use sea_orm::prelude::*;
-use sea_orm::{DatabaseConnection, Set};
+use sea_orm::Set;
 
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::Deserialize;
-use tantivy::{Index, IndexReader};
+use tantivy::IndexReader;
 use url::Url;
 
 use super::response;
 use crate::api::response::SearchResult;
-use crate::config::Config;
 use crate::models::crawl_queue;
 use crate::search::Searcher;
+use crate::state::AppState;
+
 #[derive(Debug, Deserialize)]
 pub struct SearchReq<'r> {
     pub term: &'r str,
@@ -20,15 +21,20 @@ pub struct SearchReq<'r> {
 
 #[post("/search", data = "<search_req>")]
 pub async fn search(
-    config: &State<Config>,
-    index: &State<Index>,
-    reader: &State<IndexReader>,
+    state: &State<AppState>,
     search_req: Json<SearchReq<'_>>,
 ) -> Result<Json<response::SearchResults>, BadRequest<String>> {
     let fields = Searcher::doc_fields();
 
-    let searcher = reader.searcher();
-    let docs = Searcher::search_with_lens(&config.lenses, index, reader, search_req.term);
+    let index = state.index.lock().unwrap();
+    let searcher = index.reader.searcher();
+
+    let docs = Searcher::search_with_lens(
+        &state.config.lenses,
+        &index.index,
+        &index.reader,
+        search_req.term,
+    );
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (_score, doc_addr) in docs {
@@ -59,9 +65,9 @@ pub async fn search(
 /// Show the list of URLs in the queue and their status
 #[get("/queue")]
 pub async fn list_queue(
-    db: &State<DatabaseConnection>,
+    state: &State<AppState>,
 ) -> Result<Json<response::ListQueue>, BadRequest<String>> {
-    let db = db.inner();
+    let db = &state.db;
     let queue = crawl_queue::Entity::find().all(db).await;
 
     match queue {
@@ -79,10 +85,10 @@ pub struct QueueItem<'r> {
 /// Add url to queue
 #[post("/queue", data = "<queue_item>")]
 pub async fn add_queue(
-    db: &State<DatabaseConnection>,
+    state: &State<AppState>,
     queue_item: Json<QueueItem<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
-    let db = db.inner();
+    let db = &state.db;
 
     let parsed = Url::parse(queue_item.url).unwrap();
     let new_task = crawl_queue::ActiveModel {
@@ -100,9 +106,10 @@ pub async fn add_queue(
 
 /// Fun stats about index size, etc.
 #[get("/stats")]
-pub fn app_stats(index_reader: &State<IndexReader>) -> Json<response::AppStats> {
-    let index = index_reader.searcher();
+pub fn app_stats(state: &State<AppState>) -> Json<response::AppStats> {
+    let index = state.index.lock().unwrap();
+    let reader = index.reader.searcher();
     Json(response::AppStats {
-        num_docs: index.num_docs(),
+        num_docs: reader.num_docs(),
     })
 }

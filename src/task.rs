@@ -1,14 +1,12 @@
 use sea_orm::prelude::*;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
-
-use tantivy::IndexWriter;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
-use crate::config::Config;
 use crate::crawler::Crawler;
 use crate::models::{crawl_queue, indexed_document};
 use crate::search::Searcher;
+use crate::state::AppState;
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -27,8 +25,7 @@ pub enum AppShutdown {
 
 /// Manages the crawl queue
 pub async fn manager_task(
-    db: DatabaseConnection,
-    config: Config,
+    state: AppState,
     queue: mpsc::Sender<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
@@ -37,7 +34,7 @@ pub async fn manager_task(
         // tokio::select allows us to listen to a shutdown message while
         // also processing queue tasks.
         let next_url = tokio::select! {
-            res = crawl_queue::dequeue(&db, config.user_settings.domain_crawl_limit.clone()) => res.unwrap(),
+            res = crawl_queue::dequeue(&state.db, state.config.user_settings.domain_crawl_limit.clone()) => res.unwrap(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 return;
@@ -49,7 +46,7 @@ pub async fn manager_task(
             let task_id = task.id;
             let mut update: crawl_queue::ActiveModel = task.into();
             update.status = Set(crawl_queue::CrawlStatus::Processing);
-            update.update(&db).await.unwrap();
+            update.update(&state.db).await.unwrap();
 
             // Send to worker
             let cmd = Command::Fetch(CrawlTask { id: task_id });
@@ -65,9 +62,7 @@ pub async fn manager_task(
 
 /// Grabs a task
 pub async fn worker_task(
-    db: DatabaseConnection,
-    config: Config,
-    mut index: IndexWriter,
+    state: AppState,
     mut queue: mpsc::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
@@ -87,15 +82,15 @@ pub async fn worker_task(
             log::info!("received cmd: {:?}", cmd);
             match cmd {
                 Command::Fetch(crawl) => {
-                    let result = crawler.fetch_by_job(&db, crawl.id).await;
+                    let result = crawler.fetch_by_job(&state.db, crawl.id).await;
                     // mark crawl as finished
-                    crawl_queue::mark_done(&db, crawl.id).await.unwrap();
+                    crawl_queue::mark_done(&state.db, crawl.id).await.unwrap();
 
                     match result {
                         Ok(Some(crawl_result)) => {
                             // Add links found to crawl queue
                             for link in crawl_result.links.iter() {
-                                crawl_queue::enqueue(&db, link, &config.user_settings)
+                                crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
                                     .await
                                     .unwrap();
                             }
@@ -106,25 +101,29 @@ pub async fn worker_task(
 
                                 let existing = indexed_document::Entity::find()
                                     .filter(indexed_document::Column::Url.eq(url.as_str()))
-                                    .one(&db)
+                                    .one(&state.db)
                                     .await
                                     .unwrap();
 
                                 // Delete old document, if any.
                                 if let Some(doc) = &existing {
-                                    Searcher::delete(&mut index, &doc.doc_id).unwrap();
+                                    let mut index = state.index.lock().unwrap();
+                                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
                                 }
 
                                 // Add document to index
-                                let doc_id = Searcher::add_document(
-                                    &mut index,
-                                    &crawl_result.title.unwrap_or_default(),
-                                    &crawl_result.description.unwrap_or_default(),
-                                    url.host_str().unwrap(),
-                                    url.as_str(),
-                                    &content,
-                                )
-                                .unwrap();
+                                let doc_id = {
+                                    let mut index = state.index.lock().unwrap();
+                                    Searcher::add_document(
+                                        &mut index.writer,
+                                        &crawl_result.title.unwrap_or_default(),
+                                        &crawl_result.description.unwrap_or_default(),
+                                        url.host_str().unwrap(),
+                                        url.as_str(),
+                                        &content,
+                                    )
+                                    .unwrap()
+                                };
 
                                 // Update/create index reference in our database
                                 let indexed = if let Some(doc) = existing {
@@ -141,7 +140,7 @@ pub async fn worker_task(
                                     }
                                 };
 
-                                indexed.save(&db).await.unwrap();
+                                indexed.save(&state.db).await.unwrap();
                             }
                         }
                         Err(err) => log::error!("Unable to crawl id: {} - {:?}", crawl.id, err),
