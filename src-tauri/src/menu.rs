@@ -1,10 +1,12 @@
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu, SystemTrayMenu, SystemTrayMenuItem};
 
 pub fn get_tray_menu() -> SystemTrayMenu {
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
+    let pause = CustomMenuItem::new("pause".to_string(), "Pause Crawler");
     let hide = CustomMenuItem::new("toggle".to_string(), "Hide");
+    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
 
     SystemTrayMenu::new()
+        .add_item(pause)
         .add_item(hide)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)

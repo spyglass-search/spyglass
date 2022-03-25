@@ -70,6 +70,20 @@ pub async fn worker_task(
     let crawler = Crawler::new();
 
     loop {
+        if state.app_state.get("paused").unwrap().to_string() == "true" {
+            // Run w/ a select on the shutdown signal otherwise we're stuck in an
+            // infinite loop
+            tokio::select! {
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
+                    continue
+                }
+                _ = shutdown_rx.recv() => {
+                    log::info!("🛑 Shutting down worker");
+                    return;
+                }
+            }
+        }
+
         let next_cmd = tokio::select! {
             res = queue.recv() => res,
             _ = shutdown_rx.recv() => {

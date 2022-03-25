@@ -11,6 +11,11 @@ pub struct AppStats {
     pub num_docs: u64,
 }
 
+#[derive(Serialize)]
+pub struct AppStatus {
+    pub is_paused: bool,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,

@@ -1,18 +1,16 @@
-use sea_orm::prelude::*;
-use sea_orm::Set;
-
 use rocket::response::status::BadRequest;
 use rocket::serde::json::Json;
 use rocket::State;
+use sea_orm::prelude::*;
+use sea_orm::Set;
 use serde::Deserialize;
-use tantivy::IndexReader;
 use url::Url;
 
 use super::response;
 use crate::api::response::SearchResult;
-use crate::models::crawl_queue;
 use crate::search::Searcher;
 use crate::state::AppState;
+use crate::models::crawl_queue;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchReq<'r> {
@@ -60,6 +58,19 @@ pub async fn search(
     };
 
     Ok(Json(response::SearchResults { results, meta }))
+}
+
+#[post("/pause")]
+pub async fn pause_crawler(
+    state: &State<AppState>,
+) -> Result<Json<response::AppStatus>, BadRequest<String>> {
+    let app_state = &state.app_state;
+    let mut paused_status = app_state.get_mut("paused").unwrap();
+
+    let is_paused = !(paused_status.to_string() == *"true");
+    *paused_status = is_paused.to_string();
+
+    Ok(Json(response::AppStatus { is_paused }))
 }
 
 /// Show the list of URLs in the queue and their status

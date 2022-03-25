@@ -12,7 +12,7 @@ use crate::search::{IndexPath, Searcher};
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
-    pub app_state: DashMap<String, String>,
+    pub app_state: Arc<DashMap<String, String>>,
     pub config: Config,
     pub index: Arc<Mutex<Searcher>>,
 }
@@ -38,12 +38,14 @@ impl AppState {
             .expect("Unable to connect to database");
 
         let index = Searcher::with_index(&IndexPath::LocalPath(Self::index_dir()));
+
+        // TODO: Load from saved preferences
         let app_state = DashMap::new();
         app_state.insert("paused".to_string(), "true".to_string());
 
         let app = AppState {
             db: db.clone(),
-            app_state,
+            app_state: Arc::new(app_state),
             config,
             index: Arc::new(Mutex::new(index)),
         };

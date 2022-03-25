@@ -20,7 +20,9 @@ pub async fn start_api(state: AppState) -> rocket::Shutdown {
                 // search
                 route::search,
                 // app stats
-                route::app_stats
+                route::app_stats,
+                // Pause/unpause crawler
+                route::pause_crawler,
             ],
         )
         .ignite()

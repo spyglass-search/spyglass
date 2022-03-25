@@ -4,8 +4,7 @@
 )]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::{LogicalSize, GlobalShortcutManager, Manager, Size, SystemTray, SystemTrayEvent};
-
+use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent};
 mod menu;
 
 const INPUT_WIDTH: f64 = 640.0;
@@ -15,6 +14,11 @@ const INPUT_Y: f64 = 128.0;
 const RESULT_HEIGHT: f64 = 96.0;
 
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AppStatus {
+    pub is_paused: bool,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
@@ -40,7 +44,11 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![escape, search, open_result])
+        .invoke_handler(tauri::generate_handler![
+            escape,
+            open_result,
+            search,
+        ])
         .menu(menu::get_app_menu())
         .setup(|app| {
             // hide from dock (also hides menu bar)
@@ -53,20 +61,22 @@ fn main() {
             let mut shortcuts = app.global_shortcut_manager();
             if !shortcuts.is_registered(SHORTCUT).unwrap() {
                 let handle = app.get_window("main").unwrap();
-                shortcuts.register(SHORTCUT, move || {
-                    if handle.is_visible().unwrap() {
-                        handle.hide().unwrap();
-                    } else {
-                        handle.show().unwrap();
-                        handle
-                            .set_size(Size::Logical(LogicalSize {
-                                width: INPUT_WIDTH,
-                                height: INPUT_HEIGHT,
-                            }))
-                            .unwrap();
-                        handle.set_focus().unwrap();
-                    }
-                }).unwrap();
+                shortcuts
+                    .register(SHORTCUT, move || {
+                        if handle.is_visible().unwrap() {
+                            handle.hide().unwrap();
+                        } else {
+                            handle.show().unwrap();
+                            handle
+                                .set_size(Size::Logical(LogicalSize {
+                                    width: INPUT_WIDTH,
+                                    height: INPUT_HEIGHT,
+                                }))
+                                .unwrap();
+                            handle.set_focus().unwrap();
+                        }
+                    })
+                    .unwrap();
             }
 
             // Center window horizontally in the current screen
@@ -99,8 +109,14 @@ fn main() {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
                 match id.as_str() {
-                    "quit" => {
-                        app.exit(0);
+                    "pause" => {
+                        let new_label = if pause_crawler() {
+                            "Resume indexing"
+                        } else {
+                            "Pause indexing"
+                        };
+
+                        item_handle.set_title(new_label).unwrap();
                     }
                     "toggle" => {
                         let window = app.get_window("main").unwrap();
@@ -112,6 +128,9 @@ fn main() {
                             "Hide"
                         };
                         item_handle.set_title(new_title).unwrap();
+                    }
+                    "quit" => {
+                        app.exit(0);
                     }
                     _ => {}
                 }
@@ -131,6 +150,17 @@ async fn escape(window: tauri::Window) -> Result<(), String> {
 async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     open::that(url).unwrap();
     Ok(())
+}
+
+fn pause_crawler() -> bool {
+    let client = reqwest::blocking::Client::new();
+    let res: AppStatus = client.post("http://localhost:7777/api/pause")
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+
+    res.is_paused
 }
 
 #[tauri::command]
