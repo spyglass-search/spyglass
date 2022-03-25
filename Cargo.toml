@@ -1,5 +1,5 @@
 [package]
-name = "carto"
+name = "spyglass"
 version = "0.1.0"
 edition = "2021"
 authors = ["Andrew Huynh <a5thuynh@gmail.com>"]

@@ -205,37 +205,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
-name = "carto"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "dashmap",
- "digest 0.10.3",
- "directories",
- "dirs",
- "ego-tree",
- "hex",
- "html5ever",
- "http",
- "log",
- "regex",
- "reqwest",
- "rocket",
- "ron",
- "sea-orm",
- "serde",
- "sha2 0.10.2",
- "simple_logger",
- "sqlx",
- "tantivy",
- "tendril",
- "tokio",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2409,6 +2378,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "511254be0c5bcf062b019a6c89c01a664aa359ded62f78aa72c6fc137c0590e5"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "spyglass"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dashmap",
+ "digest 0.10.3",
+ "directories",
+ "dirs",
+ "ego-tree",
+ "hex",
+ "html5ever",
+ "http",
+ "log",
+ "regex",
+ "reqwest",
+ "rocket",
+ "ron",
+ "sea-orm",
+ "serde",
+ "sha2 0.10.2",
+ "simple_logger",
+ "sqlx",
+ "tantivy",
+ "tendril",
+ "tokio",
+ "url",
+ "uuid",
 ]
 
 [[package]]
