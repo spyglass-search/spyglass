@@ -11,7 +11,7 @@ const INPUT_WIDTH: f64 = 640.0;
 const INPUT_HEIGHT: f64 = 80.0;
 const INPUT_Y: f64 = 128.0;
 
-const RESULT_HEIGHT: f64 = 96.0;
+const RESULT_HEIGHT: f64 = 126.0;
 
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 
@@ -186,7 +186,7 @@ async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>,
         window
             .set_size(Size::Logical(LogicalSize {
                 width: INPUT_WIDTH,
-                height: INPUT_HEIGHT + (num_results as f64 * RESULT_HEIGHT),
+                height: INPUT_HEIGHT + (num_results.min(5) as f64 * RESULT_HEIGHT),
             }))
             .unwrap();
     } else {
