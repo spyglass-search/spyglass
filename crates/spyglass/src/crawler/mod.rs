@@ -23,7 +23,11 @@ static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_P
 #[derive(Debug, Default, Clone)]
 pub struct CrawlResult {
     pub content_hash: Option<String>,
+    /// Text content from page after stripping HTML tags & any semantically
+    /// unimportant sections (header/footer/etc.)
     pub content: Option<String>,
+    /// A short description of the page provided by the <meta> tag or summarized
+    /// from the content.
     pub description: Option<String>,
     pub status: u16,
     pub title: Option<String>,

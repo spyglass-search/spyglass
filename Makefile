@@ -1,4 +1,4 @@
-.PHONY: build-backend build-client run-client-dev check fmt test
+.PHONY: build-backend build-client check clippy fmt test run-client-dev
 
 build-backend:
 	cargo build -p spyglass-bin
@@ -8,6 +8,9 @@ build-client:
 
 check:
 	cargo check --all
+
+clippy:
+	cargo clippy --all
 
 fmt:
 	cargo fmt --all

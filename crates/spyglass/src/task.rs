@@ -166,6 +166,7 @@ pub async fn worker_task(
                             }
                         }
                         Ok(None) => {
+                            // Failed to grab robots.txt or crawling is not allowed
                             crawl_queue::mark_done(
                                 &state.db,
                                 crawl.id,
@@ -185,7 +186,6 @@ pub async fn worker_task(
                             .unwrap();
                             log::error!("Unable to crawl id: {} - {:?}", crawl.id, err)
                         }
-                        _ => {}
                     }
                 }
             }
