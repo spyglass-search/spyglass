@@ -1,11 +1,11 @@
 [package]
-name = "spyglass"
+name = "spyglass-app"
 version = "0.1.0"
 description = "Personal Search Engine"
 authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
 license = ""
 repository = ""
-default-run = "spyglass"
+default-run = "spyglass-app"
 edition = "2018"
 build = "src/build.rs"
 
@@ -24,10 +24,3 @@ tauri = { version = "1.0.0-rc.3", features = ["api-all", "system-tray"] }
 [features]
 default = [ "custom-protocol" ]
 custom-protocol = [ "tauri/custom-protocol" ]
-
-[profile.release]
-panic = "abort"
-codegen-units = 1
-lto = true
-incremental = false
-opt-level = "s"

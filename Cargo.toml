@@ -1,32 +1,13 @@
-[package]
-name = "spyglass"
-version = "0.1.0"
-edition = "2021"
-authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
+[workspace]
+members = [
+    "crates/client",
+    "crates/spyglass",
+    "crates/tauri",
+]
 
-[dependencies]
-anyhow = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-dashmap = "5.2"
-digest = "0.10"
-directories = "4.0"
-dirs = "4.0"
-ego-tree = "0.6.2"
-hex = "0.4"
-html5ever = "0.25"
-http = "0.2"
-log = "0.4"
-regex = "1"
-reqwest = "0.11"
-rocket = { version = "0.5.0-rc.1", features = [ "json" ] }
-ron = "0.7"
-sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
-serde = { version = "1.0", features = ["derive"] }
-sha2 = "0.10"
-simple_logger = "2.1"
-sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono"] }
-tantivy = "0.17"
-tendril = "0.4.2"
-tokio = { version = "1", features = ["full"] }
-uuid = { version = "0.8", features = ["serde", "v4"], default-features = false }
-url = "2.2"
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+incremental = false
+opt-level = "s"
