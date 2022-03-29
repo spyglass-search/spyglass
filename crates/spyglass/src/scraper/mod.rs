@@ -93,7 +93,7 @@ mod test {
 
     #[test]
     fn test_html_to_text() {
-        let html = include_str!("../../fixtures/raw.html");
+        let html = include_str!("../../../../fixtures/raw.html");
         let doc = html_to_text(html);
         assert_eq!(doc.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(doc.meta.len(), 9);

@@ -1,4 +1,4 @@
-.PHONY: build-backend build-client run-client-dev check fmt
+.PHONY: build-backend build-client run-client-dev check fmt test
 
 build-backend:
 	cargo build -p spyglass-bin
@@ -11,6 +11,9 @@ check:
 
 fmt:
 	cargo fmt --all
+
+test:
+	cargo test --all
 
 run-client-dev:
 	cargo tauri dev

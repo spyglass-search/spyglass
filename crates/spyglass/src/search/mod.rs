@@ -246,7 +246,7 @@ impl Searcher {
 
 #[cfg(test)]
 mod test {
-    use crate::config::Lense;
+    use crate::config::Lens;
     use crate::search::{IndexPath, Searcher};
     use std::collections::HashMap;
 
@@ -330,7 +330,7 @@ mod test {
 
     #[test]
     pub fn test_basic_lense_search() {
-        let lens = Lense {
+        let lens = Lens {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
             urls: Vec::new(),
