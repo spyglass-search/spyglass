@@ -50,7 +50,11 @@ pub fn app() -> Html {
                 // Search result navigation
                 if event.key() == "ArrowDown" {
                     event.stop_propagation();
-                    let max_len = if search_results.is_empty() { 0 } else { search_results.len() - 1 };
+                    let max_len = if search_results.is_empty() {
+                        0
+                    } else {
+                        search_results.len() - 1
+                    };
                     selected_idx.set((*selected_idx + 1).min(max_len));
                 } else if event.key() == "ArrowUp" {
                     event.stop_propagation();

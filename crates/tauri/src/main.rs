@@ -2,9 +2,10 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent};
+
+use shared::response::{AppStatus, SearchResult, SearchResults};
 mod menu;
 
 const INPUT_WIDTH: f64 = 640.0;
@@ -14,32 +15,7 @@ const INPUT_Y: f64 = 128.0;
 const RESULT_HEIGHT: f64 = 126.0;
 
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AppStatus {
-    pub num_docs: u64,
-    pub is_paused: bool,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SearchMeta {
-    pub query: String,
-    pub num_docs: u64,
-    pub wall_time_ms: u64,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct SearchResult {
-    pub title: String,
-    pub description: String,
-    pub url: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SearchResults {
-    pub results: Vec<SearchResult>,
-    pub meta: SearchMeta,
-}
+const API_ENDPOINT: &str = "http://localhost:7777";
 
 fn main() {
     let ctx = tauri::generate_context!();
@@ -102,56 +78,57 @@ fn main() {
                 }
             }
         })
-        .on_system_tray_event(move |app, event| {
-            match event {
-                SystemTrayEvent::LeftClick { .. } => {
-                    let app_status = app_status();
-                    let handle = app.tray_handle();
+        .on_system_tray_event(move |app, event| match event {
+            SystemTrayEvent::LeftClick { .. } => {
+                let app_status = app_status();
+                let handle = app.tray_handle();
 
-                    let status = handle.get_item(menu::CRAWL_STATUS_MENU_ITEM);
-                    status.set_title(if app_status.is_paused {
+                let status = handle.get_item(menu::CRAWL_STATUS_MENU_ITEM);
+                status
+                    .set_title(if app_status.is_paused {
                         "▶️ Resume indexing"
                     } else {
                         "⏸ Pause indexing"
-                    }).unwrap();
+                    })
+                    .unwrap();
 
-                    let ndocs_item = handle.get_item(menu::NUM_DOCS_MENU_ITEM);
-                    let _nqueued_item = handle.get_item(menu::NUM_QUEUED_MENU_ITEM);
+                let ndocs_item = handle.get_item(menu::NUM_DOCS_MENU_ITEM);
+                let _nqueued_item = handle.get_item(menu::NUM_QUEUED_MENU_ITEM);
 
-
-                    ndocs_item.set_title(format!("{} docs indexed", app_status.num_docs)).unwrap();
-                }
-                SystemTrayEvent::MenuItemClick { id, .. } => {
-                    let item_handle = app.tray_handle().get_item(&id);
-                    match id.as_str() {
-                        menu::CRAWL_STATUS_MENU_ITEM => {
-                            let new_label = if pause_crawler() {
-                                "Resume indexing"
-                            } else {
-                                "Pause indexing"
-                            };
-
-                            item_handle.set_title(new_label).unwrap();
-                        }
-                        menu::TOGGLE_MENU_ITEM => {
-                            let window = app.get_window("main").unwrap();
-                            let new_title = if window.is_visible().unwrap() {
-                                window.hide().unwrap();
-                                "Show"
-                            } else {
-                                window.show().unwrap();
-                                "Hide"
-                            };
-                            item_handle.set_title(new_title).unwrap();
-                        }
-                        menu::QUIT_MENU_ITEM => {
-                            app.exit(0);
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
+                ndocs_item
+                    .set_title(format!("{} documents indexed", app_status.num_docs))
+                    .unwrap();
             }
+            SystemTrayEvent::MenuItemClick { id, .. } => {
+                let item_handle = app.tray_handle().get_item(&id);
+                match id.as_str() {
+                    menu::CRAWL_STATUS_MENU_ITEM => {
+                        let new_label = if pause_crawler() {
+                            "▶️ Resume indexing"
+                        } else {
+                            "⏸ Pause indexing"
+                        };
+
+                        item_handle.set_title(new_label).unwrap();
+                    }
+                    menu::TOGGLE_MENU_ITEM => {
+                        let window = app.get_window("main").unwrap();
+                        let new_title = if window.is_visible().unwrap() {
+                            window.hide().unwrap();
+                            "Show"
+                        } else {
+                            window.show().unwrap();
+                            "Hide"
+                        };
+                        item_handle.set_title(new_title).unwrap();
+                    }
+                    menu::QUIT_MENU_ITEM => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         })
         .run(ctx)
         .expect("error while running tauri application");
@@ -182,14 +159,13 @@ fn app_status() -> AppStatus {
     res
 }
 
-
 fn pause_crawler() -> bool {
     let client = reqwest::blocking::Client::new();
     let mut map = HashMap::new();
     map.insert("toggle_pause", true);
 
     let res: AppStatus = client
-        .post("http://localhost:7777/api/status")
+        .post(format!("{}/api/status", API_ENDPOINT))
         .json(&map)
         .send()
         .unwrap()
@@ -206,7 +182,7 @@ async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>,
 
     let res: SearchResults = reqwest::Client::new()
         // TODO: make this configurable
-        .post("http://localhost:7777/api/search")
+        .post(format!("{}/api/search", API_ENDPOINT))
         .json(&map)
         .send()
         .await
