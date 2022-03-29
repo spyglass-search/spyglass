@@ -15,7 +15,9 @@ pub fn get_tray_menu() -> SystemTrayMenu {
     SystemTrayMenu::new()
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled())
+        .add_item(
+            CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
+        )
         .add_item(CustomMenuItem::new(NUM_QUEUED_MENU_ITEM.to_string(), "XX queued").disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(hide)
@@ -29,7 +31,10 @@ pub fn get_app_menu() -> Menu {
     Menu::new().add_submenu(Submenu::new(
         &ctx.package_info().name,
         Menu::new()
-            .add_native_item(MenuItem::About(ctx.package_info().name.to_string(), Default::default()))
+            .add_native_item(MenuItem::About(
+                ctx.package_info().name.to_string(),
+                Default::default(),
+            ))
             // Currently we need to include these so that the shortcuts for these
             // actions work.
             .add_native_item(MenuItem::Copy)

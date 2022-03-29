@@ -6,6 +6,8 @@ use sea_orm::Set;
 use serde::Deserialize;
 use url::Url;
 
+use shared::response::{AppStatus, SearchMeta, SearchResult, SearchResults};
+
 use super::response;
 use crate::models::crawl_queue;
 use crate::search::Searcher;
@@ -20,7 +22,7 @@ pub struct SearchReq<'r> {
 pub async fn search(
     state: &State<AppState>,
     search_req: Json<SearchReq<'_>>,
-) -> Result<Json<response::SearchResults>, BadRequest<String>> {
+) -> Result<Json<SearchResults>, BadRequest<String>> {
     let fields = Searcher::doc_fields();
 
     let index = state.index.lock().unwrap();
@@ -33,7 +35,7 @@ pub async fn search(
         search_req.term,
     );
 
-    let mut results: Vec<response::SearchResult> = Vec::new();
+    let mut results: Vec<SearchResult> = Vec::new();
     for (_score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
 
@@ -41,7 +43,7 @@ pub async fn search(
         let description = retrieved.get_first(fields.description).unwrap();
         let url = retrieved.get_first(fields.url).unwrap();
 
-        let result = response::SearchResult {
+        let result = SearchResult {
             title: title.as_text().unwrap().to_string(),
             description: description.as_text().unwrap().to_string(),
             url: url.as_text().unwrap().to_string(),
@@ -50,13 +52,13 @@ pub async fn search(
         results.push(result);
     }
 
-    let meta = response::SearchMeta {
+    let meta = SearchMeta {
         query: search_req.term.to_string(),
         num_docs: searcher.num_docs(),
         wall_time_ms: 1000,
     };
 
-    Ok(Json(response::SearchResults { results, meta }))
+    Ok(Json(SearchResults { results, meta }))
 }
 
 /// Show the list of URLs in the queue and their status
@@ -101,7 +103,7 @@ pub async fn add_queue(
     }
 }
 
-pub fn _get_current_status(state: &State<AppState>) -> response::AppStatus {
+pub fn _get_current_status(state: &State<AppState>) -> AppStatus {
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
@@ -111,7 +113,7 @@ pub fn _get_current_status(state: &State<AppState>) -> response::AppStatus {
     let index = state.index.lock().unwrap();
     let reader = index.reader.searcher();
 
-    response::AppStatus {
+    AppStatus {
         num_docs: reader.num_docs(),
         is_paused,
     }
@@ -119,7 +121,7 @@ pub fn _get_current_status(state: &State<AppState>) -> response::AppStatus {
 
 /// Fun stats about index size, etc.
 #[get("/status")]
-pub fn app_stats(state: &State<AppState>) -> Json<response::AppStatus> {
+pub fn app_stats(state: &State<AppState>) -> Json<AppStatus> {
     Json(_get_current_status(state))
 }
 
@@ -132,7 +134,7 @@ pub struct UpdateStatusRequest {
 pub async fn update_app_status(
     state: &State<AppState>,
     update_status: Json<UpdateStatusRequest>,
-) -> Result<Json<response::AppStatus>, BadRequest<String>> {
+) -> Result<Json<AppStatus>, BadRequest<String>> {
     // Update status
     if update_status.toggle_pause.is_some() {
         let app_state = &state.app_state;

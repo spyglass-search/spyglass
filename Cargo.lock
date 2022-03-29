@@ -4157,6 +4157,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "shared_child"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4253,6 +4261,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "shared",
  "tauri",
  "tauri-build",
 ]
@@ -4279,6 +4288,7 @@ dependencies = [
  "sea-orm",
  "serde",
  "sha2 0.10.2",
+ "shared",
  "simple_logger",
  "sqlx",
  "tantivy",
