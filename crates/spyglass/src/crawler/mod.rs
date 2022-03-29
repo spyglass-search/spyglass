@@ -34,6 +34,12 @@ pub struct CrawlResult {
     pub raw: Option<String>,
 }
 
+impl CrawlResult {
+    pub fn is_success(&self) -> bool {
+        self.status >= 200 && self.status <= 299
+    }
+}
+
 fn _normalize_href(url: &Url, href: &str) -> Option<String> {
     if href.starts_with("//") {
         // schema relative url
@@ -70,8 +76,18 @@ impl Crawler {
     /// Fetches and parses the content of a page.
     async fn crawl(&self, url: &Url) -> CrawlResult {
         // Fetch & store page data.
-        let res = self.client.get(url.as_str()).send().await.unwrap();
+        let res = self.client.get(url.as_str()).send().await;
+        if res.is_err() {
+            // Unable to connect to host
+            return CrawlResult {
+                // Service unavilable
+                status: 503_u16,
+                url: url.to_string(),
+                ..Default::default()
+            };
+        }
 
+        let res = res.unwrap();
         log::info!("Status: {}", res.status());
         let status = res.status();
         if status == StatusCode::OK {

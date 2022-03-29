@@ -97,11 +97,19 @@ pub async fn worker_task(
             match cmd {
                 Command::Fetch(crawl) => {
                     let result = crawler.fetch_by_job(&state.db, crawl.id).await;
-                    // mark crawl as finished
-                    crawl_queue::mark_done(&state.db, crawl.id).await.unwrap();
 
                     match result {
                         Ok(Some(crawl_result)) => {
+                            let cq_status = if crawl_result.is_success() {
+                                crawl_queue::CrawlStatus::Completed
+                            } else {
+                                crawl_queue::CrawlStatus::Failed
+                            };
+
+                            crawl_queue::mark_done(&state.db, crawl.id, cq_status)
+                                .await
+                                .unwrap();
+
                             // Add links found to crawl queue
                             for link in crawl_result.links.iter() {
                                 crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
@@ -157,7 +165,26 @@ pub async fn worker_task(
                                 indexed.save(&state.db).await.unwrap();
                             }
                         }
-                        Err(err) => log::error!("Unable to crawl id: {} - {:?}", crawl.id, err),
+                        Ok(None) => {
+                            crawl_queue::mark_done(
+                                &state.db,
+                                crawl.id,
+                                crawl_queue::CrawlStatus::Completed,
+                            )
+                            .await
+                            .unwrap();
+                        }
+                        Err(err) => {
+                            // mark crawl as failed
+                            crawl_queue::mark_done(
+                                &state.db,
+                                crawl.id,
+                                crawl_queue::CrawlStatus::Failed,
+                            )
+                            .await
+                            .unwrap();
+                            log::error!("Unable to crawl id: {} - {:?}", crawl.id, err)
+                        }
                         _ => {}
                     }
                 }

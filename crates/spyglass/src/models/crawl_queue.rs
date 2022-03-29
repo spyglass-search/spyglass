@@ -208,11 +208,15 @@ pub async fn enqueue(
     Ok(())
 }
 
-pub async fn mark_done(db: &DatabaseConnection, id: i64) -> anyhow::Result<()> {
+pub async fn mark_done(
+    db: &DatabaseConnection,
+    id: i64,
+    status: CrawlStatus,
+) -> anyhow::Result<()> {
     let crawl = Entity::find_by_id(id).one(db).await?.unwrap();
 
     let mut updated: ActiveModel = crawl.into();
-    updated.status = Set(CrawlStatus::Completed);
+    updated.status = Set(status);
     updated.update(db).await?;
 
     Ok(())
