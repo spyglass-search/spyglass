@@ -7,12 +7,8 @@ pub struct ListQueue {
 }
 
 #[derive(Serialize)]
-pub struct AppStats {
-    pub num_docs: u64,
-}
-
-#[derive(Serialize)]
 pub struct AppStatus {
+    pub num_docs: u64,
     pub is_paused: bool,
 }
 

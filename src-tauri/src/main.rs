@@ -154,7 +154,11 @@ async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
 
 fn pause_crawler() -> bool {
     let client = reqwest::blocking::Client::new();
-    let res: AppStatus = client.post("http://localhost:7777/api/pause")
+    let mut map = HashMap::new();
+    map.insert("toggle_pause", true);
+
+    let res: AppStatus = client.post("http://localhost:7777/api/status")
+        .json(&map)
         .send()
         .unwrap()
         .json()

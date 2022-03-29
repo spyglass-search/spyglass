@@ -7,10 +7,9 @@ use serde::Deserialize;
 use url::Url;
 
 use super::response;
-use crate::api::response::SearchResult;
+use crate::models::crawl_queue;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::models::crawl_queue;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchReq<'r> {
@@ -34,7 +33,7 @@ pub async fn search(
         search_req.term,
     );
 
-    let mut results: Vec<SearchResult> = Vec::new();
+    let mut results: Vec<response::SearchResult> = Vec::new();
     for (_score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
 
@@ -42,7 +41,7 @@ pub async fn search(
         let description = retrieved.get_first(fields.description).unwrap();
         let url = retrieved.get_first(fields.url).unwrap();
 
-        let result = SearchResult {
+        let result = response::SearchResult {
             title: title.as_text().unwrap().to_string(),
             description: description.as_text().unwrap().to_string(),
             url: url.as_text().unwrap().to_string(),
@@ -58,19 +57,6 @@ pub async fn search(
     };
 
     Ok(Json(response::SearchResults { results, meta }))
-}
-
-#[post("/pause")]
-pub async fn pause_crawler(
-    state: &State<AppState>,
-) -> Result<Json<response::AppStatus>, BadRequest<String>> {
-    let app_state = &state.app_state;
-    let mut paused_status = app_state.get_mut("paused").unwrap();
-
-    let is_paused = !(paused_status.to_string() == *"true");
-    *paused_status = is_paused.to_string();
-
-    Ok(Json(response::AppStatus { is_paused }))
 }
 
 /// Show the list of URLs in the queue and their status
@@ -115,12 +101,47 @@ pub async fn add_queue(
     }
 }
 
-/// Fun stats about index size, etc.
-#[get("/stats")]
-pub fn app_stats(state: &State<AppState>) -> Json<response::AppStats> {
+pub fn _get_current_status(state: &State<AppState>) -> response::AppStatus {
+    // Grab crawler status
+    let app_state = &state.app_state;
+    let paused_status = app_state.get("paused").unwrap();
+    let is_paused = *paused_status == *"true";
+
+    // Grab details about index
     let index = state.index.lock().unwrap();
     let reader = index.reader.searcher();
-    Json(response::AppStats {
+
+    response::AppStatus {
         num_docs: reader.num_docs(),
-    })
+        is_paused,
+    }
+}
+
+/// Fun stats about index size, etc.
+#[get("/status")]
+pub fn app_stats(state: &State<AppState>) -> Json<response::AppStatus> {
+    Json(_get_current_status(state))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateStatusRequest {
+    pub toggle_pause: Option<bool>,
+}
+
+#[post("/status", data = "<update_status>")]
+pub async fn update_app_status(
+    state: &State<AppState>,
+    update_status: Json<UpdateStatusRequest>,
+) -> Result<Json<response::AppStatus>, BadRequest<String>> {
+    // Update status
+    if update_status.toggle_pause.is_some() {
+        let app_state = &state.app_state;
+        let mut paused_status = app_state.get_mut("paused").unwrap();
+
+        let current_status = paused_status.to_string() == "true";
+        let updated_status = !current_status;
+        *paused_status = updated_status.to_string();
+    }
+
+    Ok(Json(_get_current_status(state)))
 }
