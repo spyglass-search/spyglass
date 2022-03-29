@@ -47,9 +47,11 @@ pub fn app() -> Html {
             let document = gloo::utils::document();
             let listener = EventListener::new(&document, "keydown", move |event| {
                 let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap_throw();
+                // Search result navigation
                 if event.key() == "ArrowDown" {
                     event.stop_propagation();
-                    selected_idx.set((*selected_idx + 1).min(10));
+                    let max_len = if search_results.is_empty() { 0 } else { search_results.len() - 1 };
+                    selected_idx.set((*selected_idx + 1).min(max_len));
                 } else if event.key() == "ArrowUp" {
                     event.stop_propagation();
                     selected_idx.set((*selected_idx - 1).max(0));
@@ -100,7 +102,7 @@ pub fn app() -> Html {
         cb.forget();
     });
 
-    let results = search_results[0..search_results.len().min(5)]
+    let results = search_results
         .iter()
         .enumerate()
         .map(|(idx, res)| search_result_component(res, idx == *selected_idx))

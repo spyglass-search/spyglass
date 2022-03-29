@@ -27,7 +27,7 @@ pub struct SearchMeta {
     pub wall_time_ms: u64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SearchResult {
     pub title: String,
     pub description: String,
@@ -44,11 +44,7 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
-            escape,
-            open_result,
-            search,
-        ])
+        .invoke_handler(tauri::generate_handler![escape, open_result, search,])
         .menu(menu::get_app_menu())
         .setup(|app| {
             // hide from dock (also hides menu bar)
@@ -157,7 +153,8 @@ fn pause_crawler() -> bool {
     let mut map = HashMap::new();
     map.insert("toggle_pause", true);
 
-    let res: AppStatus = client.post("http://localhost:7777/api/status")
+    let res: AppStatus = client
+        .post("http://localhost:7777/api/status")
         .json(&map)
         .send()
         .unwrap()
@@ -183,14 +180,15 @@ async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>,
         .await
         .unwrap();
 
-    println!("search: {:?}", res);
-    let num_results = res.results.len();
+    let results: Vec<SearchResult> = res.results[0..5].to_vec();
+
+    let num_results = results.len();
 
     if num_results > 0 {
         window
             .set_size(Size::Logical(LogicalSize {
                 width: INPUT_WIDTH,
-                height: INPUT_HEIGHT + (num_results.min(5) as f64 * RESULT_HEIGHT),
+                height: INPUT_HEIGHT + (num_results.min(results.len()) as f64 * RESULT_HEIGHT),
             }))
             .unwrap();
     } else {
@@ -202,5 +200,5 @@ async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>,
             .unwrap();
     }
 
-    Ok(res.results)
+    Ok(results)
 }
