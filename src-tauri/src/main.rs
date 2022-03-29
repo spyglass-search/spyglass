@@ -17,6 +17,7 @@ const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
+    pub num_docs: u64,
     pub is_paused: bool,
 }
 
@@ -102,34 +103,54 @@ fn main() {
             }
         })
         .on_system_tray_event(move |app, event| {
-            if let SystemTrayEvent::MenuItemClick { id, .. } = event {
-                let item_handle = app.tray_handle().get_item(&id);
-                match id.as_str() {
-                    "pause" => {
-                        let new_label = if pause_crawler() {
-                            "Resume indexing"
-                        } else {
-                            "Pause indexing"
-                        };
+            match event {
+                SystemTrayEvent::LeftClick { .. } => {
+                    let app_status = app_status();
+                    let handle = app.tray_handle();
 
-                        item_handle.set_title(new_label).unwrap();
-                    }
-                    "toggle" => {
-                        let window = app.get_window("main").unwrap();
-                        let new_title = if window.is_visible().unwrap() {
-                            window.hide().unwrap();
-                            "Show"
-                        } else {
-                            window.show().unwrap();
-                            "Hide"
-                        };
-                        item_handle.set_title(new_title).unwrap();
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
+                    let status = handle.get_item(menu::CRAWL_STATUS_MENU_ITEM);
+                    status.set_title(if app_status.is_paused {
+                        "▶️ Resume indexing"
+                    } else {
+                        "⏸ Pause indexing"
+                    }).unwrap();
+
+                    let ndocs_item = handle.get_item(menu::NUM_DOCS_MENU_ITEM);
+                    let _nqueued_item = handle.get_item(menu::NUM_QUEUED_MENU_ITEM);
+
+
+                    ndocs_item.set_title(format!("{} docs indexed", app_status.num_docs)).unwrap();
                 }
+                SystemTrayEvent::MenuItemClick { id, .. } => {
+                    let item_handle = app.tray_handle().get_item(&id);
+                    match id.as_str() {
+                        menu::CRAWL_STATUS_MENU_ITEM => {
+                            let new_label = if pause_crawler() {
+                                "Resume indexing"
+                            } else {
+                                "Pause indexing"
+                            };
+
+                            item_handle.set_title(new_label).unwrap();
+                        }
+                        menu::TOGGLE_MENU_ITEM => {
+                            let window = app.get_window("main").unwrap();
+                            let new_title = if window.is_visible().unwrap() {
+                                window.hide().unwrap();
+                                "Show"
+                            } else {
+                                window.show().unwrap();
+                                "Hide"
+                            };
+                            item_handle.set_title(new_title).unwrap();
+                        }
+                        menu::QUIT_MENU_ITEM => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
             }
         })
         .run(ctx)
@@ -147,6 +168,20 @@ async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     open::that(url).unwrap();
     Ok(())
 }
+
+fn app_status() -> AppStatus {
+    let client = reqwest::blocking::Client::new();
+
+    let res: AppStatus = client
+        .get("http://localhost:7777/api/status")
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+
+    res
+}
+
 
 fn pause_crawler() -> bool {
     let client = reqwest::blocking::Client::new();
