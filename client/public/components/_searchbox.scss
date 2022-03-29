@@ -1,0 +1,56 @@
+@import "../constants";
+
+.search-box {
+    background: $bg-color;
+    border: none;
+    box-sizing: border-box;
+    color: $fg-color;
+    flex: 1;
+    font-size: 3em;
+    margin: 0;
+    padding: 0.4em;
+    min-width: 0;
+
+    &::placeholder {
+        color: $comment;
+    }
+
+    &:focus {
+        outline: transparent;
+    }
+}
+
+.result-selected {
+    background: darken($blue, 25%);
+    .result-description, .result-url > a {
+        color: $fg-color !important;
+    }
+}
+
+.result-item {
+    border-bottom: 1px solid #444;
+    padding: 1.25em;
+    height: 9em;
+    box-sizing: border-box;
+
+    .result-url > a {
+        font-size: 0.9em;
+        text-decoration: none;
+        color: $blue;
+    }
+
+    h2.result-title {
+        font-weight: normal;
+        font-size: 1.1em;
+        padding: 0;
+        margin: 0.5em 0;
+    }
+
+    .result-description {
+        color: $comment;
+        line-height: 1.5em;
+        font-size: 1em;
+        overflow: hidden;
+        height: 3em;
+    }
+}

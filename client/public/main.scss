@@ -1,10 +1,7 @@
+@import "constants";
 @import "normalize";
-
-// Derived from Monokai
-$bg-color: #2e2e2e;
-$fg-color: #d6d6d6;
-$comment: #797979;
-$blue: #6c99bb;
+@import "components/searchbox";
+@import "components/lenses";
 
 html, body {
     margin: 0;
@@ -20,56 +17,9 @@ body {
     font-size: 14px;
 }
 
-.search-box {
-    font-size: 3em;
-    padding: 0.4em;
-    margin: 0;
-    width: 100%;
-    border: none;
-    box-sizing: border-box;
-    background: $bg-color;
-    color: $fg-color;
-
-    &::placeholder {
-        color: $comment;
-    }
-}
-
 .query-container {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
     border-bottom: 1px solid $comment;
-}
-
-.result-selected {
-    background: darken($blue, 25%);
-    .result-description, .result-url > a {
-        color: $fg-color !important;
-    }
-}
-
-.result-item {
-    border-bottom: 1px solid #444;
-    padding: 1.25em;
-    height: 9em;
-    box-sizing: border-box;
-
-    .result-url > a {
-        font-size: 0.9em;
-        text-decoration: none;
-        color: $blue;
-    }
-
-    h2.result-title {
-        font-weight: normal;
-        font-size: 1.1em;
-        padding: 0;
-        margin: 0.5em 0;
-    }
-
-    .result-description {
-        color: $comment;
-        line-height: 1.5em;
-        font-size: 1em;
-        overflow: hidden;
-        height: 3em;
-    }
 }

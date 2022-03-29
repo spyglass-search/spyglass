@@ -32,6 +32,7 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
+    let lens = use_state_eq(Vec::new);
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
     let query = use_state_eq(|| "".to_string());
@@ -39,6 +40,8 @@ pub fn app() -> Html {
     {
         let selected_idx = selected_idx.clone();
         let search_results = search_results.clone();
+        let lens = lens.clone();
+
         use_effect(move || {
             // Attach a keydown event listener to the document.
             let document = gloo::utils::document();
@@ -60,6 +63,13 @@ pub fn app() -> Html {
                     spawn_local(async move {
                         escape().await.unwrap();
                     });
+                } else if event.key() == "Backspace" {
+                    event.stop_propagation();
+                    if !lens.is_empty() {
+                        log::info!("updating lenses");
+                        let all_but_last = lens[0..lens.len() - 1].to_vec();
+                        lens.set(all_but_last);
+                    }
                 }
             });
             || drop(listener)
@@ -90,7 +100,7 @@ pub fn app() -> Html {
         cb.forget();
     });
 
-    let results = search_results
+    let results = search_results[0..search_results.len().min(5)]
         .iter()
         .enumerate()
         .map(|(idx, res)| search_result_component(res, idx == *selected_idx))
@@ -107,6 +117,15 @@ pub fn app() -> Html {
     html! {
         <div>
             <div class="query-container">
+                <ul class={"lenses"}>
+                    {lens.iter().map(|lens_name: &String| {
+                        html! {
+                            <li class={"lens"}>
+                                <span class={"lens-title"}>{lens_name}</span>
+                            </li>
+                        }
+                    }).collect::<Html>()}
+                </ul>
                 <input
                     type={"text"}
                     class={"search-box"}

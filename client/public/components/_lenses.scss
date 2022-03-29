@@ -1,0 +1,21 @@
+@import "../constants";
+
+.lenses {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 1em 0;
+    margin: 0;
+}
+
+.lens {
+    align-items: center;
+    background: $blue;
+    border-radius: 6px;
+    color: #fff;
+    display: flex;
+    font-size: 3em;
+    justify-content: center;
+    list-style: none;
+    margin-left: 0.2em;
+    padding: 0 0.2em;
+}
