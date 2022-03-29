@@ -3,6 +3,8 @@
     windows_subsystem = "windows"
 )]
 use std::collections::HashMap;
+
+use num_format::{Locale, ToFormattedString};
 use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent};
 
 use shared::response::{AppStatus, SearchResult, SearchResults};
@@ -83,8 +85,8 @@ fn main() {
                 let app_status = app_status();
                 let handle = app.tray_handle();
 
-                let status = handle.get_item(menu::CRAWL_STATUS_MENU_ITEM);
-                status
+                handle
+                    .get_item(menu::CRAWL_STATUS_MENU_ITEM)
                     .set_title(if app_status.is_paused {
                         "▶️ Resume indexing"
                     } else {
@@ -92,11 +94,20 @@ fn main() {
                     })
                     .unwrap();
 
-                let ndocs_item = handle.get_item(menu::NUM_DOCS_MENU_ITEM);
-                let _nqueued_item = handle.get_item(menu::NUM_QUEUED_MENU_ITEM);
+                handle
+                    .get_item(menu::NUM_DOCS_MENU_ITEM)
+                    .set_title(format!(
+                        "{} documents indexed",
+                        app_status.num_docs.to_formatted_string(&Locale::en)
+                    ))
+                    .unwrap();
 
-                ndocs_item
-                    .set_title(format!("{} documents indexed", app_status.num_docs))
+                handle
+                    .get_item(menu::NUM_QUEUED_MENU_ITEM)
+                    .set_title(format!(
+                        "{} in queue",
+                        app_status.num_queued.to_formatted_string(&Locale::en)
+                    ))
                     .unwrap();
             }
             SystemTrayEvent::MenuItemClick { id, .. } => {

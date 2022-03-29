@@ -103,7 +103,10 @@ pub async fn add_queue(
     }
 }
 
-pub fn _get_current_status(state: &State<AppState>) -> AppStatus {
+pub async fn _get_current_status(state: &State<AppState>) -> AppStatus {
+    let db = &state.db;
+    let num_queued = crawl_queue::num_queued(db).await.unwrap();
+
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
@@ -115,14 +118,15 @@ pub fn _get_current_status(state: &State<AppState>) -> AppStatus {
 
     AppStatus {
         num_docs: reader.num_docs(),
+        num_queued,
         is_paused,
     }
 }
 
 /// Fun stats about index size, etc.
 #[get("/status")]
-pub fn app_stats(state: &State<AppState>) -> Json<AppStatus> {
-    Json(_get_current_status(state))
+pub async fn app_stats(state: &State<AppState>) -> Json<AppStatus> {
+    Json(_get_current_status(state).await)
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,5 +149,5 @@ pub async fn update_app_status(
         *paused_status = updated_status.to_string();
     }
 
-    Ok(Json(_get_current_status(state)))
+    Ok(Json(_get_current_status(state).await))
 }

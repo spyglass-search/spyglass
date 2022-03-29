@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use sea_orm::entity::prelude::*;
-use sea_orm::{sea_query, DbBackend, QueryOrder, Set, Statement};
+use sea_orm::{sea_query, DbBackend, FromQueryResult, QueryOrder, QuerySelect, Set, Statement};
 use serde::Serialize;
 use url::Url;
 
@@ -89,6 +89,22 @@ pub async fn reset_processing(db: &DatabaseConnection) {
         .exec(db)
         .await
         .unwrap();
+}
+
+#[derive(FromQueryResult)]
+struct CrawlQueueCount {
+    count: i64,
+}
+
+pub async fn num_queued(db: &DatabaseConnection) -> anyhow::Result<u64, sea_orm::DbErr> {
+    let res = Entity::find()
+        .column_as(Column::Id.count(), "count")
+        .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
+        .into_model::<CrawlQueueCount>()
+        .one(db)
+        .await?;
+
+    Ok(res.unwrap().count as u64)
 }
 
 /// Get the next url in the crawl queue
