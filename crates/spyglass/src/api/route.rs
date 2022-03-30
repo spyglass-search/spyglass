@@ -3,25 +3,20 @@ use rocket::serde::json::Json;
 use rocket::State;
 use sea_orm::prelude::*;
 use sea_orm::Set;
-use serde::Deserialize;
 use url::Url;
 
 use shared::response::{AppStatus, SearchMeta, SearchResult, SearchResults};
 
+use super::param::{QueueItemParam, SearchParam, UpdateStatusParam};
 use super::response;
 use crate::models::crawl_queue;
 use crate::search::Searcher;
 use crate::state::AppState;
 
-#[derive(Debug, Deserialize)]
-pub struct SearchReq<'r> {
-    pub term: &'r str,
-}
-
 #[post("/search", data = "<search_req>")]
 pub async fn search(
     state: &State<AppState>,
-    search_req: Json<SearchReq<'_>>,
+    search_req: Json<SearchParam<'_>>,
 ) -> Result<Json<SearchResults>, BadRequest<String>> {
     let fields = Searcher::doc_fields();
 
@@ -75,17 +70,11 @@ pub async fn list_queue(
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct QueueItem<'r> {
-    pub url: &'r str,
-    pub force_crawl: bool,
-}
-
 /// Add url to queue
 #[post("/queue", data = "<queue_item>")]
 pub async fn add_queue(
     state: &State<AppState>,
-    queue_item: Json<QueueItem<'_>>,
+    queue_item: Json<QueueItemParam<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
     let db = &state.db;
 
@@ -129,15 +118,10 @@ pub async fn app_stats(state: &State<AppState>) -> Json<AppStatus> {
     Json(_get_current_status(state).await)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateStatusRequest {
-    pub toggle_pause: Option<bool>,
-}
-
 #[post("/status", data = "<update_status>")]
 pub async fn update_app_status(
     state: &State<AppState>,
-    update_status: Json<UpdateStatusRequest>,
+    update_status: Json<UpdateStatusParam>,
 ) -> Result<Json<AppStatus>, BadRequest<String>> {
     // Update status
     if update_status.toggle_pause.is_some() {

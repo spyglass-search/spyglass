@@ -1,12 +1,12 @@
 use gloo::events::EventListener;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
 use components::{search_result_component, SearchResult};
+mod events;
 
 const MIN_CHARS: usize = 2;
 
@@ -32,11 +32,15 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
+    // Lens related data + results
     let lens = use_state_eq(Vec::new);
+    // Current query string
+    let query = use_state_eq(|| "".to_string());
+    // Search results + selected index
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
-    let query = use_state_eq(|| "".to_string());
 
+    // Handle key events
     {
         let selected_idx = selected_idx.clone();
         let search_results = search_results.clone();
@@ -46,47 +50,28 @@ pub fn app() -> Html {
             // Attach a keydown event listener to the document.
             let document = gloo::utils::document();
             let listener = EventListener::new(&document, "keydown", move |event| {
-                let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap_throw();
-                // Search result navigation
-                if event.key() == "ArrowDown" {
-                    event.stop_propagation();
-                    let max_len = if search_results.is_empty() {
-                        0
-                    } else {
-                        search_results.len() - 1
-                    };
-                    selected_idx.set((*selected_idx + 1).min(max_len));
-                } else if event.key() == "ArrowUp" {
-                    event.stop_propagation();
-                    selected_idx.set((*selected_idx - 1).max(0));
-                } else if event.key() == "Enter" {
-                    let selected: &SearchResult = (*search_results).get(*selected_idx).unwrap();
-                    let url = selected.url.clone();
-                    spawn_local(async move {
-                        open(url).await.unwrap();
-                    });
-                } else if event.key() == "Escape" {
-                    spawn_local(async move {
-                        escape().await.unwrap();
-                    });
-                } else if event.key() == "Backspace" {
-                    event.stop_propagation();
-                    if !lens.is_empty() {
-                        log::info!("updating lenses");
-                        let all_but_last = lens[0..lens.len() - 1].to_vec();
-                        lens.set(all_but_last);
-                    }
-                }
+                events::handle_global_key_down(event, lens, search_results, selected_idx)
             });
             || drop(listener)
         });
     }
 
+    // Handle changes to the query string
     {
+        let lens = lens.clone();
+
         let search_results = search_results.clone();
         use_effect_with_deps(
             move |query| {
-                update_results(search_results, query.clone());
+                if query.len() > MIN_CHARS {
+                    if query.starts_with("::") {
+                        // show lens search
+                        show_lens_results(search_results, query.clone())
+                    } else {
+                        log::info!("query: {}", query);
+                        update_results(search_results, query.clone());
+                    }
+                }
                 || ()
             },
             (*query).clone(),
@@ -149,11 +134,15 @@ pub fn app() -> Html {
     }
 }
 
-fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
-    if query.len() <= MIN_CHARS {
-        return;
-    }
+fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
+    handle.set(vec![
+        "wiki".to_string(),
+        "wiki:en".to_string(),
+        "osrs".to_string(),
+    ]);
+}
 
+fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
     spawn_local(async move {
         match run_search(query).await {
             Ok(results) => {
