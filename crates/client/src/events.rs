@@ -3,12 +3,13 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use super::{escape, open};
+use super::{clear_results, escape, open};
 use crate::components::SearchResult;
 
 pub fn handle_global_key_down(
     event: &Event,
     lens: UseStateHandle<Vec<String>>,
+    query: UseStateHandle<String>,
     search_results: UseStateHandle<Vec<SearchResult>>,
     selected_idx: UseStateHandle<usize>,
 ) {
@@ -31,6 +32,16 @@ pub fn handle_global_key_down(
             spawn_local(async move {
                 open(url).await.unwrap();
             });
+        // Otherwise we're dealing w/ a lens, add to lens vec
+        } else {
+            // Add lens to list
+            let mut new_lens = lens.clone().to_vec();
+            new_lens.push(selected.title.to_string());
+            lens.set(new_lens);
+            // Clear query string
+            query.set("".to_string());
+            // Clear results list
+            clear_results(search_results);
         }
     } else if event.key() == "Escape" {
         spawn_local(async move {

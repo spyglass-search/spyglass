@@ -51,12 +51,13 @@ pub fn app() -> Html {
         let selected_idx = selected_idx.clone();
         let search_results = search_results.clone();
         let lens = lens.clone();
+        let query = query.clone();
 
         use_effect(move || {
             // Attach a keydown event listener to the document.
             let document = gloo::utils::document();
             let listener = EventListener::new(&document, "keydown", move |event| {
-                events::handle_global_key_down(event, lens.clone(), search_results.clone(), selected_idx.clone())
+                events::handle_global_key_down(event, lens.clone(), query.clone(), search_results.clone(), selected_idx.clone())
             });
             || drop(listener)
         });
@@ -139,6 +140,11 @@ pub fn app() -> Html {
     }
 }
 
+fn clear_results(handle: UseStateHandle<Vec<SearchResult>>) {
+    handle.set(Vec::new());
+    resize_window(INPUT_HEIGHT).unwrap();
+}
+
 fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, _: String) {
     let mut res = Vec::new();
     let test = SearchResult {
@@ -165,6 +171,7 @@ fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
                 window
                     .alert_with_message(&format!("Error: {:?}", e))
                     .unwrap();
+                    clear_results(handle);
             }
         }
     })
