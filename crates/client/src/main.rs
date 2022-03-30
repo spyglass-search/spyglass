@@ -8,6 +8,8 @@ mod components;
 use components::{search_result_component, SearchResult};
 mod events;
 
+const LENS_SEARCH_PREFIX: &str = "/";
+
 const MIN_CHARS: usize = 2;
 
 const INPUT_HEIGHT: f64 = 80.0;
@@ -69,7 +71,7 @@ pub fn app() -> Html {
         use_effect_with_deps(
             move |query| {
                 if query.len() > MIN_CHARS {
-                    if query.starts_with("::") {
+                    if query.starts_with(LENS_SEARCH_PREFIX) {
                         // show lens search
                         log::info!("lens search: {}", query);
                         show_lens_results(search_results, query.clone())
