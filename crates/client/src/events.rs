@@ -35,7 +35,7 @@ pub fn handle_global_key_down(
         // Otherwise we're dealing w/ a lens, add to lens vec
         } else {
             // Add lens to list
-            let mut new_lens = lens.clone().to_vec();
+            let mut new_lens = lens.to_vec();
             new_lens.push(selected.title.to_string());
             lens.set(new_lens);
             // Clear query string

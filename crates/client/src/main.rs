@@ -5,7 +5,7 @@ use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
-use components::{search_result_component, SearchResult};
+use components::{lens_list, search_result_component, SearchResult};
 mod events;
 
 const LENS_SEARCH_PREFIX: &str = "/";
@@ -116,15 +116,7 @@ pub fn app() -> Html {
     html! {
         <div>
             <div class="query-container">
-                <ul class={"lenses"}>
-                    {lens.iter().map(|lens_name: &String| {
-                        html! {
-                            <li class={"lens"}>
-                                <span class={"lens-title"}>{lens_name}</span>
-                            </li>
-                        }
-                    }).collect::<Html>()}
-                </ul>
+                {lens_list(&lens)}
                 <input
                     type={"text"}
                     class={"search-box"}
