@@ -1,3 +1,5 @@
+# See https://github.com/rust-lang/rustfmt/blob/master/Configurations.md
+# for more configuration options
 max_width = 100
 hard_tabs = false
 tab_spaces = 4
