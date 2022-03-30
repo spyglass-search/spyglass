@@ -10,6 +10,9 @@ mod events;
 
 const MIN_CHARS: usize = 2;
 
+const INPUT_HEIGHT: f64 = 80.0;
+const RESULT_HEIGHT: f64 = 126.0;
+
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
     #[wasm_bindgen(js_name = invokeSearch, catch)]
@@ -23,6 +26,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "escape", catch)]
     pub async fn escape() -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = "resizeWindow", catch)]
+    pub fn resize_window(height: f64) -> Result<(), JsValue>;
 }
 
 fn main() {
@@ -50,7 +56,7 @@ pub fn app() -> Html {
             // Attach a keydown event listener to the document.
             let document = gloo::utils::document();
             let listener = EventListener::new(&document, "keydown", move |event| {
-                events::handle_global_key_down(event, lens, search_results, selected_idx)
+                events::handle_global_key_down(event, lens.clone(), search_results.clone(), selected_idx.clone())
             });
             || drop(listener)
         });
@@ -58,17 +64,16 @@ pub fn app() -> Html {
 
     // Handle changes to the query string
     {
-        let lens = lens.clone();
-
         let search_results = search_results.clone();
         use_effect_with_deps(
             move |query| {
                 if query.len() > MIN_CHARS {
                     if query.starts_with("::") {
                         // show lens search
+                        log::info!("lens search: {}", query);
                         show_lens_results(search_results, query.clone())
                     } else {
-                        log::info!("query: {}", query);
+                        log::info!("query search: {}", query);
                         update_results(search_results, query.clone());
                     }
                 }
@@ -134,12 +139,17 @@ pub fn app() -> Html {
     }
 }
 
-fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
-    handle.set(vec![
-        "wiki".to_string(),
-        "wiki:en".to_string(),
-        "osrs".to_string(),
-    ]);
+fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, _: String) {
+    let mut res = Vec::new();
+    let test = SearchResult {
+        title: "wiki".to_string(),
+        description: "Search through a variety of wikis".to_string(),
+        url: None
+    };
+    res.push(test);
+
+    resize_window(INPUT_HEIGHT + (res.len() as f64) * RESULT_HEIGHT).unwrap();
+    handle.set(res);
 }
 
 fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
@@ -147,6 +157,7 @@ fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
         match run_search(query).await {
             Ok(results) => {
                 let results: Vec<SearchResult> = results.into_serde().unwrap();
+                resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
                 handle.set(results);
             }
             Err(e) => {

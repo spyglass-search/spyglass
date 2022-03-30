@@ -23,7 +23,7 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![escape, open_result, search,])
+        .invoke_handler(tauri::generate_handler![escape, open_result, search, resize_window])
         .menu(menu::get_app_menu())
         .setup(|app| {
             // hide from dock (also hides menu bar)
@@ -187,7 +187,17 @@ fn pause_crawler() -> bool {
 }
 
 #[tauri::command]
-async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>, String> {
+fn resize_window(window: tauri::Window, height: f64) {
+    window
+    .set_size(Size::Logical(LogicalSize {
+        width: INPUT_WIDTH,
+        height,
+    }))
+    .unwrap();
+}
+
+#[tauri::command]
+async fn search(_: tauri::Window, query: &str) -> Result<Vec<SearchResult>, String> {
     let mut map = HashMap::new();
     map.insert("term", query);
 
@@ -203,24 +213,5 @@ async fn search(window: tauri::Window, query: &str) -> Result<Vec<SearchResult>,
         .unwrap();
 
     let results: Vec<SearchResult> = res.results[0..5].to_vec();
-
-    let num_results = results.len();
-
-    if num_results > 0 {
-        window
-            .set_size(Size::Logical(LogicalSize {
-                width: INPUT_WIDTH,
-                height: INPUT_HEIGHT + (num_results.min(results.len()) as f64 * RESULT_HEIGHT),
-            }))
-            .unwrap();
-    } else {
-        window
-            .set_size(Size::Logical(LogicalSize {
-                width: INPUT_WIDTH,
-                height: INPUT_HEIGHT,
-            }))
-            .unwrap();
-    }
-
     Ok(results)
 }

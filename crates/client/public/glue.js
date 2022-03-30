@@ -20,3 +20,7 @@ export async function invokeSearch(query) {
 export async function openResult(url) {
     return await invoke("open_result", { url });
 }
+
+export function resizeWindow(height) {
+    return invoke("resize_window", { height });
+}

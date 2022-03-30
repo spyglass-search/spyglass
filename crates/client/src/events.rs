@@ -27,10 +27,11 @@ pub fn handle_global_key_down(
         selected_idx.set((*selected_idx - 1).max(0));
     } else if event.key() == "Enter" {
         let selected: &SearchResult = (*search_results).get(*selected_idx).unwrap();
-        let url = selected.url.clone();
-        spawn_local(async move {
-            open(url).await.unwrap();
-        });
+        if let Some(url) = selected.url.clone() {
+            spawn_local(async move {
+                open(url).await.unwrap();
+            });
+        }
     } else if event.key() == "Escape" {
         spawn_local(async move {
             escape().await.unwrap();
