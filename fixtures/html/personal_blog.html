@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COVID-19 Stats Tracker</title>
+  <link rel="icon" href="&#x2F;favicon&#x2F;favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&family=Inconsolata&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href='https://a5huynh.github.io/blog.css' type="text/css">
+  </head>
+<body>
+  <div class='header'>
+    <div id='big-name'>
+      <a href='/'>Andrew Huynh</a>
+    </div>
+    <div id='my-attrs'>
+      <div>Thoughts&nbsp;</div>
+      <div>and ramblings.</div>
+    </div>
+    <div id='social-icons'>
+      <div>
+        <a
+          href='http://www.google.com/recaptcha/mailhide/d?k=01uNCZrwDlz2I3VKthc1vVRw==&amp;c=6YTbdnM2V4n_HnbJamUSEoWCPMs3doQFXFC1r8BFdkU='>
+          <img src='https://a5huynh.github.io/img/email.svg' alt='Email me!'>
+        </a>
+      </div>
+      <div>
+        <a href='http://twitter.com/a5huynh'>
+          <img src='https://a5huynh.github.io/img/twitter.svg' alt='Follow me on Twitter!'>
+        </a>
+      </div>
+      <div>
+        <a href='http://www.linkedin.com/profile/view?id=30602610'>
+          <img src='https://a5huynh.github.io/img/linkedin.svg' alt='Check me out on LinkedIn.'>
+        </a>
+      </div>
+    </div>
+  </div>
+
+<div class='article'>
+  <h1>COVID-19 Stats Tracker</h1>
+  <p class='meta'>
+    2020 July 15 - San Francisco |
+    <span>855 words</span>
+  </p>
+
+
+
+<div class='post-tags'>
+
+    <a href='https://a5huynh.github.io/tags/esp32/'>
+        <span
+            >
+            #esp32
+        </span>
+    </a>
+
+    <a href='https://a5huynh.github.io/tags/hardware/'>
+        <span
+            >
+            #hardware
+        </span>
+    </a>
+
+    <a href='https://a5huynh.github.io/tags/iot/'>
+        <span
+            >
+            #iot
+        </span>
+    </a>
+
+</div>
+
+
+
+
+  <p>One of things I wanted to accomplish when I began learning more about
+electronics was to build a small device from the ground up. This would
+include sourcing all parts, writing the necessary code, and designing and
+3D printing an enclosure for the device. Given the state the world at this
+time, as my first foray into electronics design, I decided to make a little
+device to keep track of <a href="https://covidtracking.com/api/us">US COVID-19 stats</a>.</p>
+<span id="continue-reading"></span><h2 id="bill-of-materials">Bill of Materials</h2>
+<ul>
+<li><strong>1</strong> × <a href="https://docs.wemos.cc/en/latest/d32/d32.html">Wemos LOLIN D32</a></li>
+<li><strong>1</strong> × <a href="http://www.lcdwiki.com/2.4inch_SPI_Module_ILI9341_SKU:MSP2402">MSP2402 SPI LCD Screen</a></li>
+<li><strong>1</strong> × Protoboard</li>
+<li><strong>3</strong> × <a href="https://en.wikipedia.org/wiki/JST_connector">JST connectors</a></li>
+<li><strong>2</strong> × <a href="https://en.wikipedia.org/wiki/Pin_header">Pin headers</a></li>
+</ul>
+<p>Starting off small, I used a micro-controller that came with everything and
+the kitchen sink. The <a href="https://docs.wemos.cc/en/latest/d32/d32.html">Wemos LOLIN D32</a> is a fantastic little
+piece of electronics that cost around $5. It's a dev board based around the
+<a href="https://en.wikipedia.org/wiki/ESP32">ESP32-WROOM-32</a> module and is compatible with the Arduino
+platform. and comes with WiFi and Bluetooth out of the box. Perhaps a
+little overkill for what I'm building, but it allowed me to get up and
+running very quickly.</p>
+<p>The MSP2402 screen is an 2.4 inch TFT LCD Screen with a resolution of
+320x240 pixels. I chose a larger screen so that I can could make something
+large enough for &quot;at-a-glance&quot; stats that I could put on a shelf somewhere.</p>
+<p>All major pieces were connected together on a protoboard using JST connectors and
+pin headers so that future revisions can reuse the same components.</p>
+<h2 id="writing-the-code">Writing the Code</h2>
+<p>The code for the project is available on <a href="https://github.com/a5huynh/embedded/tree/master/esp32-display">GitHub</a>.</p>
+<p>The project utilizes a couple useful utilities to make development a lot
+easier. First and foremost is the <a href="https://platformio.org/">PlatformIO IDE</a>
+plugin for VS Code. This brings some modern niceties that aren't available
+with the standard Arduino IDE such as dependency version management, a
+command line based build system, and the ability to use the code editor of
+your choice.</p>
+<p>For the implementation itself, I used:</p>
+<ul>
+<li><a href="https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient">Arduino HTTPClient library</a> to make requests to the COVID-19 stats API</li>
+<li><a href="https://github.com/bblanchon/ArduinoJson">ArduinoJson</a> to parse the API results</li>
+<li><a href="https://github.com/Bodmer/TFT_eSPI">TFT_eSPI</a> to display the results</li>
+</ul>
+<p>The basic loop function would look like something below:</p>
+<pre data-lang="c" class="language-c "><code class="language-c" data-lang="c">bool updateScreen = false;
+
+void loop() {
+    if (wifi.run() == WL_CONNECTED) {
+        unsigned long currentTime = millis();
+        if (currentTime - LAST_UPDATED_TIME >= UPDATE_TIME_MS) {
+            LAST_UPDATED_TIME = currentTime;
+            update_tracker()
+        }
+    }
+
+    if (updateScreen) {
+        render_stats();
+    }
+}
+</code></pre>
+<p>We want to make sure we have an internet connection (<code>wifi.run()</code>) and if everything
+looks good, we can go ahead and make a request to the API. If anything has changed
+in the stats, we'll set a flag to update the screen. Once that request is done,
+if the screen update flag is set, we can run through the code to re-render the
+contents of the screen.</p>
+<p>All in all, the code was very straightforward and pretty similar to how you would
+build a similar stats tracker in any other language/platform.</p>
+<h2 id="wiring-schematic">Wiring Schematic</h2>
+<p>Now for the hardware.</p>
+<p>To keep track of all the different wires, I used
+<a href="https://kicad-pcb.org/">kicad</a> to build out a schematic based on the
+breadboard prototype I had built. As I get better at kicad, my hope is
+eventually turn some of these schematics into actual PCBs that can be
+printed, but for the time being, it's a handy way to visualize the
+connections.</p>
+<p><img src="/img/2020/covid-tracker-schematic.png" alt="covid" /></p>
+<p>For this first build, I left out the button which allows you to jump to different
+screens, but the code and schematic still handles this.</p>
+<p>Below are some photos of the final soldered result:</p>
+<ul>
+<li>Photo #1: Overview of the entire project.</li>
+<li>Photo #2: Closeup of the soldering for the main board.</li>
+<li>Photo #3: Closeup of the LCD setup.</li>
+</ul>
+<script type="text/javascript">
+    function show_image(image) {
+        document.getElementById('selected_img').src = image;
+    }
+</script>
+<div class="gallery">
+    <div class="gallery_nav">
+        <ul>
+
+            <li><a href='javascript:void' onclick="show_image('&#x2F;img&#x2F;2020&#x2F;covid-tracker&#x2F;overview.jpg')">·</a></li>
+
+            <li><a href='javascript:void' onclick="show_image('&#x2F;img&#x2F;2020&#x2F;covid-tracker&#x2F;soldering-work.jpg')">·</a></li>
+
+            <li><a href='javascript:void' onclick="show_image('&#x2F;img&#x2F;2020&#x2F;covid-tracker&#x2F;lcd.jpg')">·</a></li>
+
+        </ul>
+    </div>
+    <div class="gallery_container">
+        <img id="selected_img" src=&#x2F;img&#x2F;2020&#x2F;covid-tracker&#x2F;overview.jpg style="width:100%">
+    </div>
+</div>
+<h2 id="designing-printing-an-enclosure">Designing &amp; Printing an Enclosure</h2>
+<p>For the enclosure design, I settled on using <a href="https://www.shapr3d.com/">Shapr3D</a> for
+the iPad. It is a fantastic application that has everything I need as a
+hobbyist to get things done. Since the enclosure is nothing more than a
+simple rectangular box, diving into more complex tools like Fusion 360 or
+AutoCAD just didn't seem like a lot of fun.</p>
+<p>This was my first enclosure that was designed from scratch, and is comprised of two
+large halves that are screwed together. The files are available <a href="/files/2020/covid-tracker-box-v1.zip">here for download</a>.</p>
+<p>I used my MonoPrice Maker Select v2 to print out the enclosure and test prototypes
+before finally putting everything together.</p>
+<h2 id="finished-result">Finished Result!</h2>
+<p>Here's a video fo the COVID tracker booting up and loading the data</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/h8oSt7ZR6MU" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<p>Some things I would like to work on for v2 of this enclosure:</p>
+<ul>
+<li>New enclosure with better assembly and holes for buttons. The two halves was a
+naive design decision due to inexperience and made assmebly more difficult
+than necessary.</li>
+<li>Adding additional screens that can be toggled via buttons.</li>
+</ul>
+
+  <span id='#thats-all-folks'>&#8718;</span>
+</div>
+<div class='footer'>
+    Rabble-rouser.<br>
+    Founder @ New Thing<br>
+    Like what you see? My website is <a href='https://github.com/a5huynh/a5huynh.github.com'>open source!</a>
+  </div>
+  <script type="text/javascript"
+    src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+
+</body>
+</html>
