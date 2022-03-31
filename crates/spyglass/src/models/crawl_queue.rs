@@ -9,6 +9,8 @@ use url::Url;
 use super::indexed_document;
 use crate::config::{Limit, UserSettings};
 
+const MAX_RETRIES: u8 = 5;
+
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum CrawlStatus {
@@ -223,9 +225,17 @@ pub async fn mark_done(
     status: CrawlStatus,
 ) -> anyhow::Result<()> {
     let crawl = Entity::find_by_id(id).one(db).await?.unwrap();
+    let mut updated: ActiveModel = crawl.clone().into();
 
-    let mut updated: ActiveModel = crawl.into();
-    updated.status = Set(status);
+    // Bump up number of retries if this failed
+    if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
+        updated.num_retries = Set(crawl.num_retries + 1);
+        // Queue again
+        updated.status = Set(CrawlStatus::Queued);
+    } else {
+        updated.status = Set(status);
+    }
+
     updated.update(db).await?;
 
     Ok(())
