@@ -59,7 +59,13 @@ pub fn app() -> Html {
             // Attach a keydown event listener to the document.
             let document = gloo::utils::document();
             let listener = EventListener::new(&document, "keydown", move |event| {
-                events::handle_global_key_down(event, lens.clone(), query.clone(), search_results.clone(), selected_idx.clone())
+                events::handle_global_key_down(
+                    event,
+                    lens.clone(),
+                    query.clone(),
+                    search_results.clone(),
+                    selected_idx.clone(),
+                )
             });
             || drop(listener)
         });
@@ -146,7 +152,7 @@ fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, _: String) {
         title: "wiki".to_string(),
         description: "Search through a variety of wikis".to_string(),
         url: None,
-        score: 0.5_f32
+        score: 0.5_f32,
     };
     res.push(test);
 
@@ -168,7 +174,7 @@ fn update_results(handle: UseStateHandle<Vec<SearchResult>>, lenses: &[String], 
                 window
                     .alert_with_message(&format!("Error: {:?}", e))
                     .unwrap();
-                    clear_results(handle);
+                clear_results(handle);
             }
         }
     })

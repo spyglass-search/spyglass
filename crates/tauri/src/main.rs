@@ -22,7 +22,12 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![escape, open_result, search, resize_window])
+        .invoke_handler(tauri::generate_handler![
+            escape,
+            open_result,
+            search,
+            resize_window
+        ])
         .menu(menu::get_app_menu())
         .setup(|app| {
             // hide from dock (also hides menu bar)
@@ -188,11 +193,11 @@ fn pause_crawler() -> bool {
 #[tauri::command]
 fn resize_window(window: tauri::Window, height: f64) {
     window
-    .set_size(Size::Logical(LogicalSize {
-        width: INPUT_WIDTH,
-        height,
-    }))
-    .unwrap();
+        .set_size(Size::Logical(LogicalSize {
+            width: INPUT_WIDTH,
+            height,
+        }))
+        .unwrap();
 }
 
 #[derive(Serialize)]
@@ -202,7 +207,11 @@ struct SearchRequest {
 }
 
 #[tauri::command]
-async fn search(_: tauri::Window, lenses: Vec<String>, query: &str) -> Result<Vec<SearchResult>, String> {
+async fn search(
+    _: tauri::Window,
+    lenses: Vec<String>,
+    query: &str,
+) -> Result<Vec<SearchResult>, String> {
     let data = SearchRequest {
         lenses,
         query: query.to_string(),

@@ -10,13 +10,16 @@ pub struct SearchResult {
 }
 
 pub fn lens_list(lens: &[String]) -> Html {
-    let items = lens.iter().map(|lens_name: &String| {
-        html! {
-            <li class={"lens"}>
-                <span class={"lens-title"}>{lens_name}</span>
-            </li>
-        }
-    }).collect::<Html>();
+    let items = lens
+        .iter()
+        .map(|lens_name: &String| {
+            html! {
+                <li class={"lens"}>
+                    <span class={"lens-title"}>{lens_name}</span>
+                </li>
+            }
+        })
+        .collect::<Html>();
 
     html! {
         <ul class={"lenses"}>
@@ -43,7 +46,6 @@ pub fn search_result_component(res: &SearchResult, is_selected: bool) -> Html {
     } else {
         html! { <span></span> }
     };
-
 
     html! {
         <div class={vec![Some("result-item".to_string()), selected]}>

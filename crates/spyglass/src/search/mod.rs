@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{BooleanQuery, FuzzyTermQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
@@ -348,7 +348,7 @@ mod test {
             &searcher.index,
             &searcher.reader,
             &applied_lens,
-            query
+            query,
         );
         assert_eq!(results.len(), 1);
     }
