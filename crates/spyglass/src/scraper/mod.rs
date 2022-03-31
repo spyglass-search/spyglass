@@ -12,6 +12,8 @@ use crate::scraper::html::Html;
 
 pub struct ScrapeResult {
     pub title: Option<String>,
+    // Page description, extracted from meta tags or summarized from the actual content
+    pub description: String,
     pub meta: HashMap<String, String>,
     pub content: String,
     pub links: HashSet<String>,
@@ -79,8 +81,22 @@ pub fn html_to_text(doc: &str) -> ScrapeResult {
     let mut links = HashSet::new();
     filter_text_nodes(&root, &mut content, &mut links, &ignore_list);
 
+    let description = {
+        if meta.contains_key("description") {
+            meta.get("description").unwrap().to_string()
+        } else if meta.contains_key("og:description") {
+            meta.get("og:description").unwrap().to_string()
+        } else if content.len() > 0 {
+            // Extract first paragraph from content
+            todo!()
+        } else {
+            "".to_string()
+        }
+    };
+
     ScrapeResult {
         title,
+        description,
         meta,
         content,
         links,

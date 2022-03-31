@@ -100,18 +100,6 @@ impl Crawler {
             let raw_body = res.text().await.unwrap();
             // Parse the html.
             let parse_result = html_to_text(&raw_body);
-            // Grab description from meta tags
-            // TODO: Should we weight OpenGraph meta attrs more than others?
-            let description = {
-                if parse_result.meta.contains_key("description") {
-                    Some(parse_result.meta.get("description").unwrap().to_string())
-                } else if parse_result.meta.contains_key("og:description") {
-                    Some(parse_result.meta.get("og:description").unwrap().to_string())
-                } else {
-                    None
-                }
-            };
-
             // Hash the body content, used to detect changes (eventually).
             let mut hasher = Sha256::new();
             hasher.update(&parse_result.content.as_bytes());
@@ -129,7 +117,7 @@ impl Crawler {
             return CrawlResult {
                 content_hash,
                 content: Some(parse_result.content),
-                description,
+                description: Some(parse_result.description),
                 status: status.as_u16(),
                 title: parse_result.title,
                 url: url.to_string(),
