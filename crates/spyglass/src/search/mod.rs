@@ -35,6 +35,7 @@ pub struct DocFields {
     pub description: Field,
     pub title: Field,
     pub url: Field,
+    pub raw: Field,
 }
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
@@ -61,6 +62,8 @@ impl Searcher {
         schema_builder.add_text_field("url", TEXT | STORED);
         // Indexed but don't store for retreival
         schema_builder.add_text_field("content", TEXT);
+        // Stored but not indexed
+        schema_builder.add_text_field("raw", STORED);
 
         schema_builder.build()
     }
@@ -83,6 +86,7 @@ impl Searcher {
             description: schema.get_field("description").unwrap(),
             title: schema.get_field("title").unwrap(),
             url: schema.get_field("url").unwrap(),
+            raw: schema.get_field("raw").unwrap(),
         }
     }
 
@@ -124,15 +128,17 @@ impl Searcher {
         domain: &str,
         url: &str,
         content: &str,
+        raw: &str,
     ) -> tantivy::Result<String> {
         let fields = Searcher::doc_fields();
 
         let doc_id = Uuid::new_v4().to_hyphenated().to_string();
         let mut doc = Document::default();
-        doc.add_text(fields.id, &doc_id);
-        doc.add_text(fields.domain, domain);
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
+        doc.add_text(fields.domain, domain);
+        doc.add_text(fields.id, &doc_id);
+        doc.add_text(fields.raw, raw);
         doc.add_text(fields.title, title);
         doc.add_text(fields.url, url);
         writer.add_document(doc)?;

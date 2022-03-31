@@ -144,6 +144,7 @@ pub async fn worker_task(
                                         url.host_str().unwrap(),
                                         url.as_str(),
                                         &content,
+                                        &crawl_result.raw.unwrap(),
                                     )
                                     .unwrap()
                                 };
