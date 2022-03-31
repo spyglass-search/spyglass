@@ -34,6 +34,15 @@ impl ActiveModelBehavior for ActiveModel {
             ..ActiveModelTrait::default()
         }
     }
+
+    // Triggered before insert / update
+    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+        if !insert {
+            self.updated_at = Set(chrono::Utc::now());
+        }
+
+        Ok(self)
+    }
 }
 
 impl From<Model> for ParsedRule {

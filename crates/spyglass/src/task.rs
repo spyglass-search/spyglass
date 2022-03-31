@@ -100,6 +100,7 @@ pub async fn worker_task(
 
                     match result {
                         Ok(Some(crawl_result)) => {
+                            // Update job status
                             let cq_status = if crawl_result.is_success() {
                                 crawl_queue::CrawlStatus::Completed
                             } else {
@@ -151,7 +152,6 @@ pub async fn worker_task(
                                 let indexed = if let Some(doc) = existing {
                                     let mut update: indexed_document::ActiveModel = doc.into();
                                     update.doc_id = Set(doc_id);
-                                    update.updated_at = Set(chrono::Utc::now());
                                     update
                                 } else {
                                     indexed_document::ActiveModel {
