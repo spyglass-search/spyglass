@@ -6,6 +6,7 @@ pub struct SearchResult {
     pub title: String,
     pub description: String,
     pub url: Option<String>,
+    pub score: f32,
 }
 
 pub fn lens_list(lens: &[String]) -> Html {
@@ -51,6 +52,7 @@ pub fn search_result_component(res: &SearchResult, is_selected: bool) -> Html {
             </div>
             <h2 class={"result-title"}>{res.title.clone()}</h2>
             <div class={"result-description"}>{res.description.clone()}</div>
+            <div class={"result-score"}>{res.score}</div>
         </div>
     }
 }

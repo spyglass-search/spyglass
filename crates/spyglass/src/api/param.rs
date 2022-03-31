@@ -2,7 +2,8 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchParam<'r> {
-    pub term: &'r str,
+    pub lenses: Vec<String>,
+    pub query: &'r str,
 }
 
 #[derive(Debug, Deserialize)]

@@ -13,8 +13,8 @@ export async function onClearSearch(callback) {
     await listen('clear_search', callback);
 }
 
-export async function invokeSearch(query) {
-    return await invoke("search", { query });
+export async function invokeSearch(lenses, query) {
+    return await invoke("search", { lenses, query });
 }
 
 export async function openResult(url) {

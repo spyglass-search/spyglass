@@ -19,6 +19,7 @@ pub struct SearchResult {
     pub title: String,
     pub description: String,
     pub url: String,
+    pub score: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

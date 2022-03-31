@@ -169,33 +169,27 @@ impl Searcher {
         lenses: &HashMap<String, Lens>,
         _index: &Index,
         reader: &IndexReader,
+        applied_lens: &[String],
         query_string: &str,
     ) -> Vec<SearchResult> {
         let fields = Searcher::doc_fields();
         let searcher = reader.searcher();
 
         // Tokenize query string
-        let mut lense_refs: Vec<String> = Vec::new();
         let mut terms = Vec::new();
 
         for term in query_string.split(' ') {
             // remove whitespace
             let term = term.trim();
-            if term.starts_with("::") && term.ends_with("::") {
-                let lens = term.strip_prefix("::").unwrap().strip_suffix("::").unwrap();
-                lense_refs.push(lens.to_string());
-            } else {
-                terms.push(term);
-            }
+            terms.push(term);
         }
 
-        log::info!("lenses: {:?}", lense_refs);
-        log::info!("terms: {:?}", terms);
+        log::info!("lenses: {:?}, terms: {:?}", applied_lens, terms);
 
         let mut lense_queries: QueryVec = Vec::new();
-        for lens in lense_refs {
-            if lenses.contains_key(&lens) {
-                let lens = lenses.get(&lens).unwrap();
+        for lens in applied_lens {
+            if lenses.contains_key(lens) {
+                let lens = lenses.get(lens).unwrap();
                 for domain in &lens.domains {
                     lense_queries.push((
                         Occur::Should,
@@ -212,11 +206,15 @@ impl Searcher {
         for term in terms {
             term_query.push((
                 Occur::Should,
-                Box::new(FuzzyTermQuery::new(
+                Box::new(TermQuery::new(
                     Term::from_field_text(fields.content, term),
-                    1,
-                    true,
+                    IndexRecordOption::Basic,
                 )),
+                // Box::new(FuzzyTermQuery::new(
+                //     Term::from_field_text(fields.content, term),
+                //     1,
+                //     true,
+                // )),
             ))
         }
 
@@ -230,7 +228,7 @@ impl Searcher {
 
         let query = BooleanQuery::new(nested_query);
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(10))
+            .search(&query, &TopDocs::with_limit(5))
             .expect("Unable to execute query");
 
         log::info!(
@@ -336,6 +334,8 @@ mod test {
             urls: Vec::new(),
         };
 
+        let applied_lens = vec!["wiki".to_string()];
+
         let mut lenses = HashMap::new();
         lenses.insert("wiki".to_string(), lens.clone());
 
@@ -343,7 +343,13 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "::wiki:: salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.index, &searcher.reader, query);
+        let results = Searcher::search_with_lens(
+            &lenses,
+            &searcher.index,
+            &searcher.reader,
+            &applied_lens,
+            query
+        );
         assert_eq!(results.len(), 1);
     }
 }

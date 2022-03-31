@@ -27,11 +27,12 @@ pub async fn search(
         &state.config.lenses,
         &index.index,
         &index.reader,
-        search_req.term,
+        &search_req.lenses,
+        search_req.query,
     );
 
     let mut results: Vec<SearchResult> = Vec::new();
-    for (_score, doc_addr) in docs {
+    for (score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
 
         let title = retrieved.get_first(fields.title).unwrap();
@@ -42,13 +43,14 @@ pub async fn search(
             title: title.as_text().unwrap().to_string(),
             description: description.as_text().unwrap().to_string(),
             url: url.as_text().unwrap().to_string(),
+            score,
         };
 
         results.push(result);
     }
 
     let meta = SearchMeta {
-        query: search_req.term.to_string(),
+        query: search_req.query.to_string(),
         num_docs: searcher.num_docs(),
         wall_time_ms: 1000,
     };

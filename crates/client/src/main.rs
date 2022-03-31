@@ -18,7 +18,7 @@ const RESULT_HEIGHT: f64 = 126.0;
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
     #[wasm_bindgen(js_name = invokeSearch, catch)]
-    pub async fn run_search(query: String) -> Result<JsValue, JsValue>;
+    pub async fn run_search(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "onClearSearch")]
     pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
@@ -67,6 +67,7 @@ pub fn app() -> Html {
 
     // Handle changes to the query string
     {
+        let lens = lens.clone();
         let search_results = search_results.clone();
         use_effect_with_deps(
             move |query| {
@@ -77,7 +78,7 @@ pub fn app() -> Html {
                         show_lens_results(search_results, query.clone())
                     } else {
                         log::info!("query search: {}", query);
-                        update_results(search_results, query.clone());
+                        update_results(search_results, &lens, query.clone());
                     }
                 }
                 || ()
@@ -144,7 +145,8 @@ fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, _: String) {
     let test = SearchResult {
         title: "wiki".to_string(),
         description: "Search through a variety of wikis".to_string(),
-        url: None
+        url: None,
+        score: 0.5_f32
     };
     res.push(test);
 
@@ -152,9 +154,10 @@ fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, _: String) {
     handle.set(res);
 }
 
-fn update_results(handle: UseStateHandle<Vec<SearchResult>>, query: String) {
+fn update_results(handle: UseStateHandle<Vec<SearchResult>>, lenses: &[String], query: String) {
+    let lenses = lenses.to_owned();
     spawn_local(async move {
-        match run_search(query).await {
+        match run_search(JsValue::from_serde(&lenses).unwrap(), query).await {
             Ok(results) => {
                 let results: Vec<SearchResult> = results.into_serde().unwrap();
                 resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();

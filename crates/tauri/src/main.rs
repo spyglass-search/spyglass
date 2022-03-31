@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 use num_format::{Locale, ToFormattedString};
+use serde::Serialize;
 use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent};
 
 use shared::response::{AppStatus, SearchResult, SearchResults};
@@ -13,8 +14,6 @@ mod menu;
 const INPUT_WIDTH: f64 = 640.0;
 const INPUT_HEIGHT: f64 = 80.0;
 const INPUT_Y: f64 = 128.0;
-
-const RESULT_HEIGHT: f64 = 126.0;
 
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 const API_ENDPOINT: &str = "http://localhost:7777";
@@ -76,7 +75,7 @@ fn main() {
             if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                 if !is_focused {
                     event.window().hide().unwrap();
-                    event.window().emit("clear_search", 1).unwrap();
+                    event.window().emit("clear_search", true).unwrap();
                 }
             }
         })
@@ -196,15 +195,23 @@ fn resize_window(window: tauri::Window, height: f64) {
     .unwrap();
 }
 
+#[derive(Serialize)]
+struct SearchRequest {
+    lenses: Vec<String>,
+    query: String,
+}
+
 #[tauri::command]
-async fn search(_: tauri::Window, query: &str) -> Result<Vec<SearchResult>, String> {
-    let mut map = HashMap::new();
-    map.insert("term", query);
+async fn search(_: tauri::Window, lenses: Vec<String>, query: &str) -> Result<Vec<SearchResult>, String> {
+    let data = SearchRequest {
+        lenses,
+        query: query.to_string(),
+    };
 
     let res: SearchResults = reqwest::Client::new()
         // TODO: make this configurable
         .post(format!("{}/api/search", API_ENDPOINT))
-        .json(&map)
+        .json(&data)
         .send()
         .await
         .unwrap()
@@ -212,6 +219,6 @@ async fn search(_: tauri::Window, query: &str) -> Result<Vec<SearchResult>, Stri
         .await
         .unwrap();
 
-    let results: Vec<SearchResult> = res.results[0..5].to_vec();
+    let results: Vec<SearchResult> = res.results.to_vec();
     Ok(results)
 }
