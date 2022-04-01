@@ -14,7 +14,7 @@ export async function onClearSearch(callback) {
 }
 
 export async function searchDocs(lenses, query) {
-    return await invoke("search", { lenses, query });
+    return await invoke("search_docs", { lenses, query });
 }
 
 export async function searchLenses(query) {

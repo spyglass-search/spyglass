@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use shared::response::{LensResult, SearchResult};
 use yew::prelude::*;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
@@ -7,6 +8,28 @@ pub struct ResultListData {
     pub description: String,
     pub url: Option<String>,
     pub score: f32,
+}
+
+impl From<&LensResult> for ResultListData {
+    fn from(x: &LensResult) -> Self {
+        ResultListData {
+            title: x.title.clone(),
+            description: x.description.clone(),
+            url: None,
+            score: 1.0,
+        }
+    }
+}
+
+impl From<&SearchResult> for ResultListData {
+    fn from(x: &SearchResult) -> Self {
+        ResultListData {
+            title: x.title.clone(),
+            description: x.description.clone(),
+            url: Some(x.url.clone()),
+            score: x.score,
+        }
+    }
 }
 
 pub fn lens_list(lens: &[String]) -> Html {

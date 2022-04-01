@@ -157,20 +157,14 @@ fn clear_results(handle: UseStateHandle<Vec<ResultListData>>) {
 }
 
 fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, query: String) {
-    let query = query.strip_prefix("/").unwrap().to_string();
+    let query = query.strip_prefix('/').unwrap().to_string();
     spawn_local(async move {
         match search_lenses(query).await {
             Ok(results) => {
                 let results: Vec<response::LensResult> = results.into_serde().unwrap();
-                let results = results.iter()
-                    .map(|x| {
-                        ResultListData {
-                            title: x.title.clone(),
-                            description: x.description.clone(),
-                            url: None,
-                            score: 1.0
-                        }
-                    })
+                let results = results
+                    .iter()
+                    .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
 
                 resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
@@ -193,15 +187,9 @@ fn update_results(handle: UseStateHandle<Vec<ResultListData>>, lenses: &[String]
         match search_docs(JsValue::from_serde(&lenses).unwrap(), query).await {
             Ok(results) => {
                 let results: Vec<response::SearchResult> = results.into_serde().unwrap();
-                let results = results.iter()
-                    .map(|x| {
-                        ResultListData {
-                            title: x.title.clone(),
-                            description: x.description.clone(),
-                            url: Some(x.url.clone()),
-                            score: x.score
-                        }
-                    })
+                let results = results
+                    .iter()
+                    .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
 
                 resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
