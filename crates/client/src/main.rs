@@ -5,8 +5,9 @@ use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
-use components::{lens_list, search_result_component, SearchResult};
 mod events;
+use components::{lens_list, search_result_component, ResultListData};
+use shared::response;
 
 const LENS_SEARCH_PREFIX: &str = "/";
 
@@ -17,8 +18,11 @@ const RESULT_HEIGHT: f64 = 126.0;
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = invokeSearch, catch)]
-    pub async fn run_search(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
+    #[wasm_bindgen(js_name = "searchDocs", catch)]
+    pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_name = "searchLenses", catch)]
+    pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "onClearSearch")]
     pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
@@ -95,6 +99,7 @@ pub fn app() -> Html {
 
     {
         // TODO: Is this the best way to handle calls from Tauri?
+        let lens = lens.clone();
         let query = query.clone();
         let results = search_results.clone();
         let selected_idx = selected_idx.clone();
@@ -103,6 +108,7 @@ pub fn app() -> Html {
                 query.set("".to_string());
                 results.set(Vec::new());
                 selected_idx.set(0);
+                lens.set(Vec::new());
             }) as Box<dyn Fn()>);
 
             on_clear_search(&cb).await;
@@ -145,31 +151,59 @@ pub fn app() -> Html {
     }
 }
 
-fn clear_results(handle: UseStateHandle<Vec<SearchResult>>) {
+fn clear_results(handle: UseStateHandle<Vec<ResultListData>>) {
     handle.set(Vec::new());
     resize_window(INPUT_HEIGHT).unwrap();
 }
 
-fn show_lens_results(handle: UseStateHandle<Vec<SearchResult>>, _: String) {
-    let mut res = Vec::new();
-    let test = SearchResult {
-        title: "wiki".to_string(),
-        description: "Search through a variety of wikis".to_string(),
-        url: None,
-        score: 0.5_f32,
-    };
-    res.push(test);
+fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, query: String) {
+    let query = query.strip_prefix("/").unwrap().to_string();
+    spawn_local(async move {
+        match search_lenses(query).await {
+            Ok(results) => {
+                let results: Vec<response::LensResult> = results.into_serde().unwrap();
+                let results = results.iter()
+                    .map(|x| {
+                        ResultListData {
+                            title: x.title.clone(),
+                            description: x.description.clone(),
+                            url: None,
+                            score: 1.0
+                        }
+                    })
+                    .collect::<Vec<ResultListData>>();
 
-    resize_window(INPUT_HEIGHT + (res.len() as f64) * RESULT_HEIGHT).unwrap();
-    handle.set(res);
+                resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
+                handle.set(results);
+            }
+            Err(e) => {
+                let window = window().unwrap();
+                window
+                    .alert_with_message(&format!("Error: {:?}", e))
+                    .unwrap();
+                clear_results(handle);
+            }
+        }
+    })
 }
 
-fn update_results(handle: UseStateHandle<Vec<SearchResult>>, lenses: &[String], query: String) {
+fn update_results(handle: UseStateHandle<Vec<ResultListData>>, lenses: &[String], query: String) {
     let lenses = lenses.to_owned();
     spawn_local(async move {
-        match run_search(JsValue::from_serde(&lenses).unwrap(), query).await {
+        match search_docs(JsValue::from_serde(&lenses).unwrap(), query).await {
             Ok(results) => {
-                let results: Vec<SearchResult> = results.into_serde().unwrap();
+                let results: Vec<response::SearchResult> = results.into_serde().unwrap();
+                let results = results.iter()
+                    .map(|x| {
+                        ResultListData {
+                            title: x.title.clone(),
+                            description: x.description.clone(),
+                            url: Some(x.url.clone()),
+                            score: x.score
+                        }
+                    })
+                    .collect::<Vec<ResultListData>>();
+
                 resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
                 handle.set(results);
             }

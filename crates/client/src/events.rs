@@ -4,13 +4,13 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use super::{clear_results, escape, open};
-use crate::components::SearchResult;
+use crate::components::ResultListData;
 
 pub fn handle_global_key_down(
     event: &Event,
     lens: UseStateHandle<Vec<String>>,
     query: UseStateHandle<String>,
-    search_results: UseStateHandle<Vec<SearchResult>>,
+    search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
     let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap_throw();
@@ -27,7 +27,7 @@ pub fn handle_global_key_down(
         event.stop_propagation();
         selected_idx.set((*selected_idx - 1).max(0));
     } else if event.key() == "Enter" {
-        let selected: &SearchResult = (*search_results).get(*selected_idx).unwrap();
+        let selected: &ResultListData = (*search_results).get(*selected_idx).unwrap();
         if let Some(url) = selected.url.clone() {
             spawn_local(async move {
                 open(url).await.unwrap();

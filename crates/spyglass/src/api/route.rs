@@ -3,11 +3,12 @@ use rocket::serde::json::Json;
 use rocket::State;
 use sea_orm::prelude::*;
 use sea_orm::Set;
+use shared::response::LensResult;
 use url::Url;
 
-use shared::response::{AppStatus, SearchMeta, SearchResult, SearchResults};
+use shared::request;
+use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 
-use super::param::{QueueItemParam, SearchParam, UpdateStatusParam};
 use super::response;
 use crate::models::crawl_queue;
 use crate::search::Searcher;
@@ -16,7 +17,7 @@ use crate::state::AppState;
 #[post("/search", data = "<search_req>")]
 pub async fn search(
     state: &State<AppState>,
-    search_req: Json<SearchParam<'_>>,
+    search_req: Json<request::SearchParam<'_>>,
 ) -> Result<Json<SearchResults>, BadRequest<String>> {
     let fields = Searcher::doc_fields();
 
@@ -76,7 +77,7 @@ pub async fn list_queue(
 #[post("/queue", data = "<queue_item>")]
 pub async fn add_queue(
     state: &State<AppState>,
-    queue_item: Json<QueueItemParam<'_>>,
+    queue_item: Json<request::QueueItemParam<'_>>,
 ) -> Result<&'static str, BadRequest<String>> {
     let db = &state.db;
 
@@ -123,7 +124,7 @@ pub async fn app_stats(state: &State<AppState>) -> Json<AppStatus> {
 #[post("/status", data = "<update_status>")]
 pub async fn update_app_status(
     state: &State<AppState>,
-    update_status: Json<UpdateStatusParam>,
+    update_status: Json<request::UpdateStatusParam>,
 ) -> Result<Json<AppStatus>, BadRequest<String>> {
     // Update status
     if update_status.toggle_pause.is_some() {
@@ -136,4 +137,24 @@ pub async fn update_app_status(
     }
 
     Ok(Json(_get_current_status(state).await))
+}
+
+#[post("/lenses", data = "<param>")]
+pub async fn search_lenses(
+    state: &State<AppState>,
+    param: Json<request::SearchLensesParam<'_>>,
+) -> Result<Json<SearchLensesResp>, BadRequest<String>> {
+    let mut results = Vec::new();
+
+    for (lens_name, _) in state.config.lenses.iter() {
+        log::info!("{} - {}", lens_name, param.query);
+        if lens_name.starts_with(param.query) {
+            results.push(LensResult {
+                title: lens_name.to_owned(),
+                description: "".to_string(),
+            })
+        }
+    }
+
+    Ok(Json(SearchLensesResp { results }))
 }

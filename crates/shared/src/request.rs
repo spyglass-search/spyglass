@@ -1,8 +1,13 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SearchParam<'r> {
     pub lenses: Vec<String>,
+    pub query: &'r str,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SearchLensesParam<'r> {
     pub query: &'r str,
 }
 

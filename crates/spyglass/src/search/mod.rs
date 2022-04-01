@@ -216,12 +216,15 @@ impl Searcher {
                     Term::from_field_text(fields.content, term),
                     IndexRecordOption::Basic,
                 )),
-                // Box::new(FuzzyTermQuery::new(
-                //     Term::from_field_text(fields.content, term),
-                //     1,
-                //     true,
-                // )),
-            ))
+            ));
+
+            term_query.push((
+                Occur::Should,
+                Box::new(TermQuery::new(
+                    Term::from_field_text(fields.title, term),
+                    IndexRecordOption::Basic,
+                )),
+            ));
         }
 
         let mut nested_query: QueryVec =
@@ -229,8 +232,6 @@ impl Searcher {
         if !lense_queries.is_empty() {
             nested_query.push((Occur::Must, Box::new(BooleanQuery::new(lense_queries))));
         }
-
-        log::debug!("QUERY: {:?}", nested_query);
 
         let query = BooleanQuery::new(nested_query);
         let top_docs = searcher

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use yew::prelude::*;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct SearchResult {
+pub struct ResultListData {
     pub title: String,
     pub description: String,
     pub url: Option<String>,
@@ -28,7 +28,7 @@ pub fn lens_list(lens: &[String]) -> Html {
     }
 }
 
-pub fn search_result_component(res: &SearchResult, is_selected: bool) -> Html {
+pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html {
     let mut selected: Option<String> = None;
     if is_selected {
         selected = Some("result-selected".to_string());

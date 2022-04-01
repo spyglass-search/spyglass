@@ -14,7 +14,7 @@ pub struct SearchMeta {
     pub wall_time_ms: u64,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchResult {
     pub title: String,
     pub description: String,
@@ -26,4 +26,15 @@ pub struct SearchResult {
 pub struct SearchResults {
     pub results: Vec<SearchResult>,
     pub meta: SearchMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LensResult {
+    pub title: String,
+    pub description: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SearchLensesResp {
+    pub results: Vec<LensResult>,
 }

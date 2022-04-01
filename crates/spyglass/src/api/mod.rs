@@ -1,4 +1,3 @@
-mod param;
 mod response;
 mod route;
 
@@ -20,6 +19,7 @@ pub async fn start_api(state: AppState) -> rocket::Shutdown {
                 route::list_queue,
                 // search
                 route::search,
+                route::search_lenses,
                 // app stats
                 route::app_stats,
                 // Pause/unpause crawler

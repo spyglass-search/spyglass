@@ -5,10 +5,10 @@
 use std::collections::HashMap;
 
 use num_format::{Locale, ToFormattedString};
-use serde::Serialize;
 use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent};
 
-use shared::response::{AppStatus, SearchResult, SearchResults};
+use shared::{request, response};
+
 mod menu;
 
 const INPUT_WIDTH: f64 = 640.0;
@@ -25,7 +25,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             escape,
             open_result,
-            search,
+            search_docs,
+            search_lenses,
             resize_window
         ])
         .menu(menu::get_app_menu())
@@ -161,10 +162,10 @@ async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn app_status() -> AppStatus {
+fn app_status() -> response::AppStatus {
     let client = reqwest::blocking::Client::new();
 
-    let res: AppStatus = client
+    let res: response::AppStatus = client
         .get("http://localhost:7777/api/status")
         .send()
         .unwrap()
@@ -179,7 +180,7 @@ fn pause_crawler() -> bool {
     let mut map = HashMap::new();
     map.insert("toggle_pause", true);
 
-    let res: AppStatus = client
+    let res: response::AppStatus = client
         .post(format!("{}/api/status", API_ENDPOINT))
         .json(&map)
         .send()
@@ -200,24 +201,15 @@ fn resize_window(window: tauri::Window, height: f64) {
         .unwrap();
 }
 
-#[derive(Serialize)]
-struct SearchRequest {
-    lenses: Vec<String>,
-    query: String,
-}
-
 #[tauri::command]
-async fn search(
+async fn search_docs(
     _: tauri::Window,
     lenses: Vec<String>,
     query: &str,
-) -> Result<Vec<SearchResult>, String> {
-    let data = SearchRequest {
-        lenses,
-        query: query.to_string(),
-    };
+) -> Result<Vec<response::SearchResult>, String> {
+    let data = request::SearchParam { lenses, query };
 
-    let res: SearchResults = reqwest::Client::new()
+    let res: response::SearchResults = reqwest::Client::new()
         // TODO: make this configurable
         .post(format!("{}/api/search", API_ENDPOINT))
         .json(&data)
@@ -228,6 +220,25 @@ async fn search(
         .await
         .unwrap();
 
-    let results: Vec<SearchResult> = res.results.to_vec();
+    let results: Vec<response::SearchResult> = res.results.to_vec();
+    Ok(results)
+}
+
+#[tauri::command]
+async fn search_lenses(_: tauri::Window, query: &str) -> Result<Vec<response::LensResult>, String> {
+    let data = request::SearchLensesParam { query };
+
+    let res: response::SearchLensesResp = reqwest::Client::new()
+        // TODO: make this configurable
+        .post(format!("{}/api/lenses", API_ENDPOINT))
+        .json(&data)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    let results: Vec<response::LensResult> = res.results.to_vec();
     Ok(results)
 }
