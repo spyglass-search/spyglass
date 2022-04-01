@@ -93,18 +93,22 @@ pub fn app() -> Html {
         );
     }
 
-    // TODO: Is this the best way to handle calls from Tauri?
-    let query_ref = query.clone();
-    let results_ref = search_results.clone();
-    spawn_local(async move {
-        let cb = Closure::wrap(Box::new(move || {
-            query_ref.set("".to_string());
-            results_ref.set(Vec::new());
-        }) as Box<dyn Fn()>);
+    {
+        // TODO: Is this the best way to handle calls from Tauri?
+        let query = query.clone();
+        let results = search_results.clone();
+        let selected_idx = selected_idx.clone();
+        spawn_local(async move {
+            let cb = Closure::wrap(Box::new(move || {
+                query.set("".to_string());
+                results.set(Vec::new());
+                selected_idx.set(0);
+            }) as Box<dyn Fn()>);
 
-        on_clear_search(&cb).await;
-        cb.forget();
-    });
+            on_clear_search(&cb).await;
+            cb.forget();
+        });
+    }
 
     let results = search_results
         .iter()
