@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use num_format::{Locale, ToFormattedString};
-use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent};
+use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent, Window};
 
 use shared::{request, response};
 
@@ -17,6 +17,31 @@ const INPUT_Y: f64 = 128.0;
 
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 const API_ENDPOINT: &str = "http://localhost:7777";
+
+fn _hide_window(handle: &Window) {
+    handle.hide().unwrap();
+    handle.emit("clear_search", true).unwrap();
+fn _center_window(window: &Window) {
+    if let Some(monitor) = window.current_monitor().unwrap() {
+        let size = monitor.size();
+        let scale = monitor.scale_factor();
+
+        let middle = (size.width as f64 / (scale * 2.0)) - (INPUT_WIDTH / 2.0);
+
+        window
+            .set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                x: middle,
+                y: INPUT_Y,
+            }))
+            .unwrap();
+    }
+}
+
+fn _show_window(window: &Window) {
+    window.show().unwrap();
+    window.set_focus().unwrap();
+    resize_window(window.clone(), INPUT_HEIGHT);
+}
 
 fn main() {
     let ctx = tauri::generate_context!();
@@ -36,52 +61,34 @@ fn main() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             app.get_window("main").unwrap().open_devtools();
+            let window = app.get_window("main").unwrap();
 
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
             if !shortcuts.is_registered(SHORTCUT).unwrap() {
-                let handle = app.get_window("main").unwrap();
+                let window = window.clone();
                 shortcuts
                     .register(SHORTCUT, move || {
-                        if handle.is_visible().unwrap() {
-                            handle.hide().unwrap();
+                        if window.is_visible().unwrap() {
+                            _hide_window(&window);
                         } else {
-                            handle.show().unwrap();
-                            handle
-                                .set_size(Size::Logical(LogicalSize {
-                                    width: INPUT_WIDTH,
-                                    height: INPUT_HEIGHT,
-                                }))
-                                .unwrap();
-                            handle.set_focus().unwrap();
+                            _show_window(&window);
                         }
                     })
                     .unwrap();
             }
 
             // Center window horizontally in the current screen
-            let window = app.get_window("main").unwrap();
-            if let Some(monitor) = window.current_monitor().unwrap() {
-                let size = monitor.size();
-                let scale = monitor.scale_factor();
+            _center_window(&window);
 
-                let middle = (size.width as f64 / (scale * 2.0)) - (INPUT_WIDTH / 2.0);
-
-                window
-                    .set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                        x: middle,
-                        y: INPUT_Y,
-                    }))
-                    .unwrap();
-            }
             Ok(())
         })
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
         .on_window_event(|event| {
             if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                 if !is_focused {
-                    event.window().hide().unwrap();
-                    event.window().emit("clear_search", true).unwrap();
+                    let handle = event.window();
+                    _hide_window(&handle);
                 }
             }
         })
@@ -130,10 +137,10 @@ fn main() {
                     menu::TOGGLE_MENU_ITEM => {
                         let window = app.get_window("main").unwrap();
                         let new_title = if window.is_visible().unwrap() {
-                            window.hide().unwrap();
+                            _hide_window(&window);
                             "Show"
                         } else {
-                            window.show().unwrap();
+                            _show_window(&window);
                             "Hide"
                         };
                         item_handle.set_title(new_title).unwrap();
@@ -152,7 +159,7 @@ fn main() {
 
 #[tauri::command]
 async fn escape(window: tauri::Window) -> Result<(), String> {
-    window.hide().unwrap();
+    _hide_window(&window);
     Ok(())
 }
 
