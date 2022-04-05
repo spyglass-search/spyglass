@@ -1,20 +1,16 @@
 use gloo::events::EventListener;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, HtmlInputElement};
+use web_sys::{window, Element, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
 mod events;
-use components::{selected_lens_list, search_result_component, ResultListData};
+use components::{search_result_component, selected_lens_list, ResultListData};
 use shared::response;
 
 const LENS_SEARCH_PREFIX: &str = "/";
-
 const MIN_CHARS: usize = 2;
-
-const INPUT_HEIGHT: f64 = 80.0;
-const RESULT_HEIGHT: f64 = 126.0;
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -51,6 +47,7 @@ pub fn app() -> Html {
     // Search results + selected index
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
+    let node_ref = use_state_eq(NodeRef::default);
 
     // Handle key events
     {
@@ -58,6 +55,7 @@ pub fn app() -> Html {
         let search_results = search_results.clone();
         let lens = lens.clone();
         let query = query.clone();
+        let node_ref = node_ref.clone();
 
         use_effect(move || {
             // Attach a keydown event listener to the document.
@@ -65,6 +63,7 @@ pub fn app() -> Html {
             let listener = EventListener::new(&document, "keydown", move |event| {
                 events::handle_global_key_down(
                     event,
+                    node_ref.clone(),
                     lens.clone(),
                     query.clone(),
                     search_results.clone(),
@@ -79,16 +78,19 @@ pub fn app() -> Html {
     {
         let lens = lens.clone();
         let search_results = search_results.clone();
+        let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
                 if query.len() > MIN_CHARS {
                     if query.starts_with(LENS_SEARCH_PREFIX) {
                         // show lens search
                         log::info!("lens search: {}", query);
-                        show_lens_results(search_results, query.clone())
+                        let el = node_ref.cast::<Element>().unwrap();
+                        show_lens_results(search_results, el, query.clone());
                     } else {
                         log::info!("query search: {}", query);
-                        update_results(search_results, &lens, query.clone());
+                        let el = node_ref.cast::<Element>().unwrap();
+                        show_doc_results(search_results, &lens, el, query.clone());
                     }
                 }
                 || ()
@@ -131,13 +133,13 @@ pub fn app() -> Html {
     };
 
     html! {
-        <div>
+        <div ref={(*node_ref).clone()}>
             <div class="query-container">
                 {selected_lens_list(&lens)}
                 <input
                     type={"text"}
                     class={"search-box"}
-                    placeholder={"Spyglass Search"}
+                    placeholder={"Search"}
                     value={(*query).clone()}
                     {onkeyup}
                     spellcheck={"false"}
@@ -151,12 +153,12 @@ pub fn app() -> Html {
     }
 }
 
-fn clear_results(handle: UseStateHandle<Vec<ResultListData>>) {
+fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element) {
     handle.set(Vec::new());
-    resize_window(INPUT_HEIGHT).unwrap();
+    resize_window(node.client_height() as f64).unwrap();
 }
 
-fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, query: String) {
+fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element, query: String) {
     let query = query.strip_prefix('/').unwrap().to_string();
     spawn_local(async move {
         match search_lenses(query).await {
@@ -167,21 +169,28 @@ fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, query: String)
                     .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
 
-                resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
                 handle.set(results);
+
+                let height = node.client_height();
+                resize_window(height as f64).unwrap();
             }
             Err(e) => {
                 let window = window().unwrap();
                 window
                     .alert_with_message(&format!("Error: {:?}", e))
                     .unwrap();
-                clear_results(handle);
+                clear_results(handle, node);
             }
         }
     })
 }
 
-fn update_results(handle: UseStateHandle<Vec<ResultListData>>, lenses: &[String], query: String) {
+fn show_doc_results(
+    handle: UseStateHandle<Vec<ResultListData>>,
+    lenses: &[String],
+    node: Element,
+    query: String,
+) {
     let lenses = lenses.to_owned();
     spawn_local(async move {
         match search_docs(JsValue::from_serde(&lenses).unwrap(), query).await {
@@ -192,15 +201,17 @@ fn update_results(handle: UseStateHandle<Vec<ResultListData>>, lenses: &[String]
                     .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
 
-                resize_window(INPUT_HEIGHT + (results.len() as f64) * RESULT_HEIGHT).unwrap();
                 handle.set(results);
+
+                let height = node.client_height();
+                resize_window(height as f64).unwrap();
             }
             Err(e) => {
                 let window = window().unwrap();
                 window
                     .alert_with_message(&format!("Error: {:?}", e))
                     .unwrap();
-                clear_results(handle);
+                clear_results(handle, node);
             }
         }
     })

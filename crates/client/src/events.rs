@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::Element;
 use yew::prelude::*;
 
 use super::{clear_results, escape, open};
@@ -8,6 +9,7 @@ use crate::components::ResultListData;
 
 pub fn handle_global_key_down(
     event: &Event,
+    node_ref: UseStateHandle<NodeRef>,
     lens: UseStateHandle<Vec<String>>,
     query: UseStateHandle<String>,
     search_results: UseStateHandle<Vec<ResultListData>>,
@@ -41,7 +43,8 @@ pub fn handle_global_key_down(
             // Clear query string
             query.set("".to_string());
             // Clear results list
-            clear_results(search_results);
+            let el = node_ref.cast::<Element>().unwrap();
+            clear_results(search_results, el);
         }
     } else if event.key() == "Escape" {
         spawn_local(async move {
