@@ -151,7 +151,11 @@ pub async fn search_lenses(
         if lens_name.starts_with(param.query) {
             results.push(LensResult {
                 title: lens_name.to_owned(),
-                description: lens_info.description.as_ref().unwrap_or(&"".to_string()).to_owned(),
+                description: lens_info
+                    .description
+                    .as_ref()
+                    .unwrap_or(&"".to_string())
+                    .to_owned(),
             })
         }
     }

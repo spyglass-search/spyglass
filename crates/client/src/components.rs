@@ -4,7 +4,7 @@ use yew::prelude::*;
 #[derive(Debug, PartialEq)]
 pub enum ResultListType {
     DocSearch,
-    LensSearch
+    LensSearch,
 }
 
 #[derive(Debug, PartialEq)]
@@ -35,11 +35,10 @@ impl From<&SearchResult> for ResultListData {
             description: x.description.clone(),
             url: Some(x.url.clone()),
             score: x.score,
-            result_type: ResultListType::DocSearch
+            result_type: ResultListType::DocSearch,
         }
     }
 }
-
 
 /// Render a list of selected lenses
 pub fn selected_lens_list(lens: &[String]) -> Html {

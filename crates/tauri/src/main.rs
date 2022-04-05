@@ -5,7 +5,9 @@
 use std::collections::HashMap;
 
 use num_format::{Locale, ToFormattedString};
-use tauri::{GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent, Window};
+use tauri::{
+    GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent, Window,
+};
 
 use shared::{request, response};
 
@@ -18,9 +20,6 @@ const INPUT_Y: f64 = 128.0;
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 const API_ENDPOINT: &str = "http://localhost:7777";
 
-fn _hide_window(handle: &Window) {
-    handle.hide().unwrap();
-    handle.emit("clear_search", true).unwrap();
 fn _center_window(window: &Window) {
     if let Some(monitor) = window.current_monitor().unwrap() {
         let size = monitor.size();
@@ -35,6 +34,11 @@ fn _center_window(window: &Window) {
             }))
             .unwrap();
     }
+}
+
+fn _hide_window(window: &Window) {
+    window.hide().unwrap();
+    window.emit("clear_search", true).unwrap();
 }
 
 fn _show_window(window: &Window) {
