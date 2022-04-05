@@ -16,8 +16,10 @@ pub struct Config {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Lens {
     pub name: String,
+    pub description: Option<String>,
     pub domains: Vec<String>,
     pub urls: Vec<String>,
+    pub version: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

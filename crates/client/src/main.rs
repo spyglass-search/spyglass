@@ -6,7 +6,7 @@ use yew::prelude::*;
 
 mod components;
 mod events;
-use components::{lens_list, search_result_component, ResultListData};
+use components::{selected_lens_list, search_result_component, ResultListData};
 use shared::response;
 
 const LENS_SEARCH_PREFIX: &str = "/";
@@ -133,7 +133,7 @@ pub fn app() -> Html {
     html! {
         <div>
             <div class="query-container">
-                {lens_list(&lens)}
+                {selected_lens_list(&lens)}
                 <input
                     type={"text"}
                     class={"search-box"}

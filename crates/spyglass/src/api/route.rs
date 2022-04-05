@@ -146,12 +146,12 @@ pub async fn search_lenses(
 ) -> Result<Json<SearchLensesResp>, BadRequest<String>> {
     let mut results = Vec::new();
 
-    for (lens_name, _) in state.config.lenses.iter() {
-        log::info!("{} - {}", lens_name, param.query);
+    for (lens_name, lens_info) in state.config.lenses.iter() {
+        log::trace!("{} - {}", lens_name, param.query);
         if lens_name.starts_with(param.query) {
             results.push(LensResult {
                 title: lens_name.to_owned(),
-                description: "".to_string(),
+                description: lens_info.description.as_ref().unwrap_or(&"".to_string()).to_owned(),
             })
         }
     }
