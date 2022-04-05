@@ -13,7 +13,7 @@ pub struct Config {
 
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Lens {
     pub name: String,
     pub description: Option<String>,
