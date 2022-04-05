@@ -1,13 +1,13 @@
 use shared::response::{LensResult, SearchResult};
 use yew::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {
     DocSearch,
     LensSearch,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ResultListData {
     pub title: String,
     pub description: String,
@@ -95,8 +95,8 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
         }
         ResultListType::LensSearch => {
             html! {
-                <div class={vec![Some("result-item".to_string()), selected]}>
-                    <h2 class={"result-title-lg"}>{res.title.clone()}</h2>
+                <div class={vec![Some("lens-result-item".to_string()), selected]}>
+                    <h2 class={"result-title"}>{res.title.clone()}</h2>
                     <div class={"result-description"}>{res.description.clone()}</div>
                 </div>
             }

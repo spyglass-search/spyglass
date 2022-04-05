@@ -78,6 +78,7 @@ pub fn app() -> Html {
     {
         let lens = lens.clone();
         let search_results = search_results.clone();
+        let selected_idx = selected_idx.clone();
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
@@ -86,11 +87,11 @@ pub fn app() -> Html {
                         // show lens search
                         log::info!("lens search: {}", query);
                         let el = node_ref.cast::<Element>().unwrap();
-                        show_lens_results(search_results, el, query.clone());
+                        show_lens_results(search_results, el, selected_idx, query.clone());
                     } else {
                         log::info!("query search: {}", query);
                         let el = node_ref.cast::<Element>().unwrap();
-                        show_doc_results(search_results, &lens, el, query.clone());
+                        show_doc_results(search_results, &lens, el, selected_idx, query.clone());
                     }
                 }
                 || ()
@@ -158,7 +159,12 @@ fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element) {
     resize_window(node.client_height() as f64).unwrap();
 }
 
-fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element, query: String) {
+fn show_lens_results(
+    handle: UseStateHandle<Vec<ResultListData>>,
+    node: Element,
+    selected_idx: UseStateHandle<usize>,
+    query: String
+) {
     let query = query.strip_prefix('/').unwrap().to_string();
     spawn_local(async move {
         match search_lenses(query).await {
@@ -168,6 +174,11 @@ fn show_lens_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element,
                     .iter()
                     .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
+
+                let max_idx = results.len().max(1) - 1;
+                if max_idx < *selected_idx {
+                    selected_idx.set(max_idx);
+                }
 
                 handle.set(results);
 
@@ -189,6 +200,7 @@ fn show_doc_results(
     handle: UseStateHandle<Vec<ResultListData>>,
     lenses: &[String],
     node: Element,
+    selected_idx: UseStateHandle<usize>,
     query: String,
 ) {
     let lenses = lenses.to_owned();
@@ -200,6 +212,12 @@ fn show_doc_results(
                     .iter()
                     .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
+
+
+                let max_idx = results.len().max(1) - 1;
+                if max_idx < *selected_idx {
+                    selected_idx.set(max_idx);
+                }
 
                 handle.set(results);
 

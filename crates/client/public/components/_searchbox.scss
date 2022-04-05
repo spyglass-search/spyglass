@@ -61,3 +61,25 @@
         height: 3em;
     }
 }
+
+.lens-result-item {
+    border-bottom: 1px solid #444;
+    padding: 1.25em;
+    height: 7em;
+    box-sizing: border-box;
+
+    h2.result-title {
+        font-weight: normal;
+        font-size: 2.1em;
+        padding: 0;
+        margin: 0;
+    }
+
+    .result-description {
+        color: $comment;
+        line-height: 1.5em;
+        font-size: 1em;
+        overflow: hidden;
+        height: 3em;
+    }
+}
