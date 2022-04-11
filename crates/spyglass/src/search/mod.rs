@@ -5,12 +5,14 @@ use std::path::PathBuf;
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{BooleanQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{Occur, Query, QueryParser};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
+mod query;
 use crate::config::Lens;
+use crate::search::query::build_query;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -181,59 +183,8 @@ impl Searcher {
         let fields = Searcher::doc_fields();
         let searcher = reader.searcher();
 
-        // Tokenize query string
-        let mut terms = Vec::new();
+        let query = build_query(fields, lenses, applied_lens, query_string);
 
-        for term in query_string.split(' ') {
-            // remove whitespace
-            let term = term.trim();
-            terms.push(term);
-        }
-
-        log::info!("lenses: {:?}, terms: {:?}", applied_lens, terms);
-
-        let mut lense_queries: QueryVec = Vec::new();
-        for lens in applied_lens {
-            if lenses.contains_key(lens) {
-                let lens = lenses.get(lens).unwrap();
-                for domain in &lens.domains {
-                    lense_queries.push((
-                        Occur::Should,
-                        Box::new(TermQuery::new(
-                            Term::from_field_text(fields.domain, domain),
-                            IndexRecordOption::Basic,
-                        )),
-                    ));
-                }
-            }
-        }
-
-        let mut term_query: QueryVec = Vec::new();
-        for term in terms {
-            term_query.push((
-                Occur::Should,
-                Box::new(TermQuery::new(
-                    Term::from_field_text(fields.content, term),
-                    IndexRecordOption::Basic,
-                )),
-            ));
-
-            term_query.push((
-                Occur::Should,
-                Box::new(TermQuery::new(
-                    Term::from_field_text(fields.title, term),
-                    IndexRecordOption::Basic,
-                )),
-            ));
-        }
-
-        let mut nested_query: QueryVec =
-            vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
-        if !lense_queries.is_empty() {
-            nested_query.push((Occur::Must, Box::new(BooleanQuery::new(lense_queries))));
-        }
-
-        let query = BooleanQuery::new(nested_query);
         let top_docs = searcher
             .search(&query, &TopDocs::with_limit(5))
             .expect("Unable to execute query");
