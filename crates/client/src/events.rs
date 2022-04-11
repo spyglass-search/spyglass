@@ -27,7 +27,8 @@ pub fn handle_global_key_down(
         selected_idx.set((*selected_idx + 1).min(max_len));
     } else if event.key() == "ArrowUp" {
         event.stop_propagation();
-        selected_idx.set((*selected_idx - 1).max(0));
+        let new_idx = (*selected_idx).max(1) - 1;
+        selected_idx.set(new_idx);
     } else if event.key() == "Enter" {
         let selected: &ResultListData = (*search_results).get(*selected_idx).unwrap();
         if let Some(url) = selected.url.clone() {
