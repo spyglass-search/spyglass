@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use tantivy::schema::*;
 use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
+use tantivy::schema::*;
 
 use super::DocFields;
 use crate::config::Lens;
@@ -15,11 +15,10 @@ pub fn build_query(
     query_string: &str,
 ) -> BooleanQuery {
     // Tokenize query string
-    let terms: Vec<&str> = query_string.split(' ')
+    let terms: Vec<&str> = query_string
+        .split(' ')
         .into_iter()
-        .map(|token| {
-            token.trim()
-        })
+        .map(|token| token.trim())
         .collect();
 
     log::info!("lenses: {:?}, terms: {:?}", applied_lens, terms);
@@ -59,8 +58,7 @@ pub fn build_query(
         ));
     }
 
-    let mut nested_query: QueryVec =
-        vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
+    let mut nested_query: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
     if !lense_queries.is_empty() {
         nested_query.push((Occur::Must, Box::new(BooleanQuery::new(lense_queries))));
     }

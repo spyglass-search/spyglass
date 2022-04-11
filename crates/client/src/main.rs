@@ -163,7 +163,7 @@ fn show_lens_results(
     handle: UseStateHandle<Vec<ResultListData>>,
     node: Element,
     selected_idx: UseStateHandle<usize>,
-    query: String
+    query: String,
 ) {
     let query = query.strip_prefix('/').unwrap().to_string();
     spawn_local(async move {
@@ -212,7 +212,6 @@ fn show_doc_results(
                     .iter()
                     .map(|x| x.into())
                     .collect::<Vec<ResultListData>>();
-
 
                 let max_idx = results.len().max(1) - 1;
                 if max_idx < *selected_idx {
