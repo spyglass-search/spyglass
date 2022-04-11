@@ -34,7 +34,12 @@ pub async fn manager_task(
         // tokio::select allows us to listen to a shutdown message while
         // also processing queue tasks.
         let next_url = tokio::select! {
-            res = crawl_queue::dequeue(&state.db, state.config.user_settings.domain_crawl_limit.clone()) => res.unwrap(),
+            res = crawl_queue::dequeue(
+                &state.db,
+                state.config.user_settings.domain_crawl_limit.clone(),
+                state.config.user_settings.inflight_crawl_limit.clone(),
+                state.config.user_settings.inflight_domain_limit.clone(),
+            ) => res.unwrap(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 return;

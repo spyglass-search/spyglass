@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use sea_orm::entity::prelude::*;
-use sea_orm::{sea_query, DbBackend, FromQueryResult, QueryOrder, QuerySelect, Set, Statement};
+use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement};
 use serde::Serialize;
 use url::Url;
 
@@ -121,40 +121,58 @@ pub async fn num_queued(db: &DatabaseConnection) -> anyhow::Result<u64, sea_orm:
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
-    limit: Limit,
+    domain_crawl_limit: Limit,
+    inflight_crawl_limit: Limit,
+    inflight_domain_limit: Limit,
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
-    if let Limit::Infinite = limit {
-        return Entity::find()
-            .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
-            .order_by_asc(Column::UpdatedAt)
-            .one(db)
-            .await;
-    } else if let Limit::Finite(num_domains) = limit {
-        let entity = Entity::find().from_raw_sql(Statement::from_sql_and_values(
-            DbBackend::Sqlite,
-            r#"
-                SELECT
-                    cq.*
-                FROM crawl_queue cq
-                LEFT JOIN (
-                    SELECT
-                        domain,
-                        count(*) as count
-                    FROM indexed_document
-                    GROUP BY domain
-                ) as t on t.domain = cq.domain
-                WHERE
-                    COALESCE(t.count, 0) < ?
-                    AND status = ?
-                ORDER BY cq.updated_at ASC
-            "#,
-            vec![num_domains.into(), CrawlStatus::Queued.to_string().into()],
-        ));
+    // Check for inflight limits
+    if let Limit::Finite(inflight_crawl_limit) = inflight_crawl_limit {
+        // How many do we have in progress?
+        let num_in_progress = Entity::find()
+            .filter(Column::Status.eq(CrawlStatus::Processing.to_string()))
+            .count(db)
+            .await? as u32;
 
-        return entity.one(db).await;
+        if num_in_progress >= inflight_crawl_limit {
+            return Ok(None);
+        }
     }
 
-    Ok(None)
+    let entity = Entity::find().from_raw_sql(Statement::from_sql_and_values(
+        DbBackend::Sqlite,
+        r#"
+            SELECT
+                cq.*
+            FROM crawl_queue cq
+            LEFT JOIN (
+                SELECT
+                    domain,
+                    count(*) as count
+                FROM indexed_document
+                GROUP BY domain
+            ) AS indexed ON indexed.domain = cq.domain
+            LEFT JOIN (
+                SELECT
+                    domain,
+                    count(*) as count
+                FROM crawl_queue
+                WHERE status = "Processing"
+                GROUP BY domain
+            ) AS inflight ON inflight.domain = cq.domain
+            WHERE
+                COALESCE(indexed.count, 0) < ? AND
+                COALESCE(inflight.count, 0) < ? AND
+                status = ?
+            ORDER BY cq.updated_at ASC
+        "#,
+        vec![
+            domain_crawl_limit.value().into(),
+            inflight_domain_limit.value().into(),
+            CrawlStatus::Queued.to_string().into(),
+        ],
+    ));
+
+    return entity.one(db).await;
 }
 
 /// Add url to the crawl queue
@@ -298,7 +316,9 @@ mod test {
         let url = "https://oldschool.runescape.wiki/";
         crawl_queue::enqueue(&db, url, &settings).await.unwrap();
 
-        let queue = crawl_queue::dequeue(&db, Limit::Infinite).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, Limit::Infinite, Limit::Infinite, Limit::Infinite)
+            .await
+            .unwrap();
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url);
     }
@@ -318,10 +338,14 @@ mod test {
             ..Default::default()
         };
         doc.save(&db).await.unwrap();
-        let queue = crawl_queue::dequeue(&db, Limit::Finite(2)).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, Limit::Finite(2), Limit::Infinite, Limit::Infinite)
+            .await
+            .unwrap();
         assert!(queue.is_some());
 
-        let queue = crawl_queue::dequeue(&db, Limit::Finite(1)).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, Limit::Finite(1), Limit::Infinite, Limit::Infinite)
+            .await
+            .unwrap();
         assert!(queue.is_none());
     }
 }

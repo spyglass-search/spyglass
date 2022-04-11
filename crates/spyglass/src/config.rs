@@ -34,11 +34,24 @@ impl Default for Limit {
     }
 }
 
+impl Limit {
+    pub fn value(&self) -> u32 {
+        match self {
+            Limit::Infinite => u32::MAX,
+            Limit::Finite(val) => *val,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct UserSettings {
     /// Number of pages allowed per domain. Sub-domains are treated as
     /// separate domains.
     pub domain_crawl_limit: Limit,
+    /// Total number of in-flight crawls allowed for the entire app.
+    pub inflight_crawl_limit: Limit,
+    /// Number of in-flight crawls allowed per domain.
+    pub inflight_domain_limit: Limit,
     /// Should we run the setup wizard?
     pub run_wizard: bool,
     /// Domains explicitly allowed, regardless of what's in the blocklist.
