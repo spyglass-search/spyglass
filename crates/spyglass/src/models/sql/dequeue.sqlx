@@ -1,0 +1,26 @@
+indexed AS (
+    SELECT
+        domain,
+        count(*) as count
+    FROM indexed_document
+    GROUP BY domain
+),
+inflight AS (
+    SELECT
+        domain,
+        count(*) as count
+    FROM crawl_queue
+    WHERE status = "Processing"
+    GROUP BY domain
+)
+SELECT
+    cq.*
+FROM crawl_queue cq
+LEFT JOIN prioritized ON prioritized.domain = cq.domain
+LEFT JOIN indexed ON indexed.domain = cq.domain
+LEFT JOIN inflight ON inflight.domain = cq.domain
+WHERE
+    COALESCE(indexed.count, 0) < ? AND
+    COALESCE(inflight.count, 0) < ? AND
+    status = "Queued"
+ORDER BY prioritized.priority DESC, cq.updated_at ASC

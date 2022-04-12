@@ -122,6 +122,7 @@ pub async fn num_queued(db: &DatabaseConnection) -> anyhow::Result<u64, sea_orm:
 pub async fn dequeue(
     db: &DatabaseConnection,
     user_settings: UserSettings,
+    prioritized: &[String],
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     // Check for inflight limits
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
@@ -136,39 +137,39 @@ pub async fn dequeue(
         }
     }
 
-    let entity = Entity::find().from_raw_sql(Statement::from_sql_and_values(
+    // List of domains to prioritize when dequeuing tasks
+    // For example, we'll pull domains that make up with lenses before
+    // general crawling.
+    let prioritized_domains = if prioritized.is_empty() {
+        "(\"\", 1)".to_string()
+    } else {
+        prioritized
+            .iter()
+            .map(|domain| format!("(\"{}\", 1)", domain))
+            .collect::<Vec<String>>()
+            .join(",")
+    };
+
+
+    let sql = Statement::from_sql_and_values(
         DbBackend::Sqlite,
-        r#"
-            SELECT
-                cq.*
-            FROM crawl_queue cq
-            LEFT JOIN (
-                SELECT
-                    domain,
-                    count(*) as count
-                FROM indexed_document
-                GROUP BY domain
-            ) AS indexed ON indexed.domain = cq.domain
-            LEFT JOIN (
-                SELECT
-                    domain,
-                    count(*) as count
-                FROM crawl_queue
-                WHERE status = "Processing"
-                GROUP BY domain
-            ) AS inflight ON inflight.domain = cq.domain
-            WHERE
-                COALESCE(indexed.count, 0) < ? AND
-                COALESCE(inflight.count, 0) < ? AND
-                status = ?
-            ORDER BY cq.updated_at ASC
-        "#,
+        &format!(
+            r#"
+                WITH prioritized(domain, priority)
+                AS (values {}),
+                {}
+            "#,
+            prioritized_domains,
+            include_str!("sql/dequeue.sqlx")
+        ),
         vec![
             user_settings.domain_crawl_limit.value().into(),
             user_settings.inflight_domain_limit.value().into(),
-            CrawlStatus::Queued.to_string().into(),
         ],
-    ));
+    );
+    log::info!("{}", sql.to_string());
+
+    let entity = Entity::find().from_raw_sql(sql);
 
     return entity.one(db).await;
 }
@@ -312,9 +313,13 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
+        let prioritized = vec![];
+
         crawl_queue::enqueue(&db, url, &settings).await.unwrap();
 
-        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, settings, &prioritized)
+            .await
+            .unwrap();
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url);
     }
@@ -328,6 +333,7 @@ mod test {
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
         let parsed = Url::parse(&url).unwrap();
+        let prioritized = vec![];
 
         crawl_queue::enqueue(&db, url, &settings).await.unwrap();
         let doc = indexed_document::ActiveModel {
@@ -337,14 +343,18 @@ mod test {
             ..Default::default()
         };
         doc.save(&db).await.unwrap();
-        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, settings, &prioritized)
+            .await
+            .unwrap();
         assert!(queue.is_some());
 
         let settings = UserSettings {
             domain_crawl_limit: Limit::Finite(1),
             ..Default::default()
         };
-        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, settings, &prioritized)
+            .await
+            .unwrap();
         assert!(queue.is_none());
     }
 }

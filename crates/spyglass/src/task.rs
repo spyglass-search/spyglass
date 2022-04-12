@@ -30,13 +30,19 @@ pub async fn manager_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
+    let prioritized: Vec<String> = state.config.lenses
+        .into_values()
+        .flat_map(|lense| lense.domains)
+        .collect();
+
     loop {
         // tokio::select allows us to listen to a shutdown message while
         // also processing queue tasks.
         let next_url = tokio::select! {
             res = crawl_queue::dequeue(
                 &state.db,
-                state.config.user_settings.clone()
+                state.config.user_settings.clone(),
+                &prioritized,
             ) => res.unwrap(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
