@@ -121,12 +121,10 @@ pub async fn num_queued(db: &DatabaseConnection) -> anyhow::Result<u64, sea_orm:
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
-    domain_crawl_limit: Limit,
-    inflight_crawl_limit: Limit,
-    inflight_domain_limit: Limit,
+    user_settings: UserSettings,
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     // Check for inflight limits
-    if let Limit::Finite(inflight_crawl_limit) = inflight_crawl_limit {
+    if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
         // How many do we have in progress?
         let num_in_progress = Entity::find()
             .filter(Column::Status.eq(CrawlStatus::Processing.to_string()))
@@ -166,8 +164,8 @@ pub async fn dequeue(
             ORDER BY cq.updated_at ASC
         "#,
         vec![
-            domain_crawl_limit.value().into(),
-            inflight_domain_limit.value().into(),
+            user_settings.domain_crawl_limit.value().into(),
+            user_settings.inflight_domain_limit.value().into(),
             CrawlStatus::Queued.to_string().into(),
         ],
     ));
@@ -316,16 +314,17 @@ mod test {
         let url = "https://oldschool.runescape.wiki/";
         crawl_queue::enqueue(&db, url, &settings).await.unwrap();
 
-        let queue = crawl_queue::dequeue(&db, Limit::Infinite, Limit::Infinite, Limit::Infinite)
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url);
     }
 
     #[tokio::test]
     async fn test_dequeue_with_limit() {
-        let settings = UserSettings::default();
+        let settings = UserSettings {
+            domain_crawl_limit: Limit::Finite(2),
+            ..Default::default()
+        };
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
         let parsed = Url::parse(&url).unwrap();
@@ -338,14 +337,14 @@ mod test {
             ..Default::default()
         };
         doc.save(&db).await.unwrap();
-        let queue = crawl_queue::dequeue(&db, Limit::Finite(2), Limit::Infinite, Limit::Infinite)
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_some());
 
-        let queue = crawl_queue::dequeue(&db, Limit::Finite(1), Limit::Infinite, Limit::Infinite)
-            .await
-            .unwrap();
+        let settings = UserSettings {
+            domain_crawl_limit: Limit::Finite(1),
+            ..Default::default()
+        };
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_none());
     }
 }
