@@ -1,3 +1,4 @@
-# cartographer
+# Spyglass
 
-Cartographer indexes & maps your digital history, allowing you to search through it with ease.
+Spyglass is a search engine for *your* web, crawling and indexing documents that you
+care about and making them available to you through a *simple* & *fast* interface.
