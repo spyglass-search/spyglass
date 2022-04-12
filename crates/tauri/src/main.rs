@@ -92,7 +92,7 @@ fn main() {
             if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                 if !is_focused {
                     let handle = event.window();
-                    _hide_window(&handle);
+                    _hide_window(handle);
                 }
             }
         })

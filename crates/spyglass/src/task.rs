@@ -30,7 +30,9 @@ pub async fn manager_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
-    let prioritized: Vec<String> = state.config.lenses
+    let prioritized: Vec<String> = state
+        .config
+        .lenses
         .into_values()
         .flat_map(|lense| lense.domains)
         .collect();

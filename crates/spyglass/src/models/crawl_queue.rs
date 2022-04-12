@@ -150,7 +150,6 @@ pub async fn dequeue(
             .join(",")
     };
 
-
     let sql = Statement::from_sql_and_values(
         DbBackend::Sqlite,
         &format!(
