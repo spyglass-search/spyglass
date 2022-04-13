@@ -50,7 +50,6 @@ impl From<Model> for ParsedRule {
         ParsedRule {
             domain: model.domain,
             regex: model.rule,
-            no_index: model.no_index,
             allow_crawl: model.allow_crawl,
         }
     }

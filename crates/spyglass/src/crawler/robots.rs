@@ -4,10 +4,10 @@
 /// - https://www.robotstxt.org/robotstxt.html
 use regex::RegexSet;
 
+#[derive(Clone, Debug)]
 pub struct ParsedRule {
     pub domain: String,
     pub regex: String,
-    pub no_index: bool,
     pub allow_crawl: bool,
 }
 
@@ -37,14 +37,14 @@ fn rule_to_regex(rule: &str) -> String {
 }
 
 /// Convert a set of rules into a regex set for matching
-pub fn filter_set(rules: &[ParsedRule]) -> RegexSet {
-    let disallow: Vec<String> = rules
+pub fn filter_set(rules: &[ParsedRule], allow: bool) -> RegexSet {
+    let rules: Vec<String> = rules
         .iter()
-        .filter(|x| !x.allow_crawl)
+        .filter(|x| x.allow_crawl == allow)
         .map(|x| x.regex.clone())
         .collect();
 
-    RegexSet::new(&disallow).unwrap()
+    RegexSet::new(&rules).unwrap()
 }
 
 /// Parse a robots.txt file and return a vector of parsed rules
@@ -76,7 +76,6 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                         rules.push(ParsedRule {
                             domain: domain.to_string(),
                             regex: rule_to_regex(end.trim()),
-                            no_index: false,
                             allow_crawl: prefix.starts_with("allow"),
                         });
                     }
@@ -90,7 +89,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
 
 #[cfg(test)]
 mod test {
-    use crate::crawler::robots::{filter_set, parse, rule_to_regex};
+    use crate::crawler::robots::{filter_set, parse, ParsedRule, rule_to_regex};
     use regex::Regex;
 
     #[test]
@@ -130,8 +129,27 @@ mod test {
     fn test_filter_set() {
         let robots_txt = include_str!("../../../../fixtures/robots.txt");
         let matches = parse("oldschool.runescape.wiki", robots_txt);
-        let filter_set = filter_set(&matches);
-        assert!(filter_set.is_match("/api.php"));
-        assert!(filter_set.is_match("/blah?title=Property:test"));
+        let disallow = filter_set(&matches, false);
+        assert!(disallow.is_match("/api.php"));
+        assert!(disallow.is_match("/blah?title=Property:test"));
+    }
+
+    #[test]
+    fn test_filter_set_google() {
+        let robots_txt = include_str!("../../../../fixtures/robots_www_google_com.txt");
+        let matches = parse("www.google.com", robots_txt);
+
+        let only_search: Vec<ParsedRule> = matches.iter()
+            .filter(|x| {
+                x.regex.starts_with("/search")
+            })
+            .cloned()
+            .collect();
+
+        let allow = filter_set(&only_search, true);
+        let disallow = filter_set(&only_search, false);
+
+        assert!(!allow.is_match("/search?kgmid=/m/0dsbpg6"));
+        assert!(disallow.is_match("/search?kgmid=/m/0dsbpg6"));
     }
 }

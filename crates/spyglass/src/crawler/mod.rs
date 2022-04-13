@@ -162,7 +162,7 @@ impl Crawler {
                             let new_rule = resource_rule::ActiveModel {
                                 domain: Set(rule.domain.to_owned()),
                                 rule: Set(rule.regex.to_owned()),
-                                no_index: Set(rule.no_index),
+                                no_index: Set(false),
                                 allow_crawl: Set(rule.allow_crawl),
                                 ..Default::default()
                             };
@@ -175,8 +175,10 @@ impl Crawler {
 
         // Check path against rules, if we find any matches that disallow, skip it
         let rules_into: Vec<ParsedRule> = rules.iter().map(|x| x.to_owned().into()).collect();
-        let filter_set = filter_set(&rules_into);
-        if filter_set.is_match(path) {
+
+        let allow_filter = filter_set(&rules_into, true);
+        let disallow_filter = filter_set(&rules_into, false);
+        if !allow_filter.is_match(path) && disallow_filter.is_match(path) {
             log::info!("Unable to crawl {}|{} due to rule", domain, path);
             return Ok(false);
         }
