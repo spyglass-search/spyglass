@@ -153,11 +153,7 @@ pub async fn dequeue(
     let sql = Statement::from_sql_and_values(
         DbBackend::Sqlite,
         &format!(
-            r#"
-                WITH prioritized(domain, priority)
-                AS (values {}),
-                {}
-            "#,
+            "WITH prioritized(domain, priority) AS (values {}), {}",
             prioritized_domains,
             include_str!("sql/dequeue.sqlx")
         ),

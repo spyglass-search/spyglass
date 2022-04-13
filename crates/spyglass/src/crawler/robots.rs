@@ -89,7 +89,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
 
 #[cfg(test)]
 mod test {
-    use crate::crawler::robots::{filter_set, parse, ParsedRule, rule_to_regex};
+    use crate::crawler::robots::{filter_set, parse, rule_to_regex, ParsedRule};
     use regex::Regex;
 
     #[test]
@@ -139,10 +139,9 @@ mod test {
         let robots_txt = include_str!("../../../../fixtures/robots_www_google_com.txt");
         let matches = parse("www.google.com", robots_txt);
 
-        let only_search: Vec<ParsedRule> = matches.iter()
-            .filter(|x| {
-                x.regex.starts_with("/search")
-            })
+        let only_search: Vec<ParsedRule> = matches
+            .iter()
+            .filter(|x| x.regex.starts_with("/search"))
             .cloned()
             .collect();
 
