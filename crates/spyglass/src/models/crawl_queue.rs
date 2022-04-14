@@ -162,7 +162,6 @@ pub async fn dequeue(
             user_settings.inflight_domain_limit.value().into(),
         ],
     );
-    log::info!("{}", sql.to_string());
 
     let entity = Entity::find().from_raw_sql(sql);
 

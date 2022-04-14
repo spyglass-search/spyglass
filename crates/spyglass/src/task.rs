@@ -71,6 +71,101 @@ pub async fn manager_task(
     }
 }
 
+async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
+    let result = crawler.fetch_by_job(&state.db, task.id).await;
+
+    match result {
+        Ok(Some(crawl_result)) => {
+            // Update job status
+            let cq_status = if crawl_result.is_success() {
+                crawl_queue::CrawlStatus::Completed
+            } else {
+                crawl_queue::CrawlStatus::Failed
+            };
+
+            crawl_queue::mark_done(&state.db, task.id, cq_status)
+                .await
+                .unwrap();
+
+            // Add links found to crawl queue
+            for link in crawl_result.links.iter() {
+                crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
+                    .await
+                    .unwrap();
+            }
+
+            // Add / update search index w/ crawl result.
+            if let Some(content) = crawl_result.content {
+                let url = Url::parse(&crawl_result.url).unwrap();
+
+                let existing = indexed_document::Entity::find()
+                    .filter(indexed_document::Column::Url.eq(url.as_str()))
+                    .one(&state.db)
+                    .await
+                    .unwrap();
+
+                // Delete old document, if any.
+                if let Some(doc) = &existing {
+                    let mut index = state.index.lock().unwrap();
+                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
+                }
+
+                // Add document to index
+                let doc_id = {
+                    let mut index = state.index.lock().unwrap();
+                    Searcher::add_document(
+                        &mut index.writer,
+                        &crawl_result.title.unwrap_or_default(),
+                        &crawl_result.description.unwrap_or_default(),
+                        url.host_str().unwrap(),
+                        url.as_str(),
+                        &content,
+                        &crawl_result.raw.unwrap(),
+                    )
+                    .unwrap()
+                };
+
+                // Update/create index reference in our database
+                let indexed = if let Some(doc) = existing {
+                    let mut update: indexed_document::ActiveModel = doc.into();
+                    update.doc_id = Set(doc_id);
+                    update
+                } else {
+                    indexed_document::ActiveModel {
+                        domain: Set(url.host_str().unwrap().to_string()),
+                        url: Set(url.as_str().to_string()),
+                        doc_id: Set(doc_id),
+                        ..Default::default()
+                    }
+                };
+
+                indexed.save(&state.db).await.unwrap();
+            }
+        }
+        Ok(None) => {
+            // Failed to grab robots.txt or crawling is not allowed
+            crawl_queue::mark_done(
+                &state.db,
+                task.id,
+                crawl_queue::CrawlStatus::Completed,
+            )
+            .await
+            .unwrap();
+        }
+        Err(err) => {
+            // mark crawl as failed
+            crawl_queue::mark_done(
+                &state.db,
+                task.id,
+                crawl_queue::CrawlStatus::Failed,
+            )
+            .await
+            .unwrap();
+            log::error!("Unable to crawl id: {} - {:?}", task.id, err)
+        }
+    }
+}
+
 /// Grabs a task
 pub async fn worker_task(
     state: AppState,
@@ -104,101 +199,9 @@ pub async fn worker_task(
         };
 
         if let Some(cmd) = next_cmd {
-            log::info!("received cmd: {:?}", cmd);
             match cmd {
-                Command::Fetch(crawl) => {
-                    let result = crawler.fetch_by_job(&state.db, crawl.id).await;
-
-                    match result {
-                        Ok(Some(crawl_result)) => {
-                            // Update job status
-                            let cq_status = if crawl_result.is_success() {
-                                crawl_queue::CrawlStatus::Completed
-                            } else {
-                                crawl_queue::CrawlStatus::Failed
-                            };
-
-                            crawl_queue::mark_done(&state.db, crawl.id, cq_status)
-                                .await
-                                .unwrap();
-
-                            // Add links found to crawl queue
-                            for link in crawl_result.links.iter() {
-                                crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
-                                    .await
-                                    .unwrap();
-                            }
-
-                            // Add / update search index w/ crawl result.
-                            if let Some(content) = crawl_result.content {
-                                let url = Url::parse(&crawl_result.url).unwrap();
-
-                                let existing = indexed_document::Entity::find()
-                                    .filter(indexed_document::Column::Url.eq(url.as_str()))
-                                    .one(&state.db)
-                                    .await
-                                    .unwrap();
-
-                                // Delete old document, if any.
-                                if let Some(doc) = &existing {
-                                    let mut index = state.index.lock().unwrap();
-                                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
-                                }
-
-                                // Add document to index
-                                let doc_id = {
-                                    let mut index = state.index.lock().unwrap();
-                                    Searcher::add_document(
-                                        &mut index.writer,
-                                        &crawl_result.title.unwrap_or_default(),
-                                        &crawl_result.description.unwrap_or_default(),
-                                        url.host_str().unwrap(),
-                                        url.as_str(),
-                                        &content,
-                                        &crawl_result.raw.unwrap(),
-                                    )
-                                    .unwrap()
-                                };
-
-                                // Update/create index reference in our database
-                                let indexed = if let Some(doc) = existing {
-                                    let mut update: indexed_document::ActiveModel = doc.into();
-                                    update.doc_id = Set(doc_id);
-                                    update
-                                } else {
-                                    indexed_document::ActiveModel {
-                                        domain: Set(url.host_str().unwrap().to_string()),
-                                        url: Set(url.as_str().to_string()),
-                                        doc_id: Set(doc_id),
-                                        ..Default::default()
-                                    }
-                                };
-
-                                indexed.save(&state.db).await.unwrap();
-                            }
-                        }
-                        Ok(None) => {
-                            // Failed to grab robots.txt or crawling is not allowed
-                            crawl_queue::mark_done(
-                                &state.db,
-                                crawl.id,
-                                crawl_queue::CrawlStatus::Completed,
-                            )
-                            .await
-                            .unwrap();
-                        }
-                        Err(err) => {
-                            // mark crawl as failed
-                            crawl_queue::mark_done(
-                                &state.db,
-                                crawl.id,
-                                crawl_queue::CrawlStatus::Failed,
-                            )
-                            .await
-                            .unwrap();
-                            log::error!("Unable to crawl id: {} - {:?}", crawl.id, err)
-                        }
-                    }
+                Command::Fetch(task) => {
+                    tokio::spawn(_handle_fetch(state.clone(), crawler.clone(), task.clone()));
                 }
             }
         }
