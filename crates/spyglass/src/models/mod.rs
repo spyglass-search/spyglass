@@ -3,6 +3,7 @@ use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, Sch
 pub mod crawl_queue;
 pub mod fetch_history;
 pub mod indexed_document;
+pub mod link;
 pub mod resource_rule;
 
 use crate::config::Config;
@@ -39,6 +40,14 @@ pub async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm
         builder.build(
             schema
                 .create_table_from_entity(resource_rule::Entity)
+                .if_not_exists(),
+        ),
+    )
+    .await?;
+    db.execute(
+        builder.build(
+            schema
+                .create_table_from_entity(link::Entity)
                 .if_not_exists(),
         ),
     )

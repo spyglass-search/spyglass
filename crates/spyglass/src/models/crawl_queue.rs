@@ -173,14 +173,14 @@ pub async fn enqueue(
     db: &DatabaseConnection,
     url: &str,
     settings: &UserSettings,
-) -> anyhow::Result<(), sea_orm::DbErr> {
+) -> anyhow::Result<bool, sea_orm::DbErr> {
     let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
 
     // Ignore invalid URLs
     let parsed = Url::parse(url);
     if parsed.is_err() {
         log::debug!("Url ignored: invalid URL - {}", url);
-        return Ok(());
+        return Ok(false);
     }
     let parsed = parsed.unwrap();
 
@@ -188,14 +188,14 @@ pub async fn enqueue(
     // Ignore URLs w/ no domain/host strings
     if domain.is_none() {
         log::debug!("Url ignored: invalid domain - {}", url);
-        return Ok(());
+        return Ok(false);
     }
 
     // Ignore domains in blocklist
     let domain = domain.unwrap();
     if block_list.contains(&domain.to_string()) {
         log::debug!("Url ignored: blocked domain - {}", url);
-        return Ok(());
+        return Ok(false);
     }
 
     let exists = Entity::find()
@@ -206,7 +206,7 @@ pub async fn enqueue(
     // ignore duplicate urls
     if exists.is_some() {
         log::debug!("Url ignored: duplicate crawl - {}", url);
-        return Ok(());
+        return Ok(false);
     }
 
     // ignore already indexed docs
@@ -218,7 +218,7 @@ pub async fn enqueue(
 
     if already_indexed {
         log::info!("Url ignored: already indexed - {}", url);
-        return Ok(());
+        return Ok(false);
     }
 
     let new_task = ActiveModel {
@@ -227,7 +227,7 @@ pub async fn enqueue(
         ..Default::default()
     };
     new_task.insert(db).await?;
-    Ok(())
+    Ok(true)
 }
 
 pub async fn mark_done(

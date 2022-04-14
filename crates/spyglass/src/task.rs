@@ -4,7 +4,7 @@ use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
 use crate::crawler::Crawler;
-use crate::models::{crawl_queue, indexed_document};
+use crate::models::{crawl_queue, link, indexed_document};
 use crate::search::Searcher;
 use crate::state::AppState;
 
@@ -89,9 +89,15 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
             // Add links found to crawl queue
             for link in crawl_result.links.iter() {
-                crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
+                let added = crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
                     .await
                     .unwrap();
+
+                // Only add valid urls
+                if added {
+                    link::save_link(&state.db, &crawl_result.url, link).await
+                        .unwrap();
+                }
             }
 
             // Add / update search index w/ crawl result.
@@ -144,23 +150,15 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
         }
         Ok(None) => {
             // Failed to grab robots.txt or crawling is not allowed
-            crawl_queue::mark_done(
-                &state.db,
-                task.id,
-                crawl_queue::CrawlStatus::Completed,
-            )
-            .await
-            .unwrap();
+            crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Completed)
+                .await
+                .unwrap();
         }
         Err(err) => {
             // mark crawl as failed
-            crawl_queue::mark_done(
-                &state.db,
-                task.id,
-                crawl_queue::CrawlStatus::Failed,
-            )
-            .await
-            .unwrap();
+            crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed)
+                .await
+                .unwrap();
             log::error!("Unable to crawl id: {} - {:?}", task.id, err)
         }
     }
