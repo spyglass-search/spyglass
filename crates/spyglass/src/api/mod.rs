@@ -1,7 +1,7 @@
 mod response;
 mod route;
 
-use crate::state::AppState;
+use libspyglass::state::AppState;
 
 pub async fn start_api(state: AppState) -> rocket::Shutdown {
     let api_config = rocket::Config {

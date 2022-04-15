@@ -1,27 +1,19 @@
 #[macro_use]
-extern crate html5ever;
-#[macro_use]
 extern crate rocket;
 
 use simple_logger::SimpleLogger;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 
+use libspyglass::models::crawl_queue;
+use libspyglass::state::AppState;
+use libspyglass::task::{self, AppShutdown};
+
 mod api;
-mod crawler;
 mod importer;
-mod models;
-mod scraper;
-mod search;
-mod state;
-mod task;
-mod test;
 
 use crate::api::start_api;
 use crate::importer::FirefoxImporter;
-use crate::models::crawl_queue;
-use crate::state::AppState;
-use crate::task::AppShutdown;
 
 #[tokio::main]
 async fn main() {

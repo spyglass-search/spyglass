@@ -1,4 +1,4 @@
-use crate::models::crawl_queue;
+use libspyglass::models::crawl_queue;
 use rocket::serde::Serialize;
 
 #[derive(Serialize)]

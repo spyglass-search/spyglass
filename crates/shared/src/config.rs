@@ -11,6 +11,12 @@ pub struct Config {
     pub lenses: HashMap<String, Lens>,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

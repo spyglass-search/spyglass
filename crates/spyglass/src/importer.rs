@@ -3,8 +3,8 @@ use shared::config::Config;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, fs, path::PathBuf};
 
-use crate::models::crawl_queue;
-use crate::state::AppState;
+use libspyglass::models::crawl_queue;
+use libspyglass::state::AppState;
 
 pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,

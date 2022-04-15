@@ -9,10 +9,11 @@ use url::Url;
 use shared::request;
 use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 
+use libspyglass::models::crawl_queue;
+use libspyglass::search::Searcher;
+use libspyglass::state::AppState;
+
 use super::response;
-use crate::models::crawl_queue;
-use crate::search::Searcher;
-use crate::state::AppState;
 
 #[post("/search", data = "<search_req>")]
 pub async fn search(

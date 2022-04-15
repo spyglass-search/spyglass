@@ -74,6 +74,12 @@ pub struct Crawler {
     pub client: Client,
 }
 
+impl Default for Crawler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Crawler {
     pub fn new() -> Self {
         let client = Client::builder()

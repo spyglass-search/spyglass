@@ -30,3 +30,7 @@ tendril = "0.4.2"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "0.8", features = ["serde", "v4"], default-features = false }
 url = "2.2"
+
+[lib]
+name = "libspyglass"
+path = "src/lib.rs"
