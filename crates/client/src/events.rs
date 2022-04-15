@@ -53,7 +53,7 @@ pub fn handle_global_key_down(
         });
     } else if event.key() == "Backspace" {
         event.stop_propagation();
-        if !lens.is_empty() {
+        if query.is_empty() && !lens.is_empty() {
             log::info!("updating lenses");
             let all_but_last = lens[0..lens.len() - 1].to_vec();
             lens.set(all_but_last);
