@@ -28,8 +28,8 @@ fn filter_p_nodes(root: &NodeRef<Node>, p_list: &mut Vec<String>) {
             let element = node.as_element().unwrap();
             if element.name().eq_ignore_ascii_case("p") {
                 let mut p_content = String::from("");
-                let mut _links = HashSet::new();
-                filter_text_nodes(&child, &mut p_content, &mut _links);
+                let mut links = HashSet::new();
+                filter_text_nodes(&child, &mut p_content, &mut links);
 
                 if !p_content.is_empty() {
                     p_list.push(p_content);
@@ -92,7 +92,7 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, links: &mut HashSet
                 let href = element.attrs.get(&href_key).unwrap().to_string();
                 // Ignore anchor links
                 if !href.starts_with('#') {
-                    links.insert(href);
+                    links.insert(href.to_string());
                 }
             }
 

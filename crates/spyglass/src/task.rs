@@ -4,7 +4,7 @@ use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
 use crate::crawler::Crawler;
-use crate::models::{crawl_queue, link, indexed_document};
+use crate::models::{crawl_queue, indexed_document, link};
 use crate::search::Searcher;
 use crate::state::AppState;
 
@@ -95,7 +95,8 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
                 // Only add valid urls
                 if added {
-                    link::save_link(&state.db, &crawl_result.url, link).await
+                    link::save_link(&state.db, &crawl_result.url, link)
+                        .await
                         .unwrap();
                 }
             }

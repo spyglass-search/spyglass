@@ -45,9 +45,17 @@ impl CrawlResult {
 }
 
 fn _normalize_href(url: &Url, href: &str) -> Option<String> {
+    // Force HTTPS, crawler will fallback to HTTP if necessary.
     if href.starts_with("//") {
         // schema relative url
-        if let Ok(url) = Url::parse(&format!("{}:{}", url.scheme(), href)) {
+        if let Ok(url) = Url::parse(&format!("{}:{}", "https", href)) {
+            return Some(url.to_string());
+        }
+    } else if href.starts_with("http://") || href.starts_with("https://") {
+        // Force HTTPS, crawler will fallback to HTTP if necessary.
+        if let Ok(url) = Url::parse(href) {
+            let mut url = url.clone();
+            url.set_scheme("https").unwrap();
             return Some(url.to_string());
         }
     } else {
@@ -79,6 +87,10 @@ impl Crawler {
 
     /// Fetches and parses the content of a page.
     async fn crawl(&self, url: &Url) -> CrawlResult {
+        // Force HTTPs
+        let mut url = url.clone();
+        url.set_scheme("https").unwrap();
+
         // Fetch & store page data.
         let res = self.client.get(url.as_str()).send().await;
         if res.is_err() {
@@ -110,7 +122,7 @@ impl Crawler {
             let normalized_links = parse_result
                 .links
                 .iter()
-                .filter_map(|link| _normalize_href(url, link))
+                .filter_map(|link| _normalize_href(&url, link))
                 .collect();
 
             log::info!("content hash: {:?}", content_hash);
@@ -342,6 +354,10 @@ mod test {
         let url = Url::parse("https://example.com").unwrap();
 
         assert_eq!(
+            _normalize_href(&url, "http://foo.com"),
+            Some("https://foo.com/".into())
+        );
+        assert_eq!(
             _normalize_href(&url, "https://foo.com"),
             Some("https://foo.com/".into())
         );
@@ -360,11 +376,6 @@ mod test {
         assert_eq!(
             _normalize_href(&url, "foo.html"),
             Some("https://example.com/foo.html".into())
-        );
-
-        assert_eq!(
-            _normalize_href(&url, "ftp://blah.com/file.exe"),
-            Some("ftp://blah.com/file.exe".into())
         );
     }
 }

@@ -31,7 +31,11 @@ impl ActiveModelBehavior for ActiveModel {
 }
 
 pub type LinkSaved = bool;
-pub async fn save_link(db: &DatabaseConnection, src: &String, dst: &String) -> anyhow::Result<LinkSaved, sea_orm::DbErr> {
+pub async fn save_link(
+    db: &DatabaseConnection,
+    src: &String,
+    dst: &String,
+) -> anyhow::Result<LinkSaved, sea_orm::DbErr> {
     let src_url = Url::parse(src).unwrap();
     let dst_url = Url::parse(dst).unwrap();
 
