@@ -30,19 +30,13 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
-pub type LinkSaved = bool;
 pub async fn save_link(
     db: &DatabaseConnection,
     src: &String,
     dst: &String,
-) -> anyhow::Result<LinkSaved, sea_orm::DbErr> {
+) -> anyhow::Result<(), sea_orm::DbErr> {
     let src_url = Url::parse(src).unwrap();
     let dst_url = Url::parse(dst).unwrap();
-
-    // Ignore links in the same domain
-    if src_url.host_str().unwrap() == dst_url.host_str().unwrap() {
-        return Ok(false);
-    }
 
     let new_link = ActiveModel {
         src_domain: Set(src_url.host_str().unwrap().to_owned()),
@@ -53,5 +47,6 @@ pub async fn save_link(
     };
 
     new_link.insert(db).await?;
-    Ok(true)
+
+    Ok(())
 }

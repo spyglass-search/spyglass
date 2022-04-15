@@ -94,7 +94,7 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                     .unwrap();
 
                 // Only add valid urls
-                if added {
+                if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
                     link::save_link(&state.db, &crawl_result.url, link)
                         .await
                         .unwrap();
