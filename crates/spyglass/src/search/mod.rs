@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{Occur, Query, QueryParser};
+use tantivy::query::{Occur, Query, QueryParser, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
@@ -90,6 +90,26 @@ impl Searcher {
             url: schema.get_field("url").unwrap(),
             raw: schema.get_field("raw").unwrap(),
         }
+    }
+
+    pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
+        let fields = Searcher::doc_fields();
+        let searcher = reader.searcher();
+
+        let query = TermQuery::new(
+            Term::from_field_text(fields.id, doc_id),
+            IndexRecordOption::Basic
+        );
+
+        let res = searcher.search(&query, &TopDocs::with_limit(1))
+            .expect("Unable to execute query");
+
+        if res.is_empty() {
+            return None;
+        }
+
+        let (_, doc_address) = res.first().unwrap();
+        Some(searcher.doc(*doc_address).unwrap())
     }
 
     pub fn with_index(index_path: &IndexPath) -> Self {

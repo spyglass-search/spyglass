@@ -3539,7 +3539,11 @@ checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 name = "reindexer"
 version = "0.1.0"
 dependencies = [
- "shared",
+ "anyhow",
+ "sea-orm",
+ "spyglass",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -4281,21 +4285,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spyglass-app"
-version = "0.1.0"
-dependencies = [
- "num-format",
- "open",
- "reqwest",
- "serde",
- "serde_json",
- "shared",
- "tauri",
- "tauri-build",
-]
-
-[[package]]
-name = "spyglass-bin"
+name = "spyglass"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4324,6 +4314,20 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "spyglass-app"
+version = "0.1.0"
+dependencies = [
+ "num-format",
+ "open",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "shared",
+ "tauri",
+ "tauri-build",
 ]
 
 [[package]]

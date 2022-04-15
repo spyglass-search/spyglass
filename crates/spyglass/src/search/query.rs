@@ -1,12 +1,24 @@
 use std::collections::HashMap;
 
-use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
+use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery};
 use tantivy::schema::*;
+use tantivy::Score;
 
 use super::DocFields;
 use shared::config::Lens;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
+
+fn _boosted_term(field: Field, term: &str, boost: Score) -> Box<BoostQuery> {
+    Box::new(BoostQuery::new(
+        Box::new(TermQuery::new(
+            Term::from_field_text(field, term),
+            // Needs WithFreqs otherwise scoring is wonky.
+            IndexRecordOption::WithFreqs,
+        )),
+        boost,
+    ))
+}
 
 pub fn build_query(
     fields: DocFields,
@@ -41,21 +53,9 @@ pub fn build_query(
 
     let mut term_query: QueryVec = Vec::new();
     for term in terms {
-        term_query.push((
-            Occur::Should,
-            Box::new(TermQuery::new(
-                Term::from_field_text(fields.content, term),
-                IndexRecordOption::Basic,
-            )),
-        ));
-
-        term_query.push((
-            Occur::Should,
-            Box::new(TermQuery::new(
-                Term::from_field_text(fields.title, term),
-                IndexRecordOption::Basic,
-            )),
-        ));
+        // Emphasize matches in the content more than words in the title
+        term_query.push((Occur::Should, _boosted_term(fields.content, term, 5.0)));
+        term_query.push((Occur::Should, _boosted_term(fields.title, term, 0.25)));
     }
 
     let mut nested_query: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];

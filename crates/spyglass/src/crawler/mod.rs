@@ -90,7 +90,6 @@ impl Crawler {
 
         Crawler { client }
     }
-
     /// Fetches and parses the content of a page.
     async fn crawl(&self, url: &Url) -> CrawlResult {
         // Force HTTPs
@@ -110,44 +109,48 @@ impl Crawler {
         }
 
         let res = res.unwrap();
-        log::info!("Status: {}", res.status());
-        let status = res.status();
+        let status = res.status().as_u16();
         if status == StatusCode::OK {
-            // TODO: Save headers
-            // log::info!("Headers:\n{:?}", res.headers());
             let raw_body = res.text().await.unwrap();
-            // Parse the html.
-            let parse_result = html_to_text(&raw_body);
-            // Hash the body content, used to detect changes (eventually).
-            let mut hasher = Sha256::new();
-            hasher.update(&parse_result.content.as_bytes());
-            let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-
-            // Normalize links from scrape result. If the links start with "/" they
-            // should be appended to the current URL.
-            let normalized_links = parse_result
-                .links
-                .iter()
-                .filter_map(|link| _normalize_href(&url, link))
-                .collect();
-
-            log::info!("content hash: {:?}", content_hash);
-            return CrawlResult {
-                content_hash,
-                content: Some(parse_result.content),
-                description: Some(parse_result.description),
-                status: status.as_u16(),
-                title: parse_result.title,
-                url: url.to_string(),
-                links: normalized_links,
-                raw: Some(raw_body),
-            };
+            let mut scrape_result = self.scrape_page(&url, &raw_body).await;
+            scrape_result.status = status;
+            return scrape_result;
         }
 
         CrawlResult {
-            status: status.as_u16(),
+            status,
             url: url.to_string(),
             ..Default::default()
+        }
+    }
+
+    pub async fn scrape_page(&self, url: &Url, raw_body: &str) -> CrawlResult {
+        // Parse the html.
+        let parse_result = html_to_text(raw_body);
+
+        // Hash the body content, used to detect changes (eventually).
+        let mut hasher = Sha256::new();
+        hasher.update(&parse_result.content.as_bytes());
+        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+
+        // Normalize links from scrape result. If the links start with "/" they
+        // should be appended to the current URL.
+        let normalized_links = parse_result
+            .links
+            .iter()
+            .filter_map(|link| _normalize_href(url, link))
+            .collect();
+
+        log::info!("content hash: {:?}", content_hash);
+        CrawlResult {
+            content_hash,
+            content: Some(parse_result.content),
+            description: Some(parse_result.description),
+            status: 200,
+            title: parse_result.title,
+            url: url.to_string(),
+            links: normalized_links,
+            raw: Some(raw_body.to_string()),
         }
     }
 
