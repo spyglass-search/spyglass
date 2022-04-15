@@ -11,8 +11,8 @@ use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
 mod query;
-use crate::config::Lens;
 use crate::search::query::build_query;
+use shared::config::Lens;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -202,8 +202,8 @@ impl Searcher {
 
 #[cfg(test)]
 mod test {
-    use crate::config::Lens;
     use crate::search::{IndexPath, Searcher};
+    use shared::config::Lens;
     use std::collections::HashMap;
 
     fn _build_test_index(searcher: &mut Searcher) {

@@ -8,7 +8,6 @@ use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 
 mod api;
-mod config;
 mod crawler;
 mod importer;
 mod models;

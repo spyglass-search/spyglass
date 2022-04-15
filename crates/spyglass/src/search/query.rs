@@ -4,7 +4,7 @@ use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
 use tantivy::schema::*;
 
 use super::DocFields;
-use crate::config::Lens;
+use shared::config::Lens;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
 

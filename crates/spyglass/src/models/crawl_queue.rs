@@ -7,7 +7,7 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use crate::config::{Limit, UserSettings};
+use shared::config::{Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
 
@@ -173,7 +173,7 @@ pub async fn dequeue(
 pub enum SkipReason {
     Invalid,
     Blocked,
-    Duplicate
+    Duplicate,
 }
 
 pub async fn enqueue(
@@ -265,9 +265,9 @@ mod test {
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
-    use crate::config::{Limit, UserSettings};
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
+    use shared::config::{Limit, UserSettings};
 
     #[tokio::test]
     async fn test_insert() {

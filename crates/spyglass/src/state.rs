@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use sea_orm::DatabaseConnection;
+use shared::config::Config;
 
-use crate::config::Config;
 use crate::models::{create_connection, setup_schema};
 use crate::search::{IndexPath, Searcher};
 
