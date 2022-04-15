@@ -54,7 +54,7 @@ fn _normalize_href(url: &Url, href: &str) -> Option<String> {
     } else if href.starts_with("http://") || href.starts_with("https://") {
         // Force HTTPS, crawler will fallback to HTTP if necessary.
         if let Ok(url) = Url::parse(href) {
-            let mut url = url.clone();
+            let mut url = url;
             url.set_scheme("https").unwrap();
             return Some(url.to_string());
         }

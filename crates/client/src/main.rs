@@ -5,12 +5,10 @@ use web_sys::{window, Element, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
+mod constants;
 mod events;
 use components::{search_result_component, selected_lens_list, ResultListData};
 use shared::response;
-
-const LENS_SEARCH_PREFIX: &str = "/";
-const MIN_CHARS: usize = 2;
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -82,8 +80,8 @@ pub fn app() -> Html {
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
-                if query.len() > MIN_CHARS {
-                    if query.starts_with(LENS_SEARCH_PREFIX) {
+                if query.len() > constants::MIN_CHARS {
+                    if query.starts_with(constants::LENS_SEARCH_PREFIX) {
                         // show lens search
                         log::info!("lens search: {}", query);
                         let el = node_ref.cast::<Element>().unwrap();

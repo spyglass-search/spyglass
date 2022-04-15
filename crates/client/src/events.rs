@@ -58,5 +58,11 @@ pub fn handle_global_key_down(
             let all_but_last = lens[0..lens.len() - 1].to_vec();
             lens.set(all_but_last);
         }
+
+        if query.len() < crate::constants::MIN_CHARS {
+            // Clear results list
+            let el = node_ref.cast::<Element>().unwrap();
+            clear_results(search_results, el);
+        }
     }
 }
