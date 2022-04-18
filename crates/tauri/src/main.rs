@@ -101,30 +101,32 @@ fn main() {
                 let app_status = app_status();
                 let handle = app.tray_handle();
 
-                handle
-                    .get_item(menu::CRAWL_STATUS_MENU_ITEM)
-                    .set_title(if app_status.is_paused {
-                        "▶️ Resume indexing"
-                    } else {
-                        "⏸ Pause indexing"
-                    })
-                    .unwrap();
+                if let Some(app_status) = app_status {
+                    handle
+                        .get_item(menu::CRAWL_STATUS_MENU_ITEM)
+                        .set_title(if app_status.is_paused {
+                            "▶️ Resume indexing"
+                        } else {
+                            "⏸ Pause indexing"
+                        })
+                        .unwrap();
 
-                handle
-                    .get_item(menu::NUM_DOCS_MENU_ITEM)
-                    .set_title(format!(
-                        "{} documents indexed",
-                        app_status.num_docs.to_formatted_string(&Locale::en)
-                    ))
-                    .unwrap();
+                    handle
+                        .get_item(menu::NUM_DOCS_MENU_ITEM)
+                        .set_title(format!(
+                            "{} documents indexed",
+                            app_status.num_docs.to_formatted_string(&Locale::en)
+                        ))
+                        .unwrap();
 
-                handle
-                    .get_item(menu::NUM_QUEUED_MENU_ITEM)
-                    .set_title(format!(
-                        "{} in queue",
-                        app_status.num_queued.to_formatted_string(&Locale::en)
-                    ))
-                    .unwrap();
+                    handle
+                        .get_item(menu::NUM_QUEUED_MENU_ITEM)
+                        .set_title(format!(
+                            "{} in queue",
+                            app_status.num_queued.to_formatted_string(&Locale::en)
+                        ))
+                        .unwrap();
+                }
             }
             SystemTrayEvent::MenuItemClick { id, .. } => {
                 let item_handle = app.tray_handle().get_item(&id);
@@ -173,17 +175,14 @@ async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn app_status() -> response::AppStatus {
+fn app_status() -> Option<response::AppStatus> {
     let client = reqwest::blocking::Client::new();
 
-    let res: response::AppStatus = client
-        .get("http://localhost:7777/api/status")
-        .send()
-        .unwrap()
-        .json()
-        .unwrap();
+    if let Ok(resp) = client.get("http://localhost:7777/api/status").send() {
+        return Some(resp.json().unwrap());
+    }
 
-    res
+    None
 }
 
 fn pause_crawler() -> bool {
