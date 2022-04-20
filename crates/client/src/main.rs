@@ -1,4 +1,5 @@
 use gloo::events::EventListener;
+use js_sys::Date;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, Element, HtmlInputElement};
@@ -42,6 +43,7 @@ pub fn app() -> Html {
     let lens = use_state_eq(Vec::new);
     // Current query string
     let query = use_state_eq(|| "".to_string());
+    let query_debounce = use_state_eq(Date::now);
     // Search results + selected index
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
@@ -80,7 +82,10 @@ pub fn app() -> Html {
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
-                if query.len() > constants::MIN_CHARS {
+                // Was the last char typed > 1 sec ago?
+                let is_debounced = *query_debounce >= constants::DEBOUNCE_TIME_MS;
+
+                if is_debounced && query.len() > constants::MIN_CHARS {
                     if query.starts_with(constants::LENS_SEARCH_PREFIX) {
                         // show lens search
                         log::info!("lens search: {}", query);
@@ -92,6 +97,8 @@ pub fn app() -> Html {
                         show_doc_results(search_results, &lens, el, selected_idx, query.clone());
                     }
                 }
+
+                query_debounce.set(Date::now());
                 || ()
             },
             (*query).clone(),
