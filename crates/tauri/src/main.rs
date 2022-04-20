@@ -5,10 +5,12 @@
 use std::collections::HashMap;
 
 use num_format::{Locale, ToFormattedString};
+use tauri::api::process::Command;
 use tauri::{
     GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent, Window,
 };
 
+use shared::config::Config;
 use shared::{request, response};
 
 mod menu;
@@ -47,6 +49,14 @@ fn _show_window(window: &Window) {
     resize_window(window.clone(), INPUT_HEIGHT);
 }
 
+#[allow(dead_code)]
+fn check_and_start_backend() {
+    let _ = Command::new_sidecar("spyglass-server")
+        .expect("failed to create `spyglass` binary command")
+        .spawn()
+        .expect("Failed to spawn sidecar");
+}
+
 fn main() {
     let ctx = tauri::generate_context!();
 
@@ -64,8 +74,15 @@ fn main() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // Only show in dev/debug mode.
+            #[cfg(debug_assertions)]
             app.get_window("main").unwrap().open_devtools();
+
             let window = app.get_window("main").unwrap();
+
+            // Start up backend (only in release mode)
+            #[cfg(not(debug_assertions))]
+            check_and_start_backend();
 
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
@@ -139,6 +156,18 @@ fn main() {
                         };
 
                         item_handle.set_title(new_label).unwrap();
+                    }
+                    menu::OPEN_LENSES_FOLDER => {
+                        std::process::Command::new("open")
+                            .arg(Config::lenses_dir())
+                            .spawn()
+                            .unwrap();
+                    }
+                    menu::OPEN_SETTINGS_FOLDER => {
+                        std::process::Command::new("open")
+                            .arg(Config::prefs_dir())
+                            .spawn()
+                            .unwrap();
                     }
                     menu::TOGGLE_MENU_ITEM => {
                         let window = app.get_window("main").unwrap();

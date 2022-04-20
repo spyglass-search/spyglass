@@ -67,7 +67,7 @@ pub struct UserSettings {
 }
 
 impl Config {
-    fn _load_user_settings() -> UserSettings {
+    fn load_user_settings() -> UserSettings {
         let prefs_path = Self::prefs_file();
         if prefs_path.exists() {
             ron::from_str(&fs::read_to_string(prefs_path).unwrap())
@@ -84,7 +84,7 @@ impl Config {
         }
     }
 
-    fn _load_lenses() -> anyhow::Result<HashMap<String, Lens>> {
+    fn load_lenses() -> anyhow::Result<HashMap<String, Lens>> {
         let mut lenses = HashMap::new();
 
         let lense_dir = Self::lenses_dir();
@@ -109,6 +109,10 @@ impl Config {
         proj_dirs.data_dir().to_path_buf()
     }
 
+    pub fn logs_dir() -> PathBuf {
+        Self::data_dir().join("logs")
+    }
+
     pub fn prefs_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
         proj_dirs.preference_dir().to_path_buf()
@@ -127,6 +131,9 @@ impl Config {
         let data_dir = Config::data_dir();
         fs::create_dir_all(&data_dir).expect("Unable to create data folder");
 
+        let logs_dir = Config::logs_dir();
+        fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
+
         let prefs_dir = Config::prefs_dir();
         fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
 
@@ -134,8 +141,8 @@ impl Config {
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
         Config {
-            lenses: Self::_load_lenses().expect("Unable to load lenses"),
-            user_settings: Self::_load_user_settings(),
+            lenses: Self::load_lenses().expect("Unable to load lenses"),
+            user_settings: Self::load_user_settings(),
         }
     }
 }
@@ -146,7 +153,7 @@ mod test {
 
     #[test]
     pub fn test_load_lenses() {
-        let res = Config::_load_lenses();
+        let res = Config::load_lenses();
         assert!(!res.is_err());
     }
 }

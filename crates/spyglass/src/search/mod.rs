@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
+use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
 
 use tantivy::collector::TopDocs;
@@ -28,6 +29,14 @@ pub struct Searcher {
     pub index: Index,
     pub reader: IndexReader,
     pub writer: IndexWriter,
+}
+
+impl Debug for Searcher {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        f.debug_struct("Searcher")
+            .field("index", &self.index)
+            .finish()
+    }
 }
 
 pub struct DocFields {
@@ -98,10 +107,11 @@ impl Searcher {
 
         let query = TermQuery::new(
             Term::from_field_text(fields.id, doc_id),
-            IndexRecordOption::Basic
+            IndexRecordOption::Basic,
         );
 
-        let res = searcher.search(&query, &TopDocs::with_limit(1))
+        let res = searcher
+            .search(&query, &TopDocs::with_limit(1))
             .expect("Unable to execute query");
 
         if res.is_empty() {

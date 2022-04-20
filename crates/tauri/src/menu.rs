@@ -7,10 +7,17 @@ pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
 pub const NUM_QUEUED_MENU_ITEM: &str = "num_queue";
 pub const CRAWL_STATUS_MENU_ITEM: &str = "crawl_status";
 
+pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
+pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
+
 pub fn get_tray_menu() -> SystemTrayMenu {
     let pause = CustomMenuItem::new(CRAWL_STATUS_MENU_ITEM.to_string(), "");
-    let hide = CustomMenuItem::new(TOGGLE_MENU_ITEM.to_string(), "Hide");
     let quit = CustomMenuItem::new(QUIT_MENU_ITEM.to_string(), "Quit");
+
+    let open_lenses_folder =
+        CustomMenuItem::new(OPEN_LENSES_FOLDER.to_string(), "Show lenses folder");
+    let open_settings_folder =
+        CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Show settings folder");
 
     SystemTrayMenu::new()
         .add_item(pause)
@@ -20,7 +27,8 @@ pub fn get_tray_menu() -> SystemTrayMenu {
         )
         .add_item(CustomMenuItem::new(NUM_QUEUED_MENU_ITEM.to_string(), "XX queued").disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(hide)
+        .add_item(open_lenses_folder)
+        .add_item(open_settings_folder)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)
 }

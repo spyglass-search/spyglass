@@ -69,7 +69,7 @@ fn _normalize_href(url: &Url, href: &str) -> Option<String> {
     None
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Crawler {
     pub client: Client,
 }

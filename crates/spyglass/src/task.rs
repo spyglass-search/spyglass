@@ -24,6 +24,7 @@ pub enum AppShutdown {
 }
 
 /// Manages the crawl queue
+#[tracing::instrument(skip_all)]
 pub async fn manager_task(
     state: AppState,
     queue: mpsc::Sender<Command>,
@@ -71,6 +72,7 @@ pub async fn manager_task(
     }
 }
 
+#[tracing::instrument(skip(state, crawler))]
 async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
     let result = crawler.fetch_by_job(&state.db, task.id).await;
 

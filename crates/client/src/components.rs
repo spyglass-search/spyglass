@@ -9,6 +9,7 @@ pub enum ResultListType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResultListData {
+    pub domain: Option<String>,
     pub title: String,
     pub description: String,
     pub url: Option<String>,
@@ -19,11 +20,12 @@ pub struct ResultListData {
 impl From<&LensResult> for ResultListData {
     fn from(x: &LensResult) -> Self {
         ResultListData {
-            title: x.title.clone(),
             description: x.description.clone(),
-            url: None,
-            score: 1.0,
+            domain: None,
             result_type: ResultListType::LensSearch,
+            score: 1.0,
+            title: x.title.clone(),
+            url: None,
         }
     }
 }
@@ -31,11 +33,12 @@ impl From<&LensResult> for ResultListData {
 impl From<&SearchResult> for ResultListData {
     fn from(x: &SearchResult) -> Self {
         ResultListData {
-            title: x.title.clone(),
             description: x.description.clone(),
-            url: Some(x.url.clone()),
-            score: x.score,
+            domain: Some(x.domain.clone()),
             result_type: ResultListType::DocSearch,
+            score: x.score,
+            title: x.title.clone(),
+            url: Some(x.url.clone()),
         }
     }
 }
@@ -74,7 +77,8 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
                 html! {
                     <div class={"result-url"}>
                         <a href={res.url.clone()} target={"_blank"}>
-                            {format!("🌐 {}", url.unwrap())}
+                            <img src={format!("https://icons.duckduckgo.com/ip3/{}.ico", res.domain.as_ref().unwrap_or(&"example.com".to_string()))} />
+                            {url.unwrap()}
                         </a>
                     </div>
                 }

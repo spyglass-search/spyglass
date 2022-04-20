@@ -16,7 +16,7 @@ inflight AS (
 SELECT
     cq.*
 FROM crawl_queue cq
-LEFT JOIN prioritized ON prioritized.domain = cq.domain
+LEFT JOIN prioritized ON cq.domain LIKE prioritized.domain
 LEFT JOIN indexed ON indexed.domain = cq.domain
 LEFT JOIN inflight ON inflight.domain = cq.domain
 WHERE

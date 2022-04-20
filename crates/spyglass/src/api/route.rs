@@ -37,11 +37,13 @@ pub async fn search(
     for (score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
 
+        let domain = retrieved.get_first(fields.domain).unwrap();
         let title = retrieved.get_first(fields.title).unwrap();
         let description = retrieved.get_first(fields.description).unwrap();
         let url = retrieved.get_first(fields.url).unwrap();
 
         let result = SearchResult {
+            domain: domain.as_text().unwrap().to_string(),
             title: title.as_text().unwrap().to_string(),
             description: description.as_text().unwrap().to_string(),
             url: url.as_text().unwrap().to_string(),

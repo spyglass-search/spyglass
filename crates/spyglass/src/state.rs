@@ -9,7 +9,7 @@ use shared::config::Config;
 use crate::models::{create_connection, setup_schema};
 use crate::search::{IndexPath, Searcher};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub app_state: Arc<DashMap<String, String>>,

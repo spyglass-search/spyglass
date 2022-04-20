@@ -6,6 +6,7 @@ use std::{env, fs, path::PathBuf};
 use libspyglass::models::crawl_queue;
 use libspyglass::state::AppState;
 
+#[allow(dead_code)]
 pub struct FirefoxImporter {
     pub profile_path: Option<PathBuf>,
     pub imported_path: PathBuf,
@@ -14,6 +15,7 @@ pub struct FirefoxImporter {
 
 impl FirefoxImporter {
     /// Get the default profile path for Firefox
+    #[allow(dead_code)]
     fn default_profile_path() -> Result<PathBuf, &'static str> {
         let home = home_dir().expect("No home directory detected");
         match env::consts::OS {
@@ -24,6 +26,7 @@ impl FirefoxImporter {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new(config: &Config) -> Self {
         let mut profile_path = None;
 
@@ -40,6 +43,7 @@ impl FirefoxImporter {
         }
     }
 
+    #[allow(dead_code)]
     pub fn detect_profiles(&self) -> Vec<PathBuf> {
         let mut path_results = Vec::new();
         if let Some(path) = &self.profile_path {
@@ -57,6 +61,7 @@ impl FirefoxImporter {
     }
 
     /// Add Firefox history into our crawl queue.
+    #[allow(dead_code)]
     async fn copy_history(&self, state: &AppState) -> anyhow::Result<()> {
         log::info!("Importing history");
         let pool = SqlitePoolOptions::new()
@@ -87,6 +92,7 @@ impl FirefoxImporter {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn import(&self, state: &AppState) -> anyhow::Result<PathBuf> {
         let profiles = self.detect_profiles();
         let path = profiles.first().expect("No Firefox history detected");

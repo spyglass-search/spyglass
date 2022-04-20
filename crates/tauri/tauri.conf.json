@@ -1,6 +1,6 @@
 {
   "package": {
-    "productName": "spyglass",
+    "productName": "Spyglass",
     "version": "0.1.0"
   },
   "build": {
@@ -23,8 +23,8 @@
         "icons/icon.ico"
       ],
       "resources": [],
-      "externalBin": [],
-      "copyright": "",
+      "externalBin": ["../../target/release/spyglass-server"],
+      "copyright": "(C) 2022 Andrew Huynh",
       "category": "DeveloperTool",
       "shortDescription": "",
       "longDescription": "",
@@ -60,7 +60,7 @@
       "height": 80
     }],
     "security": {
-      "csp": "default-src blob: data: filesystem: ws: http: https: 'unsafe-eval' 'unsafe-inline'"
+      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'; script-src 'unsafe-eval'"
     },
     "systemTray": {
       "iconPath": "icons/icon.png",

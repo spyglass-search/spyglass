@@ -28,15 +28,25 @@
 }
 
 .result-item {
-    border-bottom: 1px solid #444;
+    border-top: 1px solid #444;
     padding: 1.25em;
     height: 9em;
     box-sizing: border-box;
 
-    .result-url > a {
+    .result-url {
         font-size: 0.9em;
-        text-decoration: none;
-        color: $blue;
+
+        img {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+
+        &> a {
+            text-decoration: none;
+            color: $blue;
+        }
     }
 
     h2.result-title {
@@ -63,7 +73,7 @@
 }
 
 .lens-result-item {
-    border-bottom: 1px solid #444;
+    border-top: 1px solid #444;
     padding: 1.25em;
     height: 7em;
     box-sizing: border-box;

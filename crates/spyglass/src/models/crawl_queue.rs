@@ -145,7 +145,11 @@ pub async fn dequeue(
     } else {
         prioritized
             .iter()
-            .map(|domain| format!("(\"{}\", 1)", domain))
+            .map(|domain| {
+                // TODO: Should probably sanitize this...
+                let domain = domain.replace('*', "%");
+                format!("(\"{}\", 1)", domain)
+            })
             .collect::<Vec<String>>()
             .join(",")
     };
@@ -162,6 +166,8 @@ pub async fn dequeue(
             user_settings.inflight_domain_limit.value().into(),
         ],
     );
+
+    dbg!(&sql);
 
     let entity = Entity::find().from_raw_sql(sql);
 
@@ -321,6 +327,9 @@ mod test {
         let queue = crawl_queue::dequeue(&db, settings, &prioritized)
             .await
             .unwrap();
+
+        dbg!(&queue);
+
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url);
     }
