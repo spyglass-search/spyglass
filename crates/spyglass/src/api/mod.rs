@@ -1,36 +1,57 @@
-mod response;
-mod route;
+extern crate jsonrpc_ipc_server;
+
+use jsonrpc_core::{BoxFuture, IoHandler, Result};
+use jsonrpc_ipc_server::{Server, ServerBuilder};
 
 use libspyglass::state::AppState;
 
-pub async fn start_api(state: AppState) -> rocket::Shutdown {
-    let api_config = rocket::Config {
-        port: 7777,
-        ..rocket::Config::debug_default()
-    };
+use shared::request::{SearchLensesParam, SearchParam};
+use shared::response::{AppStatus, SearchLensesResp, SearchResults};
+use shared::rpc::{gen_ipc_path, Rpc};
 
-    let rocket = rocket::custom(&api_config)
-        .manage::<AppState>(state.clone())
-        .mount(
-            "/api",
-            routes![
-                // queue routes
-                route::add_queue,
-                route::list_queue,
-                // search
-                route::search,
-                route::search_lenses,
-                // app stats
-                route::app_stats,
-                // Pause/unpause crawler
-                route::update_app_status,
-            ],
-        )
-        .ignite()
-        .await
+mod response;
+mod route;
+
+pub struct SpyglassRPC {
+    state: AppState,
+}
+
+impl Rpc for SpyglassRPC {
+    fn protocol_version(&self) -> Result<String> {
+        Ok("version1".into())
+    }
+
+    fn app_stats(&self) -> BoxFuture<Result<AppStatus>> {
+        Box::pin(route::app_stats(self.state.clone()))
+    }
+
+    fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
+        Box::pin(route::toggle_pause(self.state.clone()))
+    }
+
+    fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>> {
+        Box::pin(route::search(self.state.clone(), query))
+    }
+
+    fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>> {
+        Box::pin(route::search_lenses(self.state.clone(), query))
+    }
+}
+
+pub fn start_api_ipc(state: &AppState) -> anyhow::Result<Server, ()> {
+    let endpoint = gen_ipc_path();
+
+    let mut io = IoHandler::new();
+    let rpc = SpyglassRPC {
+        state: state.clone(),
+    };
+    io.extend_with(rpc.to_delegate());
+
+    let server = ServerBuilder::new(io)
+        .start(&endpoint)
+        .map_err(|_| log::warn!("Couldn't open socket"))
         .unwrap();
 
-    let shutdown_handle = rocket.shutdown();
-    tokio::spawn(rocket.launch());
-    shutdown_handle
+    log::info!("Started IPC server at {}", endpoint);
+    Ok(server)
 }

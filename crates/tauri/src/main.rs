@@ -2,25 +2,24 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-use std::collections::HashMap;
-
+use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use tauri::api::process::Command;
 use tauri::{
-    GlobalShortcutManager, LogicalSize, Manager, Size, SystemTray, SystemTrayEvent, Window,
+    GlobalShortcutManager, LogicalSize, Manager, Size, State, SystemTray, SystemTrayEvent, Window,
 };
 
 use shared::config::Config;
 use shared::{request, response};
 
 mod menu;
+mod rpc;
 
 const INPUT_WIDTH: f64 = 640.0;
 const INPUT_HEIGHT: f64 = 80.0;
 const INPUT_Y: f64 = 128.0;
 
 const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
-const API_ENDPOINT: &str = "http://localhost:7777";
 
 fn _center_window(window: &Window) {
     if let Some(monitor) = window.current_monitor().unwrap() {
@@ -52,7 +51,7 @@ fn _show_window(window: &Window) {
 #[allow(dead_code)]
 fn check_and_start_backend() {
     let _ = Command::new_sidecar("spyglass-server")
-        .expect("failed to create `spyglass` binary command")
+        .expect("failed to create `spyglass-server` binary command")
         .spawn()
         .expect("Failed to spawn sidecar");
 }
@@ -61,6 +60,7 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
+        .manage(tauri::async_runtime::block_on(rpc::RpcClient::new()))
         .invoke_handler(tauri::generate_handler![
             escape,
             open_result,
@@ -113,9 +113,11 @@ fn main() {
                 }
             }
         })
-        .on_system_tray_event(move |app, event| match event {
+        .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { .. } => {
-                let app_status = app_status();
+                let rpc = app.state::<rpc::RpcClient>().inner();
+
+                let app_status = tauri::async_runtime::block_on(app_status(rpc));
                 let handle = app.tray_handle();
 
                 if let Some(app_status) = app_status {
@@ -149,7 +151,10 @@ fn main() {
                 let item_handle = app.tray_handle().get_item(&id);
                 match id.as_str() {
                     menu::CRAWL_STATUS_MENU_ITEM => {
-                        let new_label = if pause_crawler() {
+                        let rpc = app.state::<rpc::RpcClient>().inner();
+
+                        let is_paused = tauri::async_runtime::block_on(pause_crawler(rpc));
+                        let new_label = if is_paused {
                             "▶️ Resume indexing"
                         } else {
                             "⏸ Pause indexing"
@@ -204,32 +209,6 @@ async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn app_status() -> Option<response::AppStatus> {
-    let client = reqwest::blocking::Client::new();
-
-    if let Ok(resp) = client.get("http://localhost:7777/api/status").send() {
-        return Some(resp.json().unwrap());
-    }
-
-    None
-}
-
-fn pause_crawler() -> bool {
-    let client = reqwest::blocking::Client::new();
-    let mut map = HashMap::new();
-    map.insert("toggle_pause", true);
-
-    let res: response::AppStatus = client
-        .post(format!("{}/api/status", API_ENDPOINT))
-        .json(&map)
-        .send()
-        .unwrap()
-        .json()
-        .unwrap();
-
-    res.is_paused
-}
-
 #[tauri::command]
 fn resize_window(window: tauri::Window, height: f64) {
     window
@@ -240,44 +219,73 @@ fn resize_window(window: tauri::Window, height: f64) {
         .unwrap();
 }
 
-#[tauri::command]
-async fn search_docs(
-    _: tauri::Window,
-    lenses: Vec<String>,
-    query: &str,
-) -> Result<Vec<response::SearchResult>, String> {
-    let data = request::SearchParam { lenses, query };
-
-    let res: response::SearchResults = reqwest::Client::new()
-        // TODO: make this configurable
-        .post(format!("{}/api/search", API_ENDPOINT))
-        .json(&data)
-        .send()
+async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
+    match rpc
+        .client
+        .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
         .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    {
+        Ok(resp) => Some(resp),
+        Err(_) => None,
+    }
+}
 
-    let results: Vec<response::SearchResult> = res.results.to_vec();
-    Ok(results)
+async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
+    match rpc
+        .client
+        .call_method::<bool, response::AppStatus>("toggle_pause", "", true)
+        .await
+    {
+        Ok(resp) => resp.is_paused,
+        Err(_) => false,
+    }
 }
 
 #[tauri::command]
-async fn search_lenses(_: tauri::Window, query: &str) -> Result<Vec<response::LensResult>, String> {
-    let data = request::SearchLensesParam { query };
+async fn search_docs<'r>(
+    _: tauri::Window,
+    rpc: State<'r, rpc::RpcClient>,
+    lenses: Vec<String>,
+    query: &str,
+) -> Result<Vec<response::SearchResult>, String> {
+    let data = request::SearchParam {
+        lenses,
+        query: query.to_string(),
+    };
 
-    let res: response::SearchLensesResp = reqwest::Client::new()
-        // TODO: make this configurable
-        .post(format!("{}/api/lenses", API_ENDPOINT))
-        .json(&data)
-        .send()
+    match rpc
+        .client
+        .call_method::<(request::SearchParam,), response::SearchResults>("search_docs", "", (data,))
         .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    {
+        Ok(resp) => Ok(resp.results.to_vec()),
+        Err(err) => {
+            dbg!(err);
+            Ok(Vec::new())
+        }
+    }
+}
 
-    let results: Vec<response::LensResult> = res.results.to_vec();
-    Ok(results)
+#[tauri::command]
+async fn search_lenses<'r>(
+    _: tauri::Window,
+    rpc: State<'r, rpc::RpcClient>,
+    query: &str,
+) -> Result<Vec<response::LensResult>, String> {
+    let data = request::SearchLensesParam {
+        query: query.to_string(),
+    };
+
+    match rpc
+        .client
+        .call_method::<(request::SearchLensesParam,), response::SearchLensesResp>(
+            "search_lenses",
+            "",
+            (data,),
+        )
+        .await
+    {
+        Ok(resp) => Ok(resp.results.to_vec()),
+        Err(_) => Ok(Vec::new()),
+    }
 }

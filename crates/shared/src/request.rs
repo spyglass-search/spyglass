@@ -1,19 +1,19 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct SearchParam<'r> {
+pub struct SearchParam {
     pub lenses: Vec<String>,
-    pub query: &'r str,
+    pub query: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct SearchLensesParam<'r> {
-    pub query: &'r str,
+pub struct SearchLensesParam {
+    pub query: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct QueueItemParam<'r> {
-    pub url: &'r str,
+pub struct QueueItemParam {
+    pub url: String,
     pub force_crawl: bool,
 }
 

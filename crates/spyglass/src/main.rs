@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate rocket;
-
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 use tracing_subscriber::EnvFilter;
@@ -13,14 +10,14 @@ use shared::config::Config;
 mod api;
 mod importer;
 
-use crate::api::start_api;
+use crate::api::start_api_ipc;
 
-#[tokio::main]
-async fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
+        .with_thread_names(true)
         .with_writer(non_blocking)
         .with_env_filter(
             EnvFilter::default()
@@ -30,8 +27,25 @@ async fn main() {
         )
         .init();
 
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_name("spyglass-backend")
+        .build()
+        .unwrap();
+
     // Initialize/Load user preferences
-    let state = AppState::new().await;
+    let state = rt.block_on(AppState::new());
+
+    // Start IPC server
+    let server = start_api_ipc(&state).expect("Unable to start IPC server");
+
+    rt.block_on(start_backend(&state));
+    server.close();
+
+    Ok(())
+}
+
+async fn start_backend(state: &AppState) {
     // TODO: Implement user-friendly start-up wizard
     // if state.config.user_settings.run_wizard {
     //     // Import data from Firefox
@@ -73,17 +87,14 @@ async fn main() {
     ));
 
     // Gracefully handle shutdowns
-    let server = start_api(state.clone()).await;
-
+    // let server = start_api(state.clone()).await;
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");
-            server.notify();
             shutdown_tx.send(AppShutdown::Now).unwrap();
         }
         Err(err) => {
             log::error!("Unable to listen for shutdown signal: {}", err);
-            server.notify();
             shutdown_tx.send(AppShutdown::Now).unwrap();
         }
     }

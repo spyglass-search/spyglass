@@ -1,5 +1,5 @@
 use libspyglass::models::crawl_queue;
-use rocket::serde::Serialize;
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct ListQueue {

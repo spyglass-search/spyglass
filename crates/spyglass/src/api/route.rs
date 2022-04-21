@@ -1,6 +1,4 @@
-use rocket::response::status::BadRequest;
-use rocket::serde::json::Json;
-use rocket::State;
+use jsonrpc_core::{Error, ErrorCode, Result};
 use sea_orm::prelude::*;
 use sea_orm::Set;
 use shared::response::LensResult;
@@ -15,11 +13,8 @@ use libspyglass::state::AppState;
 
 use super::response;
 
-#[post("/search", data = "<search_req>")]
-pub async fn search(
-    state: &State<AppState>,
-    search_req: Json<request::SearchParam<'_>>,
-) -> Result<Json<SearchResults>, BadRequest<String>> {
+#[allow(dead_code)]
+pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = Searcher::doc_fields();
 
     let index = state.index.lock().unwrap();
@@ -30,7 +25,7 @@ pub async fn search(
         &index.index,
         &index.reader,
         &search_req.lenses,
-        search_req.query,
+        &search_req.query,
     );
 
     let mut results: Vec<SearchResult> = Vec::new();
@@ -54,37 +49,36 @@ pub async fn search(
     }
 
     let meta = SearchMeta {
-        query: search_req.query.to_string(),
+        query: search_req.query,
         num_docs: searcher.num_docs(),
         wall_time_ms: 1000,
     };
 
-    Ok(Json(SearchResults { results, meta }))
+    Ok(SearchResults { results, meta })
 }
 
 /// Show the list of URLs in the queue and their status
-#[get("/queue")]
-pub async fn list_queue(
-    state: &State<AppState>,
-) -> Result<Json<response::ListQueue>, BadRequest<String>> {
+#[allow(dead_code)]
+pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
     let db = &state.db;
     let queue = crawl_queue::Entity::find().all(db).await;
 
     match queue {
-        Ok(queue) => Ok(Json(response::ListQueue { queue })),
-        Err(err) => Err(BadRequest(Some(err.to_string()))),
+        Ok(queue) => Ok(response::ListQueue { queue }),
+        Err(err) => Err(Error {
+            code: ErrorCode::InternalError,
+            message: err.to_string(),
+            data: None,
+        }),
     }
 }
 
 /// Add url to queue
-#[post("/queue", data = "<queue_item>")]
-pub async fn add_queue(
-    state: &State<AppState>,
-    queue_item: Json<request::QueueItemParam<'_>>,
-) -> Result<&'static str, BadRequest<String>> {
+#[allow(dead_code)]
+pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> Result<String> {
     let db = &state.db;
 
-    let parsed = Url::parse(queue_item.url).unwrap();
+    let parsed = Url::parse(&queue_item.url).unwrap();
     let new_task = crawl_queue::ActiveModel {
         domain: Set(parsed.host_str().unwrap().to_string()),
         url: Set(queue_item.url.to_owned()),
@@ -93,12 +87,16 @@ pub async fn add_queue(
     };
 
     match new_task.insert(db).await {
-        Ok(_) => Ok("ok"),
-        Err(err) => Err(BadRequest(Some(err.to_string()))),
+        Ok(_) => Ok("ok".to_string()),
+        Err(err) => Err(Error {
+            code: ErrorCode::InternalError,
+            message: err.to_string(),
+            data: None,
+        }),
     }
 }
 
-pub async fn _get_current_status(state: &State<AppState>) -> AppStatus {
+pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     let db = &state.db;
     let num_queued = crawl_queue::num_queued(db).await.unwrap();
 
@@ -111,47 +109,39 @@ pub async fn _get_current_status(state: &State<AppState>) -> AppStatus {
     let index = state.index.lock().unwrap();
     let reader = index.reader.searcher();
 
-    AppStatus {
+    Ok(AppStatus {
         num_docs: reader.num_docs(),
         num_queued,
         is_paused,
-    }
+    })
 }
 
 /// Fun stats about index size, etc.
-#[get("/status")]
-pub async fn app_stats(state: &State<AppState>) -> Json<AppStatus> {
-    Json(_get_current_status(state).await)
+pub async fn app_stats(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+    _get_current_status(state).await
 }
 
-#[post("/status", data = "<update_status>")]
-pub async fn update_app_status(
-    state: &State<AppState>,
-    update_status: Json<request::UpdateStatusParam>,
-) -> Result<Json<AppStatus>, BadRequest<String>> {
-    // Update status
-    if update_status.toggle_pause.is_some() {
-        let app_state = &state.app_state;
-        let mut paused_status = app_state.get_mut("paused").unwrap();
+pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+    let app_state = &state.app_state;
+    let mut paused_status = app_state.get_mut("paused").unwrap();
 
-        let current_status = paused_status.to_string() == "true";
-        let updated_status = !current_status;
-        *paused_status = updated_status.to_string();
-    }
+    let current_status = paused_status.to_string() == "true";
+    let updated_status = !current_status;
+    *paused_status = updated_status.to_string();
 
-    Ok(Json(_get_current_status(state).await))
+    _get_current_status(state.clone()).await
 }
 
-#[post("/lenses", data = "<param>")]
+#[allow(dead_code)]
 pub async fn search_lenses(
-    state: &State<AppState>,
-    param: Json<request::SearchLensesParam<'_>>,
-) -> Result<Json<SearchLensesResp>, BadRequest<String>> {
+    state: AppState,
+    param: request::SearchLensesParam,
+) -> Result<SearchLensesResp> {
     let mut results = Vec::new();
 
     for (lens_name, lens_info) in state.config.lenses.iter() {
         log::trace!("{} - {}", lens_name, param.query);
-        if lens_name.starts_with(param.query) {
+        if lens_name.starts_with(&param.query) {
             results.push(LensResult {
                 title: lens_name.to_owned(),
                 description: lens_info
@@ -163,5 +153,5 @@ pub async fn search_lenses(
         }
     }
 
-    Ok(Json(SearchLensesResp { results }))
+    Ok(SearchLensesResp { results })
 }

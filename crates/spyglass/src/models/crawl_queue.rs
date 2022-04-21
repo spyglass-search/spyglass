@@ -167,8 +167,6 @@ pub async fn dequeue(
         ],
     );
 
-    dbg!(&sql);
-
     let entity = Entity::find().from_raw_sql(sql);
 
     return entity.one(db).await;
@@ -327,8 +325,6 @@ mod test {
         let queue = crawl_queue::dequeue(&db, settings, &prioritized)
             .await
             .unwrap();
-
-        dbg!(&queue);
 
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url);

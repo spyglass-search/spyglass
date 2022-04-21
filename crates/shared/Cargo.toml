@@ -8,6 +8,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 directories = "4.0"
+jsonrpc-core = "18.0.0"
+jsonrpc-core-client = "18.0.0"
+jsonrpc-derive = "18.0.0"
 log = "0.4"
 ron = "0.7"
 serde = { version = "1.0", features = ["derive"] }

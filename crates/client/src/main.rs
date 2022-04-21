@@ -85,14 +85,12 @@ pub fn app() -> Html {
                 // Was the last char typed > 1 sec ago?
                 let is_debounced = *query_debounce >= constants::DEBOUNCE_TIME_MS;
 
-                if is_debounced && query.len() > constants::MIN_CHARS {
+                if is_debounced && query.len() >= constants::MIN_CHARS {
                     if query.starts_with(constants::LENS_SEARCH_PREFIX) {
                         // show lens search
-                        log::info!("lens search: {}", query);
                         let el = node_ref.cast::<Element>().unwrap();
                         show_lens_results(search_results, el, selected_idx, query.clone());
                     } else {
-                        log::info!("query search: {}", query);
                         let el = node_ref.cast::<Element>().unwrap();
                         show_doc_results(search_results, &lens, el, selected_idx, query.clone());
                     }
