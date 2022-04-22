@@ -4196,6 +4196,7 @@ version = "0.1.0"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
+ "log",
  "num-format",
  "open",
  "serde",
@@ -4203,6 +4204,9 @@ dependencies = [
  "shared",
  "tauri",
  "tauri-build",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]

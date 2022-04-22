@@ -2,6 +2,7 @@ use jsonrpc_core::{Error, ErrorCode, Result};
 use sea_orm::prelude::*;
 use sea_orm::Set;
 use shared::response::LensResult;
+use tracing::instrument;
 use url::Url;
 
 use shared::request;
@@ -13,7 +14,7 @@ use libspyglass::state::AppState;
 
 use super::response;
 
-#[allow(dead_code)]
+#[instrument(skip(state))]
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = Searcher::doc_fields();
 
@@ -58,7 +59,7 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
 }
 
 /// Show the list of URLs in the queue and their status
-#[allow(dead_code)]
+#[instrument(skip(state))]
 pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
     let db = &state.db;
     let queue = crawl_queue::Entity::find().all(db).await;
@@ -74,7 +75,7 @@ pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
 }
 
 /// Add url to queue
-#[allow(dead_code)]
+#[instrument(skip(state))]
 pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> Result<String> {
     let db = &state.db;
 
@@ -117,22 +118,28 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
 }
 
 /// Fun stats about index size, etc.
+#[instrument(skip(state))]
 pub async fn app_stats(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     _get_current_status(state).await
 }
 
+#[instrument(skip(state))]
 pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
-    let app_state = &state.app_state;
-    let mut paused_status = app_state.get_mut("paused").unwrap();
+    // Scope so that the app_state mutex is correctly released.
+    {
+        let app_state = &state.app_state;
+        let mut paused_status = app_state.get_mut("paused").unwrap();
 
-    let current_status = paused_status.to_string() == "true";
-    let updated_status = !current_status;
-    *paused_status = updated_status.to_string();
+        log::info!("dlafjadkl");
+        let current_status = paused_status.to_string() == "true";
+        let updated_status = !current_status;
+        *paused_status = updated_status.to_string();
+    }
 
     _get_current_status(state.clone()).await
 }
 
-#[allow(dead_code)]
+#[instrument(skip(state))]
 pub async fn search_lenses(
     state: AppState,
     param: request::SearchLensesParam,

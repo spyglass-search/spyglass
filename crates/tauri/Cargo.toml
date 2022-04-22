@@ -15,14 +15,18 @@ build = "src/build.rs"
 tauri-build = { version = "1.0.0-rc.5", features = [] }
 
 [dependencies]
-open = "2"
-num-format = "0.4"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ipc"] }
+log = "0.4"
+num-format = "0.4"
+open = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 shared = { path = "../shared" }
 tauri = { version = "1.0.0-rc.5", features = ["api-all", "devtools", "system-tray"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "std"] }
 
 [features]
 default = [ "custom-protocol" ]

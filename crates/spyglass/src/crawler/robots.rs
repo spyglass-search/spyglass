@@ -14,9 +14,12 @@ pub struct ParsedRule {
 const BOT_AGENT_NAME: &str = "carto";
 
 /// Convert a robots.txt rule into a proper regex string
-fn rule_to_regex(rule: &str) -> String {
-    let mut regex = String::new();
+fn rule_to_regex(rule: &str) -> Option<String> {
+    if rule.len() == 0 {
+        return None;
+    }
 
+    let mut regex = String::new();
     let mut has_end = false;
     for ch in rule.chars() {
         match ch {
@@ -33,7 +36,7 @@ fn rule_to_regex(rule: &str) -> String {
         regex.push_str(".*");
     }
 
-    regex
+    Some(regex)
 }
 
 /// Convert a set of rules into a regex set for matching
@@ -73,11 +76,21 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                     }
 
                     if prefix.starts_with("disallow") || prefix.starts_with("allow") {
-                        rules.push(ParsedRule {
-                            domain: domain.to_string(),
-                            regex: rule_to_regex(end.trim()),
-                            allow_crawl: prefix.starts_with("allow"),
-                        });
+                        let regex = rule_to_regex(end.trim());
+                        if regex.is_some() {
+                            rules.push(ParsedRule {
+                                domain: domain.to_string(),
+                                regex: regex.unwrap(),
+                                allow_crawl: prefix.starts_with("allow"),
+                            });
+                        // Empty disallow is an allow all
+                        } else if regex.is_none() && prefix.starts_with("disallow") {
+                            rules.push(ParsedRule {
+                                domain: domain.to_string(),
+                                regex: rule_to_regex("/").unwrap(),
+                                allow_crawl: true,
+                            });
+                        }
                     }
                 }
             }
@@ -94,7 +107,7 @@ mod test {
 
     #[test]
     fn test_parse() {
-        let robots_txt = include_str!("../../../../fixtures/robots.txt");
+        let robots_txt = include_str!("../../../../fixtures/robots/oldschool_runescape_wiki.txt");
         let matches = parse("oldschool.runescape.wiki", robots_txt);
 
         assert_eq!(matches.len(), 59);
@@ -102,7 +115,7 @@ mod test {
 
     #[test]
     fn test_parse_large() {
-        let robots_txt = include_str!("../../../../fixtures/robots_2.txt");
+        let robots_txt = include_str!("../../../../fixtures/robots/reddit_com.txt");
         let matches = parse("www.reddit.com", robots_txt);
 
         assert_eq!(matches.len(), 37);
@@ -110,7 +123,7 @@ mod test {
 
     #[test]
     fn test_parse_blanks() {
-        let robots_txt = include_str!("../../../../fixtures/robots_crates_io.txt");
+        let robots_txt = include_str!("../../../../fixtures/robots/crates_io.txt");
         let matches = parse("crates.io", robots_txt);
 
         assert_eq!(matches.len(), 1);
@@ -118,7 +131,7 @@ mod test {
 
     #[test]
     fn test_rule_to_regex() {
-        let regex = rule_to_regex("/*?title=Property:");
+        let regex = rule_to_regex("/*?title=Property:").unwrap();
         assert_eq!(regex, "/.*\\?title=Property:.*");
 
         let re = Regex::new(&regex).unwrap();
@@ -127,7 +140,7 @@ mod test {
 
     #[test]
     fn test_filter_set() {
-        let robots_txt = include_str!("../../../../fixtures/robots.txt");
+        let robots_txt = include_str!("../../../../fixtures/robots/oldschool_runescape_wiki.txt");
         let matches = parse("oldschool.runescape.wiki", robots_txt);
         let disallow = filter_set(&matches, false);
         assert!(disallow.is_match("/api.php"));
@@ -136,7 +149,7 @@ mod test {
 
     #[test]
     fn test_filter_set_google() {
-        let robots_txt = include_str!("../../../../fixtures/robots_www_google_com.txt");
+        let robots_txt = include_str!("../../../../fixtures/robots/www_google_com.txt");
         let matches = parse("www.google.com", robots_txt);
 
         let only_search: Vec<ParsedRule> = matches
@@ -150,5 +163,17 @@ mod test {
 
         assert!(!allow.is_match("/search?kgmid=/m/0dsbpg6"));
         assert!(disallow.is_match("/search?kgmid=/m/0dsbpg6"));
+    }
+
+    #[test]
+    fn test_filter_set_factorio() {
+        let robots_txt = include_str!("../../../../fixtures/robots/wiki_factorio_com.txt");
+        let matches = parse("wiki.factorio.com", robots_txt);
+
+        let allow = filter_set(&matches, true);
+        let disallow = filter_set(&matches, false);
+
+        assert_eq!(allow.is_match("/Belt_transport_system"), true);
+        assert_eq!(disallow.is_match("/Belt_transport_system"), false);
     }
 }

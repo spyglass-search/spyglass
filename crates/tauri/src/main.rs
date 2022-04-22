@@ -226,18 +226,24 @@ async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
         .await
     {
         Ok(resp) => Some(resp),
-        Err(_) => None,
+        Err(err) => {
+            log::error!("{}", err);
+            None
+        }
     }
 }
 
 async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
     match rpc
         .client
-        .call_method::<bool, response::AppStatus>("toggle_pause", "", true)
+        .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
         .await
     {
         Ok(resp) => resp.is_paused,
-        Err(_) => false,
+        Err(err) => {
+            log::error!("{}", err);
+            false
+        }
     }
 }
 
@@ -260,7 +266,7 @@ async fn search_docs<'r>(
     {
         Ok(resp) => Ok(resp.results.to_vec()),
         Err(err) => {
-            dbg!(err);
+            log::error!("{}", err);
             Ok(Vec::new())
         }
     }
@@ -286,6 +292,9 @@ async fn search_lenses<'r>(
         .await
     {
         Ok(resp) => Ok(resp.results.to_vec()),
-        Err(_) => Ok(Vec::new()),
+        Err(err) => {
+            log::error!("{}", err);
+            Ok(Vec::new())
+        }
     }
 }
