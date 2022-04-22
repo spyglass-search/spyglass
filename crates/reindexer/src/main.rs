@@ -38,7 +38,6 @@ async fn main() -> Result<(), anyhow::Error> {
                     .unwrap()
                     .as_text()
                     .unwrap();
-                println!("Reindexing: {}", url);
 
                 // Scrape page
                 let url = Url::parse(url).unwrap();
