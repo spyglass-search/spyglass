@@ -37,7 +37,7 @@ jobs:
       run: |
         cargo build -p spyglass --verbose --release
         mkdir -p crates/tauri/binaries
-        cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
+        cp target/release/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
     - uses: tauri-apps/tauri-action@v0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
