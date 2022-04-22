@@ -60,7 +60,6 @@ fn main() {
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
-        .manage(tauri::async_runtime::block_on(rpc::RpcClient::new()))
         .invoke_handler(tauri::generate_handler![
             escape,
             open_result,
@@ -83,6 +82,9 @@ fn main() {
             // Start up backend (only in release mode)
             #[cfg(not(debug_assertions))]
             check_and_start_backend();
+
+            // Wait for the server to boot up
+            app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
 
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
