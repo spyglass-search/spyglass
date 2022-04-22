@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Setup arch target
+      run: echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
     - name: Setup wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: Install tauri system deps
@@ -31,8 +33,8 @@ jobs:
       run: cargo build -p spyglass --verbose
     - name: Create sidecar
       run: |
-        mkdir -p target/release
-        cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$ARCH
+        mkdir -p crates/tauri/binaries
+        cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
     - name: Build everything
       run: |
         cargo tauri build
