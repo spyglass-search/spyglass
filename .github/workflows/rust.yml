@@ -32,7 +32,7 @@ jobs:
     - name: Create sidecar
       run: |
         mkdir -p target/release
-        cp target/debug/spyglass target/release/spyglass-server-$ARCH
+        cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$ARCH
     - name: Build everything
       run: |
         cargo tauri build
