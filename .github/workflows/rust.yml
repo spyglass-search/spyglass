@@ -1,4 +1,4 @@
-name: Rust
+name: Rust - Linux x86
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-
+  ARCH: x86_64-unknown-linux-gnu
 jobs:
   build:
 
@@ -16,7 +16,26 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
+    - name: Setup wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Install tauri system deps
+      run: |
+        sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev \
+            libgtk-3-dev \
+            libappindicator3-dev \
+            librsvg2-dev
+        cargo install tauri-cli --locked --version ^1.0.0-rc.8
+        cargo install --locked trunk
+    - name: Build backend
+      run: cargo build -p spyglass --verbose
+    - name: Create sidecar
+      run: |
+        mkdir -p target/release
+        cp target/debug/spyglass target/release/spyglass-server-$ARCH
+    - name: Build everything
+      run: |
+        cargo tauri build
+        cargo build --verbose
     - name: Run tests
       run: cargo test --verbose

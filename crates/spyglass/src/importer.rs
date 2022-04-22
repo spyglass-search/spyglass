@@ -113,6 +113,7 @@ mod test {
     use shared::config::Config;
 
     #[test]
+    #[ignore]
     fn test_detect_profiles() {
         let config = Config::new();
         let importer = FirefoxImporter::new(&config);

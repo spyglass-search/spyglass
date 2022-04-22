@@ -152,6 +152,7 @@ mod test {
     use crate::config::Config;
 
     #[test]
+    #[ignore]
     pub fn test_load_lenses() {
         let res = Config::load_lenses();
         assert!(!res.is_err());
