@@ -1,0 +1,57 @@
+name: "Tauri - Publish"
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: setup node
+      uses: actions/setup-node@v1
+      with:
+        node-version: 16
+    - name: install Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - name: install wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: install trunk
+      run: cargo install --locked trunk
+    - name: install dependencies (ubuntu only)
+      if: matrix.platform == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf
+    - name: Setup arch target (macos / linux only)
+      if: matrix.platform != 'windows-latest'
+      run: |
+        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
+        echo "target_ext=" >>$GITHUB_ENV
+    - name: Setup arch target (windows only)
+      if: matrix.platform == 'windows-latest'
+      run: |
+        echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
+        echo "target_ext=.exe" >> $env:GITHUB_ENV
+    - name: build sidecar
+      run: |
+        cargo build -p spyglass --verbose --release
+        mkdir -p crates/tauri/binaries
+        cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+    - uses: tauri-apps/tauri-action@v0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
+        releaseName: "App v__VERSION__"
+        releaseBody: "See the assets to download this version and install."
+        releaseDraft: true
+        prerelease: false
