@@ -49,7 +49,7 @@ impl Limit {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UserSettings {
     /// Number of pages allowed per domain. Sub-domains are treated as
     /// separate domains.
@@ -64,6 +64,22 @@ pub struct UserSettings {
     pub allow_list: Vec<String>,
     /// Domains explicitly blocked from crawling.
     pub block_list: Vec<String>,
+}
+
+impl Default for UserSettings {
+    fn default() -> Self {
+        UserSettings {
+            domain_crawl_limit: Limit::Finite(1000),
+            // 10 total crawlers at a time
+            inflight_crawl_limit: Limit::Finite(10),
+            // Limit to 2 crawlers for a domain
+            inflight_domain_limit: Limit::Finite(2),
+            // Not used at the moment
+            run_wizard: false,
+            allow_list: Vec::new(),
+            block_list: vec!["web.archive.org".to_string()]
+        }
+    }
 }
 
 impl Config {
