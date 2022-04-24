@@ -46,6 +46,7 @@ fn _show_window(window: &Window) {
     window.show().unwrap();
     window.set_focus().unwrap();
     resize_window(window.clone(), INPUT_HEIGHT);
+    _center_window(window);
 }
 
 #[allow(dead_code)]

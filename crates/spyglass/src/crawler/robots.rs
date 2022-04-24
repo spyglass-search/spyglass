@@ -15,7 +15,7 @@ const BOT_AGENT_NAME: &str = "carto";
 
 /// Convert a robots.txt rule into a proper regex string
 fn rule_to_regex(rule: &str) -> Option<String> {
-    if rule.len() == 0 {
+    if rule.is_empty() {
         return None;
     }
 
@@ -77,10 +77,10 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
 
                     if prefix.starts_with("disallow") || prefix.starts_with("allow") {
                         let regex = rule_to_regex(end.trim());
-                        if regex.is_some() {
+                        if let Some(regex) = regex {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
-                                regex: regex.unwrap(),
+                                regex,
                                 allow_crawl: prefix.starts_with("allow"),
                             });
                         // Empty disallow is an allow all
