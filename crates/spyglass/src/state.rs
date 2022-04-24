@@ -27,7 +27,7 @@ impl AppState {
 
         // TODO: Load from saved preferences
         let app_state = DashMap::new();
-        app_state.insert("paused".to_string(), "true".to_string());
+        app_state.insert("paused".to_string(), "false".to_string());
 
         let app = AppState {
             db: db.clone(),
