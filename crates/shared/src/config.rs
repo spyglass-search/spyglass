@@ -125,6 +125,10 @@ impl Config {
         proj_dirs.data_dir().to_path_buf()
     }
 
+    pub fn index_dir() -> PathBuf {
+        Self::data_dir().join("index")
+    }
+
     pub fn logs_dir() -> PathBuf {
         Self::data_dir().join("logs")
     }
@@ -146,6 +150,9 @@ impl Config {
     pub fn new() -> Self {
         let data_dir = Config::data_dir();
         fs::create_dir_all(&data_dir).expect("Unable to create data folder");
+
+        let index_dir = Config::index_dir();
+        fs::create_dir_all(&index_dir).expect("Unable to create index folder");
 
         let logs_dir = Config::logs_dir();
         fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");

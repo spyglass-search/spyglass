@@ -1,5 +1,3 @@
-use std::fs;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
@@ -18,26 +16,14 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn crawl_dir() -> PathBuf {
-        Config::data_dir().join("crawls")
-    }
-
-    pub fn index_dir() -> PathBuf {
-        Config::data_dir().join("index")
-    }
-
-    pub async fn init_data_folders(&self) {
-        fs::create_dir_all(AppState::crawl_dir()).expect("Unable to create crawl folder");
-        fs::create_dir_all(AppState::index_dir()).expect("Unable to create index folder");
-    }
-
     pub async fn new() -> Self {
         let config = Config::new();
+
         let db = create_connection(false)
             .await
             .expect("Unable to connect to database");
 
-        let index = Searcher::with_index(&IndexPath::LocalPath(Self::index_dir()));
+        let index = Searcher::with_index(&IndexPath::LocalPath(Config::index_dir()));
 
         // TODO: Load from saved preferences
         let app_state = DashMap::new();
@@ -52,7 +38,6 @@ impl AppState {
         let _ = setup_schema(&db.clone())
             .await
             .expect("Unable to setup schema");
-        app.init_data_folders().await;
 
         app
     }
