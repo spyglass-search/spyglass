@@ -117,6 +117,27 @@ impl Config {
             }
         }
 
+        if lenses.is_empty() {
+            // Create a default lens as an example.
+            let lens = Lens {
+                version: "1".to_string(),
+                name: "wiki".to_string(),
+                description: Some("Search through official user-supported wikis for knowledge, games, and more.".to_string()),
+                domains: vec![
+                    "en.wikipedia.org".to_string(),
+                    "oldschool.runescape.wiki".to_string(),
+                    "wiki.factorio.com".to_string()
+                ],
+                urls: Vec::new(),
+            };
+
+            fs::write(
+                Self::lenses_dir().join("wiki.ron"),
+                ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
+            )
+                .expect("Unable to save default lens file.");
+        }
+
         Ok(lenses)
     }
 
