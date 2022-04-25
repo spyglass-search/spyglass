@@ -7,6 +7,18 @@
 > and can be used to replace basic searches. ⚠️
 
 
+## Installation
+
+Stable compiled builds are provided on the [releases](https://github.com/a5huynh/spyglass/releases) pages.
+Download the appriopriate file for your OS (e.g. `.deb` for linux, `.dmg` for macOS and `.msi` for Windows)
+
+If you're interested in building from source, after checking out the repository run the following:
+
+```
+make setup-dev
+make build-release
+```
+
 ## Spyglass in action
 
 Once launched, press **`Cmd + Shift + /`** to open Spyglass. Queries prefixed with `/`
