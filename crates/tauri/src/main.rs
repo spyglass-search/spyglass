@@ -58,6 +58,14 @@ fn check_and_start_backend() {
 }
 
 fn main() {
+    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::fmt()
+        .with_thread_names(true)
+        .with_writer(non_blocking)
+        .init();
+
     let ctx = tauri::generate_context!();
 
     tauri::Builder::default()
