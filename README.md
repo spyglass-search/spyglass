@@ -9,6 +9,12 @@
 
 ## Spyglass in action
 
+Once launched, press **`Cmd + Shift + /`** to open Spyglass. Queries prefixed with `/`
+will search through your installed lenses, otherwise it'll search through your index.
+
+Use the arrow keys to select the result you want and hit `Enter` to open the link in the
+browser of your choice!
+
 [![Spyglass in action!](docs/spyglass-poc.gif)](https://www.youtube.com/embed/OzNrxtM3s_8)
 
 
