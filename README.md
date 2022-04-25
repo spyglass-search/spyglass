@@ -1,7 +1,7 @@
 # Spyglass
 
 > tl; dr: Spyglass is a search platform that lives on your device, indexing what
-> you want, exposing it to you in a simpe & fast interface.
+> you want, exposing it to you in a super simple & fast interface.
 
 > ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional
 > and can be used to replace basic searches. ⚠️
