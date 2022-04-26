@@ -5,8 +5,7 @@
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
-use tauri::api::process::Command;
-use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, Window};
+use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
 
 use shared::config::Config;
 use shared::response;
@@ -15,41 +14,148 @@ mod cmd;
 mod constants;
 mod menu;
 mod rpc;
+mod window;
 
-fn _center_window(window: &Window) {
-    if let Some(monitor) = window.current_monitor().unwrap() {
-        let size = monitor.size();
-        let scale = monitor.scale_factor();
+fn main() {
+    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-        let middle = (size.width as f64 / (scale * 2.0)) - (constants::INPUT_WIDTH / 2.0);
+    tracing_subscriber::fmt()
+        .with_thread_names(true)
+        .with_writer(non_blocking)
+        .init();
 
-        window
-            .set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                x: middle,
-                y: constants::INPUT_Y,
-            }))
-            .unwrap();
+    let ctx = tauri::generate_context!();
+
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            cmd::escape,
+            cmd::open_result,
+            cmd::search_docs,
+            cmd::search_lenses,
+            cmd::resize_window
+        ])
+        .menu(menu::get_app_menu())
+        .setup(|app| {
+            // hide from dock (also hides menu bar)
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Only show in dev/debug mode.
+            #[cfg(debug_assertions)]
+            app.get_window("main").unwrap().open_devtools();
+
+            let window = app.get_window("main").unwrap();
+
+            // Start up backend (only in release mode)
+            #[cfg(not(debug_assertions))]
+            rpc::check_and_start_backend();
+
+            // Wait for the server to boot up
+            app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
+
+            // Register global shortcut
+            let mut shortcuts = app.global_shortcut_manager();
+            if !shortcuts.is_registered(constants::SHORTCUT).unwrap() {
+                let window = window.clone();
+                shortcuts
+                    .register(constants::SHORTCUT, move || {
+                        if window.is_visible().unwrap() {
+                            window::hide_window(&window);
+                        } else {
+                            window::show_window(&window);
+                        }
+                    })
+                    .unwrap();
+            }
+
+            // Center window horizontally in the current screen
+            window::center_window(&window);
+
+            Ok(())
+        })
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::Focused(is_focused) = event.event() {
+                if !is_focused {
+                    let handle = event.window();
+                    window::hide_window(handle);
+                }
+            }
+        })
+        .on_system_tray_event(|app, event| match event {
+            SystemTrayEvent::LeftClick { .. } => update_tray_menu(app),
+            SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
+            SystemTrayEvent::MenuItemClick { id, .. } => {
+                let item_handle = app.tray_handle().get_item(&id);
+                match id.as_str() {
+                    menu::CRAWL_STATUS_MENU_ITEM => {
+                        let rpc = app.state::<rpc::RpcClient>().inner();
+
+                        let is_paused = tauri::async_runtime::block_on(pause_crawler(rpc));
+                        let new_label = if is_paused {
+                            "▶️ Resume indexing"
+                        } else {
+                            "⏸ Pause indexing"
+                        };
+
+                        item_handle.set_title(new_label).unwrap();
+                    }
+                    menu::OPEN_LENSES_FOLDER => {
+                        open_folder(Config::lenses_dir());
+                    }
+                    menu::OPEN_SETTINGS_FOLDER => {
+                        open_folder(Config::prefs_dir());
+                    }
+                    menu::TOGGLE_MENU_ITEM => {
+                        let window = app.get_window("main").unwrap();
+                        let new_title = if window.is_visible().unwrap() {
+                            window::hide_window(&window);
+                            "Show"
+                        } else {
+                            window::show_window(&window);
+                            "Hide"
+                        };
+                        item_handle.set_title(new_title).unwrap();
+                    }
+                    menu::QUIT_MENU_ITEM => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        })
+        .run(ctx)
+        .expect("error while running tauri application");
+}
+
+async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
+    match rpc
+        .client
+        .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
+        .await
+    {
+        Ok(resp) => Some(resp),
+        Err(err) => {
+            log::error!("{}", err);
+            None
+        }
     }
 }
 
-fn _hide_window(window: &Window) {
-    window.hide().unwrap();
-    window.emit("clear_search", true).unwrap();
-}
-
-fn _show_window(window: &Window) {
-    window.show().unwrap();
-    window.set_focus().unwrap();
-    cmd::resize_window(window.clone(), constants::INPUT_HEIGHT);
-    _center_window(window);
-}
-
-#[allow(dead_code)]
-fn check_and_start_backend() {
-    let _ = Command::new_sidecar("spyglass-server")
-        .expect("failed to create `spyglass-server` binary command")
-        .spawn()
-        .expect("Failed to spawn sidecar");
+async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
+    match rpc
+        .client
+        .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
+        .await
+    {
+        Ok(resp) => resp.is_paused,
+        Err(err) => {
+            log::error!("{}", err);
+            false
+        }
+    }
 }
 
 fn open_folder(folder: PathBuf) {
@@ -103,147 +209,5 @@ fn update_tray_menu(app: &AppHandle) {
                 app_status.num_queued.to_formatted_string(&Locale::en)
             ))
             .unwrap();
-    }
-}
-
-fn main() {
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-    tracing_subscriber::fmt()
-        .with_thread_names(true)
-        .with_writer(non_blocking)
-        .init();
-
-    let ctx = tauri::generate_context!();
-
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
-            cmd::escape,
-            cmd::open_result,
-            cmd::search_docs,
-            cmd::search_lenses,
-            cmd::resize_window
-        ])
-        .menu(menu::get_app_menu())
-        .setup(|app| {
-            // hide from dock (also hides menu bar)
-            #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
-            // Only show in dev/debug mode.
-            #[cfg(debug_assertions)]
-            app.get_window("main").unwrap().open_devtools();
-
-            let window = app.get_window("main").unwrap();
-
-            // Start up backend (only in release mode)
-            #[cfg(not(debug_assertions))]
-            check_and_start_backend();
-
-            // Wait for the server to boot up
-            app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
-
-            // Register global shortcut
-            let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts.is_registered(constants::SHORTCUT).unwrap() {
-                let window = window.clone();
-                shortcuts
-                    .register(constants::SHORTCUT, move || {
-                        if window.is_visible().unwrap() {
-                            _hide_window(&window);
-                        } else {
-                            _show_window(&window);
-                        }
-                    })
-                    .unwrap();
-            }
-
-            // Center window horizontally in the current screen
-            _center_window(&window);
-
-            Ok(())
-        })
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
-        .on_window_event(|event| {
-            if let tauri::WindowEvent::Focused(is_focused) = event.event() {
-                if !is_focused {
-                    let handle = event.window();
-                    _hide_window(handle);
-                }
-            }
-        })
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick { .. } => update_tray_menu(app),
-            SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
-            SystemTrayEvent::MenuItemClick { id, .. } => {
-                let item_handle = app.tray_handle().get_item(&id);
-                match id.as_str() {
-                    menu::CRAWL_STATUS_MENU_ITEM => {
-                        let rpc = app.state::<rpc::RpcClient>().inner();
-
-                        let is_paused = tauri::async_runtime::block_on(pause_crawler(rpc));
-                        let new_label = if is_paused {
-                            "▶️ Resume indexing"
-                        } else {
-                            "⏸ Pause indexing"
-                        };
-
-                        item_handle.set_title(new_label).unwrap();
-                    }
-                    menu::OPEN_LENSES_FOLDER => {
-                        open_folder(Config::lenses_dir());
-                    }
-                    menu::OPEN_SETTINGS_FOLDER => {
-                        open_folder(Config::prefs_dir());
-                    }
-                    menu::TOGGLE_MENU_ITEM => {
-                        let window = app.get_window("main").unwrap();
-                        let new_title = if window.is_visible().unwrap() {
-                            _hide_window(&window);
-                            "Show"
-                        } else {
-                            _show_window(&window);
-                            "Hide"
-                        };
-                        item_handle.set_title(new_title).unwrap();
-                    }
-                    menu::QUIT_MENU_ITEM => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        })
-        .run(ctx)
-        .expect("error while running tauri application");
-}
-
-async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
-        .await
-    {
-        Ok(resp) => Some(resp),
-        Err(err) => {
-            log::error!("{}", err);
-            None
-        }
-    }
-}
-
-async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
-        .await
-    {
-        Ok(resp) => resp.is_paused,
-        Err(err) => {
-            log::error!("{}", err);
-            false
-        }
     }
 }

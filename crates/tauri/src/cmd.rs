@@ -1,13 +1,11 @@
 use shared::{request, response};
-use tauri::{LogicalSize, Size, State};
+use tauri::State;
 
-use crate::_hide_window;
-use crate::constants;
-use crate::rpc;
+use crate::{rpc, window};
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
-    _hide_window(&window);
+    window::hide_window(&window);
     Ok(())
 }
 
@@ -19,12 +17,7 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub fn resize_window(window: tauri::Window, height: f64) {
-    window
-        .set_size(Size::Logical(LogicalSize {
-            width: constants::INPUT_WIDTH,
-            height,
-        }))
-        .unwrap();
+    window::resize_window(&window, height);
 }
 
 #[tauri::command]
