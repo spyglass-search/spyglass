@@ -130,7 +130,6 @@ pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
         let app_state = &state.app_state;
         let mut paused_status = app_state.get_mut("paused").unwrap();
 
-        log::info!("dlafjadkl");
         let current_status = paused_status.to_string() == "true";
         let updated_status = !current_status;
         *paused_status = updated_status.to_string();

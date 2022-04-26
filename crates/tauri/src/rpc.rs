@@ -1,11 +1,20 @@
 use jsonrpc_core_client::{transports::ipc, TypedClient};
 use shared::rpc::gen_ipc_path;
+use tauri::api::process::Command;
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
-use tokio_retry::strategy::{ExponentialBackoff, jitter};
 
 pub struct RpcClient {
     pub client: TypedClient,
     pub endpoint: String,
+}
+
+#[allow(dead_code)]
+pub fn check_and_start_backend() {
+    let _ = Command::new_sidecar("spyglass-server")
+        .expect("failed to create `spyglass-server` binary command")
+        .spawn()
+        .expect("Failed to spawn sidecar");
 }
 
 async fn connect(endpoint: String) -> Result<TypedClient, ()> {
@@ -24,11 +33,9 @@ impl RpcClient {
             .map(jitter) // add jitter to delays
             .take(3);
 
-
-        let client: TypedClient = Retry::spawn(
-            retry_strategy,
-            || { connect(endpoint.clone()) }
-        ).await.unwrap();
+        let client: TypedClient = Retry::spawn(retry_strategy, || connect(endpoint.clone()))
+            .await
+            .unwrap();
 
         RpcClient {
             client,
