@@ -13,6 +13,7 @@ build-client:
 build-release:
 # Build backend binaries
 	cargo build -p spyglass --release
+	mkdir -p crates/tauri/binaries/spyglss-server-$(TARGET_ARCH)
 	cp target/release/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
 # Build client
 	cargo tauri build
