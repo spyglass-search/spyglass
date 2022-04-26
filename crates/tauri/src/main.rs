@@ -2,12 +2,13 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-use std::path::PathBuf;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
+use std::path::PathBuf;
 use tauri::api::process::Command;
 use tauri::{
-    GlobalShortcutManager, LogicalSize, Manager, Size, State, SystemTray, SystemTrayEvent, Window,
+    AppHandle, GlobalShortcutManager, LogicalSize, Manager, Size, State, SystemTray,
+    SystemTrayEvent, Window,
 };
 
 use shared::config::Config;
@@ -58,7 +59,6 @@ fn check_and_start_backend() {
         .expect("Failed to spawn sidecar");
 }
 
-
 fn open_folder(folder: PathBuf) {
     #[cfg(target_os = "linux")]
     std::process::Command::new("xdg-open")
@@ -77,8 +77,42 @@ fn open_folder(folder: PathBuf) {
         .arg(folder)
         .spawn()
         .unwrap();
-
 }
+
+fn update_tray_menu(app: &AppHandle) {
+    let rpc = app.state::<rpc::RpcClient>().inner();
+
+    let app_status = tauri::async_runtime::block_on(app_status(rpc));
+    let handle = app.tray_handle();
+
+    if let Some(app_status) = app_status {
+        handle
+            .get_item(menu::CRAWL_STATUS_MENU_ITEM)
+            .set_title(if app_status.is_paused {
+                "▶️ Resume indexing"
+            } else {
+                "⏸ Pause indexing"
+            })
+            .unwrap();
+
+        handle
+            .get_item(menu::NUM_DOCS_MENU_ITEM)
+            .set_title(format!(
+                "{} documents indexed",
+                app_status.num_docs.to_formatted_string(&Locale::en)
+            ))
+            .unwrap();
+
+        handle
+            .get_item(menu::NUM_QUEUED_MENU_ITEM)
+            .set_title(format!(
+                "{} in queue",
+                app_status.num_queued.to_formatted_string(&Locale::en)
+            ))
+            .unwrap();
+    }
+}
+
 fn main() {
     let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -147,39 +181,8 @@ fn main() {
             }
         })
         .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick { .. } => {
-                let rpc = app.state::<rpc::RpcClient>().inner();
-
-                let app_status = tauri::async_runtime::block_on(app_status(rpc));
-                let handle = app.tray_handle();
-
-                if let Some(app_status) = app_status {
-                    handle
-                        .get_item(menu::CRAWL_STATUS_MENU_ITEM)
-                        .set_title(if app_status.is_paused {
-                            "▶️ Resume indexing"
-                        } else {
-                            "⏸ Pause indexing"
-                        })
-                        .unwrap();
-
-                    handle
-                        .get_item(menu::NUM_DOCS_MENU_ITEM)
-                        .set_title(format!(
-                            "{} documents indexed",
-                            app_status.num_docs.to_formatted_string(&Locale::en)
-                        ))
-                        .unwrap();
-
-                    handle
-                        .get_item(menu::NUM_QUEUED_MENU_ITEM)
-                        .set_title(format!(
-                            "{} in queue",
-                            app_status.num_queued.to_formatted_string(&Locale::en)
-                        ))
-                        .unwrap();
-                }
-            }
+            SystemTrayEvent::LeftClick { .. } => update_tray_menu(app),
+            SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
             SystemTrayEvent::MenuItemClick { id, .. } => {
                 let item_handle = app.tray_handle().get_item(&id);
                 match id.as_str() {
