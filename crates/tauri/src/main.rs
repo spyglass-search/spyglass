@@ -2,6 +2,7 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+use std::path::PathBuf;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use tauri::api::process::Command;
@@ -57,6 +58,27 @@ fn check_and_start_backend() {
         .expect("Failed to spawn sidecar");
 }
 
+
+fn open_folder(folder: PathBuf) {
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open")
+        .arg(folder)
+        .spawn()
+        .unwrap();
+
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg(folder)
+        .spawn()
+        .unwrap();
+
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("explorer")
+        .arg(folder)
+        .spawn()
+        .unwrap();
+
+}
 fn main() {
     let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -174,16 +196,10 @@ fn main() {
                         item_handle.set_title(new_label).unwrap();
                     }
                     menu::OPEN_LENSES_FOLDER => {
-                        std::process::Command::new("open")
-                            .arg(Config::lenses_dir())
-                            .spawn()
-                            .unwrap();
+                        open_folder(Config::lenses_dir());
                     }
                     menu::OPEN_SETTINGS_FOLDER => {
-                        std::process::Command::new("open")
-                            .arg(Config::prefs_dir())
-                            .spawn()
-                            .unwrap();
+                        open_folder(Config::prefs_dir());
                     }
                     menu::TOGGLE_MENU_ITEM => {
                         let window = app.get_window("main").unwrap();
