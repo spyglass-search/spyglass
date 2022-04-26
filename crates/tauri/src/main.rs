@@ -6,34 +6,27 @@ use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
 use tauri::api::process::Command;
-use tauri::{
-    AppHandle, GlobalShortcutManager, LogicalSize, Manager, Size, State, SystemTray,
-    SystemTrayEvent, Window,
-};
+use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, Window};
 
 use shared::config::Config;
-use shared::{request, response};
+use shared::response;
 
+mod cmd;
+mod constants;
 mod menu;
 mod rpc;
-
-const INPUT_WIDTH: f64 = 640.0;
-const INPUT_HEIGHT: f64 = 80.0;
-const INPUT_Y: f64 = 128.0;
-
-const SHORTCUT: &str = "CmdOrCtrl+Shift+/";
 
 fn _center_window(window: &Window) {
     if let Some(monitor) = window.current_monitor().unwrap() {
         let size = monitor.size();
         let scale = monitor.scale_factor();
 
-        let middle = (size.width as f64 / (scale * 2.0)) - (INPUT_WIDTH / 2.0);
+        let middle = (size.width as f64 / (scale * 2.0)) - (constants::INPUT_WIDTH / 2.0);
 
         window
             .set_position(tauri::Position::Logical(tauri::LogicalPosition {
                 x: middle,
-                y: INPUT_Y,
+                y: constants::INPUT_Y,
             }))
             .unwrap();
     }
@@ -47,7 +40,7 @@ fn _hide_window(window: &Window) {
 fn _show_window(window: &Window) {
     window.show().unwrap();
     window.set_focus().unwrap();
-    resize_window(window.clone(), INPUT_HEIGHT);
+    cmd::resize_window(window.clone(), constants::INPUT_HEIGHT);
     _center_window(window);
 }
 
@@ -126,11 +119,11 @@ fn main() {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            escape,
-            open_result,
-            search_docs,
-            search_lenses,
-            resize_window
+            cmd::escape,
+            cmd::open_result,
+            cmd::search_docs,
+            cmd::search_lenses,
+            cmd::resize_window
         ])
         .menu(menu::get_app_menu())
         .setup(|app| {
@@ -153,10 +146,10 @@ fn main() {
 
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts.is_registered(SHORTCUT).unwrap() {
+            if !shortcuts.is_registered(constants::SHORTCUT).unwrap() {
                 let window = window.clone();
                 shortcuts
-                    .register(SHORTCUT, move || {
+                    .register(constants::SHORTCUT, move || {
                         if window.is_visible().unwrap() {
                             _hide_window(&window);
                         } else {
@@ -227,28 +220,6 @@ fn main() {
         .expect("error while running tauri application");
 }
 
-#[tauri::command]
-async fn escape(window: tauri::Window) -> Result<(), String> {
-    _hide_window(&window);
-    Ok(())
-}
-
-#[tauri::command]
-async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
-    open::that(url).unwrap();
-    Ok(())
-}
-
-#[tauri::command]
-fn resize_window(window: tauri::Window, height: f64) {
-    window
-        .set_size(Size::Logical(LogicalSize {
-            width: INPUT_WIDTH,
-            height,
-        }))
-        .unwrap();
-}
-
 async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
     match rpc
         .client
@@ -273,58 +244,6 @@ async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
         Err(err) => {
             log::error!("{}", err);
             false
-        }
-    }
-}
-
-#[tauri::command]
-async fn search_docs<'r>(
-    _: tauri::Window,
-    rpc: State<'r, rpc::RpcClient>,
-    lenses: Vec<String>,
-    query: &str,
-) -> Result<Vec<response::SearchResult>, String> {
-    let data = request::SearchParam {
-        lenses,
-        query: query.to_string(),
-    };
-
-    match rpc
-        .client
-        .call_method::<(request::SearchParam,), response::SearchResults>("search_docs", "", (data,))
-        .await
-    {
-        Ok(resp) => Ok(resp.results.to_vec()),
-        Err(err) => {
-            log::error!("{}", err);
-            Ok(Vec::new())
-        }
-    }
-}
-
-#[tauri::command]
-async fn search_lenses<'r>(
-    _: tauri::Window,
-    rpc: State<'r, rpc::RpcClient>,
-    query: &str,
-) -> Result<Vec<response::LensResult>, String> {
-    let data = request::SearchLensesParam {
-        query: query.to_string(),
-    };
-
-    match rpc
-        .client
-        .call_method::<(request::SearchLensesParam,), response::SearchLensesResp>(
-            "search_lenses",
-            "",
-            (data,),
-        )
-        .await
-    {
-        Ok(resp) => Ok(resp.results.to_vec()),
-        Err(err) => {
-            log::error!("{}", err);
-            Ok(Vec::new())
         }
     }
 }

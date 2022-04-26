@@ -1,7 +1,7 @@
 use jsonrpc_core_client::{transports::ipc, TypedClient};
 use shared::rpc::gen_ipc_path;
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
-use tokio_retry::strategy::{ExponentialBackoff, jitter};
 
 pub struct RpcClient {
     pub client: TypedClient,
@@ -24,11 +24,9 @@ impl RpcClient {
             .map(jitter) // add jitter to delays
             .take(3);
 
-
-        let client: TypedClient = Retry::spawn(
-            retry_strategy,
-            || { connect(endpoint.clone()) }
-        ).await.unwrap();
+        let client: TypedClient = Retry::spawn(retry_strategy, || connect(endpoint.clone()))
+            .await
+            .unwrap();
 
         RpcClient {
             client,
