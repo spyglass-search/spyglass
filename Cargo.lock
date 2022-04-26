@@ -4192,7 +4192,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
