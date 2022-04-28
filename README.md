@@ -6,6 +6,17 @@
 > ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional
 > and can be used to replace basic searches. ⚠️
 
+## Table of Contents
+
+* [Installation](#installation)
+* [Spyglass in Action](#spyglass-in-action)
+* [Why Spyglass](#why-spyglass)
+* [How does it know what to crawl](#how-does-it-know-what-to-crawl)
+  * [Example: Curated recipe searching](#curated-recipe-searching)
+  * [Example: Narrowing down by a specific topic](#curated-recipe-searching)
+* [Settings](#settings)
+  * [Updating the shorcut](#updating-the-shortcut)
+
 
 ## Installation
 
@@ -136,5 +147,26 @@ file found in their directory on startup, a default one will be created.
       "web.archive.org",
       "w3schools.com"
     ],
+    # Shortcut to launch the search bar
+    shortcut: "CmdOrCtrl+Shift+/",
 )
 ```
+
+### Updating the Shortcut
+
+To update the shortcut combine the following modifiers w/ an appropriate
+[keycode](https://docs.rs/tao/0.8.3/tao/keyboard/enum.KeyCode.html) combining each key with a "+".
+
+Supported Modifiers:
+
+* "Option" / "Alt"
+* "Control" / "Ctrl"
+* "Command" / "Cmd" / "Super"
+* "Shift"
+* "CmdOrCtrl"
+
+Examples:
+
+* "CmdOrCtrl+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
+* "CmdOrCtrl+Shift+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
+* "Shift+4+2" => Launches the app w/ `Shift` + `4` + `2`
