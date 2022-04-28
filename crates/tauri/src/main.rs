@@ -54,12 +54,16 @@ fn main() {
             // Wait for the server to boot up
             app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
 
+            // Load user settings
+            let config = Config::new();
+            app.manage(config.clone());
+
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts.is_registered(constants::SHORTCUT).unwrap() {
+            if !shortcuts.is_registered(&config.user_settings.shortcut).unwrap() {
                 let window = window.clone();
                 shortcuts
-                    .register(constants::SHORTCUT, move || {
+                    .register(&config.user_settings.shortcut, move || {
                         if window.is_visible().unwrap() {
                             window::hide_window(&window);
                         } else {
