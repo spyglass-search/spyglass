@@ -1,4 +1,4 @@
-name: Rust - Linux x86
+name: Rust check/build
 
 on:
   push:

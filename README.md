@@ -1,3 +1,6 @@
+![check/build workflow](https://github.com/a5huynh/spyglass/actions/workflows/rust.yml/badge.svg)
+[![](https://img.shields.io/badge/discord-join%20the%20community-blue)](https://discord.gg/JdBSznWf)
+
 # Spyglass
 
 > tl; dr: Spyglass is a search platform that lives on your device, indexing what
