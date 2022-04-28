@@ -64,6 +64,14 @@ pub struct UserSettings {
     pub allow_list: Vec<String>,
     /// Domains explicitly blocked from crawling.
     pub block_list: Vec<String>,
+    #[serde(default = "UserSettings::default_shortcut")]
+    pub shortcut: String,
+}
+
+impl UserSettings {
+    fn default_shortcut() -> String {
+        "CmdOrCtrl+Shift+/".to_string()
+    }
 }
 
 impl Default for UserSettings {
@@ -78,6 +86,7 @@ impl Default for UserSettings {
             run_wizard: false,
             allow_list: Vec::new(),
             block_list: vec!["web.archive.org".to_string()],
+            shortcut: UserSettings::default_shortcut(),
         }
     }
 }
