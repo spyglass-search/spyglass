@@ -26,6 +26,7 @@ jobs:
             libwebkit2gtk-4.0-dev \
             libgtk-3-dev \
             libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev
         cargo install tauri-cli --locked --version ^1.0.0-rc.8
         cargo install --locked trunk
