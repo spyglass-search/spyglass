@@ -1,6 +1,8 @@
+use std::io;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
-use tracing_subscriber::EnvFilter;
+use tracing_log::LogTracer;
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::models::crawl_queue;
 use libspyglass::state::AppState;
@@ -16,16 +18,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing_subscriber::fmt()
-        .with_thread_names(true)
-        .with_writer(non_blocking)
-        .with_env_filter(
-            EnvFilter::default()
+    let subscriber = tracing_subscriber::registry()
+        .with(
+            EnvFilter::from_default_env()
                 .add_directive(tracing::Level::INFO.into())
-                .add_directive("tantivy=WARN".parse().unwrap())
-                .add_directive("rocket=WARN".parse().unwrap()),
+                .add_directive("tantivy=WARN".parse().unwrap()),
         )
-        .init();
+        .with(fmt::Layer::new().with_writer(io::stdout))
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
+
+    tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
+    LogTracer::init()?;
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
