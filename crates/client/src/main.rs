@@ -2,7 +2,7 @@ use gloo::events::EventListener;
 use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, Element, HtmlElement, HtmlInputElement, VisibilityState};
+use web_sys::{window, Element, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
@@ -21,6 +21,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "onClearSearch")]
     pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
+
+    #[wasm_bindgen(js_name = "onFocus")]
+    pub async fn on_focus(callback: &Closure<dyn Fn()>);
 
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
@@ -72,20 +75,6 @@ pub fn app() -> Html {
             });
             || drop(listener)
         });
-
-        use_effect(move || {
-            // Attach a keydown event listener to the document.
-            let document = gloo::utils::document();
-            let listener = EventListener::new(&document.clone(), "visibilitychange", move |_| {
-                if document.visibility_state() == VisibilityState::Visible {
-                    if let Some(el) = document.get_element_by_id("searchbox") {
-                        let el: HtmlElement = el.unchecked_into();
-                        let _ = el.focus();
-                    }
-                }
-            });
-            || drop(listener)
-        });
     }
 
     // Handle changes to the query string
@@ -117,8 +106,9 @@ pub fn app() -> Html {
         );
     }
 
+    // Handle callbacks to Tauri
+    // TODO: Is this the best way to handle calls from Tauri?
     {
-        // TODO: Is this the best way to handle calls from Tauri?
         let lens = lens.clone();
         let query = query.clone();
         let results = search_results.clone();
@@ -132,6 +122,18 @@ pub fn app() -> Html {
             }) as Box<dyn Fn()>);
 
             on_clear_search(&cb).await;
+            cb.forget();
+        });
+
+        spawn_local(async move {
+            let cb = Closure::wrap(Box::new(move || {
+                let document = gloo::utils::document();
+                if let Some(el) = document.get_element_by_id("searchbox") {
+                    let el: HtmlElement = el.unchecked_into();
+                    let _ = el.focus();
+                }
+            }) as Box<dyn Fn()>);
+            on_focus(&cb).await;
             cb.forget();
         });
     }

@@ -33,6 +33,7 @@ pub async fn resize_window(window: &Window, height: f64) {
 }
 
 pub fn show_window(window: &Window) {
+    window.emit("focus_window", true).unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();
     spawn(cmd::resize_window(window.clone(), constants::INPUT_HEIGHT));
