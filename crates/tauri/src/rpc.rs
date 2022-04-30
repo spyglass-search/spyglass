@@ -31,7 +31,8 @@ impl RpcClient {
 
         let retry_strategy = ExponentialBackoff::from_millis(10)
             .map(jitter) // add jitter to delays
-            .take(3);
+            .take(10);
+
 
         let client: TypedClient = Retry::spawn(retry_strategy, || connect(endpoint.clone()))
             .await

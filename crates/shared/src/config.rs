@@ -5,6 +5,9 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+pub const MAX_TOTAL_INFLIGHT: u32 = 100;
+pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub user_settings: UserSettings,
@@ -72,6 +75,19 @@ impl UserSettings {
     fn default_shortcut() -> String {
         "CmdOrCtrl+Shift+/".to_string()
     }
+
+    pub fn constraint_limits(&mut self) {
+        // Make sure crawler limits are reasonable
+        match self.inflight_crawl_limit {
+            Limit::Infinite => self.inflight_crawl_limit = Limit::Finite(MAX_TOTAL_INFLIGHT),
+            Limit::Finite(limit) => self.inflight_crawl_limit = Limit::Finite(limit.min(MAX_TOTAL_INFLIGHT))
+        }
+
+        match self.inflight_domain_limit {
+            Limit::Infinite => self.inflight_domain_limit = Limit::Finite(MAX_DOMAIN_INFLIGHT),
+            Limit::Finite(limit) => self.inflight_domain_limit = Limit::Finite(limit.min(MAX_DOMAIN_INFLIGHT))
+        }
+    }
 }
 
 impl Default for UserSettings {
@@ -92,20 +108,26 @@ impl Default for UserSettings {
 }
 
 impl Config {
-    fn load_user_settings() -> UserSettings {
+    fn load_user_settings() -> anyhow::Result<UserSettings> {
         let prefs_path = Self::prefs_file();
-        if prefs_path.exists() {
-            ron::from_str(&fs::read_to_string(prefs_path).unwrap())
-                .expect("Unable to read user preferences file.")
-        } else {
-            let settings = UserSettings::default();
-            // Write out default settings
-            fs::write(
-                prefs_path,
-                ron::ser::to_string_pretty(&settings, Default::default()).unwrap(),
-            )
-            .expect("Unable to save user preferences file.");
-            settings
+
+        match prefs_path.exists() {
+            true => {
+                let mut settings: UserSettings = ron::from_str(&fs::read_to_string(prefs_path).unwrap())?;
+                settings.constraint_limits();
+                Ok(settings)
+            },
+            _ => {
+                let settings = UserSettings::default();
+                // Write out default settings
+                fs::write(
+                    prefs_path,
+                    ron::ser::to_string_pretty(&settings, Default::default()).unwrap(),
+                )
+                .expect("Unable to save user preferences file.");
+
+                Ok(settings)
+            }
         }
     }
 
@@ -196,9 +218,22 @@ impl Config {
         let lenses_dir = Config::lenses_dir();
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
+        // Gracefully handle issues loading user settings/lenses
+        let user_settings = Self::load_user_settings()
+            .unwrap_or_else(|err| {
+                log::warn!("Invalid user settings file! Reason: {}", err);
+                Default::default()
+            });
+
+        let lenses = Self::load_lenses()
+            .unwrap_or_else(|err| {
+                log::warn!("Unable to load lenses! Reason: {}", err);
+                Default::default()
+            });
+
         Config {
-            lenses: Self::load_lenses().expect("Unable to load lenses"),
-            user_settings: Self::load_user_settings(),
+            lenses,
+            user_settings,
         }
     }
 }
