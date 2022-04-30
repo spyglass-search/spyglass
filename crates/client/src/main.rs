@@ -1,8 +1,8 @@
 use gloo::events::EventListener;
 use js_sys::Date;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, Element, HtmlInputElement};
+use web_sys::{window, Element, HtmlElement, HtmlInputElement, VisibilityState};
 use yew::prelude::*;
 
 mod components;
@@ -69,6 +69,23 @@ pub fn app() -> Html {
                     search_results.clone(),
                     selected_idx.clone(),
                 )
+            });
+            || drop(listener)
+        });
+
+        use_effect(move || {
+            // Attach a keydown event listener to the document.
+            let document = gloo::utils::document();
+            let listener = EventListener::new(&document.clone(), "visibilitychange", move |_| {
+                if document.visibility_state() == VisibilityState::Visible {
+                    match document.get_element_by_id("searchbox") {
+                        Some(el) => {
+                            let el: HtmlElement = el.unchecked_into();
+                            let _ = el.focus();
+                        },
+                        _ => {}
+                    }
+                }
             });
             || drop(listener)
         });
@@ -165,6 +182,7 @@ pub fn app() -> Html {
             <div class="query-container">
                 {selected_lens_list(&lens)}
                 <input
+                    id={"searchbox"}
                     type={"text"}
                     class={"search-box"}
                     placeholder={"Search"}
@@ -172,7 +190,7 @@ pub fn app() -> Html {
                     {onkeyup}
                     {onkeydown}
                     spellcheck={"false"}
-                    tabindex={"0"}
+                    tabindex={"-1"}
                 />
             </div>
             <div class={"search-results-list"}>
