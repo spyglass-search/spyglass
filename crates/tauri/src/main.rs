@@ -4,8 +4,11 @@
 )]
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
+use std::io;
 use std::path::PathBuf;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
+use tracing_log::LogTracer;
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use shared::config::Config;
 use shared::response;
@@ -16,14 +19,21 @@ mod menu;
 mod rpc;
 mod window;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing_subscriber::fmt()
-        .with_thread_names(true)
-        .with_writer(non_blocking)
-        .init();
+    let subscriber = tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
+        .with(
+            fmt::Layer::new()
+                .with_thread_names(true)
+                .with_writer(io::stdout),
+        )
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
+
+    tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
+    LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
 
@@ -60,7 +70,10 @@ fn main() {
 
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts.is_registered(&config.user_settings.shortcut).unwrap() {
+            if !shortcuts
+                .is_registered(&config.user_settings.shortcut)
+                .unwrap()
+            {
                 let window = window.clone();
                 shortcuts
                     .register(&config.user_settings.shortcut, move || {
@@ -132,6 +145,8 @@ fn main() {
         })
         .run(ctx)
         .expect("error while running tauri application");
+
+    Ok(())
 }
 
 async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
