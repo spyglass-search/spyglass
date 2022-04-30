@@ -5,6 +5,9 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+pub const MAX_TOTAL_INFLIGHT: u32 = 100;
+pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub user_settings: UserSettings,
@@ -72,6 +75,19 @@ impl UserSettings {
     fn default_shortcut() -> String {
         "CmdOrCtrl+Shift+/".to_string()
     }
+
+    pub fn constraint_limits(&mut self) {
+        // Make sure crawler limits are reasonable
+        match self.inflight_crawl_limit {
+            Limit::Infinite => self.inflight_crawl_limit = Limit::Finite(MAX_TOTAL_INFLIGHT),
+            Limit::Finite(limit) => self.inflight_crawl_limit = Limit::Finite(limit.min(MAX_TOTAL_INFLIGHT))
+        }
+
+        match self.inflight_domain_limit {
+            Limit::Infinite => self.inflight_domain_limit = Limit::Finite(MAX_DOMAIN_INFLIGHT),
+            Limit::Finite(limit) => self.inflight_domain_limit = Limit::Finite(limit.min(MAX_DOMAIN_INFLIGHT))
+        }
+    }
 }
 
 impl Default for UserSettings {
@@ -96,7 +112,11 @@ impl Config {
         let prefs_path = Self::prefs_file();
 
         match prefs_path.exists() {
-            true => Ok(ron::from_str(&fs::read_to_string(prefs_path).unwrap())?),
+            true => {
+                let mut settings: UserSettings = ron::from_str(&fs::read_to_string(prefs_path).unwrap())?;
+                settings.constraint_limits();
+                Ok(settings)
+            },
             _ => {
                 let settings = UserSettings::default();
                 // Write out default settings
