@@ -78,12 +78,9 @@ pub fn app() -> Html {
             let document = gloo::utils::document();
             let listener = EventListener::new(&document.clone(), "visibilitychange", move |_| {
                 if document.visibility_state() == VisibilityState::Visible {
-                    match document.get_element_by_id("searchbox") {
-                        Some(el) => {
-                            let el: HtmlElement = el.unchecked_into();
-                            let _ = el.focus();
-                        },
-                        _ => {}
+                    if let Some(el) = document.get_element_by_id("searchbox") {
+                        let el: HtmlElement = el.unchecked_into();
+                        let _ = el.focus();
                     }
                 }
             });
@@ -161,7 +158,6 @@ pub fn app() -> Html {
     };
 
     let onkeydown = {
-        let search_results = search_results.clone();
         Callback::from(move |e: KeyboardEvent| {
             // No need to prevent default behavior if there are no search results.
             if search_results.is_empty() {
@@ -172,7 +168,7 @@ pub fn app() -> Html {
             match key.as_str() {
                 "ArrowUp" => e.prevent_default(),
                 "ArrowDown" => e.prevent_default(),
-                _ => return,
+                _ => (),
             }
         })
     };
@@ -203,8 +199,7 @@ pub fn app() -> Html {
 fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element) {
     handle.set(Vec::new());
     spawn_local(async move {
-        resize_window(node.client_height() as f64)
-            .await.unwrap();
+        resize_window(node.client_height() as f64).await.unwrap();
     });
 }
 
@@ -230,11 +225,8 @@ fn show_lens_results(
                 }
 
                 handle.set(results);
-
-                let height = node.client_height();
                 spawn_local(async move {
-                    resize_window(node.client_height() as f64)
-                        .await.unwrap();
+                    resize_window(node.client_height() as f64).await.unwrap();
                 });
             }
             Err(e) => {
@@ -271,11 +263,8 @@ fn show_doc_results(
                 }
 
                 handle.set(results);
-
-                let height = node.client_height();
                 spawn_local(async move {
-                    resize_window(node.client_height() as f64)
-                        .await.unwrap();
+                    resize_window(node.client_height() as f64).await.unwrap();
                 });
             }
             Err(e) => {
