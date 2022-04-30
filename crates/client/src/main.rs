@@ -131,8 +131,32 @@ pub fn app() -> Html {
     let onkeyup = {
         let query = query.clone();
         Callback::from(move |e: KeyboardEvent| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            query.set(input.value());
+            let key = e.key();
+            match key.as_str() {
+                "ArrowUp" => e.prevent_default(),
+                "ArrowDown" => e.prevent_default(),
+                _ => {
+                    let input: HtmlInputElement = e.target_unchecked_into();
+                    query.set(input.value());
+                }
+            }
+        })
+    };
+
+    let onkeydown = {
+        let search_results = search_results.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            // No need to prevent default behavior if there are no search results.
+            if search_results.is_empty() {
+                return;
+            }
+
+            let key = e.key();
+            match key.as_str() {
+                "ArrowUp" => e.prevent_default(),
+                "ArrowDown" => e.prevent_default(),
+                _ => return,
+            }
         })
     };
 
@@ -146,6 +170,7 @@ pub fn app() -> Html {
                     placeholder={"Search"}
                     value={(*query).clone()}
                     {onkeyup}
+                    {onkeydown}
                     spellcheck={"false"}
                     tabindex={"0"}
                 />
