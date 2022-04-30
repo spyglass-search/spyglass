@@ -33,7 +33,6 @@ impl RpcClient {
             .map(jitter) // add jitter to delays
             .take(10);
 
-
         let client: TypedClient = Retry::spawn(retry_strategy, || connect(endpoint.clone()))
             .await
             .unwrap();

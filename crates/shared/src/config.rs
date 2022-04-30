@@ -80,12 +80,16 @@ impl UserSettings {
         // Make sure crawler limits are reasonable
         match self.inflight_crawl_limit {
             Limit::Infinite => self.inflight_crawl_limit = Limit::Finite(MAX_TOTAL_INFLIGHT),
-            Limit::Finite(limit) => self.inflight_crawl_limit = Limit::Finite(limit.min(MAX_TOTAL_INFLIGHT))
+            Limit::Finite(limit) => {
+                self.inflight_crawl_limit = Limit::Finite(limit.min(MAX_TOTAL_INFLIGHT))
+            }
         }
 
         match self.inflight_domain_limit {
             Limit::Infinite => self.inflight_domain_limit = Limit::Finite(MAX_DOMAIN_INFLIGHT),
-            Limit::Finite(limit) => self.inflight_domain_limit = Limit::Finite(limit.min(MAX_DOMAIN_INFLIGHT))
+            Limit::Finite(limit) => {
+                self.inflight_domain_limit = Limit::Finite(limit.min(MAX_DOMAIN_INFLIGHT))
+            }
         }
     }
 }
@@ -113,10 +117,11 @@ impl Config {
 
         match prefs_path.exists() {
             true => {
-                let mut settings: UserSettings = ron::from_str(&fs::read_to_string(prefs_path).unwrap())?;
+                let mut settings: UserSettings =
+                    ron::from_str(&fs::read_to_string(prefs_path).unwrap())?;
                 settings.constraint_limits();
                 Ok(settings)
-            },
+            }
             _ => {
                 let settings = UserSettings::default();
                 // Write out default settings
@@ -219,17 +224,15 @@ impl Config {
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
         // Gracefully handle issues loading user settings/lenses
-        let user_settings = Self::load_user_settings()
-            .unwrap_or_else(|err| {
-                log::warn!("Invalid user settings file! Reason: {}", err);
-                Default::default()
-            });
+        let user_settings = Self::load_user_settings().unwrap_or_else(|err| {
+            log::warn!("Invalid user settings file! Reason: {}", err);
+            Default::default()
+        });
 
-        let lenses = Self::load_lenses()
-            .unwrap_or_else(|err| {
-                log::warn!("Unable to load lenses! Reason: {}", err);
-                Default::default()
-            });
+        let lenses = Self::load_lenses().unwrap_or_else(|err| {
+            log::warn!("Unable to load lenses! Reason: {}", err);
+            Default::default()
+        });
 
         Config {
             lenses,

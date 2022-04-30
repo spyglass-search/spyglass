@@ -24,13 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .with(
-            EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into())
+            fmt::Layer::new()
+                .with_thread_names(true)
+                .with_writer(io::stdout),
         )
-        .with(fmt::Layer::new()
-            .with_thread_names(true)
-            .with_writer(io::stdout))
         .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
 
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
@@ -71,7 +70,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Register global shortcut
             let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts.is_registered(&config.user_settings.shortcut).unwrap() {
+            if !shortcuts
+                .is_registered(&config.user_settings.shortcut)
+                .unwrap()
+            {
                 let window = window.clone();
                 shortcuts
                     .register(&config.user_settings.shortcut, move || {
