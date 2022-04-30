@@ -1,8 +1,8 @@
 use gloo::events::EventListener;
 use js_sys::Date;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, Element, HtmlInputElement};
+use web_sys::{window, Element, HtmlElement, HtmlInputElement, VisibilityState};
 use yew::prelude::*;
 
 mod components;
@@ -72,6 +72,23 @@ pub fn app() -> Html {
             });
             || drop(listener)
         });
+
+        use_effect(move || {
+            // Attach a keydown event listener to the document.
+            let document = gloo::utils::document();
+            let listener = EventListener::new(&document.clone(), "visibilitychange", move |_| {
+                if document.visibility_state() == VisibilityState::Visible {
+                    match document.get_element_by_id("searchbox") {
+                        Some(el) => {
+                            let el: HtmlElement = el.unchecked_into();
+                            let _ = el.focus();
+                        },
+                        _ => {}
+                    }
+                }
+            });
+            || drop(listener)
+        });
     }
 
     // Handle changes to the query string
@@ -131,8 +148,32 @@ pub fn app() -> Html {
     let onkeyup = {
         let query = query.clone();
         Callback::from(move |e: KeyboardEvent| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            query.set(input.value());
+            let key = e.key();
+            match key.as_str() {
+                "ArrowUp" => e.prevent_default(),
+                "ArrowDown" => e.prevent_default(),
+                _ => {
+                    let input: HtmlInputElement = e.target_unchecked_into();
+                    query.set(input.value());
+                }
+            }
+        })
+    };
+
+    let onkeydown = {
+        let search_results = search_results.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            // No need to prevent default behavior if there are no search results.
+            if search_results.is_empty() {
+                return;
+            }
+
+            let key = e.key();
+            match key.as_str() {
+                "ArrowUp" => e.prevent_default(),
+                "ArrowDown" => e.prevent_default(),
+                _ => return,
+            }
         })
     };
 
@@ -141,13 +182,15 @@ pub fn app() -> Html {
             <div class="query-container">
                 {selected_lens_list(&lens)}
                 <input
+                    id={"searchbox"}
                     type={"text"}
                     class={"search-box"}
                     placeholder={"Search"}
                     value={(*query).clone()}
                     {onkeyup}
+                    {onkeydown}
                     spellcheck={"false"}
-                    tabindex={"0"}
+                    tabindex={"-1"}
                 />
             </div>
             <div class={"search-results-list"}>
