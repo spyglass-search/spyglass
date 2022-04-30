@@ -25,6 +25,6 @@ export async function openResult(url) {
     return await invoke("open_result", { url });
 }
 
-export function resizeWindow(height) {
-    return invoke("resize_window", { height });
+export async function resizeWindow(height) {
+    return await invoke("resize_window", { height });
 }

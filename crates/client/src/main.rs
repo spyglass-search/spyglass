@@ -29,7 +29,7 @@ extern "C" {
     pub async fn escape() -> Result<(), JsValue>;
 
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
-    pub fn resize_window(height: f64) -> Result<(), JsValue>;
+    pub async fn resize_window(height: f64) -> Result<(), JsValue>;
 }
 
 fn main() {
@@ -202,7 +202,10 @@ pub fn app() -> Html {
 
 fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element) {
     handle.set(Vec::new());
-    resize_window(node.client_height() as f64).unwrap();
+    spawn_local(async move {
+        resize_window(node.client_height() as f64)
+            .await.unwrap();
+    });
 }
 
 fn show_lens_results(
@@ -229,7 +232,10 @@ fn show_lens_results(
                 handle.set(results);
 
                 let height = node.client_height();
-                resize_window(height as f64).unwrap();
+                spawn_local(async move {
+                    resize_window(node.client_height() as f64)
+                        .await.unwrap();
+                });
             }
             Err(e) => {
                 let window = window().unwrap();
@@ -267,7 +273,10 @@ fn show_doc_results(
                 handle.set(results);
 
                 let height = node.client_height();
-                resize_window(height as f64).unwrap();
+                spawn_local(async move {
+                    resize_window(node.client_height() as f64)
+                        .await.unwrap();
+                });
             }
             Err(e) => {
                 let window = window().unwrap();

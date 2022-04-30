@@ -16,8 +16,8 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn resize_window(window: tauri::Window, height: f64) {
-    window::resize_window(&window, height);
+pub async fn resize_window(window: tauri::Window, height: f64) {
+    window::resize_window(&window, height).await;
 }
 
 #[tauri::command]
