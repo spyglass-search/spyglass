@@ -85,21 +85,14 @@ pub fn app() -> Html {
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
-                // Was the last char typed > 1 sec ago?
-                let is_debounced = *query_debounce >= constants::DEBOUNCE_TIME_MS;
-
-                if is_debounced && query.len() >= constants::MIN_CHARS {
-                    if query.starts_with(constants::LENS_SEARCH_PREFIX) {
-                        // show lens search
-                        let el = node_ref.cast::<Element>().unwrap();
-                        show_lens_results(search_results, el, selected_idx, query.clone());
-                    } else {
-                        let el = node_ref.cast::<Element>().unwrap();
-                        show_doc_results(search_results, &lens, el, selected_idx, query.clone());
-                    }
-                }
-
-                query_debounce.set(Date::now());
+                events::handle_query_change(
+                    query,
+                    query_debounce,
+                    node_ref,
+                    lens,
+                    search_results,
+                    selected_idx,
+                );
                 || ()
             },
             (*query).clone(),
@@ -113,6 +106,8 @@ pub fn app() -> Html {
         let query = query.clone();
         let results = search_results.clone();
         let selected_idx = selected_idx.clone();
+        // Reset query string, results list, etc when we receive a "clear_search"
+        // event from tauri
         spawn_local(async move {
             let cb = Closure::wrap(Box::new(move || {
                 query.set("".to_string());
@@ -125,6 +120,8 @@ pub fn app() -> Html {
             cb.forget();
         });
 
+        // Focus on the search box when we receive an "focus_window" event from
+        // tauri
         spawn_local(async move {
             let cb = Closure::wrap(Box::new(move || {
                 let document = gloo::utils::document();
