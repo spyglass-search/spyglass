@@ -13,6 +13,10 @@ export async function onClearSearch(callback) {
     await listen('clear_search', callback);
 }
 
+export async function onFocus(callback) {
+    await listen('focus_window', callback);
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke("search_docs", { lenses, query });
 }
@@ -25,6 +29,6 @@ export async function openResult(url) {
     return await invoke("open_result", { url });
 }
 
-export function resizeWindow(height) {
-    return invoke("resize_window", { height });
+export async function resizeWindow(height) {
+    return await invoke("resize_window", { height });
 }

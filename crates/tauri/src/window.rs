@@ -1,4 +1,4 @@
-use tauri::{LogicalSize, Size, Window};
+use tauri::{async_runtime::spawn, LogicalSize, Size, Window};
 
 use crate::{cmd, constants};
 
@@ -23,7 +23,7 @@ pub fn hide_window(window: &Window) {
     window.emit("clear_search", true).unwrap();
 }
 
-pub fn resize_window(window: &Window, height: f64) {
+pub async fn resize_window(window: &Window, height: f64) {
     window
         .set_size(Size::Logical(LogicalSize {
             width: constants::INPUT_WIDTH,
@@ -33,8 +33,9 @@ pub fn resize_window(window: &Window, height: f64) {
 }
 
 pub fn show_window(window: &Window) {
+    window.emit("focus_window", true).unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();
-    cmd::resize_window(window.clone(), constants::INPUT_HEIGHT);
+    spawn(cmd::resize_window(window.clone(), constants::INPUT_HEIGHT));
     center_window(window);
 }

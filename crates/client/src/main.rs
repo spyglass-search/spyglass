@@ -2,7 +2,7 @@ use gloo::events::EventListener;
 use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, Element, HtmlElement, HtmlInputElement, VisibilityState};
+use web_sys::{window, Element, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 mod components;
@@ -22,6 +22,9 @@ extern "C" {
     #[wasm_bindgen(js_name = "onClearSearch")]
     pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
 
+    #[wasm_bindgen(js_name = "onFocus")]
+    pub async fn on_focus(callback: &Closure<dyn Fn()>);
+
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
@@ -29,7 +32,7 @@ extern "C" {
     pub async fn escape() -> Result<(), JsValue>;
 
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
-    pub fn resize_window(height: f64) -> Result<(), JsValue>;
+    pub async fn resize_window(height: f64) -> Result<(), JsValue>;
 }
 
 fn main() {
@@ -72,23 +75,6 @@ pub fn app() -> Html {
             });
             || drop(listener)
         });
-
-        use_effect(move || {
-            // Attach a keydown event listener to the document.
-            let document = gloo::utils::document();
-            let listener = EventListener::new(&document.clone(), "visibilitychange", move |_| {
-                if document.visibility_state() == VisibilityState::Visible {
-                    match document.get_element_by_id("searchbox") {
-                        Some(el) => {
-                            let el: HtmlElement = el.unchecked_into();
-                            let _ = el.focus();
-                        },
-                        _ => {}
-                    }
-                }
-            });
-            || drop(listener)
-        });
     }
 
     // Handle changes to the query string
@@ -99,33 +85,29 @@ pub fn app() -> Html {
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
-                // Was the last char typed > 1 sec ago?
-                let is_debounced = *query_debounce >= constants::DEBOUNCE_TIME_MS;
-
-                if is_debounced && query.len() >= constants::MIN_CHARS {
-                    if query.starts_with(constants::LENS_SEARCH_PREFIX) {
-                        // show lens search
-                        let el = node_ref.cast::<Element>().unwrap();
-                        show_lens_results(search_results, el, selected_idx, query.clone());
-                    } else {
-                        let el = node_ref.cast::<Element>().unwrap();
-                        show_doc_results(search_results, &lens, el, selected_idx, query.clone());
-                    }
-                }
-
-                query_debounce.set(Date::now());
+                events::handle_query_change(
+                    query,
+                    query_debounce,
+                    node_ref,
+                    lens,
+                    search_results,
+                    selected_idx,
+                );
                 || ()
             },
             (*query).clone(),
         );
     }
 
+    // Handle callbacks to Tauri
+    // TODO: Is this the best way to handle calls from Tauri?
     {
-        // TODO: Is this the best way to handle calls from Tauri?
         let lens = lens.clone();
         let query = query.clone();
         let results = search_results.clone();
         let selected_idx = selected_idx.clone();
+        // Reset query string, results list, etc when we receive a "clear_search"
+        // event from tauri
         spawn_local(async move {
             let cb = Closure::wrap(Box::new(move || {
                 query.set("".to_string());
@@ -135,6 +117,20 @@ pub fn app() -> Html {
             }) as Box<dyn Fn()>);
 
             on_clear_search(&cb).await;
+            cb.forget();
+        });
+
+        // Focus on the search box when we receive an "focus_window" event from
+        // tauri
+        spawn_local(async move {
+            let cb = Closure::wrap(Box::new(move || {
+                let document = gloo::utils::document();
+                if let Some(el) = document.get_element_by_id("searchbox") {
+                    let el: HtmlElement = el.unchecked_into();
+                    let _ = el.focus();
+                }
+            }) as Box<dyn Fn()>);
+            on_focus(&cb).await;
             cb.forget();
         });
     }
@@ -148,31 +144,21 @@ pub fn app() -> Html {
     let onkeyup = {
         let query = query.clone();
         Callback::from(move |e: KeyboardEvent| {
-            let key = e.key();
-            match key.as_str() {
-                "ArrowUp" => e.prevent_default(),
-                "ArrowDown" => e.prevent_default(),
-                _ => {
-                    let input: HtmlInputElement = e.target_unchecked_into();
-                    query.set(input.value());
-                }
-            }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            query.set(input.value());
         })
     };
 
     let onkeydown = {
-        let search_results = search_results.clone();
         Callback::from(move |e: KeyboardEvent| {
-            // No need to prevent default behavior if there are no search results.
-            if search_results.is_empty() {
-                return;
-            }
-
             let key = e.key();
             match key.as_str() {
+                // Prevent cursor from moving around
                 "ArrowUp" => e.prevent_default(),
                 "ArrowDown" => e.prevent_default(),
-                _ => return,
+                // Prevent search box from losing focus
+                "Tab" => e.prevent_default(),
+                _ => (),
             }
         })
     };
@@ -202,7 +188,9 @@ pub fn app() -> Html {
 
 fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element) {
     handle.set(Vec::new());
-    resize_window(node.client_height() as f64).unwrap();
+    spawn_local(async move {
+        resize_window(node.client_height() as f64).await.unwrap();
+    });
 }
 
 fn show_lens_results(
@@ -227,9 +215,9 @@ fn show_lens_results(
                 }
 
                 handle.set(results);
-
-                let height = node.client_height();
-                resize_window(height as f64).unwrap();
+                spawn_local(async move {
+                    resize_window(node.client_height() as f64).await.unwrap();
+                });
             }
             Err(e) => {
                 let window = window().unwrap();
@@ -265,9 +253,9 @@ fn show_doc_results(
                 }
 
                 handle.set(results);
-
-                let height = node.client_height();
-                resize_window(height as f64).unwrap();
+                spawn_local(async move {
+                    resize_window(node.client_height() as f64).await.unwrap();
+                });
             }
             Err(e) => {
                 let window = window().unwrap();
