@@ -13,6 +13,10 @@ export async function onClearSearch(callback) {
     await listen('clear_search', callback);
 }
 
+export async function onFocus(callback) {
+    await listen('focus_window', callback);
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke("search_docs", { lenses, query });
 }
