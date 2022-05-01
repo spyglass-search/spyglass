@@ -172,4 +172,7 @@ Examples:
 
 * "CmdOrCtrl+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
 * "CmdOrCtrl+Shift+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
-* "Shift+4+2" => Launches the app w/ `Shift` + `4` + `2`
+* "Shift+4" => Launches the app w/ `Shift` + `4`
+
+NOTE: Shortcuts are allowed to have any number of modifiers but only a *single* key.
+For example, `Shift+4` will work but not `Shift+4+2`
