@@ -147,29 +147,20 @@ pub fn app() -> Html {
     let onkeyup = {
         let query = query.clone();
         Callback::from(move |e: KeyboardEvent| {
-            let key = e.key();
-            match key.as_str() {
-                "ArrowUp" => e.prevent_default(),
-                "ArrowDown" => e.prevent_default(),
-                _ => {
-                    let input: HtmlInputElement = e.target_unchecked_into();
-                    query.set(input.value());
-                }
-            }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            query.set(input.value());
         })
     };
 
     let onkeydown = {
         Callback::from(move |e: KeyboardEvent| {
-            // No need to prevent default behavior if there are no search results.
-            if search_results.is_empty() {
-                return;
-            }
-
             let key = e.key();
             match key.as_str() {
+                // Prevent cursor from moving around
                 "ArrowUp" => e.prevent_default(),
                 "ArrowDown" => e.prevent_default(),
+                // Prevent search box from losing focus
+                "Tab" => e.prevent_default(),
                 _ => (),
             }
         })
