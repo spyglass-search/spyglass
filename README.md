@@ -171,7 +171,7 @@ Supported Modifiers:
 Examples:
 
 * "CmdOrCtrl+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
-* "CmdOrCtrl+Shift+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
+* "CmdOrCtrl+Shift+/" => Launches the app w/ `Cmd` or `Ctrl` + `Shift` + `/`
 * "Shift+4" => Launches the app w/ `Shift` + `4`
 
 NOTE: Shortcuts are allowed to have any number of modifiers but only a *single* key.
