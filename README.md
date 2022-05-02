@@ -78,17 +78,17 @@ curated set of websites with high quality recipes.
     "#),
     domains: [
 
-        # Major sites that often have really good recipes
+        // Major sites that often have really good recipes
         "www.seriouseats.com",
         "cooking.nytimes.com",
         ...
 
-        # Specific cuisines/sites that I've found randomly w/ high-quality recipes
+        // Specific cuisines/sites that I've found randomly w/ high-quality recipes
         "www.hungryhuy.com",
         "www.vickypham.com",
     ],
 
-    # Not yet supported but ideally more ways to filter URLs within a domain
+    // Not yet supported but ideally more ways to filter URLs within a domain
     urls: [
         "www.reddit.com/r/recipes/*",
     ]
@@ -108,7 +108,7 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
     name: "rustlang",
     description: Some("Rustlang targeted websites"),
     domains: [
-        # Support for wildcards in domain names
+        // Support for wildcards in domain names
         "*.rust-lang.org",
         "docs.rs",
         "rustconf.com",
@@ -117,8 +117,8 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
         ...
     ],
 
-    # Again not yet supported but an example of indexing specific communities that
-    # are relevant to the topic
+    // Again not yet supported but an example of indexing specific communities that
+    // are relevant to the topic
     urls: [
         "www.reddit.com/r/rust",
         "www.reddit.com/r/rust_gamedev",
@@ -135,22 +135,22 @@ file found in their directory on startup, a default one will be created.
 
 ``` rust
 (
-    # The max number of pages to index per domain
+    // The max number of pages to index per domain
     domain_crawl_limit: Finite(1000),
-    # The max number of crawlers per domain
+    // The max number of crawlers per domain
     inflight_domain_limit: Finite(2),
-    # The max number of crawlers in total
+    // The max number of crawlers in total
     inflight_crawl_limit: Finite(10),
-    # Not used... yet!
+    // Not used... yet!
     run_wizard: false,
-    # Not used... yet!
+    // Not used... yet!
     allow_list: [],
-    # Domains to completely ignore.
+    // Domains to completely ignore.
     block_list: [
       "web.archive.org",
       "w3schools.com"
     ],
-    # Shortcut to launch the search bar
+    // Shortcut to launch the search bar
     shortcut: "CmdOrCtrl+Shift+/",
 )
 ```
@@ -172,4 +172,7 @@ Examples:
 
 * "CmdOrCtrl+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
 * "CmdOrCtrl+Shift+/" => Launches the app w/ `Cmd` or `Ctrl` + `/`
-* "Shift+4+2" => Launches the app w/ `Shift` + `4` + `2`
+* "Shift+4" => Launches the app w/ `Shift` + `4`
+
+NOTE: Shortcuts are allowed to have any number of modifiers but only a *single* key.
+For example, `Shift+4` will work but not `Shift+4+2`
