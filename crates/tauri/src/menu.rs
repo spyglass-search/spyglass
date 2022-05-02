@@ -11,6 +11,8 @@ pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
 pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 
 pub fn get_tray_menu() -> SystemTrayMenu {
+    let ctx = tauri::generate_context!();
+
     let pause = CustomMenuItem::new(CRAWL_STATUS_MENU_ITEM.to_string(), "");
     let quit = CustomMenuItem::new(QUIT_MENU_ITEM.to_string(), "Quit");
 
@@ -22,6 +24,10 @@ pub fn get_tray_menu() -> SystemTrayMenu {
     SystemTrayMenu::new()
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(
+            CustomMenuItem::new("about", format!("v20{}", ctx.package_info().version))
+                .disabled(),
+        )
         .add_item(
             CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
         )
