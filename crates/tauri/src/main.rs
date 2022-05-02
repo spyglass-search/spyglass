@@ -74,6 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .is_registered(&config.user_settings.shortcut)
                 .unwrap()
             {
+                log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
                 let window = window.clone();
                 shortcuts
                     .register(&config.user_settings.shortcut, move || {
@@ -118,12 +119,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         item_handle.set_title(new_label).unwrap();
                     }
-                    menu::OPEN_LENSES_FOLDER => {
-                        open_folder(Config::lenses_dir());
-                    }
-                    menu::OPEN_SETTINGS_FOLDER => {
-                        open_folder(Config::prefs_dir());
-                    }
+                    menu::OPEN_LENSES_FOLDER => open_folder(Config::lenses_dir()),
+                    menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
+                    menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                     menu::TOGGLE_MENU_ITEM => {
                         let window = app.get_window("main").unwrap();
                         let new_title = if window.is_visible().unwrap() {

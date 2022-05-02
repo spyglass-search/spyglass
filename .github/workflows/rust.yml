@@ -15,11 +15,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # Checkout source code
     - uses: actions/checkout@v3
+    # Setup arch target for sidecar build
     - name: Setup arch target
       run: echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
-    - name: Setup wasm target
-      run: rustup target add wasm32-unknown-unknown
+    # Setup rust toolchain
+    - name: Setup rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        target: wasm32-unknown-unknown
+        components: clippy
+    # Should help bring down build times
+    - uses: Swatinem/rust-cache@v1
+      with:
+        key: "1" # increment this to bust the cache if needed
     - name: Install tauri system deps
       run: |
         sudo apt-get update -y
@@ -31,15 +43,37 @@ jobs:
             librsvg2-dev
         cargo install tauri-cli --locked --version ^1.0.0-rc.8
         cargo install --locked trunk
-    - name: Build backend
-      run: cargo build -p spyglass --verbose
-    - name: Create sidecar
+
+    - name: Build sidecar
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: -p spyglass
+
+    - name: Move sidecar into place
       run: |
         mkdir -p crates/tauri/binaries
         cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
-    - name: Build everything
-      run: |
-        cargo tauri build
-        cargo build --verbose
+    # Build front-end client
+    - name: Build client
+      uses: actions-rs/cargo@v1
+      with:
+        command: tauri
+        args: build
+    # Build backend crates
+    - name: Build backend
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+    # Run tests
     - name: Run tests
-      run: cargo test --verbose
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --verbose
+    # Run clippy
+    - name: Run clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: -- -D warnings
