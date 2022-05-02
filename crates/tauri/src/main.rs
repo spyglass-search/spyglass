@@ -74,6 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .is_registered(&config.user_settings.shortcut)
                 .unwrap()
             {
+                log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
                 let window = window.clone();
                 shortcuts
                     .register(&config.user_settings.shortcut, move || {
