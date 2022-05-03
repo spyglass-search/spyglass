@@ -180,10 +180,16 @@ pub enum SkipReason {
     Duplicate,
 }
 
+#[derive(Default)]
+pub struct EnqueueSettings {
+    pub skip_blocklist: bool,
+}
+
 pub async fn enqueue(
     db: &DatabaseConnection,
     url: &str,
     settings: &UserSettings,
+    overrides: &EnqueueSettings,
 ) -> anyhow::Result<Option<SkipReason>, sea_orm::DbErr> {
     let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
 
@@ -193,7 +199,12 @@ pub async fn enqueue(
         log::debug!("Url ignored: invalid URL - {}", url);
         return Ok(Some(SkipReason::Invalid));
     }
-    let parsed = parsed.unwrap();
+
+    let mut parsed = parsed.unwrap();
+    // Always ignore fragments, otherwise crawling
+    // https://wikipedia.org/Rust#Blah would be considered different than
+    // https://wikipedia.org/Rust
+    parsed.set_fragment(None);
 
     let domain = parsed.host_str();
     // Ignore URLs w/ no domain/host strings
@@ -204,17 +215,17 @@ pub async fn enqueue(
 
     // Ignore domains in blocklist
     let domain = domain.unwrap();
-    if block_list.contains(&domain.to_string()) {
+    if !overrides.skip_blocklist && block_list.contains(&domain.to_string()) {
         log::debug!("Url ignored: blocked domain - {}", url);
         return Ok(Some(SkipReason::Blocked));
     }
 
+    // Ignore duplicates
     let exists = Entity::find()
         .filter(Column::Url.eq(url.to_string()))
         .one(db)
         .await?;
 
-    // ignore duplicate urls
     if exists.is_some() {
         log::debug!("Url ignored: duplicate crawl - {}", url);
         return Ok(Some(SkipReason::Duplicate));
@@ -302,7 +313,9 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = "https://oldschool.runescape.wiki/";
-        crawl_queue::enqueue(&db, url, &settings).await.unwrap();
+        crawl_queue::enqueue(&db, url, &settings, &Default::default())
+            .await
+            .unwrap();
 
         let crawl = crawl_queue::Entity::find()
             .filter(crawl_queue::Column::Url.eq(url.to_string()))
@@ -320,7 +333,9 @@ mod test {
         let url = "https://oldschool.runescape.wiki/";
         let prioritized = vec![];
 
-        crawl_queue::enqueue(&db, url, &settings).await.unwrap();
+        crawl_queue::enqueue(&db, url, &settings, &Default::default())
+            .await
+            .unwrap();
 
         let queue = crawl_queue::dequeue(&db, settings, &prioritized)
             .await
@@ -341,7 +356,9 @@ mod test {
         let parsed = Url::parse(&url).unwrap();
         let prioritized = vec![];
 
-        crawl_queue::enqueue(&db, url, &settings).await.unwrap();
+        crawl_queue::enqueue(&db, url, &settings, &Default::default())
+            .await
+            .unwrap();
         let doc = indexed_document::ActiveModel {
             domain: Set(parsed.host_str().unwrap().to_string()),
             url: Set(url.to_string()),

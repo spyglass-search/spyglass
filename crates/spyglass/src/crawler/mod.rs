@@ -6,16 +6,15 @@ use reqwest::{Client, StatusCode};
 use sha2::{Digest, Sha256};
 use url::Url;
 
-use entities::models::{crawl_queue, fetch_history, resource_rule};
+use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
-use entities::sea_orm::{DatabaseConnection, Set};
+use entities::sea_orm::DatabaseConnection;
 
-use crate::scraper::html_to_text;
-
+pub mod bootstrap;
 pub mod robots;
-use robots::ParsedRule;
 
-use robots::{filter_set, parse};
+use robots::check_resource_rules;
+use crate::scraper::html_to_text;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
@@ -155,82 +154,6 @@ impl Crawler {
         }
     }
 
-    /// Checks whether we're allow to crawl this domain + path
-    async fn is_crawl_allowed(
-        &self,
-        db: &DatabaseConnection,
-        domain: &str,
-        path: &str,
-        full_url: &str,
-    ) -> anyhow::Result<bool> {
-        let rules = resource_rule::Entity::find()
-            .filter(resource_rule::Column::Domain.eq(domain))
-            .all(db)
-            .await?;
-
-        if rules.is_empty() {
-            log::info!("No rules found for this domain, fetching robot.txt");
-
-            let robots_url = format!("https://{}/robots.txt", domain);
-            let res = self.client.get(robots_url).send().await;
-            match res {
-                Err(err) => log::error!("Unable to check robots.txt {}", err.to_string()),
-                Ok(res) => {
-                    if res.status() == StatusCode::OK {
-                        let body = res.text().await.unwrap();
-
-                        let parsed_rules = parse(domain, &body);
-                        for rule in parsed_rules.iter() {
-                            let new_rule = resource_rule::ActiveModel {
-                                domain: Set(rule.domain.to_owned()),
-                                rule: Set(rule.regex.to_owned()),
-                                no_index: Set(false),
-                                allow_crawl: Set(rule.allow_crawl),
-                                ..Default::default()
-                            };
-                            new_rule.insert(db).await?;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check path against rules, if we find any matches that disallow, skip it
-        let rules_into: Vec<ParsedRule> = rules.iter().map(|x| x.to_owned().into()).collect();
-
-        let allow_filter = filter_set(&rules_into, true);
-        let disallow_filter = filter_set(&rules_into, false);
-        if !allow_filter.is_match(path) && disallow_filter.is_match(path) {
-            log::info!("Unable to crawl {}|{} due to rule", domain, path);
-            return Ok(false);
-        }
-
-        // Check the content-type of the URL, only crawl HTML pages for now
-        let res = self.client.head(full_url).send().await;
-
-        match res {
-            Err(err) => {
-                log::info!("Unable to check content-type: {}", err.to_string());
-                return Ok(false);
-            }
-            Ok(res) => {
-                let headers = res.headers();
-                if !headers.contains_key(http::header::CONTENT_TYPE) {
-                    return Ok(false);
-                } else {
-                    let value = headers.get(http::header::CONTENT_TYPE).unwrap();
-                    let value = value.to_str().unwrap();
-                    if !value.to_string().contains(&"text/html") {
-                        log::info!("Unable to crawl: content-type =/= text/html");
-                        return Ok(false);
-                    }
-                }
-            }
-        }
-
-        Ok(true)
-    }
-
     // TODO: Load web indexing as a plugin?
     /// Attempts to crawl a job from the crawl_queue specific by <id>
     /// * Checks whether we can crawl using any saved rules or looking at the robots.txt
@@ -261,10 +184,7 @@ impl Crawler {
         }
 
         // Check for robots.txt of this domain
-        if !self
-            .is_crawl_allowed(db, domain, url.path(), url.as_str())
-            .await?
-        {
+        if !check_resource_rules(db, &self.client, &url).await? {
             return Ok(None);
         }
 
@@ -307,35 +227,6 @@ mod test {
         for link in result.links {
             assert!(link.starts_with("https://"))
         }
-    }
-
-    #[tokio::test]
-    async fn test_is_crawl_allowed() {
-        let crawler = Crawler::new();
-        let db = setup_test_db().await;
-
-        let url = "https://oldschool.runescape.wiki/";
-        let domain = "oldschool.runescape.wiki";
-        let rule = "/";
-
-        // Add some fake rules
-        let allow = resource_rule::ActiveModel {
-            domain: Set(domain.to_owned()),
-            rule: Set(rule.to_owned()),
-            no_index: Set(false),
-            allow_crawl: Set(true),
-            ..Default::default()
-        };
-        allow
-            .insert(&db)
-            .await
-            .expect("Unable to insert allow rule");
-
-        let res = crawler
-            .is_crawl_allowed(&db, domain, rule, url)
-            .await
-            .unwrap();
-        assert_eq!(res, true);
     }
 
     #[tokio::test]

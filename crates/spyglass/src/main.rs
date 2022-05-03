@@ -4,11 +4,12 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
+use entities::models::crawl_queue;
+use libspyglass::crawler::bootstrap;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use migration::{Migrator, MigratorTrait};
 use shared::config::Config;
-use entities::models::crawl_queue;
 
 mod api;
 mod importer;
@@ -72,28 +73,40 @@ async fn start_backend(state: &AppState) {
     crawl_queue::reset_processing(&state.db).await;
 
     // Check lenses for updates
-    // Figure out how to handle wildcard domains
     for (_, lens) in state.config.lenses.iter() {
+        // TODO: Add lens to DB
         for domain in lens.domains.iter() {
-            let _ = crawl_queue::enqueue(
+            match bootstrap::bootstrap(
                 &state.db,
-                &format!("https://{}", domain),
                 &state.config.user_settings,
+                &format!("https://{}", domain),
             )
-            .await;
+            .await
+            {
+                Err(e) => log::error!("{}", e),
+                Ok(_) => log::info!("bootstraping {}", domain),
+            }
+        }
+
+        for prefix in lens.urls.iter() {
+            match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await {
+                Err(e) => log::error!("{}", e),
+                Ok(_) => log::info!("bootstraping {}", prefix),
+            }
         }
     }
 
-    // Startup manager, workers, & API server.
     let (tx, rx) = mpsc::channel(32);
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
 
+    // Crawl scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
         tx,
         shutdown_tx.subscribe(),
     ));
 
+    // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
         rx,
@@ -101,7 +114,6 @@ async fn start_backend(state: &AppState) {
     ));
 
     // Gracefully handle shutdowns
-    // let server = start_api(state.clone()).await;
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");

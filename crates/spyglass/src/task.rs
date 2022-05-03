@@ -67,8 +67,6 @@ pub async fn manager_task(
                 return;
             }
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
 
@@ -91,9 +89,14 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
             // Add links found to crawl queue
             for link in crawl_result.links.iter() {
-                let added = crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
-                    .await
-                    .unwrap();
+                let added = crawl_queue::enqueue(
+                    &state.db,
+                    link,
+                    &state.config.user_settings,
+                    &Default::default(),
+                )
+                .await
+                .unwrap();
 
                 // Only add valid urls
                 if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {

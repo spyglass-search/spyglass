@@ -83,7 +83,13 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            crawl_queue::enqueue(&state.db, url, &self.config.user_settings).await?;
+            crawl_queue::enqueue(
+                &state.db,
+                url,
+                &self.config.user_settings,
+                &Default::default(),
+            )
+            .await?;
             count += 1;
         }
 

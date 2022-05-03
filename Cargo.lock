@@ -4364,6 +4364,7 @@ dependencies = [
  "dirs",
  "ego-tree",
  "entities",
+ "futures 0.3.21",
  "hex",
  "html5ever",
  "http",

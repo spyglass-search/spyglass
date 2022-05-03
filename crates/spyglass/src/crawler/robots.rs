@@ -1,10 +1,17 @@
-use regex::RegexSet;
-use entities::models::resource_rule;
 /// Parse robots.txt blobs
 /// See the following for more details about robots.txt files:
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
+
+use entities::models::resource_rule;
+use entities::sea_orm::{DatabaseConnection, Set};
+use entities::sea_orm::prelude::*;
+
+use regex::RegexSet;
+use reqwest::{Client, StatusCode};
 use std::convert::From;
+use url::Url;
+
 
 #[derive(Clone, Debug)]
 pub struct ParsedRule {
@@ -112,10 +119,93 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
     rules
 }
 
+// Checks whether we're allow to crawl this url
+pub async fn check_resource_rules(
+    db: &DatabaseConnection,
+    client: &Client,
+    url: &Url,
+) -> anyhow::Result<bool> {
+    let domain = url.host_str().unwrap();
+    let path = url.path();
+
+    let rules = resource_rule::Entity::find()
+        .filter(resource_rule::Column::Domain.eq(domain))
+        .all(db)
+        .await?;
+
+    if rules.is_empty() {
+        log::info!("No rules found for this domain, fetching robot.txt");
+
+        let robots_url = format!("https://{}/robots.txt", domain);
+        let res = client.get(robots_url).send().await;
+        match res {
+            Err(err) => log::error!("Unable to check robots.txt {}", err.to_string()),
+            Ok(res) => {
+                if res.status() == StatusCode::OK {
+                    let body = res.text().await.unwrap();
+
+                    let parsed_rules = parse(domain, &body);
+                    for rule in parsed_rules.iter() {
+                        let new_rule = resource_rule::ActiveModel {
+                            domain: Set(rule.domain.to_owned()),
+                            rule: Set(rule.regex.to_owned()),
+                            no_index: Set(false),
+                            allow_crawl: Set(rule.allow_crawl),
+                            ..Default::default()
+                        };
+                        new_rule.insert(db).await?;
+                    }
+                }
+            }
+        }
+    }
+
+    // Check path against rules, if we find any matches that disallow, skip it
+    let rules_into: Vec<ParsedRule> = rules.iter().map(|x| x.to_owned().into()).collect();
+
+    let allow_filter = filter_set(&rules_into, true);
+    let disallow_filter = filter_set(&rules_into, false);
+    if !allow_filter.is_match(path) && disallow_filter.is_match(path) {
+        log::info!("Unable to crawl `{}` due to rule", url.as_str());
+        return Ok(false);
+    }
+
+    // Check the content-type of the URL, only crawl HTML pages for now
+    let res = client.head(url.as_str()).send().await;
+
+    match res {
+        Err(err) => {
+            log::info!("Unable to check content-type: {}", err.to_string());
+            return Ok(false);
+        }
+        Ok(res) => {
+            let headers = res.headers();
+            if !headers.contains_key(http::header::CONTENT_TYPE) {
+                return Ok(false);
+            } else {
+                let value = headers.get(http::header::CONTENT_TYPE).unwrap();
+                let value = value.to_str().unwrap();
+                if !value.to_string().contains(&"text/html") {
+                    log::info!("Unable to crawl: content-type =/= text/html");
+                    return Ok(false);
+                }
+            }
+        }
+    }
+
+    Ok(true)
+}
+
 #[cfg(test)]
 mod test {
-    use crate::crawler::robots::{filter_set, parse, rule_to_regex, ParsedRule};
+    use super::{check_resource_rules, filter_set, parse, rule_to_regex, ParsedRule};
+    use crate::crawler::Crawler;
+
+    use entities::models::resource_rule;
+    use entities::test::setup_test_db;
+    use entities::sea_orm::{ActiveModelTrait, Set};
     use regex::Regex;
+
 
     #[test]
     fn test_parse() {
@@ -187,5 +277,33 @@ mod test {
 
         assert_eq!(allow.is_match("/Belt_transport_system"), true);
         assert_eq!(disallow.is_match("/Belt_transport_system"), false);
+    }
+
+    #[tokio::test]
+    async fn test_check_resource_rules() {
+        let crawler = Crawler::new();
+        let db = setup_test_db().await;
+
+        let url = url::Url::parse("https://oldschool.runescape.wiki/").unwrap();
+        let domain = url.host_str().unwrap();
+
+        // Add some fake rules
+        let allow = resource_rule::ActiveModel {
+            domain: Set(domain.to_owned()),
+            rule: Set("/".to_string()),
+            no_index: Set(false),
+            allow_crawl: Set(true),
+            ..Default::default()
+        };
+        allow
+            .insert(&db)
+            .await
+            .expect("Unable to insert allow rule");
+
+        let res = check_resource_rules(&db, &crawler.client, &url)
+            .await
+            .unwrap();
+
+        assert_eq!(res, true);
     }
 }
