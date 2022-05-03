@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
+    let config = Config::new();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -46,14 +47,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::resize_window
         ])
         .menu(menu::get_app_menu())
-        .setup(|app| {
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
+        .setup(move |app| {
             // hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
-            // Only show in dev/debug mode.
-            #[cfg(debug_assertions)]
-            app.get_window("main").unwrap().open_devtools();
 
             let window = app.get_window("main").unwrap();
 
@@ -65,7 +63,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
 
             // Load user settings
-            let config = Config::new();
             app.manage(config.clone());
 
             // Register global shortcut
@@ -92,7 +89,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             Ok(())
         })
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
         .on_window_event(|event| {
             if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                 if !is_focused {
@@ -106,6 +102,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
             SystemTrayEvent::MenuItemClick { id, .. } => {
                 let item_handle = app.tray_handle().get_item(&id);
+                let window = app.get_window("main").unwrap();
+
                 match id.as_str() {
                     menu::CRAWL_STATUS_MENU_ITEM => {
                         let rpc = app.state::<rpc::RpcClient>().inner();
@@ -122,20 +120,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     menu::OPEN_LENSES_FOLDER => open_folder(Config::lenses_dir()),
                     menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
-                    menu::TOGGLE_MENU_ITEM => {
-                        let window = app.get_window("main").unwrap();
-                        let new_title = if window.is_visible().unwrap() {
-                            window::hide_window(&window);
-                            "Show"
-                        } else {
+                    menu::SHOW_SEARCHBAR => {
+                        if !window.is_visible().unwrap() {
                             window::show_window(&window);
-                            "Hide"
-                        };
-                        item_handle.set_title(new_title).unwrap();
+                        }
                     }
-                    menu::QUIT_MENU_ITEM => {
-                        app.exit(0);
-                    }
+                    menu::QUIT_MENU_ITEM => app.exit(0),
+                    menu::DEV_SHOW_CONSOLE => window.open_devtools(),
                     _ => {}
                 }
             }
