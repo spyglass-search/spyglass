@@ -12,6 +12,8 @@ pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
 pub const SHOW_SEARCHBAR: &str = "show_searchbar";
 
+pub const DEV_SHOW_CONSOLE: &str = "dev_show_console";
+
 pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     let ctx = tauri::generate_context!();
 
@@ -28,7 +30,8 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
 
     let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Show logs folder");
 
-    SystemTrayMenu::new()
+    let mut tray = SystemTrayMenu::new();
+    tray = tray
         .add_item(pause)
         .add_item(show)
         .add_native_item(SystemTrayMenuItem::Separator)
@@ -42,8 +45,16 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_lenses_folder)
         .add_item(open_settings_folder)
-        .add_item(open_logs_folder)
-        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(open_logs_folder);
+
+    // Add dev utils
+    if cfg!(debug_assertions) {
+        tray = tray
+            .add_native_item(SystemTrayMenuItem::Separator)
+            .add_item(CustomMenuItem::new(DEV_SHOW_CONSOLE, "Show console"));
+    }
+
+    tray.add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)
 }
 

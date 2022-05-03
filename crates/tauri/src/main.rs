@@ -53,10 +53,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // Only show in dev/debug mode.
-            #[cfg(debug_assertions)]
-            app.get_window("main").unwrap().open_devtools();
-
             let window = app.get_window("main").unwrap();
 
             // Start up backend (only in release mode)
@@ -106,6 +102,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
             SystemTrayEvent::MenuItemClick { id, .. } => {
                 let item_handle = app.tray_handle().get_item(&id);
+                let window = app.get_window("main").unwrap();
+
                 match id.as_str() {
                     menu::CRAWL_STATUS_MENU_ITEM => {
                         let rpc = app.state::<rpc::RpcClient>().inner();
@@ -123,14 +121,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                     menu::SHOW_SEARCHBAR => {
-                        let window = app.get_window("main").unwrap();
                         if !window.is_visible().unwrap() {
                             window::show_window(&window);
                         }
                     }
-                    menu::QUIT_MENU_ITEM => {
-                        app.exit(0);
-                    }
+                    menu::QUIT_MENU_ITEM => app.exit(0),
+                    menu::DEV_SHOW_CONSOLE => window.open_devtools(),
                     _ => {}
                 }
             }
