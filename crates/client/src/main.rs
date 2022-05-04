@@ -46,7 +46,6 @@ pub fn app() -> Html {
     let lens = use_state_eq(Vec::new);
     // Current query string
     let query = use_state_eq(|| "".to_string());
-    let query_debounce = use_state_eq(Date::now);
     // Search results + selected index
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
@@ -87,7 +86,6 @@ pub fn app() -> Html {
             move |query| {
                 events::handle_query_change(
                     query,
-                    query_debounce,
                     node_ref,
                     lens,
                     search_results,
@@ -172,7 +170,6 @@ pub fn app() -> Html {
                     type={"text"}
                     class={"search-box"}
                     placeholder={"Search"}
-                    value={(*query).clone()}
                     {onkeyup}
                     {onkeydown}
                     spellcheck={"false"}

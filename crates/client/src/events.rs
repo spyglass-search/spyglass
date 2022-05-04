@@ -71,16 +71,12 @@ pub fn handle_global_key_down(
 
 pub fn handle_query_change(
     query: &str,
-    query_debounce: UseStateHandle<f64>,
     node_ref: UseStateHandle<NodeRef>,
     lens: UseStateHandle<Vec<String>>,
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
-    // Was the last char typed > 1 sec ago?
-    let is_debounced = *query_debounce >= constants::DEBOUNCE_TIME_MS;
-
-    if is_debounced && query.len() >= constants::MIN_CHARS {
+    if query.len() >= constants::MIN_CHARS {
         let el = node_ref.cast::<Element>().unwrap();
         if query.starts_with(constants::LENS_SEARCH_PREFIX) {
             // show lens search
@@ -89,6 +85,4 @@ pub fn handle_query_change(
             super::show_doc_results(search_results, &lens, el, selected_idx, query.to_string());
         }
     }
-
-    query_debounce.set(Date::now());
 }
