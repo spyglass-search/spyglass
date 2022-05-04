@@ -59,6 +59,10 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
 }
 
 pub fn get_app_menu() -> Menu {
+    if cfg!(target_os = "linux") {
+        return Menu::new();
+    }
+    
     let ctx = tauri::generate_context!();
 
     Menu::new().add_submenu(Submenu::new(
