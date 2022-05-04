@@ -4160,6 +4160,7 @@ dependencies = [
  "shared",
  "tauri",
  "tauri-build",
+ "tokio",
  "tokio-retry",
  "tracing",
  "tracing-appender",
