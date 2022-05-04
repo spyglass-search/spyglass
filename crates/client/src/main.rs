@@ -1,5 +1,4 @@
 use gloo::events::EventListener;
-use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, Element, HtmlElement, HtmlInputElement};
@@ -140,7 +139,6 @@ pub fn app() -> Html {
         .collect::<Html>();
 
     let onkeyup = {
-        let query = query.clone();
         Callback::from(move |e: KeyboardEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
             query.set(input.value());
