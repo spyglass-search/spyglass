@@ -3,7 +3,7 @@ use tauri::{async_runtime::spawn, LogicalSize, Size, Window};
 use crate::{cmd, constants};
 
 pub fn center_window(window: &Window) {
-    if let Some(monitor) = window.current_monitor().unwrap() {
+    if let Some(monitor) = window.primary_monitor().unwrap() {
         let size = monitor.size();
         let scale = monitor.scale_factor();
 
