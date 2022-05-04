@@ -33,7 +33,7 @@ pub fn build_query(
         .map(|token| token.trim())
         .collect();
 
-    log::info!("lenses: {:?}, terms: {:?}", applied_lens, terms);
+    log::trace!("lenses: {:?}, terms: {:?}", applied_lens, terms);
 
     let mut lense_queries: QueryVec = Vec::new();
     for lens in applied_lens {

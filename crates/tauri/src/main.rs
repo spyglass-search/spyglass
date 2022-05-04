@@ -2,11 +2,14 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-use jsonrpc_core::Value;
-use num_format::{Locale, ToFormattedString};
 use std::io;
 use std::path::PathBuf;
+use std::time::Duration;
+
+use jsonrpc_core::Value;
+use num_format::{Locale, ToFormattedString};
 use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
+use tokio::time;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
@@ -53,11 +56,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let window = app.get_window("main").unwrap();
-
             // Start up backend (only in release mode)
             #[cfg(not(debug_assertions))]
             rpc::check_and_start_backend();
+
+            let window = app.get_window("main").unwrap();
+            let _ = window.set_skip_taskbar(true);
 
             // Wait for the server to boot up
             app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
@@ -87,6 +91,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Center window horizontally in the current screen
             window::center_window(&window);
 
+            // Keep system tray stats updated
+            let app_handle = app.app_handle();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = time::interval(Duration::from_secs(10));
+                loop {
+                    update_tray_menu(&app_handle).await;
+                    interval.tick().await;
+                }
+            });
+
             Ok(())
         })
         .on_window_event(|event| {
@@ -97,10 +111,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         })
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick { .. } => update_tray_menu(app),
-            SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
-            SystemTrayEvent::MenuItemClick { id, .. } => {
+        .on_system_tray_event(|app, event| {
+            if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").unwrap();
 
@@ -130,7 +142,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 }
             }
-            _ => {}
         })
         .run(ctx)
         .expect("error while running tauri application");
@@ -186,10 +197,10 @@ fn open_folder(folder: PathBuf) {
         .unwrap();
 }
 
-fn update_tray_menu(app: &AppHandle) {
+async fn update_tray_menu(app: &AppHandle) {
     let rpc = app.state::<rpc::RpcClient>().inner();
 
-    let app_status = tauri::async_runtime::block_on(app_status(rpc));
+    let app_status = app_status(rpc).await;
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {
