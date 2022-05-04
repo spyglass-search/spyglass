@@ -2,11 +2,14 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-use jsonrpc_core::Value;
-use num_format::{Locale, ToFormattedString};
 use std::io;
 use std::path::PathBuf;
+use std::time::Duration;
+
+use jsonrpc_core::Value;
+use num_format::{Locale, ToFormattedString};
 use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
+use tokio::time;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
@@ -36,6 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
+    let config = Config::new();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -46,26 +50,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::resize_window
         ])
         .menu(menu::get_app_menu())
-        .setup(|app| {
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
+        .setup(move |app| {
             // hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
-            // Only show in dev/debug mode.
-            #[cfg(debug_assertions)]
-            app.get_window("main").unwrap().open_devtools();
-
-            let window = app.get_window("main").unwrap();
 
             // Start up backend (only in release mode)
             #[cfg(not(debug_assertions))]
             rpc::check_and_start_backend();
 
+            let window = app.get_window("main").unwrap();
+            let _ = window.set_skip_taskbar(true);
+
             // Wait for the server to boot up
             app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
 
             // Load user settings
-            let config = Config::new();
             app.manage(config.clone());
 
             // Register global shortcut
@@ -74,6 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .is_registered(&config.user_settings.shortcut)
                 .unwrap()
             {
+                log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
                 let window = window.clone();
                 shortcuts
                     .register(&config.user_settings.shortcut, move || {
@@ -89,9 +91,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Center window horizontally in the current screen
             window::center_window(&window);
 
+            // Keep system tray stats updated
+            let app_handle = app.app_handle();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = time::interval(Duration::from_secs(10));
+                loop {
+                    update_tray_menu(&app_handle).await;
+                    interval.tick().await;
+                }
+            });
+
             Ok(())
         })
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu()))
         .on_window_event(|event| {
             if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                 if !is_focused {
@@ -100,11 +111,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         })
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick { .. } => update_tray_menu(app),
-            SystemTrayEvent::RightClick { .. } => update_tray_menu(app),
-            SystemTrayEvent::MenuItemClick { id, .. } => {
+        .on_system_tray_event(|app, event| {
+            if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
+                let window = app.get_window("main").unwrap();
+
                 match id.as_str() {
                     menu::CRAWL_STATUS_MENU_ITEM => {
                         let rpc = app.state::<rpc::RpcClient>().inner();
@@ -118,30 +129,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         item_handle.set_title(new_label).unwrap();
                     }
-                    menu::OPEN_LENSES_FOLDER => {
-                        open_folder(Config::lenses_dir());
-                    }
-                    menu::OPEN_SETTINGS_FOLDER => {
-                        open_folder(Config::prefs_dir());
-                    }
-                    menu::TOGGLE_MENU_ITEM => {
-                        let window = app.get_window("main").unwrap();
-                        let new_title = if window.is_visible().unwrap() {
-                            window::hide_window(&window);
-                            "Show"
-                        } else {
+                    menu::OPEN_LENSES_FOLDER => open_folder(Config::lenses_dir()),
+                    menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
+                    menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
+                    menu::SHOW_SEARCHBAR => {
+                        if !window.is_visible().unwrap() {
                             window::show_window(&window);
-                            "Hide"
-                        };
-                        item_handle.set_title(new_title).unwrap();
+                        }
                     }
-                    menu::QUIT_MENU_ITEM => {
-                        app.exit(0);
-                    }
+                    menu::QUIT_MENU_ITEM => app.exit(0),
+                    menu::DEV_SHOW_CONSOLE => window.open_devtools(),
                     _ => {}
                 }
             }
-            _ => {}
         })
         .run(ctx)
         .expect("error while running tauri application");
@@ -197,10 +197,10 @@ fn open_folder(folder: PathBuf) {
         .unwrap();
 }
 
-fn update_tray_menu(app: &AppHandle) {
+async fn update_tray_menu(app: &AppHandle) {
     let rpc = app.state::<rpc::RpcClient>().inner();
 
-    let app_status = tauri::async_runtime::block_on(app_status(rpc));
+    let app_status = app_status(rpc).await;
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {
