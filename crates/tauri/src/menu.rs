@@ -32,7 +32,6 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
 
     let mut tray = SystemTrayMenu::new();
     tray = tray
-        .add_item(pause)
         .add_item(show)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(
@@ -42,6 +41,7 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
             CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
         )
         .add_item(CustomMenuItem::new(NUM_QUEUED_MENU_ITEM.to_string(), "XX queued").disabled())
+        .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_lenses_folder)
         .add_item(open_settings_folder)
