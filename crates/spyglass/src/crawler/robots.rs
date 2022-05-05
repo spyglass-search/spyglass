@@ -1,5 +1,5 @@
 use regex::RegexSet;
-use shared::models::resource_rule;
+use entities::models::resource_rule;
 /// Parse robots.txt blobs
 /// See the following for more details about robots.txt files:
 /// - https://developers.google.com/search/docs/advanced/robots/intro

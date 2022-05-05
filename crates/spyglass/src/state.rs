@@ -2,10 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use shared::config::Config;
-use shared::sea_orm::DatabaseConnection;
+use entities::sea_orm::DatabaseConnection;
 
 use crate::search::{IndexPath, Searcher};
-use shared::models::create_connection;
+use entities::models::create_connection;
 
 #[derive(Debug, Clone)]
 pub struct AppState {

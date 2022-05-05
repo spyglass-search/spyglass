@@ -6,9 +6,9 @@ use reqwest::{Client, StatusCode};
 use sha2::{Digest, Sha256};
 use url::Url;
 
-use shared::models::{crawl_queue, fetch_history, resource_rule};
-use shared::sea_orm::prelude::*;
-use shared::sea_orm::{DatabaseConnection, Set};
+use entities::models::{crawl_queue, fetch_history, resource_rule};
+use entities::sea_orm::prelude::*;
+use entities::sea_orm::{DatabaseConnection, Set};
 
 use crate::scraper::html_to_text;
 
@@ -286,9 +286,9 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use shared::models::{crawl_queue, resource_rule};
-    use shared::sea_orm::{ActiveModelTrait, Set};
-    use shared::test::setup_test_db;
+    use entities::models::{crawl_queue, resource_rule};
+    use entities::sea_orm::{ActiveModelTrait, Set};
+    use entities::test::setup_test_db;
 
     use crate::crawler::{Crawler, _normalize_href};
 

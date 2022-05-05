@@ -8,7 +8,7 @@ use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use migration::{Migrator, MigratorTrait};
 use shared::config::Config;
-use shared::models::crawl_queue;
+use entities::models::crawl_queue;
 
 mod api;
 mod importer;

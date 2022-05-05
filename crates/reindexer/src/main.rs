@@ -1,5 +1,5 @@
-use shared::models::{crawl_queue, indexed_document, link};
-use shared::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
+use entities::models::{crawl_queue, indexed_document, link};
+use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
 
 use libspyglass::crawler::Crawler;
 use libspyglass::search::Searcher;

@@ -1,7 +1,7 @@
 use jsonrpc_core::{Error, ErrorCode, Result};
 use shared::response::LensResult;
-use shared::sea_orm::prelude::*;
-use shared::sea_orm::Set;
+use entities::sea_orm::prelude::*;
+use entities::sea_orm::Set;
 use tracing::instrument;
 use url::Url;
 
@@ -10,7 +10,7 @@ use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, Se
 
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use shared::models::crawl_queue;
+use entities::models::crawl_queue;
 
 use super::response;
 

@@ -7,7 +7,7 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use crate::config::{Limit, UserSettings};
+use shared::config::{Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
 
@@ -267,10 +267,9 @@ pub async fn mark_done(
 mod test {
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, Set};
-
     use url::Url;
 
-    use crate::config::{Limit, UserSettings};
+    use shared::config::{Limit, UserSettings};
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
