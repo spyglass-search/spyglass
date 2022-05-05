@@ -17,6 +17,7 @@ http = "0.2"
 jsonrpc-core = "18.0.0"
 jsonrpc-ipc-server = "18.0.0"
 log = "0.4"
+migration = { path = "../migrations" }
 regex = "1"
 reqwest = "0.11"
 ron = "0.7"

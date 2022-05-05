@@ -288,9 +288,9 @@ impl Crawler {
 mod test {
     use shared::models::{crawl_queue, resource_rule};
     use shared::sea_orm::{ActiveModelTrait, Set};
+    use shared::test::setup_test_db;
 
     use crate::crawler::{Crawler, _normalize_href};
-    use crate::test::setup_test_db;
 
     use url::Url;
 

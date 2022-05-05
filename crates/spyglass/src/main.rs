@@ -6,6 +6,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
+use migration::{Migrator, MigratorTrait};
 use shared::config::Config;
 use shared::models::crawl_queue;
 
@@ -39,9 +40,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize/Load user preferences
     let state = rt.block_on(AppState::new());
 
+    // Run any migrations
+    match rt.block_on(Migrator::up(&state.db, None)) {
+        Ok(_) => {}
+        Err(e) => {
+            // Ruh-oh something went wrong
+            log::error!("Unable to migrate database - {:?}", e);
+            // Exit from app
+            return Ok(());
+        }
+    }
+
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");
-
     rt.block_on(start_backend(&state));
     server.close();
 

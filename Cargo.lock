@@ -2605,7 +2605,6 @@ version = "0.1.0"
 dependencies = [
  "sea-schema",
  "shared",
- "spyglass",
 ]
 
 [[package]]
@@ -4302,6 +4301,7 @@ dependencies = [
  "jsonrpc-core",
  "jsonrpc-ipc-server",
  "log",
+ "migration",
  "regex",
  "reqwest",
  "ron",

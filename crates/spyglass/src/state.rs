@@ -5,7 +5,7 @@ use shared::config::Config;
 use shared::sea_orm::DatabaseConnection;
 
 use crate::search::{IndexPath, Searcher};
-use shared::models::{create_connection, setup_schema};
+use shared::models::create_connection;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -23,10 +23,6 @@ impl AppState {
             .await
             .expect("Unable to connect to database");
 
-        let _ = setup_schema(&db.clone())
-            .await
-            .expect("Unable to setup schema");
-
         let index = Searcher::with_index(&IndexPath::LocalPath(Config::index_dir()));
 
         // TODO: Load from saved preferences
@@ -34,7 +30,7 @@ impl AppState {
         app_state.insert("paused".to_string(), "false".to_string());
 
         AppState {
-            db: db.clone(),
+            db,
             app_state: Arc::new(app_state),
             config,
             index: Arc::new(Mutex::new(index)),
