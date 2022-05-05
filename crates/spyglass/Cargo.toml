@@ -11,16 +11,17 @@ digest = "0.10"
 directories = "4.0"
 dirs = "4.0"
 ego-tree = "0.6.2"
+entities = { path = "../entities" }
 hex = "0.4"
 html5ever = "0.25"
 http = "0.2"
 jsonrpc-core = "18.0.0"
 jsonrpc-ipc-server = "18.0.0"
 log = "0.4"
+migration = { path = "../migrations" }
 regex = "1"
 reqwest = "0.11"
 ron = "0.7"
-sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 shared = { path = "../shared" }

@@ -1,15 +1,16 @@
 [package]
-name = "reindexer"
+name = "entities"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1"
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
 sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
-entities = { path = "../entities" }
+serde = { version = "1.0", features = ["derive"] }
 shared = { path = "../shared" }
-spyglass = { path = "../spyglass" }
 tokio = { version = "1", features = ["full"] }
 url = "2.2"
