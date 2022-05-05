@@ -96,20 +96,28 @@ async fn start_backend(state: &AppState) {
         }
     }
 
-    let (tx, rx) = mpsc::channel(32);
+    let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(
+        state
+            .config
+            .user_settings
+            .inflight_crawl_limit
+            .value()
+            .try_into()
+            .unwrap(),
+    );
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
 
     // Crawl scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
-        tx,
+        crawl_queue_tx,
         shutdown_tx.subscribe(),
     ));
 
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
-        rx,
+        crawl_queue_rx,
         shutdown_tx.subscribe(),
     ));
 
