@@ -1,7 +1,7 @@
-use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
+use shared::models::{crawl_queue, indexed_document, link};
+use shared::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
 
 use libspyglass::crawler::Crawler;
-use libspyglass::models::{crawl_queue, indexed_document, link};
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use url::Url;

@@ -3,16 +3,17 @@ use std::collections::HashSet;
 use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::{Client, StatusCode};
-use sea_orm::prelude::*;
-use sea_orm::{DatabaseConnection, Set};
 use sha2::{Digest, Sha256};
 use url::Url;
 
+use shared::models::{crawl_queue, fetch_history, resource_rule};
+use shared::sea_orm::prelude::*;
+use shared::sea_orm::{DatabaseConnection, Set};
+
+use crate::scraper::html_to_text;
+
 pub mod robots;
 use robots::ParsedRule;
-
-use crate::models::{crawl_queue, fetch_history, resource_rule};
-use crate::scraper::html_to_text;
 
 use robots::{filter_set, parse};
 
@@ -285,10 +286,10 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use sea_orm::{ActiveModelTrait, Set};
+    use shared::models::{crawl_queue, resource_rule};
+    use shared::sea_orm::{ActiveModelTrait, Set};
 
     use crate::crawler::{Crawler, _normalize_href};
-    use crate::models::{crawl_queue, resource_rule};
     use crate::test::setup_test_db;
 
     use url::Url;

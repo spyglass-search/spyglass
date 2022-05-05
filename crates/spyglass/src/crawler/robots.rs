@@ -1,14 +1,26 @@
+use regex::RegexSet;
+use shared::models::resource_rule;
 /// Parse robots.txt blobs
 /// See the following for more details about robots.txt files:
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
-use regex::RegexSet;
+use std::convert::From;
 
 #[derive(Clone, Debug)]
 pub struct ParsedRule {
     pub domain: String,
     pub regex: String,
     pub allow_crawl: bool,
+}
+
+impl From<resource_rule::Model> for ParsedRule {
+    fn from(model: resource_rule::Model) -> Self {
+        ParsedRule {
+            domain: model.domain,
+            regex: model.rule,
+            allow_crawl: model.allow_crawl,
+        }
+    }
 }
 
 const BOT_AGENT_NAME: &str = "carto";

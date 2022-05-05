@@ -1,12 +1,12 @@
-use sea_orm::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use shared::sea_orm::prelude::*;
+use shared::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
 use crate::crawler::Crawler;
-use crate::models::{crawl_queue, indexed_document, link};
 use crate::search::Searcher;
 use crate::state::AppState;
+use shared::models::{crawl_queue, indexed_document, link};
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {

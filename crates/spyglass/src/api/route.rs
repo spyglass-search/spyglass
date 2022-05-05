@@ -1,16 +1,16 @@
 use jsonrpc_core::{Error, ErrorCode, Result};
-use sea_orm::prelude::*;
-use sea_orm::Set;
 use shared::response::LensResult;
+use shared::sea_orm::prelude::*;
+use shared::sea_orm::Set;
 use tracing::instrument;
 use url::Url;
 
 use shared::request;
 use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 
-use libspyglass::models::crawl_queue;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
+use shared::models::crawl_queue;
 
 use super::response;
 

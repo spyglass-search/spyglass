@@ -83,13 +83,7 @@ pub fn app() -> Html {
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
-                events::handle_query_change(
-                    query,
-                    node_ref,
-                    lens,
-                    search_results,
-                    selected_idx,
-                );
+                events::handle_query_change(query, node_ref, lens, search_results, selected_idx);
                 || ()
             },
             (*query).clone(),

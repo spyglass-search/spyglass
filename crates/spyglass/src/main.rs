@@ -4,10 +4,10 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use libspyglass::models::crawl_queue;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use shared::config::Config;
+use shared::models::crawl_queue;
 
 mod api;
 mod importer;

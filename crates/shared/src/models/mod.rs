@@ -6,7 +6,7 @@ pub mod indexed_document;
 pub mod link;
 pub mod resource_rule;
 
-use shared::config::Config;
+use crate::config::Config;
 
 pub async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm::DbErr> {
     let builder = db.get_database_backend();

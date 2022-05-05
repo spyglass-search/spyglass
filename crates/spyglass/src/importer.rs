@@ -3,8 +3,8 @@ use shared::config::Config;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, fs, path::PathBuf};
 
-use libspyglass::models::crawl_queue;
 use libspyglass::state::AppState;
+use shared::models::crawl_queue;
 
 #[allow(dead_code)]
 pub struct FirefoxImporter {
