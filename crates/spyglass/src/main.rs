@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn load_lenses(state: &AppState) {
     for (_, lens) in state.config.lenses.iter() {
         // Have we added this lens to the database?
-        if let Ok(true) = lens::add(
+        match lens::add(
             &state.db,
             &lens.name,
             lens.description.as_ref(),
@@ -71,25 +71,30 @@ async fn load_lenses(state: &AppState) {
         )
         .await
         {
-            for domain in lens.domains.iter() {
-                match bootstrap::bootstrap(
-                    &state.db,
-                    &state.config.user_settings,
-                    &format!("https://{}", domain),
-                )
-                .await
-                {
-                    Err(e) => log::error!("{}", e),
-                    Ok(_) => log::info!("bootstraping {}", domain),
+            Ok(true) => {
+                for domain in lens.domains.iter() {
+                    match bootstrap::bootstrap(
+                        &state.db,
+                        &state.config.user_settings,
+                        &format!("https://{}", domain),
+                    )
+                    .await
+                    {
+                        Err(e) => log::error!("{}", e),
+                        Ok(_) => log::info!("bootstraping {}", domain),
+                    }
                 }
-            }
 
-            for prefix in lens.urls.iter() {
-                match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await {
-                    Err(e) => log::error!("{}", e),
-                    Ok(_) => log::info!("bootstraping {}", prefix),
+                for prefix in lens.urls.iter() {
+                    match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await
+                    {
+                        Err(e) => log::error!("{}", e),
+                        Ok(_) => log::info!("bootstraping {}", prefix),
+                    }
                 }
             }
+            Ok(false) => log::info!("lens ({}) already added", lens.name),
+            Err(e) => log::error!("error loading lens {}", e),
         }
     }
 }

@@ -206,7 +206,7 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use entities::models::{crawl_queue, resource_rule};
+    use entities::models::crawl_queue;
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
 

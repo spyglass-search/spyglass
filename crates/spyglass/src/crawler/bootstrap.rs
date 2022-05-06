@@ -106,8 +106,8 @@ pub async fn bootstrap(
 mod test {
     use super::{bootstrap, fetch_cdx};
 
-    use crate::models::crawl_queue;
-    use crate::test::setup_test_db;
+    use entities::models::crawl_queue;
+    use entities::test::setup_test_db;
 
     use shared::config::{Limit, UserSettings};
 
@@ -121,6 +121,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_bootstrap() {
         let db = setup_test_db().await;
         let settings = UserSettings {
@@ -129,8 +130,8 @@ mod test {
         };
 
         let res = bootstrap(&db, &settings, "https://roll20.net/compendium/dnd5e").await;
-        assert_eq!(res.unwrap(), 1933);
+        assert_eq!(res.unwrap(), 1935);
         let num_queue = crawl_queue::num_queued(&db).await.unwrap();
-        assert_eq!(num_queue, 1933);
+        assert_eq!(num_queue, 1935);
     }
 }
