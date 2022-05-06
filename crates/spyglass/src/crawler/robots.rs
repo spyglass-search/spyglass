@@ -2,16 +2,14 @@
 /// See the following for more details about robots.txt files:
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
-
 use entities::models::resource_rule;
-use entities::sea_orm::{DatabaseConnection, Set};
 use entities::sea_orm::prelude::*;
+use entities::sea_orm::{DatabaseConnection, Set};
 
 use regex::RegexSet;
 use reqwest::{Client, StatusCode};
 use std::convert::From;
 use url::Url;
-
 
 #[derive(Clone, Debug)]
 pub struct ParsedRule {
@@ -202,10 +200,9 @@ mod test {
     use crate::crawler::Crawler;
 
     use entities::models::resource_rule;
-    use entities::test::setup_test_db;
     use entities::sea_orm::{ActiveModelTrait, Set};
+    use entities::test::setup_test_db;
     use regex::Regex;
-
 
     #[test]
     fn test_parse() {

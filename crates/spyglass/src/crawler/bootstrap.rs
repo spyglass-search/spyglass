@@ -10,8 +10,8 @@ use chrono::{Duration, Utc};
 use reqwest::StatusCode;
 use url::Url;
 
-use entities::sea_orm::DatabaseConnection;
 use entities::models::crawl_queue;
+use entities::sea_orm::DatabaseConnection;
 use shared::config::UserSettings;
 
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";

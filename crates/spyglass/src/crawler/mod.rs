@@ -13,8 +13,8 @@ use entities::sea_orm::DatabaseConnection;
 pub mod bootstrap;
 pub mod robots;
 
-use robots::check_resource_rules;
 use crate::scraper::html_to_text;
+use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;

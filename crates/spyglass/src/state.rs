@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
-use shared::config::Config;
 use entities::sea_orm::DatabaseConnection;
+use shared::config::Config;
 
 use crate::search::{IndexPath, Searcher};
 use entities::models::create_connection;

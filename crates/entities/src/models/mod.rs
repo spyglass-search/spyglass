@@ -1,4 +1,4 @@
-use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, Schema};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
 pub mod crawl_queue;
 pub mod fetch_history;
@@ -7,54 +7,6 @@ pub mod link;
 pub mod resource_rule;
 
 use shared::config::Config;
-
-pub async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm::DbErr> {
-    let builder = db.get_database_backend();
-    let schema = Schema::new(builder);
-
-    db.execute(
-        builder.build(
-            schema
-                .create_table_from_entity(crawl_queue::Entity)
-                .if_not_exists(),
-        ),
-    )
-    .await?;
-    db.execute(
-        builder.build(
-            schema
-                .create_table_from_entity(fetch_history::Entity)
-                .if_not_exists(),
-        ),
-    )
-    .await?;
-    db.execute(
-        builder.build(
-            schema
-                .create_table_from_entity(indexed_document::Entity)
-                .if_not_exists(),
-        ),
-    )
-    .await?;
-    db.execute(
-        builder.build(
-            schema
-                .create_table_from_entity(resource_rule::Entity)
-                .if_not_exists(),
-        ),
-    )
-    .await?;
-    db.execute(
-        builder.build(
-            schema
-                .create_table_from_entity(link::Entity)
-                .if_not_exists(),
-        ),
-    )
-    .await?;
-
-    Ok(())
-}
 
 pub async fn create_connection(is_test: bool) -> anyhow::Result<DatabaseConnection> {
     let db_uri: String = if is_test {
