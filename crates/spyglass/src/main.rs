@@ -4,7 +4,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use entities::models::crawl_queue;
+use entities::models::{crawl_queue, lens};
 use libspyglass::crawler::bootstrap;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
@@ -60,6 +60,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn load_lenses(state: &AppState) {
+    for (_, lens) in state.config.lenses.iter() {
+        // Have we added this lens to the database?
+        if let Ok(true) = lens::add(
+            &state.db,
+            &lens.name,
+            lens.description.as_ref(),
+            &lens.version,
+        )
+        .await
+        {
+            for domain in lens.domains.iter() {
+                match bootstrap::bootstrap(
+                    &state.db,
+                    &state.config.user_settings,
+                    &format!("https://{}", domain),
+                )
+                .await
+                {
+                    Err(e) => log::error!("{}", e),
+                    Ok(_) => log::info!("bootstraping {}", domain),
+                }
+            }
+
+            for prefix in lens.urls.iter() {
+                match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await {
+                    Err(e) => log::error!("{}", e),
+                    Ok(_) => log::info!("bootstraping {}", prefix),
+                }
+            }
+        }
+    }
+}
+
 async fn start_backend(state: &AppState) {
     // TODO: Implement user-friendly start-up wizard
     // if state.config.user_settings.run_wizard {
@@ -72,30 +106,10 @@ async fn start_backend(state: &AppState) {
     // Initialize crawl_queue, set all in-flight tasks to queued.
     crawl_queue::reset_processing(&state.db).await;
 
-    // Check lenses for updates
-    for (_, lens) in state.config.lenses.iter() {
-        // TODO: Add lens to DB
-        for domain in lens.domains.iter() {
-            match bootstrap::bootstrap(
-                &state.db,
-                &state.config.user_settings,
-                &format!("https://{}", domain),
-            )
-            .await
-            {
-                Err(e) => log::error!("{}", e),
-                Ok(_) => log::info!("bootstraping {}", domain),
-            }
-        }
+    // Check lenses for updates & add any bootstrapped URLs to crawler.
+    load_lenses(state).await;
 
-        for prefix in lens.urls.iter() {
-            match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await {
-                Err(e) => log::error!("{}", e),
-                Ok(_) => log::info!("bootstraping {}", prefix),
-            }
-        }
-    }
-
+    // Create channels for scheduler / crawlers
     let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(
         state
             .config

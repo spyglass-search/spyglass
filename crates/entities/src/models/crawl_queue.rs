@@ -24,6 +24,17 @@ pub enum CrawlStatus {
     Failed,
 }
 
+impl fmt::Display for CrawlStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CrawlStatus::Queued => write!(f, "Queued"),
+            CrawlStatus::Processing => write!(f, "Processing"),
+            CrawlStatus::Completed => write!(f, "Completed"),
+            CrawlStatus::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
 #[sea_orm(table_name = "crawl_queue")]
 pub struct Model {
@@ -74,17 +85,6 @@ impl ActiveModelBehavior for ActiveModel {
         }
 
         Ok(self)
-    }
-}
-
-impl fmt::Display for CrawlStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CrawlStatus::Queued => write!(f, "Queued"),
-            CrawlStatus::Processing => write!(f, "Processing"),
-            CrawlStatus::Completed => write!(f, "Completed"),
-            CrawlStatus::Failed => write!(f, "Failed"),
-        }
     }
 }
 
