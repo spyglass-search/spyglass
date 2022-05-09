@@ -66,13 +66,14 @@ async fn load_lenses(state: &AppState) {
         match lens::add(
             &state.db,
             &lens.name,
-            lens.author.as_ref(),
+            &lens.author,
             lens.description.as_ref(),
             &lens.version,
         )
         .await
         {
             Ok(true) => {
+                log::info!("found new lens {}, bootstrapping", lens.name);
                 for domain in lens.domains.iter() {
                     match bootstrap::bootstrap(
                         &state.db,
@@ -83,7 +84,7 @@ async fn load_lenses(state: &AppState) {
                     .await
                     {
                         Err(e) => log::error!("{}", e),
-                        Ok(_) => log::info!("bootstraping {}", domain),
+                        Ok(cnt) => log::info!("bootstraping {} w/ {} urls", domain, cnt),
                     }
                 }
 
@@ -91,7 +92,7 @@ async fn load_lenses(state: &AppState) {
                     match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await
                     {
                         Err(e) => log::error!("{}", e),
-                        Ok(_) => log::info!("bootstraping {}", prefix),
+                        Ok(cnt) => log::info!("bootstraping {} w/ {} urls", prefix, cnt),
                     }
                 }
             }

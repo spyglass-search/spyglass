@@ -24,4 +24,7 @@ WHERE
     COALESCE(indexed.count, 0) < ? AND
     COALESCE(inflight.count, 0) < ? AND
     status = "Queued"
-ORDER BY p_prefix.priority DESC, p_domain.priority DESC, cq.updated_at ASC
+ORDER BY
+    p_prefix.priority DESC,
+    p_domain.priority DESC,
+    cq.updated_at ASC

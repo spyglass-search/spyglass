@@ -36,7 +36,7 @@ impl ActiveModelBehavior for ActiveModel {
 pub async fn add(
     db: &DatabaseConnection,
     name: &str,
-    author: Option<&String>,
+    author: &str,
     description: Option<&String>,
     version: &str,
 ) -> anyhow::Result<bool> {
@@ -51,7 +51,7 @@ pub async fn add(
 
     let new_lens = ActiveModel {
         name: Set(name.to_owned()),
-        author: Set(author.unwrap_or(&"Unknown".to_string()).to_string()),
+        author: Set(author.to_owned()),
         description: Set(description.map(String::from)),
         version: Set(version.to_owned()),
         ..Default::default()

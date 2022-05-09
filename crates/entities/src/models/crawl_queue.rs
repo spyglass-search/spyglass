@@ -286,6 +286,7 @@ pub async fn enqueue(
 
     let new_task = ActiveModel {
         domain: Set(domain.to_string()),
+        crawl_type: Set(overrides.crawl_type.clone()),
         url: Set(url.to_owned()),
         ..Default::default()
     };

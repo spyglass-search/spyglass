@@ -33,16 +33,19 @@ impl MigrationTrait for Migration {
             .await?;
 
         // Add crawl_type column
-        manager.alter_table(Table::alter()
-            .table(crawl_queue::Entity)
-            .add_column(
-                ColumnDef::new(Alias::new("crawl_type"))
-                .string()
-                .not_null()
-                .default(crawl_queue::CrawlType::Normal),
-            ).to_owned()
-        )
-        .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(crawl_queue::Entity)
+                    .add_column(
+                        ColumnDef::new(Alias::new("crawl_type"))
+                            .string()
+                            .not_null()
+                            .default(crawl_queue::CrawlType::Normal),
+                    )
+                    .to_owned(),
+            )
+            .await?;
 
         Ok(())
     }
