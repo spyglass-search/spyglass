@@ -1,10 +1,11 @@
 use std::collections::HashSet;
 
+use addr::parse_domain_name;
 use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::{Client, StatusCode};
 use sha2::{Digest, Sha256};
-use url::Url;
+use url::{Host, Url};
 
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
@@ -80,10 +81,49 @@ impl Default for Crawler {
     }
 }
 
+fn determine_canonical(original: &Url, extracted: &Url) -> String {
+    // Ignore IPs
+    let origin_dn = match original.host() {
+        Some(Host::Domain(s)) => Some(s),
+        _ => None
+    };
+
+    let extracted_dn = match extracted.host() {
+        Some(Host::Domain(s)) => Some(s),
+        _ => None
+    };
+
+    if origin_dn.is_none() || extracted_dn.is_none() {
+        return original.to_string();
+    }
+
+    // Only allow overrides on the same root domain.
+    let origin_dn = parse_domain_name(origin_dn.unwrap());
+    let extracted_dn = parse_domain_name(extracted_dn.unwrap());
+
+    if origin_dn.is_err() || extracted_dn.is_err() {
+        return original.to_string();
+    }
+
+    let origin_dn = origin_dn.unwrap();
+    // Special case for bootstrapper.
+    if origin_dn.root().unwrap() == "archive.org" {
+        return extracted.to_string();
+    }
+
+    if origin_dn.root() == extracted_dn.unwrap().root() {
+        extracted.to_string()
+    } else {
+        original.to_string()
+    }
+
+}
+
 impl Crawler {
     pub fn new() -> Self {
         let client = Client::builder()
             .user_agent(APP_USER_AGENT)
+            // TODO: Make configurable
             .timeout(std::time::Duration::from_secs(60))
             .build()
             .expect("Unable to create reqwest client");
@@ -141,6 +181,11 @@ impl Crawler {
             .filter_map(|link| _normalize_href(url, link))
             .collect();
 
+        let canonical_url = match parse_result.canonical_url {
+            Some(canonical) => determine_canonical(url, &canonical),
+            None => url.to_string(),
+        };
+
         log::trace!("content hash: {:?}", content_hash);
         CrawlResult {
             content_hash,
@@ -148,7 +193,7 @@ impl Crawler {
             description: Some(parse_result.description),
             status: 200,
             title: parse_result.title,
-            url: url.to_string(),
+            url: canonical_url,
             links: normalized_links,
             raw: Some(raw_body.to_string()),
         }
@@ -208,7 +253,7 @@ mod test {
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
 
-    use crate::crawler::{Crawler, _normalize_href};
+    use crate::crawler::{Crawler, _normalize_href, determine_canonical};
 
     use url::Url;
 
@@ -276,5 +321,37 @@ mod test {
             _normalize_href(&url, "foo.html"),
             Some("https://example.com/foo.html".into())
         );
+    }
+
+    #[test]
+    fn test_determine_canonical() {
+        // Test a correct override
+        let a = Url::parse("https://commons.wikipedia.org").unwrap();
+        let b = Url::parse("https://en.wikipedia.org").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://en.wikipedia.org/");
+
+       // Test a valid override from a different domain.
+       let a = Url::parse("https://web.archive.org").unwrap();
+       let b = Url::parse("https://en.wikipedia.org").unwrap();
+
+       let res = determine_canonical(&a, &b);
+       assert_eq!(res, "https://en.wikipedia.org/");
+
+        // Test ignoring an invalid override
+        let a = Url::parse("https://localhost:5000").unwrap();
+        let b = Url::parse("https://en.wikipedia.org").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://localhost:5000/");
+
+        // Test ignoring an invalid override
+        let a = Url::parse("https://en.wikipedia.org").unwrap();
+        let b = Url::parse("https://spam.com").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://en.wikipedia.org/");
+
     }
 }

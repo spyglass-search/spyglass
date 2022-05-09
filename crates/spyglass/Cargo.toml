@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+addr = "0.15.3"
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "5.2"

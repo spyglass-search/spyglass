@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery};
+use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, RegexQuery, TermQuery};
 use tantivy::schema::*;
 use tantivy::Score;
 
@@ -47,6 +47,15 @@ pub fn build_query(
                         IndexRecordOption::Basic,
                     )),
                 ));
+            }
+
+            for prefix in &lens.urls {
+                lense_queries.push((
+                    Occur::Should,
+                    Box::new(
+                        RegexQuery::from_pattern(&format!("{}.*", prefix), fields.url).unwrap(),
+                    ),
+                ))
             }
         }
     }

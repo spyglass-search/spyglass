@@ -154,7 +154,7 @@ pub async fn check_resource_rules(
                             };
                             new_rule.insert(db).await?;
                         }
-                    },
+                    }
                     // No robots.txt? Treat as an allow all
                     StatusCode::NOT_FOUND => {
                         let new_rule = resource_rule::ActiveModel {
