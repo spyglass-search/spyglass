@@ -172,14 +172,12 @@ impl Crawler {
         let domain = url.host_str().unwrap();
         let path = url.path();
 
-        // Skip history check if we're trying to force this crawl.
-        if !crawl.force_crawl {
-            if let Some(history) = fetch_history::find_by_url(db, &url).await? {
-                let since_last_fetch = Utc::now() - history.updated_at;
-                if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
-                    log::info!("Recently fetched, skipping");
-                    return Ok(None);
-                }
+        // Have we crawled this recently?
+        if let Some(history) = fetch_history::find_by_url(db, &url).await? {
+            let since_last_fetch = Utc::now() - history.updated_at;
+            if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
+                log::info!("Recently fetched, skipping");
+                return Ok(None);
             }
         }
 

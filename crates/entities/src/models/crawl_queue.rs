@@ -24,6 +24,17 @@ pub enum CrawlStatus {
     Failed,
 }
 
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
+#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
+pub enum CrawlType {
+    #[sea_orm(string_value = "API")]
+    Api,
+    #[sea_orm(string_value = "Bootstrap")]
+    Bootstrap,
+    #[sea_orm(string_value = "Normal")]
+    Normal,
+}
+
 impl fmt::Display for CrawlStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -50,9 +61,8 @@ pub struct Model {
     /// Number of retries for this task.
     #[sea_orm(default_value = 0)]
     pub num_retries: u8,
-    /// Ignore crawl settings for this URL/domain and push to crawler.
-    #[sea_orm(default_value = false)]
-    pub force_crawl: bool,
+    /// Crawl Type
+    pub crawl_type: CrawlType,
     /// When this was first added to the crawl queue.
     pub created_at: DateTimeUtc,
     /// When this task was last updated.
@@ -71,6 +81,7 @@ impl RelationTrait for Relation {
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
+            crawl_type: Set(CrawlType::Normal),
             status: Set(CrawlStatus::Queued),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),

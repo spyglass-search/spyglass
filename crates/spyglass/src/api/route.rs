@@ -83,7 +83,7 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
     let new_task = crawl_queue::ActiveModel {
         domain: Set(parsed.host_str().unwrap().to_string()),
         url: Set(queue_item.url.to_owned()),
-        force_crawl: Set(queue_item.force_crawl),
+        crawl_type: Set(crawl_queue::CrawlType::Normal),
         ..Default::default()
     };
 
