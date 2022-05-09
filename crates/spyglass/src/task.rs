@@ -31,11 +31,20 @@ pub async fn manager_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
-    let prioritized: Vec<String> = state
+
+    let prioritized_domains: Vec<String> = state
+        .clone()
         .config
         .lenses
         .into_values()
         .flat_map(|lense| lense.domains)
+        .collect();
+
+    let prioritized_prefixes: Vec<String> = state
+        .config
+        .lenses
+        .into_values()
+        .flat_map(|lens| lens.urls)
         .collect();
 
     loop {
@@ -45,7 +54,8 @@ pub async fn manager_task(
             res = crawl_queue::dequeue(
                 &state.db,
                 state.config.user_settings.clone(),
-                &prioritized,
+                &prioritized_domains,
+                &prioritized_prefixes,
             ) => res.unwrap(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
