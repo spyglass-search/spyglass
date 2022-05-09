@@ -85,12 +85,12 @@ fn determine_canonical(original: &Url, extracted: &Url) -> String {
     // Ignore IPs
     let origin_dn = match original.host() {
         Some(Host::Domain(s)) => Some(s),
-        _ => None
+        _ => None,
     };
 
     let extracted_dn = match extracted.host() {
         Some(Host::Domain(s)) => Some(s),
-        _ => None
+        _ => None,
     };
 
     if origin_dn.is_none() || extracted_dn.is_none() {
@@ -116,7 +116,6 @@ fn determine_canonical(original: &Url, extracted: &Url) -> String {
     } else {
         original.to_string()
     }
-
 }
 
 impl Crawler {
@@ -332,12 +331,12 @@ mod test {
         let res = determine_canonical(&a, &b);
         assert_eq!(res, "https://en.wikipedia.org/");
 
-       // Test a valid override from a different domain.
-       let a = Url::parse("https://web.archive.org").unwrap();
-       let b = Url::parse("https://en.wikipedia.org").unwrap();
+        // Test a valid override from a different domain.
+        let a = Url::parse("https://web.archive.org").unwrap();
+        let b = Url::parse("https://en.wikipedia.org").unwrap();
 
-       let res = determine_canonical(&a, &b);
-       assert_eq!(res, "https://en.wikipedia.org/");
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://en.wikipedia.org/");
 
         // Test ignoring an invalid override
         let a = Url::parse("https://localhost:5000").unwrap();
@@ -352,6 +351,5 @@ mod test {
 
         let res = determine_canonical(&a, &b);
         assert_eq!(res, "https://en.wikipedia.org/");
-
     }
 }
