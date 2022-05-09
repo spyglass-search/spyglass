@@ -3,7 +3,7 @@ use sea_orm::Set;
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
-#[sea_orm(table_name = "crawl_queue")]
+#[sea_orm(table_name = "lens")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
