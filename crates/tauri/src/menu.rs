@@ -5,6 +5,7 @@ pub const QUIT_MENU_ITEM: &str = "quit";
 
 pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
 pub const NUM_QUEUED_MENU_ITEM: &str = "num_queue";
+pub const NUM_IN_PROGRESS_MENU_ITEM: &str = "num_in_progress";
 pub const CRAWL_STATUS_MENU_ITEM: &str = "crawl_status";
 
 pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
@@ -41,6 +42,9 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
             CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
         )
         .add_item(CustomMenuItem::new(NUM_QUEUED_MENU_ITEM.to_string(), "XX queued").disabled())
+        .add_item(
+            CustomMenuItem::new(NUM_IN_PROGRESS_MENU_ITEM.to_string(), "XX crawling").disabled(),
+        )
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_lenses_folder)

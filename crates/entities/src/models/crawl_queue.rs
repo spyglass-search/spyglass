@@ -134,10 +134,13 @@ struct CrawlQueueCount {
     count: i64,
 }
 
-pub async fn num_queued(db: &DatabaseConnection) -> anyhow::Result<u64, sea_orm::DbErr> {
+pub async fn num_queued(
+    db: &DatabaseConnection,
+    status: CrawlStatus,
+) -> anyhow::Result<u64, sea_orm::DbErr> {
     let res = Entity::find()
         .column_as(Column::Id.count(), "count")
-        .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
+        .filter(Column::Status.eq(status.to_string()))
         .into_model::<CrawlQueueCount>()
         .one(db)
         .await?;

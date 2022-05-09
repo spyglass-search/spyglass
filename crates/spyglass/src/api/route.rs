@@ -99,12 +99,21 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
 
 pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     let db = &state.db;
-    let num_queued = crawl_queue::num_queued(db).await.unwrap();
+    let num_queued = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Queued)
+        .await
+        .unwrap();
+
+    let mut num_in_progress = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Processing)
+        .await
+        .unwrap();
 
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
     let is_paused = *paused_status == *"true";
+    if is_paused {
+        num_in_progress = 0;
+    }
 
     // Grab details about index
     let index = state.index.lock().unwrap();
@@ -113,6 +122,7 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
     Ok(AppStatus {
         num_docs: reader.num_docs(),
         num_queued,
+        num_in_progress,
         is_paused,
     })
 }

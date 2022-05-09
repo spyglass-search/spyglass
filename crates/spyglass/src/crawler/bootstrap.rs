@@ -132,7 +132,9 @@ mod test {
 
         let res = bootstrap(&db, &settings, "https://roll20.net/compendium/dnd5e").await;
         assert_eq!(res.unwrap(), 1935);
-        let num_queue = crawl_queue::num_queued(&db).await.unwrap();
+        let num_queue = crawl_queue::num_queued(&db, crawl_queue::CrawlStatus::Queued)
+            .await
+            .unwrap();
         assert_eq!(num_queue, 1935);
     }
 }
