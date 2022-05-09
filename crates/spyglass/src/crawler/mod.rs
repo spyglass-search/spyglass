@@ -141,7 +141,7 @@ impl Crawler {
             .filter_map(|link| _normalize_href(url, link))
             .collect();
 
-        log::info!("content hash: {:?}", content_hash);
+        log::trace!("content hash: {:?}", content_hash);
         CrawlResult {
             content_hash,
             content: Some(parse_result.content),

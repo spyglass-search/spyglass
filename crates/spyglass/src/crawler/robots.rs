@@ -139,20 +139,34 @@ pub async fn check_resource_rules(
         match res {
             Err(err) => log::error!("Unable to check robots.txt {}", err.to_string()),
             Ok(res) => {
-                if res.status() == StatusCode::OK {
-                    let body = res.text().await.unwrap();
+                match res.status() {
+                    StatusCode::OK => {
+                        let body = res.text().await.unwrap();
 
-                    let parsed_rules = parse(domain, &body);
-                    for rule in parsed_rules.iter() {
+                        let parsed_rules = parse(domain, &body);
+                        for rule in parsed_rules.iter() {
+                            let new_rule = resource_rule::ActiveModel {
+                                domain: Set(rule.domain.to_owned()),
+                                rule: Set(rule.regex.to_owned()),
+                                no_index: Set(false),
+                                allow_crawl: Set(rule.allow_crawl),
+                                ..Default::default()
+                            };
+                            new_rule.insert(db).await?;
+                        }
+                    },
+                    // No robots.txt? Treat as an allow all
+                    StatusCode::NOT_FOUND => {
                         let new_rule = resource_rule::ActiveModel {
-                            domain: Set(rule.domain.to_owned()),
-                            rule: Set(rule.regex.to_owned()),
+                            domain: Set(domain.to_owned()),
+                            rule: Set("/".to_owned()),
                             no_index: Set(false),
-                            allow_crawl: Set(rule.allow_crawl),
+                            allow_crawl: Set(true),
                             ..Default::default()
                         };
                         new_rule.insert(db).await?;
                     }
+                    _ => {}
                 }
             }
         }
