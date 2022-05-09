@@ -107,7 +107,7 @@ fn determine_canonical(original: &Url, extracted: &Url) -> String {
 
     let origin_dn = origin_dn.unwrap();
     // Special case for bootstrapper.
-    if origin_dn.root().unwrap() == "archive.org" {
+    if origin_dn.root().is_some() && origin_dn.root().unwrap() == "archive.org" {
         return extracted.to_string();
     }
 
