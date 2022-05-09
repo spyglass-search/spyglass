@@ -52,6 +52,16 @@ impl Default for CrawlType {
     }
 }
 
+impl fmt::Display for CrawlType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CrawlType::Api => write!(f, "Api"),
+            CrawlType::Bootstrap => write!(f, "Bootstrap"),
+            CrawlType::Normal => write!(f, "Normal"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
 #[sea_orm(table_name = "crawl_queue")]
 pub struct Model {
@@ -195,6 +205,17 @@ pub async fn dequeue(
         if num_in_progress >= inflight_crawl_limit {
             return Ok(None);
         }
+    }
+
+    // Prioritize any bootstrapping tasks first.
+    let entity = Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
+        .filter(Column::CrawlType.eq(CrawlType::Bootstrap.to_string()))
+        .one(db)
+        .await?;
+
+    if let Some(task) = entity {
+        return Ok(Some(task));
     }
 
     // List of domains to prioritize when dequeuing tasks
