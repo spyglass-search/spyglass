@@ -28,7 +28,7 @@ impl From<resource_rule::Model> for ParsedRule {
     }
 }
 
-const BOT_AGENT_NAME: &str = "carto";
+const BOT_AGENT_NAME: &str = "spyglass";
 
 /// Convert a robots.txt rule into a proper regex string
 fn rule_to_regex(rule: &str) -> Option<String> {

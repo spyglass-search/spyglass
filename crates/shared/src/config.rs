@@ -183,7 +183,7 @@ impl Config {
     }
 
     pub fn data_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", "spyglass").unwrap();
         proj_dirs.data_dir().to_path_buf()
     }
 
@@ -196,7 +196,7 @@ impl Config {
     }
 
     pub fn prefs_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", "spyglass").unwrap();
         proj_dirs.preference_dir().to_path_buf()
     }
 
