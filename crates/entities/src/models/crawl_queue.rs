@@ -24,6 +24,17 @@ pub enum CrawlStatus {
     Failed,
 }
 
+impl fmt::Display for CrawlStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CrawlStatus::Queued => write!(f, "Queued"),
+            CrawlStatus::Processing => write!(f, "Processing"),
+            CrawlStatus::Completed => write!(f, "Completed"),
+            CrawlStatus::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum CrawlType {
@@ -35,14 +46,9 @@ pub enum CrawlType {
     Normal,
 }
 
-impl fmt::Display for CrawlStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CrawlStatus::Queued => write!(f, "Queued"),
-            CrawlStatus::Processing => write!(f, "Processing"),
-            CrawlStatus::Completed => write!(f, "Completed"),
-            CrawlStatus::Failed => write!(f, "Failed"),
-        }
+impl Default for CrawlType {
+    fn default() -> Self {
+        CrawlType::Normal
     }
 }
 
@@ -217,6 +223,7 @@ pub enum SkipReason {
 #[derive(Default)]
 pub struct EnqueueSettings {
     pub skip_blocklist: bool,
+    pub crawl_type: CrawlType,
 }
 
 pub async fn enqueue(
