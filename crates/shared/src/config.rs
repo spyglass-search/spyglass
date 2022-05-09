@@ -24,6 +24,7 @@ impl Default for Config {
 /// improve results.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Lens {
+    pub author: Option<String>,
     pub name: String,
     pub description: Option<String>,
     pub domains: Vec<String>,
@@ -156,6 +157,7 @@ impl Config {
         if lenses.is_empty() {
             // Create a default lens as an example.
             let lens = Lens {
+                author: Some("Spyglass".to_string()),
                 version: "1".to_string(),
                 name: "wiki".to_string(),
                 description: Some(

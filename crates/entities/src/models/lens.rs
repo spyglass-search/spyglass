@@ -10,6 +10,7 @@ pub struct Model {
     // Will definitely run into namespace issues later on, something to think about.
     #[sea_orm(unique)]
     pub name: String,
+    pub author: String,
     pub description: Option<String>,
     pub version: String,
 }
@@ -35,6 +36,7 @@ impl ActiveModelBehavior for ActiveModel {
 pub async fn add(
     db: &DatabaseConnection,
     name: &str,
+    author: Option<&String>,
     description: Option<&String>,
     version: &str,
 ) -> anyhow::Result<bool> {
@@ -49,6 +51,7 @@ pub async fn add(
 
     let new_lens = ActiveModel {
         name: Set(name.to_owned()),
+        author: Set(author.unwrap_or(&"Unknown".to_string()).to_string()),
         description: Set(description.map(String::from)),
         version: Set(version.to_owned()),
         ..Default::default()

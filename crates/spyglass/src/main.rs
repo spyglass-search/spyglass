@@ -66,6 +66,7 @@ async fn load_lenses(state: &AppState) {
         match lens::add(
             &state.db,
             &lens.name,
+            lens.author.as_ref(),
             lens.description.as_ref(),
             &lens.version,
         )
@@ -76,6 +77,7 @@ async fn load_lenses(state: &AppState) {
                     match bootstrap::bootstrap(
                         &state.db,
                         &state.config.user_settings,
+                        // Safe to assume domains always have HTTPS support?
                         &format!("https://{}", domain),
                     )
                     .await
