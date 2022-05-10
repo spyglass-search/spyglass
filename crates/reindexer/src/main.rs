@@ -74,7 +74,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     let added = crawl_queue::enqueue(
                         &state.db,
                         link,
-                        &state.config.user_settings,
+                        &state.user_settings,
                         &Default::default(),
                     )
                     .await

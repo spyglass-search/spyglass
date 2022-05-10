@@ -61,7 +61,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn load_lenses(state: &AppState) {
-    for (_, lens) in state.config.lenses.iter() {
+    for entry in state.lenses.iter() {
+        let lens = entry.value();
         // Have we added this lens to the database?
         match lens::add(
             &state.db,
@@ -77,7 +78,7 @@ async fn load_lenses(state: &AppState) {
                 for domain in lens.domains.iter() {
                     match bootstrap::bootstrap(
                         &state.db,
-                        &state.config.user_settings,
+                        &state.user_settings,
                         // Safe to assume domains always have HTTPS support?
                         &format!("https://{}", domain),
                     )
@@ -89,7 +90,7 @@ async fn load_lenses(state: &AppState) {
                 }
 
                 for prefix in lens.urls.iter() {
-                    match bootstrap::bootstrap(&state.db, &state.config.user_settings, prefix).await
+                    match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await
                     {
                         Err(e) => log::error!("{}", e),
                         Ok(cnt) => log::info!("bootstraping {} w/ {} urls", prefix, cnt),
@@ -120,7 +121,6 @@ async fn start_backend(state: &AppState) {
     // Create channels for scheduler / crawlers
     let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(
         state
-            .config
             .user_settings
             .inflight_crawl_limit
             .value()
