@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use crate::search::{IndexPath, Searcher};
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
-use shared::config::{Config, UserSettings, Lens};
-use crate::search::{IndexPath, Searcher};
+use shared::config::{Config, Lens, UserSettings};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -12,7 +12,7 @@ pub struct AppState {
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, Lens>>,
     pub user_settings: UserSettings,
-    pub index: Arc<Mutex<Searcher>>,
+    pub index: Searcher,
 }
 
 impl AppState {
@@ -40,7 +40,7 @@ impl AppState {
             app_state: Arc::new(app_state),
             user_settings: config.user_settings,
             lenses: Arc::new(lenses),
-            index: Arc::new(Mutex::new(index)),
+            index,
         }
     }
 }

@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn load_lenses(state: &AppState) {
+async fn load_lenses(state: AppState) {
     for entry in state.lenses.iter() {
         let lens = entry.value();
         // Have we added this lens to the database?
@@ -90,8 +90,7 @@ async fn load_lenses(state: &AppState) {
                 }
 
                 for prefix in lens.urls.iter() {
-                    match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await
-                    {
+                    match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await {
                         Err(e) => log::error!("{}", e),
                         Ok(cnt) => log::info!("bootstraping {} w/ {} urls", prefix, cnt),
                     }
@@ -116,7 +115,7 @@ async fn start_backend(state: &AppState) {
     crawl_queue::reset_processing(&state.db).await;
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
-    load_lenses(state).await;
+    load_lenses(state.clone()).await;
 
     // Create channels for scheduler / crawlers
     let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(

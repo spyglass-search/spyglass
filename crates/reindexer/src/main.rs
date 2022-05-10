@@ -23,8 +23,8 @@ async fn main() -> Result<(), anyhow::Error> {
     while let Some(docs) = pages.fetch_and_next().await? {
         for doc in docs.into_iter() {
             let indexed_doc = {
-                let index = state.index.lock().unwrap();
-                Searcher::get_by_id(&index.reader, &doc.doc_id)
+                let index_reader = &state.index.reader;
+                Searcher::get_by_id(index_reader, &doc.doc_id)
             };
 
             if let Some(indexed_doc) = indexed_doc {
@@ -46,15 +46,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 // Update document in index
                 {
                     // Delete old document
-                    let mut index = state.index.lock().unwrap();
-                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
+                    Searcher::delete(&mut index_writer, &doc.doc_id).unwrap();
                 }
 
                 // Update document in DB
                 let doc_id = {
-                    let mut index = state.index.lock().unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
                     Searcher::add_document(
-                        &mut index.writer,
+                        &mut index_writer,
                         &scrape.title.unwrap_or_default(),
                         &scrape.description.unwrap_or_default(),
                         url.host_str().unwrap(),

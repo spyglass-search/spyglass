@@ -81,7 +81,9 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
     match result {
         Ok(Some(crawl_result)) => {
             // Update job status
-            let cq_status = if crawl_result.is_success() {
+            // We consider 400s complete in this case since we manage to hit the server
+            // successfully but nothing useful was returned.
+            let cq_status = if crawl_result.is_success() || crawl_result.is_bad_request() {
                 crawl_queue::CrawlStatus::Completed
             } else {
                 crawl_queue::CrawlStatus::Failed
@@ -122,15 +124,15 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
                 // Delete old document, if any.
                 if let Some(doc) = &existing {
-                    let mut index = state.index.lock().unwrap();
-                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
+                    Searcher::delete(&mut index_writer, &doc.doc_id).unwrap();
                 }
 
                 // Add document to index
                 let doc_id = {
-                    let mut index = state.index.lock().unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
                     Searcher::add_document(
-                        &mut index.writer,
+                        &mut index_writer,
                         &crawl_result.title.unwrap_or_default(),
                         &crawl_result.description.unwrap_or_default(),
                         url.host_str().unwrap(),

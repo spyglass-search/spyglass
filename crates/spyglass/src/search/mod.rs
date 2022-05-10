@@ -1,8 +1,8 @@
 #![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
@@ -25,10 +25,11 @@ pub enum IndexPath {
     Memory,
 }
 
+#[derive(Clone)]
 pub struct Searcher {
     pub index: Index,
     pub reader: IndexReader,
-    pub writer: IndexWriter,
+    pub writer: Arc<Mutex<IndexWriter>>,
 }
 
 impl Debug for Searcher {
@@ -149,7 +150,7 @@ impl Searcher {
         Searcher {
             index,
             reader,
-            writer,
+            writer: Arc::new(Mutex::new(writer)),
         }
     }
 

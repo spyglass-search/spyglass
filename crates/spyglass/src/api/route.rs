@@ -20,7 +20,7 @@ use super::response;
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = Searcher::doc_fields();
 
-    let index = state.index.lock().unwrap();
+    let index = state.index;
     let searcher = index.reader.searcher();
 
     // Create a copy of the lenses for this search
@@ -124,7 +124,7 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
     }
 
     // Grab details about index
-    let index = state.index.lock().unwrap();
+    let index = state.index;
     let reader = index.reader.searcher();
 
     Ok(AppStatus {

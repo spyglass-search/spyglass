@@ -19,7 +19,7 @@ use url::Url;
 
 use entities::models::crawl_queue;
 use entities::sea_orm::DatabaseConnection;
-use shared::config::UserSettings;
+use shared::config::{Limit, UserSettings};
 
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
@@ -171,7 +171,7 @@ pub async fn bootstrap(
     let client = reqwest::Client::new();
     let mut stream = CDXStream::new(&client, &url.to_string(), 1337);
 
-    let mut count = 0;
+    let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
         skip_blocklist: true,
         crawl_type: crawl_queue::CrawlType::Bootstrap,
@@ -180,6 +180,14 @@ pub async fn bootstrap(
     // Stream pages of URLs from the CDX server & add them to our crawl queue.
     while let Some(result) = stream.next().await {
         if let Ok(urls) = result {
+            // Some URLs/domains might have a crazy amount of URLs, so we limit
+            // how much data to bootstrap based on user settings
+            if let Limit::Finite(limit) = settings.domain_crawl_limit {
+                if count > limit as usize {
+                    return Ok(count);
+                }
+            }
+
             // Add URLs to crawl queue
             for url in urls.iter() {
                 let archive_url = create_archive_url(url);

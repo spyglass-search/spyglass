@@ -41,7 +41,12 @@ pub struct CrawlResult {
 
 impl CrawlResult {
     pub fn is_success(&self) -> bool {
+        // Success codes
         self.status >= 200 && self.status <= 299
+    }
+
+    pub fn is_bad_request(&self) -> bool {
+        self.status >= 400 && self.status <= 499
     }
 }
 
