@@ -70,7 +70,7 @@ impl Searcher {
 
         schema_builder.add_text_field("title", TEXT | STORED);
         schema_builder.add_text_field("description", TEXT | STORED);
-        schema_builder.add_text_field("url", TEXT | STORED);
+        schema_builder.add_text_field("url", STRING | STORED);
         // Indexed but don't store for retreival
         schema_builder.add_text_field("content", TEXT);
         // Stored but not indexed
@@ -335,7 +335,35 @@ mod test {
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
-        let query = "::wiki:: salinas";
+        let query = "salinas";
+        let results = Searcher::search_with_lens(
+            &lenses,
+            &searcher.index,
+            &searcher.reader,
+            &applied_lens,
+            query,
+        );
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    pub fn test_url_lens_search() {
+        let lens = Lens {
+            name: "wiki".to_string(),
+            domains: Vec::new(),
+            urls: vec!["https://en.wikipedia.org/mice".to_string()],
+            ..Default::default()
+        };
+
+        let applied_lens = vec!["wiki".to_string()];
+
+        let mut lenses = HashMap::new();
+        lenses.insert("wiki".to_string(), lens.clone());
+
+        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        _build_test_index(&mut searcher);
+
+        let query = "salinas";
         let results = Searcher::search_with_lens(
             &lenses,
             &searcher.index,

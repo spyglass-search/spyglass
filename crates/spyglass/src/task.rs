@@ -31,11 +31,20 @@ pub async fn manager_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
-    let prioritized: Vec<String> = state
+
+    let prioritized_domains: Vec<String> = state
+        .clone()
         .config
         .lenses
         .into_values()
         .flat_map(|lense| lense.domains)
+        .collect();
+
+    let prioritized_prefixes: Vec<String> = state
+        .config
+        .lenses
+        .into_values()
+        .flat_map(|lens| lens.urls)
         .collect();
 
     loop {
@@ -45,7 +54,8 @@ pub async fn manager_task(
             res = crawl_queue::dequeue(
                 &state.db,
                 state.config.user_settings.clone(),
-                &prioritized,
+                &prioritized_domains,
+                &prioritized_prefixes,
             ) => res.unwrap(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
@@ -67,8 +77,6 @@ pub async fn manager_task(
                 return;
             }
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
 
@@ -91,9 +99,14 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
             // Add links found to crawl queue
             for link in crawl_result.links.iter() {
-                let added = crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
-                    .await
-                    .unwrap();
+                let added = crawl_queue::enqueue(
+                    &state.db,
+                    link,
+                    &state.config.user_settings,
+                    &Default::default(),
+                )
+                .await
+                .unwrap();
 
                 // Only add valid urls
                 if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {

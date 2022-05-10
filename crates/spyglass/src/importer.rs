@@ -3,8 +3,8 @@ use shared::config::Config;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, fs, path::PathBuf};
 
-use libspyglass::state::AppState;
 use entities::models::crawl_queue;
+use libspyglass::state::AppState;
 
 #[allow(dead_code)]
 pub struct FirefoxImporter {
@@ -83,7 +83,13 @@ impl FirefoxImporter {
 
         let mut count = 0;
         for (_, url) in rows.iter() {
-            crawl_queue::enqueue(&state.db, url, &self.config.user_settings).await?;
+            crawl_queue::enqueue(
+                &state.db,
+                url,
+                &self.config.user_settings,
+                &Default::default(),
+            )
+            .await?;
             count += 1;
         }
 

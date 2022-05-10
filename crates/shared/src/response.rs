@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct AppStatus {
     pub num_docs: u64,
     pub num_queued: u64,
+    pub num_in_progress: u64,
     pub is_paused: bool,
 }
 

@@ -1,5 +1,5 @@
-use serde::Serialize;
 use entities::models::crawl_queue;
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct ListQueue {

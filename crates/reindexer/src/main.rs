@@ -71,9 +71,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
                 // Update parsed links
                 for link in scrape.links.iter() {
-                    let added = crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
-                        .await
-                        .unwrap();
+                    let added = crawl_queue::enqueue(
+                        &state.db,
+                        link,
+                        &state.config.user_settings,
+                        &Default::default(),
+                    )
+                    .await
+                    .unwrap();
 
                     // Only add valid urls
                     if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {

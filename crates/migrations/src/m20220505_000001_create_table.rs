@@ -1,5 +1,5 @@
-use sea_schema::migration::prelude::*;
 use entities::sea_orm::{ConnectionTrait, Statement};
+use sea_schema::migration::prelude::*;
 
 pub struct Migration;
 

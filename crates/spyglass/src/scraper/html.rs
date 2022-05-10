@@ -87,6 +87,13 @@ impl Html {
         None
     }
 
+    pub fn link_tags(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        self._find_link(&mut map);
+
+        map
+    }
+
     /// Returns a map of meta attributes from the header
     /// This specifically looks for meta tags with a "name" or "property" attr
     /// and an accompanying "content" attr.
@@ -95,6 +102,33 @@ impl Html {
         self._find_meta(&mut map);
 
         map
+    }
+
+    fn _find_link(&self, map: &mut HashMap<String, String>) {
+        // Links tags we're looking for
+        let rel_key = QualName::new(None, ns!(), local_name!("rel"));
+        let href_key = QualName::new(None, ns!(), local_name!("href"));
+
+        // Loop through elements in the header and find the matching meta tags
+        let root = self.head().unwrap();
+        for child in root.children() {
+            let node = child.value();
+            if !node.is_element() {
+                continue;
+            }
+
+            if let Some(element) = node.as_element() {
+                if element.name() == "link"
+                    && element.attrs.contains_key(&rel_key)
+                    && element.attrs.contains_key(&href_key)
+                {
+                    let key = element.attrs.get(&rel_key).unwrap().to_string();
+                    let value = element.attrs.get(&href_key).unwrap().to_string();
+
+                    map.insert(key, value);
+                }
+            }
+        }
     }
 
     fn _find_meta(&self, map: &mut HashMap<String, String>) {

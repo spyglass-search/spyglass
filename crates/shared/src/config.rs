@@ -24,11 +24,19 @@ impl Default for Config {
 /// improve results.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Lens {
+    #[serde(default = "Lens::default_author")]
+    pub author: String,
     pub name: String,
     pub description: Option<String>,
     pub domains: Vec<String>,
     pub urls: Vec<String>,
     pub version: String,
+}
+
+impl Lens {
+    fn default_author() -> String {
+        "Unknown".to_string()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -142,12 +150,14 @@ impl Config {
         let lense_dir = Self::lenses_dir();
         for entry in (fs::read_dir(lense_dir)?).flatten() {
             let path = entry.path();
-            if path.is_file() {
-                match ron::from_str::<Lens>(&fs::read_to_string(path).unwrap()) {
-                    Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
-                    Ok(lens) => {
-                        log::info!("Loaded lens {}", lens.name);
-                        lenses.insert(lens.name.clone(), lens);
+            if path.is_file() && path.extension().unwrap_or_default() == "ron" {
+                if let Ok(file_contents) = fs::read_to_string(path) {
+                    match ron::from_str::<Lens>(&file_contents) {
+                        Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
+                        Ok(lens) => {
+                            log::info!("Loaded lens {}", lens.name);
+                            lenses.insert(lens.name.clone(), lens);
+                        }
                     }
                 }
             }
@@ -156,6 +166,7 @@ impl Config {
         if lenses.is_empty() {
             // Create a default lens as an example.
             let lens = Lens {
+                author: "Spyglass".to_string(),
                 version: "1".to_string(),
                 name: "wiki".to_string(),
                 description: Some(
@@ -181,7 +192,7 @@ impl Config {
     }
 
     pub fn data_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", "spyglass").unwrap();
         proj_dirs.data_dir().to_path_buf()
     }
 
@@ -194,7 +205,7 @@ impl Config {
     }
 
     pub fn prefs_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "carto").unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", "spyglass").unwrap();
         proj_dirs.preference_dir().to_path_buf()
     }
 
