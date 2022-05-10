@@ -4408,6 +4408,7 @@ dependencies = [
  "tantivy",
  "tendril",
  "tokio",
+ "tokio-retry",
  "tracing",
  "tracing-appender",
  "tracing-log",

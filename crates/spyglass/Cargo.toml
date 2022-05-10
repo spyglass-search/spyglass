@@ -31,6 +31,7 @@ sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono
 tantivy = "0.17"
 tendril = "0.4.2"
 tokio = { version = "1", features = ["full"] }
+tokio-retry = "0.3"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-log = "0.1.3"
