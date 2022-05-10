@@ -9,7 +9,7 @@
 use chrono::{Duration, Utc};
 use futures::{FutureExt, Stream, StreamExt};
 use reqwest::{Client, Error};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -41,7 +41,7 @@ pub struct CDXStream {
     pub client: Client,
     pub is_done: bool,
     pub limit: usize,
-    pub params: HashMap<String, String>,
+    pub params: Vec<(String, String)>,
     pub next_page_request: Option<Pin<Box<dyn Future<Output = CDXResponse>>>>,
 }
 
@@ -52,7 +52,7 @@ impl CDXStream {
 
         // More docs on parameters here:
         // https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server#filtering
-        let params: HashMap<String, String> = HashMap::from([
+        let params: Vec<(String, String)> = vec![
             // TODO: Make this configurable in the lens format?
             ("matchType".into(), "prefix".into()),
             // Only successful pages
@@ -69,7 +69,7 @@ impl CDXStream {
             // Only look at things that have existed within the last year.
             ("from".into(), last_year),
             ("url".into(), prefix.into()),
-        ]);
+        ];
 
         let client_clone = client.clone();
         CDXStream {
@@ -115,11 +115,19 @@ impl Stream for CDXStream {
                         }
 
                         if let Some(resume_key) = resume_key {
-                            inner.params.insert("resumeKey".into(), resume_key);
+                            let mut new_params: Vec<(String, String)> = inner.params
+                                .iter()
+                                .filter(|(key, _)| key == "resumeKey")
+                                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                                .collect();
+
+                            new_params.push(("resumeKey".into(), resume_key));
+
                             let client = inner.client.clone();
-                            let params = inner.params.clone();
+                            let params_clone = new_params.clone();
                             let fetch =
-                                Box::pin(async move { fetch_cdx_page(client, params).await });
+                                Box::pin(async move { fetch_cdx_page(client, params_clone).await });
+                            inner.params = new_params.clone();
                             inner.next_page_request = Some(fetch);
                         } else {
                             inner.is_done = true;
@@ -143,7 +151,7 @@ impl Stream for CDXStream {
     }
 }
 
-async fn fetch_cdx_page(client: Client, params: HashMap<String, String>) -> CDXResponse {
+async fn fetch_cdx_page(client: Client, params: Vec<(String, String)>) -> CDXResponse {
     let retry_strat = ExponentialBackoff::from_millis(1000).take(3);
     // If we're hitting the CDX endpoint too fast, wait a little bit before retrying.
     Retry::spawn(retry_strat, || async {
