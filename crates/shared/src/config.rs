@@ -191,8 +191,16 @@ impl Config {
         Ok(lenses)
     }
 
+    pub fn app_identifier() -> String {
+        if cfg!(debug_assertions) {
+            "spyglass-dev".to_string()
+        } else {
+            "spyglass".to_string()
+        }
+    }
+
     pub fn data_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "spyglass").unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
         proj_dirs.data_dir().to_path_buf()
     }
 
@@ -205,7 +213,8 @@ impl Config {
     }
 
     pub fn prefs_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", "spyglass").unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
+        log::info!("Using {:?}", proj_dirs.preference_dir().to_path_buf());
         proj_dirs.preference_dir().to_path_buf()
     }
 
