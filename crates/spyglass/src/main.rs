@@ -9,7 +9,7 @@ use libspyglass::crawler::bootstrap;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use migration::{Migrator, MigratorTrait};
-use shared::config::Config;
+use shared::config::{Config, Lens};
 
 mod api;
 mod importer;
@@ -61,8 +61,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn load_lenses(state: AppState) {
+    let mut new_lenses: Vec<Lens> = Vec::new();
+
     for entry in state.lenses.iter() {
         let lens = entry.value();
+
         // Have we added this lens to the database?
         match lens::add(
             &state.db,
@@ -74,32 +77,39 @@ async fn load_lenses(state: AppState) {
         .await
         {
             Ok(true) => {
-                log::info!("found new lens {}, bootstrapping", lens.name);
-                for domain in lens.domains.iter() {
-                    match bootstrap::bootstrap(
-                        &state.db,
-                        &state.user_settings,
-                        // Safe to assume domains always have HTTPS support?
-                        &format!("https://{}", domain),
-                    )
-                    .await
-                    {
-                        Err(e) => log::error!("{}", e),
-                        Ok(cnt) => log::info!("bootstraping {} w/ {} urls", domain, cnt),
-                    }
-                }
-
-                for prefix in lens.urls.iter() {
-                    match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await {
-                        Err(e) => log::error!("{}", e),
-                        Ok(cnt) => log::info!("bootstraping {} w/ {} urls", prefix, cnt),
-                    }
-                }
+                log::info!("found new lens {}", lens.name);
+                new_lenses.push(lens.clone());
             }
             Ok(false) => log::info!("lens ({}) already added", lens.name),
             Err(e) => log::error!("error loading lens {}", e),
         }
     }
+
+    // Bootstrap new lenses
+    log::info!("bootstraping new lenses");
+    for lens in new_lenses {
+        for domain in lens.domains.iter() {
+            match bootstrap::bootstrap(
+                &state.db,
+                &state.user_settings,
+                // Safe to assume domains always have HTTPS support?
+                &format!("https://{}", domain),
+            )
+            .await
+            {
+                Err(e) => log::error!("{}", e),
+                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", domain, cnt),
+            }
+        }
+
+        for prefix in lens.urls.iter() {
+            match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await {
+                Err(e) => log::error!("{}", e),
+                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", prefix, cnt),
+            }
+        }
+    }
+    log::info!("finished bootstrapping");
 }
 
 async fn start_backend(state: &AppState) {
@@ -115,7 +125,7 @@ async fn start_backend(state: &AppState) {
     crawl_queue::reset_processing(&state.db).await;
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
-    load_lenses(state.clone()).await;
+    let _ = tokio::spawn(load_lenses(state.clone()));
 
     // Create channels for scheduler / crawlers
     let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(

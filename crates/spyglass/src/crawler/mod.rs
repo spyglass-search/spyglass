@@ -214,7 +214,7 @@ impl Crawler {
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
 
-        log::info!("Fetching URL: {:?}", crawl.url);
+        log::trace!("Fetching URL: {:?}", crawl.url);
         let url = Url::parse(&crawl.url).unwrap();
 
         // Break apart domain + path of the URL
@@ -225,7 +225,7 @@ impl Crawler {
         if let Some(history) = fetch_history::find_by_url(db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
-                log::info!("Recently fetched, skipping");
+                log::trace!("Recently fetched, skipping");
                 return Ok(None);
             }
         }
@@ -237,7 +237,7 @@ impl Crawler {
 
         // Crawl & save the data
         let result = self.crawl(&url).await;
-        log::info!(
+        log::trace!(
             "crawl result: {:?} - {:?}\n{:?}",
             result.title,
             result.url,

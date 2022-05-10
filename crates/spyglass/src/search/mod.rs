@@ -238,7 +238,7 @@ mod test {
     use std::collections::HashMap;
 
     fn _build_test_index(searcher: &mut Searcher) {
-        let writer = &mut searcher.writer;
+        let writer = &mut searcher.writer.lock().unwrap();
         Searcher::add_document(
             writer,
             "Of Mice and Men",
