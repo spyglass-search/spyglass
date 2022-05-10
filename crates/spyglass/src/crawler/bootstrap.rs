@@ -50,6 +50,8 @@ impl CDXStream {
         let last_year = Utc::now() - Duration::weeks(52);
         let last_year = last_year.format("%Y").to_string();
 
+        // More docs on parameters here:
+        // https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server#filtering
         let params: HashMap<String, String> = HashMap::from([
             // TODO: Make this configurable in the lens format?
             ("matchType".into(), "prefix".into()),
@@ -143,7 +145,7 @@ impl Stream for CDXStream {
 
 async fn fetch_cdx_page(client: Client, params: HashMap<String, String>) -> CDXResponse {
     let retry_strat = ExponentialBackoff::from_millis(1000).take(3);
-
+    // If we're hitting the CDX endpoint too fast, wait a little bit before retrying.
     Retry::spawn(retry_strat, || async {
         let req = client.get(ARCHIVE_CDX_ENDPOINT).query(&params);
         let resp = req.send().await;
@@ -155,6 +157,9 @@ async fn fetch_cdx_page(client: Client, params: HashMap<String, String>) -> CDXR
     .await
 }
 
+/// Bootstraps a URL prefix by grabbing all the archived URLs from the past year
+/// from the Internet Archive. We then crawl their archived stuff as fast as possible
+/// locally to bring the index up to date.
 pub async fn bootstrap(
     db: &DatabaseConnection,
     settings: &UserSettings,
@@ -166,13 +171,13 @@ pub async fn bootstrap(
     let client = reqwest::Client::new();
     let mut stream = CDXStream::new(&client, &url.to_string(), 1337);
 
-    // Extract URLs
     let mut count = 0;
     let overrides = crawl_queue::EnqueueSettings {
         skip_blocklist: true,
         crawl_type: crawl_queue::CrawlType::Bootstrap,
     };
 
+    // Stream pages of URLs from the CDX server & add them to our crawl queue.
     while let Some(result) = stream.next().await {
         if let Ok(urls) = result {
             // Add URLs to crawl queue
@@ -198,6 +203,8 @@ mod test {
 
     use shared::config::{Limit, UserSettings};
 
+    // These tests are ignored since they hit a 3rd party service and we don't
+    // want them to be run everytime in CI
     #[tokio::test]
     #[ignore]
     async fn test_bootstrap() {
