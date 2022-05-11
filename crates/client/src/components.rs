@@ -73,7 +73,7 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
     match res.result_type {
         ResultListType::DocSearch => {
             let url_link = if res.url.is_some() {
-                let domain = res.domain.clone().unwrap_or("example.com".to_string());
+                let domain = res.domain.clone().unwrap_or_else(||"example.com".to_string());
                 let url = res.url.clone().unwrap();
 
                 let path = url
@@ -87,7 +87,7 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
                             <img src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())} />
                             {domain.clone()}
                         </a>
-                        <span>{format!(" → {}", path.clone())}</span>
+                        <span>{format!(" → {}", path)}</span>
                     </div>
                 }
             } else {
