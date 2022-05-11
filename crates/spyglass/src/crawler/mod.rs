@@ -14,6 +14,7 @@ use entities::sea_orm::DatabaseConnection;
 pub mod bootstrap;
 pub mod robots;
 
+use crate::crawler::bootstrap::create_archive_url;
 use crate::scraper::html_to_text;
 use robots::check_resource_rules;
 
@@ -41,7 +42,12 @@ pub struct CrawlResult {
 
 impl CrawlResult {
     pub fn is_success(&self) -> bool {
+        // Success codes
         self.status >= 200 && self.status <= 299
+    }
+
+    pub fn is_bad_request(&self) -> bool {
+        self.status >= 400 && self.status <= 499
     }
 }
 
@@ -209,8 +215,15 @@ impl Crawler {
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
 
-        log::info!("Fetching URL: {:?}", crawl.url);
-        let url = Url::parse(&crawl.url).unwrap();
+        // Modify bootstrapped URLs to pull from the Internet Archive
+        let fetch_url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            create_archive_url(&crawl.url)
+        } else {
+            crawl.url.clone()
+        };
+
+        log::info!("Fetching {:?}", fetch_url);
+        let url = Url::parse(&fetch_url).unwrap();
 
         // Break apart domain + path of the URL
         let domain = url.host_str().unwrap();
@@ -220,7 +233,7 @@ impl Crawler {
         if let Some(history) = fetch_history::find_by_url(db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
-                log::info!("Recently fetched, skipping");
+                log::trace!("Recently fetched, skipping");
                 return Ok(None);
             }
         }
@@ -231,8 +244,18 @@ impl Crawler {
         }
 
         // Crawl & save the data
-        let result = self.crawl(&url).await;
-        log::info!(
+        let mut result = self.crawl(&url).await;
+        // Check to see if a canonical URL was found, if not use the original
+        // bootstrapped URL
+        if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            let parsed = Url::parse(&result.url).unwrap();
+            let domain = parsed.host_str().unwrap();
+            if domain == "web.archive.org" {
+                result.url = crawl.url.clone();
+            }
+        }
+
+        log::trace!(
             "crawl result: {:?} - {:?}\n{:?}",
             result.title,
             result.url,

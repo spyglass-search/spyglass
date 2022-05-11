@@ -23,6 +23,10 @@
 .result-selected {
     background: darken($blue, 25%);
     .result-description, .result-url > a {
+        color: darken($fg-color, 25%) !important;
+    }
+
+    .result-title {
         color: $fg-color !important;
     }
 }
@@ -30,15 +34,19 @@
 .result-item {
     border-top: 1px solid #444;
     padding: 1.25em;
-    height: 9em;
+    height: 10em;
     box-sizing: border-box;
 
     .result-url {
         font-size: 0.9em;
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
 
         img {
-            width: 1em;
-            height: 1em;
+            width: 1.1em;
+            height: 1.1em;
             vertical-align: middle;
             margin-right: 4px;
         }
@@ -50,10 +58,14 @@
     }
 
     h2.result-title {
-        font-weight: normal;
         font-size: 1.1em;
-        padding: 0;
+        font-weight: normal;
         margin: 0.5em 0;
+        overflow: hidden;
+        padding: 0;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
     }
 
     h2.result-title-lg {
@@ -66,16 +78,18 @@
     .result-description {
         color: $comment;
         line-height: 1.5em;
-        font-size: 1em;
+        font-size: 0.9em;
         overflow: hidden;
-        height: 3em;
+        text-overflow: ellipsis;
+        height: 4.25em;
+        width: 100%;
     }
 }
 
 .lens-result-item {
     border-top: 1px solid #444;
     padding: 1.25em;
-    height: 7em;
+    height: 8em;
     box-sizing: border-box;
 
     h2.result-title {

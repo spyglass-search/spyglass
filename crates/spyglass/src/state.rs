@@ -1,18 +1,18 @@
-use std::sync::{Arc, Mutex};
-
-use dashmap::DashMap;
-use entities::sea_orm::DatabaseConnection;
-use shared::config::Config;
+use std::sync::Arc;
 
 use crate::search::{IndexPath, Searcher};
+use dashmap::DashMap;
 use entities::models::create_connection;
+use entities::sea_orm::DatabaseConnection;
+use shared::config::{Config, Lens, UserSettings};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub app_state: Arc<DashMap<String, String>>,
-    pub config: Config,
-    pub index: Arc<Mutex<Searcher>>,
+    pub lenses: Arc<DashMap<String, Lens>>,
+    pub user_settings: UserSettings,
+    pub index: Searcher,
 }
 
 impl AppState {
@@ -29,11 +29,18 @@ impl AppState {
         let app_state = DashMap::new();
         app_state.insert("paused".to_string(), "false".to_string());
 
+        // Convert into dashmap
+        let lenses = DashMap::new();
+        for (key, value) in config.lenses.into_iter() {
+            lenses.insert(key, value);
+        }
+
         AppState {
             db,
             app_state: Arc::new(app_state),
-            config,
-            index: Arc::new(Mutex::new(index)),
+            user_settings: config.user_settings,
+            lenses: Arc::new(lenses),
+            index,
         }
     }
 }

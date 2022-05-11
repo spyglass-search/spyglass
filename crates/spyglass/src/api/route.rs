@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::Set;
 use jsonrpc_core::{Error, ErrorCode, Result};
@@ -18,11 +20,17 @@ use super::response;
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = Searcher::doc_fields();
 
-    let index = state.index.lock().unwrap();
+    let index = state.index;
     let searcher = index.reader.searcher();
 
+    // Create a copy of the lenses for this search
+    let mut lenses = HashMap::new();
+    for entry in state.lenses.iter() {
+        lenses.insert(entry.key().clone(), entry.value().clone());
+    }
+
     let docs = Searcher::search_with_lens(
-        &state.config.lenses,
+        &lenses,
         &index.index,
         &index.reader,
         &search_req.lenses,
@@ -116,7 +124,7 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
     }
 
     // Grab details about index
-    let index = state.index.lock().unwrap();
+    let index = state.index;
     let reader = index.reader.searcher();
 
     Ok(AppStatus {
@@ -155,7 +163,9 @@ pub async fn search_lenses(
 ) -> Result<SearchLensesResp> {
     let mut results = Vec::new();
 
-    for (lens_name, lens_info) in state.config.lenses.iter() {
+    for entry in state.lenses.iter() {
+        let lens_name = entry.key();
+        let lens_info = entry.value();
         log::trace!("{} - {}", lens_name, param.query);
         if lens_name.starts_with(&param.query) {
             results.push(LensResult {

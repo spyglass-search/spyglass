@@ -6,7 +6,7 @@ use url::Url;
 use crate::crawler::Crawler;
 use crate::search::Searcher;
 use crate::state::AppState;
-use entities::models::{crawl_queue, indexed_document, link};
+use entities::models::{crawl_queue, indexed_document};
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -32,28 +32,22 @@ pub async fn manager_task(
 ) {
     log::info!("manager started");
 
-    let prioritized_domains: Vec<String> = state
-        .clone()
-        .config
-        .lenses
-        .into_values()
-        .flat_map(|lense| lense.domains)
-        .collect();
-
-    let prioritized_prefixes: Vec<String> = state
-        .config
-        .lenses
-        .into_values()
-        .flat_map(|lens| lens.urls)
-        .collect();
-
     loop {
+        let mut prioritized_domains: Vec<String> = Vec::new();
+        let mut prioritized_prefixes: Vec<String> = Vec::new();
+
+        for entry in state.lenses.iter() {
+            let value = entry.value();
+            prioritized_domains.extend(value.domains.clone());
+            prioritized_prefixes.extend(value.urls.clone());
+        }
+
         // tokio::select allows us to listen to a shutdown message while
         // also processing queue tasks.
         let next_url = tokio::select! {
             res = crawl_queue::dequeue(
                 &state.db,
-                state.config.user_settings.clone(),
+                state.user_settings.clone(),
                 &prioritized_domains,
                 &prioritized_prefixes,
             ) => res.unwrap(),
@@ -87,7 +81,9 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
     match result {
         Ok(Some(crawl_result)) => {
             // Update job status
-            let cq_status = if crawl_result.is_success() {
+            // We consider 400s complete in this case since we manage to hit the server
+            // successfully but nothing useful was returned.
+            let cq_status = if crawl_result.is_success() || crawl_result.is_bad_request() {
                 crawl_queue::CrawlStatus::Completed
             } else {
                 crawl_queue::CrawlStatus::Failed
@@ -97,24 +93,25 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                 .await
                 .unwrap();
 
-            // Add links found to crawl queue
-            for link in crawl_result.links.iter() {
-                let added = crawl_queue::enqueue(
-                    &state.db,
-                    link,
-                    &state.config.user_settings,
-                    &Default::default(),
-                )
-                .await
-                .unwrap();
-
-                // Only add valid urls
-                if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
-                    link::save_link(&state.db, &crawl_result.url, link)
-                        .await
-                        .unwrap();
-                }
+            // Add all valid, non-duplicate, non-indexed links found to crawl queue
+            let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
+            if let Err(err) = crawl_queue::enqueue_all(
+                &state.db,
+                &to_enqueue,
+                &state.user_settings,
+                &Default::default(),
+            )
+            .await
+            {
+                log::error!("error enqueuing all: {}", err);
             }
+
+            // Only add valid urls
+            // if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
+            //     link::save_link(&state.db, &crawl_result.url, link)
+            //         .await
+            //         .unwrap();
+            // }
 
             // Add / update search index w/ crawl result.
             if let Some(content) = crawl_result.content {
@@ -128,15 +125,15 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
                 // Delete old document, if any.
                 if let Some(doc) = &existing {
-                    let mut index = state.index.lock().unwrap();
-                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
+                    Searcher::delete(&mut index_writer, &doc.doc_id).unwrap();
                 }
 
                 // Add document to index
                 let doc_id = {
-                    let mut index = state.index.lock().unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
                     Searcher::add_document(
-                        &mut index.writer,
+                        &mut index_writer,
                         &crawl_result.title.unwrap_or_default(),
                         &crawl_result.description.unwrap_or_default(),
                         url.host_str().unwrap(),

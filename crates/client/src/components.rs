@@ -73,13 +73,21 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
     match res.result_type {
         ResultListType::DocSearch => {
             let url_link = if res.url.is_some() {
-                let url = res.url.clone();
+                let domain = res.domain.clone().unwrap_or_else(||"example.com".to_string());
+                let url = res.url.clone().unwrap();
+
+                let path = url
+                    .trim_start_matches("http://")
+                    .trim_start_matches("https://")
+                    .trim_start_matches(&domain);
+
                 html! {
                     <div class={"result-url"}>
-                        <a href={res.url.clone()} target={"_blank"}>
-                            <img src={format!("https://icons.duckduckgo.com/ip3/{}.ico", res.domain.as_ref().unwrap_or(&"example.com".to_string()))} />
-                            {url.unwrap()}
+                        <a href={url.clone()} target={"_blank"}>
+                            <img src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())} />
+                            {domain.clone()}
                         </a>
+                        <span>{format!(" → {}", path)}</span>
                     </div>
                 }
             } else {
@@ -88,12 +96,9 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
 
             html! {
                 <div class={vec![Some("result-item".to_string()), selected]}>
-                    <div class={"result-url"}>
-                        {url_link}
-                    </div>
+                    {url_link}
                     <h2 class={"result-title"}>{res.title.clone()}</h2>
                     <div class={"result-description"}>{res.description.clone()}</div>
-                    <div class={"result-score"}>{res.score}</div>
                 </div>
             }
         }
