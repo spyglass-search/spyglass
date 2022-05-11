@@ -21,6 +21,7 @@ pub fn center_window(window: &Window) {
 pub fn hide_window(window: &Window) {
     window.hide().unwrap();
     window.emit("clear_search", true).unwrap();
+    spawn(cmd::resize_window(window.clone(), constants::INPUT_HEIGHT));
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
