@@ -45,9 +45,12 @@ pub fn app() -> Html {
     let lens = use_state_eq(Vec::new);
     // Current query string
     let query = use_state_eq(|| "".to_string());
+    let query_ref = use_state_eq(NodeRef::default);
+
     // Search results + selected index
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
+
     let node_ref = use_state_eq(NodeRef::default);
 
     // Handle key events
@@ -56,6 +59,7 @@ pub fn app() -> Html {
         let search_results = search_results.clone();
         let lens = lens.clone();
         let query = query.clone();
+        let query_ref = query_ref.clone();
         let node_ref = node_ref.clone();
 
         use_effect(move || {
@@ -67,6 +71,7 @@ pub fn app() -> Html {
                     node_ref.clone(),
                     lens.clone(),
                     query.clone(),
+                    query_ref.clone(),
                     search_results.clone(),
                     selected_idx.clone(),
                 )
@@ -83,13 +88,7 @@ pub fn app() -> Html {
         let node_ref = node_ref.clone();
         use_effect_with_deps(
             move |query| {
-                events::handle_query_change(
-                    query,
-                    node_ref,
-                    lens,
-                    search_results,
-                    selected_idx,
-                );
+                events::handle_query_change(query, node_ref, lens, search_results, selected_idx);
                 || ()
             },
             (*query).clone(),
@@ -101,6 +100,7 @@ pub fn app() -> Html {
     {
         let lens = lens.clone();
         let query = query.clone();
+        let query_ref = query_ref.clone();
         let results = search_results.clone();
         let selected_idx = selected_idx.clone();
         // Reset query string, results list, etc when we receive a "clear_search"
@@ -111,6 +111,9 @@ pub fn app() -> Html {
                 results.set(Vec::new());
                 selected_idx.set(0);
                 lens.set(Vec::new());
+
+                let el = query_ref.cast::<HtmlInputElement>().unwrap();
+                el.set_value("");
             }) as Box<dyn Fn()>);
 
             on_clear_search(&cb).await;
@@ -164,6 +167,7 @@ pub fn app() -> Html {
             <div class="query-container">
                 {selected_lens_list(&lens)}
                 <input
+                    ref={(*query_ref).clone()}
                     id={"searchbox"}
                     type={"text"}
                     class={"search-box"}

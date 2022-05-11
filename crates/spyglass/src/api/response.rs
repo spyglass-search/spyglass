@@ -1,4 +1,4 @@
-use libspyglass::models::crawl_queue;
+use entities::models::crawl_queue;
 use serde::Serialize;
 
 #[derive(Serialize)]

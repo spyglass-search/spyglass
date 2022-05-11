@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "crates/client",
+    "crates/entities",
+    "crates/migrations",
     "crates/reindexer",
     "crates/shared",
     "crates/spyglass",

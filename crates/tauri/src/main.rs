@@ -139,6 +139,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     menu::QUIT_MENU_ITEM => app.exit(0),
                     menu::DEV_SHOW_CONSOLE => window.open_devtools(),
+                    menu::JOIN_DISCORD => open::that(constants::DISCORD_JOIN_URL).unwrap(),
                     _ => {}
                 }
             }
@@ -226,6 +227,14 @@ async fn update_tray_menu(app: &AppHandle) {
             .set_title(format!(
                 "{} in queue",
                 app_status.num_queued.to_formatted_string(&Locale::en)
+            ))
+            .unwrap();
+
+        handle
+            .get_item(menu::NUM_IN_PROGRESS_MENU_ITEM)
+            .set_title(format!(
+                "{} crawling",
+                app_status.num_in_progress.to_formatted_string(&Locale::en)
             ))
             .unwrap();
     }

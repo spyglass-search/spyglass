@@ -1,8 +1,5 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use std::convert::From;
-
-use crate::crawler::robots::ParsedRule;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "resource_rules")]
@@ -42,16 +39,6 @@ impl ActiveModelBehavior for ActiveModel {
         }
 
         Ok(self)
-    }
-}
-
-impl From<Model> for ParsedRule {
-    fn from(model: Model) -> Self {
-        ParsedRule {
-            domain: model.domain,
-            regex: model.rule,
-            allow_crawl: model.allow_crawl,
-        }
     }
 }
 

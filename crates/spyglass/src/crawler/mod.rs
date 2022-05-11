@@ -1,20 +1,22 @@
 use std::collections::HashSet;
 
+use addr::parse_domain_name;
 use chrono::prelude::*;
 use chrono::Duration;
 use reqwest::{Client, StatusCode};
-use sea_orm::prelude::*;
-use sea_orm::{DatabaseConnection, Set};
 use sha2::{Digest, Sha256};
-use url::Url;
+use url::{Host, Url};
 
+use entities::models::{crawl_queue, fetch_history};
+use entities::sea_orm::prelude::*;
+use entities::sea_orm::DatabaseConnection;
+
+pub mod bootstrap;
 pub mod robots;
-use robots::ParsedRule;
 
-use crate::models::{crawl_queue, fetch_history, resource_rule};
+use crate::crawler::bootstrap::create_archive_url;
 use crate::scraper::html_to_text;
-
-use robots::{filter_set, parse};
+use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
@@ -40,7 +42,12 @@ pub struct CrawlResult {
 
 impl CrawlResult {
     pub fn is_success(&self) -> bool {
+        // Success codes
         self.status >= 200 && self.status <= 299
+    }
+
+    pub fn is_bad_request(&self) -> bool {
+        self.status >= 400 && self.status <= 499
     }
 }
 
@@ -80,10 +87,48 @@ impl Default for Crawler {
     }
 }
 
+fn determine_canonical(original: &Url, extracted: &Url) -> String {
+    // Ignore IPs
+    let origin_dn = match original.host() {
+        Some(Host::Domain(s)) => Some(s),
+        _ => None,
+    };
+
+    let extracted_dn = match extracted.host() {
+        Some(Host::Domain(s)) => Some(s),
+        _ => None,
+    };
+
+    if origin_dn.is_none() || extracted_dn.is_none() {
+        return original.to_string();
+    }
+
+    // Only allow overrides on the same root domain.
+    let origin_dn = parse_domain_name(origin_dn.unwrap());
+    let extracted_dn = parse_domain_name(extracted_dn.unwrap());
+
+    if origin_dn.is_err() || extracted_dn.is_err() {
+        return original.to_string();
+    }
+
+    let origin_dn = origin_dn.unwrap();
+    // Special case for bootstrapper.
+    if origin_dn.root().is_some() && origin_dn.root().unwrap() == "archive.org" {
+        return extracted.to_string();
+    }
+
+    if origin_dn.root() == extracted_dn.unwrap().root() {
+        extracted.to_string()
+    } else {
+        original.to_string()
+    }
+}
+
 impl Crawler {
     pub fn new() -> Self {
         let client = Client::builder()
             .user_agent(APP_USER_AGENT)
+            // TODO: Make configurable
             .timeout(std::time::Duration::from_secs(60))
             .build()
             .expect("Unable to create reqwest client");
@@ -141,93 +186,22 @@ impl Crawler {
             .filter_map(|link| _normalize_href(url, link))
             .collect();
 
-        log::info!("content hash: {:?}", content_hash);
+        let canonical_url = match parse_result.canonical_url {
+            Some(canonical) => determine_canonical(url, &canonical),
+            None => url.to_string(),
+        };
+
+        log::trace!("content hash: {:?}", content_hash);
         CrawlResult {
             content_hash,
             content: Some(parse_result.content),
             description: Some(parse_result.description),
             status: 200,
             title: parse_result.title,
-            url: url.to_string(),
+            url: canonical_url,
             links: normalized_links,
             raw: Some(raw_body.to_string()),
         }
-    }
-
-    /// Checks whether we're allow to crawl this domain + path
-    async fn is_crawl_allowed(
-        &self,
-        db: &DatabaseConnection,
-        domain: &str,
-        path: &str,
-        full_url: &str,
-    ) -> anyhow::Result<bool> {
-        let rules = resource_rule::Entity::find()
-            .filter(resource_rule::Column::Domain.eq(domain))
-            .all(db)
-            .await?;
-
-        if rules.is_empty() {
-            log::info!("No rules found for this domain, fetching robot.txt");
-
-            let robots_url = format!("https://{}/robots.txt", domain);
-            let res = self.client.get(robots_url).send().await;
-            match res {
-                Err(err) => log::error!("Unable to check robots.txt {}", err.to_string()),
-                Ok(res) => {
-                    if res.status() == StatusCode::OK {
-                        let body = res.text().await.unwrap();
-
-                        let parsed_rules = parse(domain, &body);
-                        for rule in parsed_rules.iter() {
-                            let new_rule = resource_rule::ActiveModel {
-                                domain: Set(rule.domain.to_owned()),
-                                rule: Set(rule.regex.to_owned()),
-                                no_index: Set(false),
-                                allow_crawl: Set(rule.allow_crawl),
-                                ..Default::default()
-                            };
-                            new_rule.insert(db).await?;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check path against rules, if we find any matches that disallow, skip it
-        let rules_into: Vec<ParsedRule> = rules.iter().map(|x| x.to_owned().into()).collect();
-
-        let allow_filter = filter_set(&rules_into, true);
-        let disallow_filter = filter_set(&rules_into, false);
-        if !allow_filter.is_match(path) && disallow_filter.is_match(path) {
-            log::info!("Unable to crawl {}|{} due to rule", domain, path);
-            return Ok(false);
-        }
-
-        // Check the content-type of the URL, only crawl HTML pages for now
-        let res = self.client.head(full_url).send().await;
-
-        match res {
-            Err(err) => {
-                log::info!("Unable to check content-type: {}", err.to_string());
-                return Ok(false);
-            }
-            Ok(res) => {
-                let headers = res.headers();
-                if !headers.contains_key(http::header::CONTENT_TYPE) {
-                    return Ok(false);
-                } else {
-                    let value = headers.get(http::header::CONTENT_TYPE).unwrap();
-                    let value = value.to_str().unwrap();
-                    if !value.to_string().contains(&"text/html") {
-                        log::info!("Unable to crawl: content-type =/= text/html");
-                        return Ok(false);
-                    }
-                }
-            }
-        }
-
-        Ok(true)
     }
 
     // TODO: Load web indexing as a plugin?
@@ -241,35 +215,47 @@ impl Crawler {
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
 
-        log::info!("Fetching URL: {:?}", crawl.url);
-        let url = Url::parse(&crawl.url).unwrap();
+        // Modify bootstrapped URLs to pull from the Internet Archive
+        let fetch_url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            create_archive_url(&crawl.url)
+        } else {
+            crawl.url.clone()
+        };
+
+        log::info!("Fetching {:?}", fetch_url);
+        let url = Url::parse(&fetch_url).unwrap();
 
         // Break apart domain + path of the URL
         let domain = url.host_str().unwrap();
         let path = url.path();
 
-        // Skip history check if we're trying to force this crawl.
-        if !crawl.force_crawl {
-            if let Some(history) = fetch_history::find_by_url(db, &url).await? {
-                let since_last_fetch = Utc::now() - history.updated_at;
-                if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
-                    log::info!("Recently fetched, skipping");
-                    return Ok(None);
-                }
+        // Have we crawled this recently?
+        if let Some(history) = fetch_history::find_by_url(db, &url).await? {
+            let since_last_fetch = Utc::now() - history.updated_at;
+            if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
+                log::trace!("Recently fetched, skipping");
+                return Ok(None);
             }
         }
 
         // Check for robots.txt of this domain
-        if !self
-            .is_crawl_allowed(db, domain, url.path(), url.as_str())
-            .await?
-        {
+        if !check_resource_rules(db, &self.client, &url).await? {
             return Ok(None);
         }
 
         // Crawl & save the data
-        let result = self.crawl(&url).await;
-        log::info!(
+        let mut result = self.crawl(&url).await;
+        // Check to see if a canonical URL was found, if not use the original
+        // bootstrapped URL
+        if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            let parsed = Url::parse(&result.url).unwrap();
+            let domain = parsed.host_str().unwrap();
+            if domain == "web.archive.org" {
+                result.url = crawl.url.clone();
+            }
+        }
+
+        log::trace!(
             "crawl result: {:?} - {:?}\n{:?}",
             result.title,
             result.url,
@@ -285,11 +271,11 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use sea_orm::{ActiveModelTrait, Set};
+    use entities::models::crawl_queue;
+    use entities::sea_orm::{ActiveModelTrait, Set};
+    use entities::test::setup_test_db;
 
-    use crate::crawler::{Crawler, _normalize_href};
-    use crate::models::{crawl_queue, resource_rule};
-    use crate::test::setup_test_db;
+    use crate::crawler::{Crawler, _normalize_href, determine_canonical};
 
     use url::Url;
 
@@ -306,35 +292,6 @@ mod test {
         for link in result.links {
             assert!(link.starts_with("https://"))
         }
-    }
-
-    #[tokio::test]
-    async fn test_is_crawl_allowed() {
-        let crawler = Crawler::new();
-        let db = setup_test_db().await;
-
-        let url = "https://oldschool.runescape.wiki/";
-        let domain = "oldschool.runescape.wiki";
-        let rule = "/";
-
-        // Add some fake rules
-        let allow = resource_rule::ActiveModel {
-            domain: Set(domain.to_owned()),
-            rule: Set(rule.to_owned()),
-            no_index: Set(false),
-            allow_crawl: Set(true),
-            ..Default::default()
-        };
-        allow
-            .insert(&db)
-            .await
-            .expect("Unable to insert allow rule");
-
-        let res = crawler
-            .is_crawl_allowed(&db, domain, rule, url)
-            .await
-            .unwrap();
-        assert_eq!(res, true);
     }
 
     #[tokio::test]
@@ -386,5 +343,36 @@ mod test {
             _normalize_href(&url, "foo.html"),
             Some("https://example.com/foo.html".into())
         );
+    }
+
+    #[test]
+    fn test_determine_canonical() {
+        // Test a correct override
+        let a = Url::parse("https://commons.wikipedia.org").unwrap();
+        let b = Url::parse("https://en.wikipedia.org").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://en.wikipedia.org/");
+
+        // Test a valid override from a different domain.
+        let a = Url::parse("https://web.archive.org").unwrap();
+        let b = Url::parse("https://en.wikipedia.org").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://en.wikipedia.org/");
+
+        // Test ignoring an invalid override
+        let a = Url::parse("https://localhost:5000").unwrap();
+        let b = Url::parse("https://en.wikipedia.org").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://localhost:5000/");
+
+        // Test ignoring an invalid override
+        let a = Url::parse("https://en.wikipedia.org").unwrap();
+        let b = Url::parse("https://spam.com").unwrap();
+
+        let res = determine_canonical(&a, &b);
+        assert_eq!(res, "https://en.wikipedia.org/");
     }
 }

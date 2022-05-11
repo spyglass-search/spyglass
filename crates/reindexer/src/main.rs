@@ -1,7 +1,7 @@
-use sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
+use entities::models::{crawl_queue, indexed_document};
+use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
 
 use libspyglass::crawler::Crawler;
-use libspyglass::models::{crawl_queue, indexed_document, link};
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use url::Url;
@@ -23,8 +23,8 @@ async fn main() -> Result<(), anyhow::Error> {
     while let Some(docs) = pages.fetch_and_next().await? {
         for doc in docs.into_iter() {
             let indexed_doc = {
-                let index = state.index.lock().unwrap();
-                Searcher::get_by_id(&index.reader, &doc.doc_id)
+                let index_reader = &state.index.reader;
+                Searcher::get_by_id(index_reader, &doc.doc_id)
             };
 
             if let Some(indexed_doc) = indexed_doc {
@@ -46,15 +46,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 // Update document in index
                 {
                     // Delete old document
-                    let mut index = state.index.lock().unwrap();
-                    Searcher::delete(&mut index.writer, &doc.doc_id).unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
+                    Searcher::delete(&mut index_writer, &doc.doc_id).unwrap();
                 }
 
                 // Update document in DB
                 let doc_id = {
-                    let mut index = state.index.lock().unwrap();
+                    let mut index_writer = state.index.writer.lock().unwrap();
                     Searcher::add_document(
-                        &mut index.writer,
+                        &mut index_writer,
                         &scrape.title.unwrap_or_default(),
                         &scrape.description.unwrap_or_default(),
                         url.host_str().unwrap(),
@@ -70,16 +70,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 update.save(&state.db).await.unwrap();
 
                 // Update parsed links
-                for link in scrape.links.iter() {
-                    let added = crawl_queue::enqueue(&state.db, link, &state.config.user_settings)
-                        .await
-                        .unwrap();
-
-                    // Only add valid urls
-                    if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
-                        link::save_link(&state.db, &scrape.url, link).await.unwrap();
-                    }
-                }
+                let to_add: Vec<String> = scrape.links.into_iter().collect();
+                crawl_queue::enqueue_all(
+                    &state.db,
+                    &to_add,
+                    &state.user_settings,
+                    &Default::default(),
+                )
+                .await?;
             }
         }
     }

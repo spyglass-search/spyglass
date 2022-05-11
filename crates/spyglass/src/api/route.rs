@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
+use entities::sea_orm::prelude::*;
+use entities::sea_orm::Set;
 use jsonrpc_core::{Error, ErrorCode, Result};
-use sea_orm::prelude::*;
-use sea_orm::Set;
 use shared::response::LensResult;
 use tracing::instrument;
 use url::Url;
@@ -8,7 +10,7 @@ use url::Url;
 use shared::request;
 use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 
-use libspyglass::models::crawl_queue;
+use entities::models::crawl_queue;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -18,11 +20,17 @@ use super::response;
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = Searcher::doc_fields();
 
-    let index = state.index.lock().unwrap();
+    let index = state.index;
     let searcher = index.reader.searcher();
 
+    // Create a copy of the lenses for this search
+    let mut lenses = HashMap::new();
+    for entry in state.lenses.iter() {
+        lenses.insert(entry.key().clone(), entry.value().clone());
+    }
+
     let docs = Searcher::search_with_lens(
-        &state.config.lenses,
+        &lenses,
         &index.index,
         &index.reader,
         &search_req.lenses,
@@ -83,7 +91,7 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
     let new_task = crawl_queue::ActiveModel {
         domain: Set(parsed.host_str().unwrap().to_string()),
         url: Set(queue_item.url.to_owned()),
-        force_crawl: Set(queue_item.force_crawl),
+        crawl_type: Set(crawl_queue::CrawlType::Normal),
         ..Default::default()
     };
 
@@ -99,20 +107,30 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
 
 pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     let db = &state.db;
-    let num_queued = crawl_queue::num_queued(db).await.unwrap();
+    let num_queued = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Queued)
+        .await
+        .unwrap();
+
+    let mut num_in_progress = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Processing)
+        .await
+        .unwrap();
 
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
     let is_paused = *paused_status == *"true";
+    if is_paused {
+        num_in_progress = 0;
+    }
 
     // Grab details about index
-    let index = state.index.lock().unwrap();
+    let index = state.index;
     let reader = index.reader.searcher();
 
     Ok(AppStatus {
         num_docs: reader.num_docs(),
         num_queued,
+        num_in_progress,
         is_paused,
     })
 }
@@ -145,7 +163,9 @@ pub async fn search_lenses(
 ) -> Result<SearchLensesResp> {
     let mut results = Vec::new();
 
-    for (lens_name, lens_info) in state.config.lenses.iter() {
+    for entry in state.lenses.iter() {
+        let lens_name = entry.key();
+        let lens_info = entry.value();
         log::trace!("{} - {}", lens_name, param.query);
         if lens_name.starts_with(&param.query) {
             results.push(LensResult {

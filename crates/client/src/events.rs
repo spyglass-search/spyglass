@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::Element;
+use web_sys::{Element, HtmlInputElement};
 use yew::prelude::*;
 
 use super::{clear_results, escape, open};
@@ -13,6 +13,7 @@ pub fn handle_global_key_down(
     node_ref: UseStateHandle<NodeRef>,
     lens: UseStateHandle<Vec<String>>,
     query: UseStateHandle<String>,
+    query_ref: UseStateHandle<NodeRef>,
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
@@ -47,6 +48,9 @@ pub fn handle_global_key_down(
             // Clear results list
             let el = node_ref.cast::<Element>().unwrap();
             clear_results(search_results, el);
+
+            let el = query_ref.cast::<HtmlInputElement>().unwrap();
+            el.set_value("");
         }
     } else if event.key() == "Escape" {
         spawn_local(async move {

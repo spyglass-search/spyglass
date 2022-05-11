@@ -4,10 +4,12 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use libspyglass::models::crawl_queue;
+use entities::models::{crawl_queue, lens};
+use libspyglass::crawler::bootstrap;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
-use shared::config::Config;
+use migration::{Migrator, MigratorTrait};
+use shared::config::{Config, Lens};
 
 mod api;
 mod importer;
@@ -39,13 +41,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize/Load user preferences
     let state = rt.block_on(AppState::new());
 
+    // Run any migrations
+    match rt.block_on(Migrator::up(&state.db, None)) {
+        Ok(_) => {}
+        Err(e) => {
+            // Ruh-oh something went wrong
+            log::error!("Unable to migrate database - {:?}", e);
+            // Exit from app
+            return Ok(());
+        }
+    }
+
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");
-
     rt.block_on(start_backend(&state));
     server.close();
 
     Ok(())
+}
+
+async fn load_lenses(state: AppState) {
+    let mut new_lenses: Vec<Lens> = Vec::new();
+
+    for entry in state.lenses.iter() {
+        let lens = entry.value();
+
+        // Have we added this lens to the database?
+        match lens::add(
+            &state.db,
+            &lens.name,
+            &lens.author,
+            lens.description.as_ref(),
+            &lens.version,
+        )
+        .await
+        {
+            Ok(true) => {
+                log::info!("found new lens {}", lens.name);
+                new_lenses.push(lens.clone());
+            }
+            Ok(false) => log::info!("lens ({}) already added", lens.name),
+            Err(e) => log::error!("error loading lens {}", e),
+        }
+    }
+
+    // Bootstrap new lenses
+    log::info!("bootstraping new lenses");
+    for lens in new_lenses {
+        for domain in lens.domains.iter() {
+            match bootstrap::bootstrap(
+                &state.db,
+                &state.user_settings,
+                // Safe to assume domains always have HTTPS support?
+                &format!("https://{}", domain),
+            )
+            .await
+            {
+                Err(e) => log::error!("{}", e),
+                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", domain, cnt),
+            }
+        }
+
+        for prefix in lens.urls.iter() {
+            match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await {
+                Err(e) => log::error!("{}", e),
+                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", prefix, cnt),
+            }
+        }
+    }
+    log::info!("finished bootstrapping");
 }
 
 async fn start_backend(state: &AppState) {
@@ -60,37 +124,35 @@ async fn start_backend(state: &AppState) {
     // Initialize crawl_queue, set all in-flight tasks to queued.
     crawl_queue::reset_processing(&state.db).await;
 
-    // Check lenses for updates
-    // Figure out how to handle wildcard domains
-    for (_, lens) in state.config.lenses.iter() {
-        for domain in lens.domains.iter() {
-            let _ = crawl_queue::enqueue(
-                &state.db,
-                &format!("https://{}", domain),
-                &state.config.user_settings,
-            )
-            .await;
-        }
-    }
+    // Check lenses for updates & add any bootstrapped URLs to crawler.
+    let _ = tokio::spawn(load_lenses(state.clone()));
 
-    // Startup manager, workers, & API server.
-    let (tx, rx) = mpsc::channel(32);
+    // Create channels for scheduler / crawlers
+    let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(
+        state
+            .user_settings
+            .inflight_crawl_limit
+            .value()
+            .try_into()
+            .unwrap(),
+    );
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
 
+    // Crawl scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
-        tx,
+        crawl_queue_tx,
         shutdown_tx.subscribe(),
     ));
 
+    // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
-        rx,
+        crawl_queue_rx,
         shutdown_tx.subscribe(),
     ));
 
     // Gracefully handle shutdowns
-    // let server = start_api(state.clone()).await;
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");

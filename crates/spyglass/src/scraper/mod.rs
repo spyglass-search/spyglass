@@ -6,6 +6,7 @@ mod html;
 use ego_tree::NodeRef;
 use html5ever::QualName;
 use std::collections::{HashMap, HashSet};
+use url::Url;
 
 use crate::scraper::element::Node;
 use crate::scraper::html::Html;
@@ -13,11 +14,13 @@ use crate::scraper::html::Html;
 #[derive(Debug)]
 pub struct ScrapeResult {
     pub title: Option<String>,
-    // Page description, extracted from meta tags or summarized from the actual content
+    /// Page description, extracted from meta tags or summarized from the actual content
     pub description: String,
     pub meta: HashMap<String, String>,
     pub content: String,
     pub links: HashSet<String>,
+    /// Index should use this URL instead of the one that lead to the content.
+    pub canonical_url: Option<Url>,
 }
 
 /// Walk the DOM and grab all the p nodes
@@ -117,9 +120,11 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, links: &mut HashSet
 pub fn html_to_text(doc: &str) -> ScrapeResult {
     let parsed = Html::parse(doc);
     let root = parsed.tree.root();
+    // Meta tags
     let meta = parsed.meta();
+    let link_tags = parsed.link_tags();
+    // Content
     let title = parsed.title();
-
     let mut content = String::from("");
     let mut links = HashSet::new();
     filter_text_nodes(&root, &mut content, &mut links);
@@ -135,19 +140,32 @@ pub fn html_to_text(doc: &str) -> ScrapeResult {
             filter_p_nodes(&root, &mut p_list);
 
             let text = p_list.iter().find(|content| !content.is_empty());
-
             text.unwrap_or(&String::from("")).trim().to_owned()
         } else {
             "".to_string()
         }
     };
 
+    // If there's a canonical URL on this page, attempt to determine whether  it's valid.
+    // More info about canonical URLS:
+    // https://developers.google.com/search/docs/advanced/crawling/consolidate-duplicate-urls
+    let canonical_url = match link_tags.get("canonical").map(|x| Url::parse(x)) {
+        // Canonical URLs *must* be a full, valid URL
+        Some(Ok(mut parsed)) => {
+            // Ignore fragments
+            parsed.set_fragment(None);
+            Some(parsed)
+        }
+        _ => None,
+    };
+
     ScrapeResult {
-        title,
-        description,
-        meta,
+        canonical_url,
         content,
+        description,
         links,
+        meta,
+        title,
     }
 }
 

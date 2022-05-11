@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+addr = "0.15.3"
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "5.2"
@@ -11,16 +12,18 @@ digest = "0.10"
 directories = "4.0"
 dirs = "4.0"
 ego-tree = "0.6.2"
+entities = { path = "../entities" }
+futures = "0.3"
 hex = "0.4"
 html5ever = "0.25"
 http = "0.2"
 jsonrpc-core = "18.0.0"
 jsonrpc-ipc-server = "18.0.0"
 log = "0.4"
+migration = { path = "../migrations" }
 regex = "1"
 reqwest = "0.11"
 ron = "0.7"
-sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 shared = { path = "../shared" }
@@ -28,6 +31,7 @@ sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono
 tantivy = "0.17"
 tendril = "0.4.2"
 tokio = { version = "1", features = ["full"] }
+tokio-retry = "0.3"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-log = "0.1.3"

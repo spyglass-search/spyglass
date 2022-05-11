@@ -5,12 +5,15 @@ pub const QUIT_MENU_ITEM: &str = "quit";
 
 pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
 pub const NUM_QUEUED_MENU_ITEM: &str = "num_queue";
+pub const NUM_IN_PROGRESS_MENU_ITEM: &str = "num_in_progress";
 pub const CRAWL_STATUS_MENU_ITEM: &str = "crawl_status";
 
 pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
 pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
 pub const SHOW_SEARCHBAR: &str = "show_searchbar";
+
+pub const JOIN_DISCORD: &str = "join_discord";
 
 pub const DEV_SHOW_CONSOLE: &str = "dev_show_console";
 
@@ -41,6 +44,9 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
             CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
         )
         .add_item(CustomMenuItem::new(NUM_QUEUED_MENU_ITEM.to_string(), "XX queued").disabled())
+        .add_item(
+            CustomMenuItem::new(NUM_IN_PROGRESS_MENU_ITEM.to_string(), "XX crawling").disabled(),
+        )
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_lenses_folder)
@@ -55,6 +61,7 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     }
 
     tray.add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new(JOIN_DISCORD, "Join our Discord"))
         .add_item(quit)
 }
 
@@ -62,7 +69,7 @@ pub fn get_app_menu() -> Menu {
     if cfg!(target_os = "linux") {
         return Menu::new();
     }
-    
+
     let ctx = tauri::generate_context!();
 
     Menu::new().add_submenu(Submenu::new(
