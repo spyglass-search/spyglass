@@ -1,4 +1,4 @@
-use entities::models::{crawl_queue, indexed_document, link};
+use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
 
 use libspyglass::crawler::Crawler;
@@ -70,21 +70,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 update.save(&state.db).await.unwrap();
 
                 // Update parsed links
-                for link in scrape.links.iter() {
-                    let added = crawl_queue::enqueue(
-                        &state.db,
-                        link,
-                        &state.user_settings,
-                        &Default::default(),
-                    )
-                    .await
-                    .unwrap();
-
-                    // Only add valid urls
-                    if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
-                        link::save_link(&state.db, &scrape.url, link).await.unwrap();
-                    }
-                }
+                let to_add: Vec<String> = scrape.links.into_iter().collect();
+                crawl_queue::enqueue_all(
+                    &state.db,
+                    &to_add,
+                    &state.user_settings,
+                    &Default::default(),
+                )
+                .await?;
             }
         }
     }

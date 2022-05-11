@@ -329,74 +329,6 @@ pub async fn enqueue_all(
     Ok(())
 }
 
-pub async fn enqueue(
-    db: &DatabaseConnection,
-    url: &str,
-    settings: &UserSettings,
-    overrides: &EnqueueSettings,
-) -> anyhow::Result<Option<SkipReason>, sea_orm::DbErr> {
-    let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
-
-    // Ignore invalid URLs
-    let parsed = Url::parse(url);
-    if parsed.is_err() {
-        log::debug!("Url ignored: invalid URL - {}", url);
-        return Ok(Some(SkipReason::Invalid));
-    }
-
-    let mut parsed = parsed.unwrap();
-    // Always ignore fragments, otherwise crawling
-    // https://wikipedia.org/Rust#Blah would be considered different than
-    // https://wikipedia.org/Rust
-    parsed.set_fragment(None);
-
-    let domain = parsed.host_str();
-    // Ignore URLs w/ no domain/host strings
-    if domain.is_none() {
-        log::debug!("Url ignored: invalid domain - {}", url);
-        return Ok(Some(SkipReason::Invalid));
-    }
-
-    // Ignore domains in blocklist
-    let domain = domain.unwrap();
-    if !overrides.skip_blocklist && block_list.contains(&domain.to_string()) {
-        log::debug!("Url ignored: blocked domain - {}", url);
-        return Ok(Some(SkipReason::Blocked));
-    }
-
-    // Ignore duplicates
-    let exists = Entity::find()
-        .filter(Column::Url.eq(url.to_string()))
-        .one(db)
-        .await?;
-
-    if exists.is_some() {
-        log::debug!("Url ignored: duplicate crawl - {}", url);
-        return Ok(Some(SkipReason::Duplicate));
-    }
-
-    // ignore already indexed docs
-    let already_indexed = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.eq(url.to_string()))
-        .one(db)
-        .await?
-        .is_some();
-
-    if already_indexed {
-        log::info!("Url ignored: already indexed - {}", url);
-        return Ok(Some(SkipReason::Duplicate));
-    }
-
-    let new_task = ActiveModel {
-        domain: Set(domain.to_string()),
-        crawl_type: Set(overrides.crawl_type.clone()),
-        url: Set(url.to_owned()),
-        ..Default::default()
-    };
-    new_task.insert(db).await?;
-    Ok(None)
-}
-
 pub async fn mark_done(
     db: &DatabaseConnection,
     id: i64,
@@ -473,13 +405,13 @@ mod test {
     async fn test_enqueue() {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
-        let url = "https://oldschool.runescape.wiki/";
-        crawl_queue::enqueue(&db, url, &settings, &Default::default())
+        let url = vec!["https://oldschool.runescape.wiki/".into()];
+        crawl_queue::enqueue_all(&db, &url, &settings, &Default::default())
             .await
             .unwrap();
 
         let crawl = crawl_queue::Entity::find()
-            .filter(crawl_queue::Column::Url.eq(url.to_string()))
+            .filter(crawl_queue::Column::Url.eq(url[0].to_string()))
             .all(&db)
             .await
             .unwrap();
@@ -491,10 +423,10 @@ mod test {
     async fn test_dequeue() {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
-        let url = "https://oldschool.runescape.wiki/";
+        let url = vec!["https://oldschool.runescape.wiki/".into()];
         let prioritized = vec![];
 
-        crawl_queue::enqueue(&db, url, &settings, &Default::default())
+        crawl_queue::enqueue_all(&db, &url, &settings, &Default::default())
             .await
             .unwrap();
 
@@ -503,7 +435,7 @@ mod test {
             .unwrap();
 
         assert!(queue.is_some());
-        assert_eq!(queue.unwrap().url, url);
+        assert_eq!(queue.unwrap().url, url[0]);
     }
 
     #[tokio::test]
@@ -513,16 +445,16 @@ mod test {
             ..Default::default()
         };
         let db = setup_test_db().await;
-        let url = "https://oldschool.runescape.wiki/";
-        let parsed = Url::parse(&url).unwrap();
+        let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
+        let parsed = Url::parse(&url[0]).unwrap();
         let prioritized = vec![];
 
-        crawl_queue::enqueue(&db, url, &settings, &Default::default())
+        crawl_queue::enqueue_all(&db, &url, &settings, &Default::default())
             .await
             .unwrap();
         let doc = indexed_document::ActiveModel {
             domain: Set(parsed.host_str().unwrap().to_string()),
-            url: Set(url.to_string()),
+            url: Set(url[0].clone()),
             doc_id: Set("docid".to_string()),
             ..Default::default()
         };

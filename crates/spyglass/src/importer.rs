@@ -82,16 +82,16 @@ impl FirefoxImporter {
         .await?;
 
         let mut count = 0;
-        for (_, url) in rows.iter() {
-            crawl_queue::enqueue(
-                &state.db,
-                url,
-                &self.config.user_settings,
-                &Default::default(),
-            )
-            .await?;
-            count += 1;
-        }
+        let to_add: Vec<String> = rows.into_iter().map(|(_, x)| x).collect();
+
+        crawl_queue::enqueue_all(
+            &state.db,
+            &to_add,
+            &self.config.user_settings,
+            &Default::default(),
+        )
+        .await?;
+        count += to_add.len();
 
         log::info!("imported {} urls", count);
 
