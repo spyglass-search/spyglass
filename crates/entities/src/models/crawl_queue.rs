@@ -250,6 +250,85 @@ pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
 }
 
+pub async fn enqueue_all(
+    db: &DatabaseConnection,
+    urls: &[String],
+    settings: &UserSettings,
+    overrides: &EnqueueSettings,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
+
+    // Ignore invalid URLs
+    let urls: Vec<String> = urls
+        .iter()
+        .filter_map(|x| {
+            if let Ok(mut parsed) = Url::parse(x) {
+                // Always ignore fragments, otherwise crawling
+                // https://wikipedia.org/Rust#Blah would be considered different than
+                // https://wikipedia.org/Rust
+                parsed.set_fragment(None);
+
+                // Ignore URLs w/ no domain/host strings
+                let domain = parsed.host_str()?;
+
+                // Ignore domains on blacklist
+                if !overrides.skip_blocklist && block_list.contains(&domain.to_string()) {
+                    return None;
+                }
+
+                Some(parsed.as_str().to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Ignore urls already in queue
+    let is_queued: HashSet<String> = Entity::find()
+        .filter(Column::Url.is_in(urls.clone()))
+        .all(db)
+        .await?
+        .iter()
+        .map(|f| f.url.to_string())
+        .collect();
+
+    // Igore urls already indexed
+    let is_indexed: HashSet<String> = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Url.is_in(urls.clone()))
+        .all(db)
+        .await?
+        .iter()
+        .map(|x| x.url.to_string())
+        .collect();
+
+    let to_add: Vec<ActiveModel> = urls
+        .into_iter()
+        .filter(|url| !is_queued.contains(url) && !is_indexed.contains(url))
+        .map(|url| {
+            let parsed = Url::parse(&url).unwrap();
+            let domain = parsed.host_str().unwrap();
+
+            ActiveModel {
+                domain: Set(domain.to_string()),
+                crawl_type: Set(overrides.crawl_type.clone()),
+                url: Set(url),
+                ..Default::default()
+            }
+        })
+        .collect();
+
+    if to_add.is_empty() {
+        return Ok(());
+    }
+
+    match Entity::insert_many(to_add).exec(db).await {
+        Ok(_) => {}
+        Err(e) => log::error!("insert_many error: {:?}", e),
+    }
+
+    Ok(())
+}
+
 pub async fn enqueue(
     db: &DatabaseConnection,
     url: &str,

@@ -6,7 +6,7 @@ use url::Url;
 use crate::crawler::Crawler;
 use crate::search::Searcher;
 use crate::state::AppState;
-use entities::models::{crawl_queue, indexed_document, link};
+use entities::models::{crawl_queue, indexed_document};
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -93,24 +93,25 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                 .await
                 .unwrap();
 
-            // Add links found to crawl queue
-            for link in crawl_result.links.iter() {
-                let added = crawl_queue::enqueue(
-                    &state.db,
-                    link,
-                    &state.user_settings,
-                    &Default::default(),
-                )
-                .await
-                .unwrap();
-
-                // Only add valid urls
-                if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
-                    link::save_link(&state.db, &crawl_result.url, link)
-                        .await
-                        .unwrap();
-                }
+            // Add all valid, non-duplicate, non-indexed links found to crawl queue
+            let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
+            if let Err(err) = crawl_queue::enqueue_all(
+                &state.db,
+                &to_enqueue,
+                &state.user_settings,
+                &Default::default(),
+            )
+            .await
+            {
+                log::error!("error enqueuing all: {}", err);
             }
+
+            // Only add valid urls
+            // if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
+            //     link::save_link(&state.db, &crawl_result.url, link)
+            //         .await
+            //         .unwrap();
+            // }
 
             // Add / update search index w/ crawl result.
             if let Some(content) = crawl_result.content {

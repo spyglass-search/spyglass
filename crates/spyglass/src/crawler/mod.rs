@@ -14,6 +14,7 @@ use entities::sea_orm::DatabaseConnection;
 pub mod bootstrap;
 pub mod robots;
 
+use crate::crawler::bootstrap::create_archive_url;
 use crate::scraper::html_to_text;
 use robots::check_resource_rules;
 
@@ -214,8 +215,15 @@ impl Crawler {
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
 
-        log::trace!("Fetching URL: {:?}", crawl.url);
-        let url = Url::parse(&crawl.url).unwrap();
+        // Modify bootstrapped URLs to pull from the Internet Archive
+        let fetch_url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            create_archive_url(&crawl.url)
+        } else {
+            crawl.url.clone()
+        };
+
+        log::info!("Fetching {:?}", fetch_url);
+        let url = Url::parse(&fetch_url).unwrap();
 
         // Break apart domain + path of the URL
         let domain = url.host_str().unwrap();
@@ -236,7 +244,17 @@ impl Crawler {
         }
 
         // Crawl & save the data
-        let result = self.crawl(&url).await;
+        let mut result = self.crawl(&url).await;
+        // Check to see if a canonical URL was found, if not use the original
+        // bootstrapped URL
+        if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            let parsed = Url::parse(&result.url).unwrap();
+            let domain = parsed.host_str().unwrap();
+            if domain == "web.archive.org" {
+                result.url = crawl.url.clone();
+            }
+        }
+
         log::trace!(
             "crawl result: {:?} - {:?}\n{:?}",
             result.title,

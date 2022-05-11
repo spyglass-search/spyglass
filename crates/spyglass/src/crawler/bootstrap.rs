@@ -21,7 +21,7 @@ use shared::config::{Limit, UserSettings};
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
 const ARCHIVE_WEB_ENDPOINT: &str = "https://web.archive.org/web";
 
-fn create_archive_url(url: &str) -> String {
+pub fn create_archive_url(url: &str) -> String {
     // Always try to grab the latest archived crawl
     let date = Utc::now();
     format!(
@@ -142,13 +142,9 @@ pub async fn bootstrap(
 
             // Add URLs to crawl queue
             log::info!("enqueing {} urls", urls.len());
-            for url in urls.iter() {
-                let archive_url = create_archive_url(url);
-                match crawl_queue::enqueue(db, &archive_url, settings, &overrides).await? {
-                    Some(_) => {}
-                    None => count += 1,
-                }
-            }
+            let urls: Vec<String> = urls.into_iter().collect();
+            crawl_queue::enqueue_all(db, &urls, settings, &overrides).await?;
+            count += urls.len();
 
             if resume.is_none() {
                 return Ok(count);
