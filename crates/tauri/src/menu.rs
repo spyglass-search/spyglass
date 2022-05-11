@@ -13,6 +13,8 @@ pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
 pub const SHOW_SEARCHBAR: &str = "show_searchbar";
 
+pub const JOIN_DISCORD: &str = "join_discord";
+
 pub const DEV_SHOW_CONSOLE: &str = "dev_show_console";
 
 pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
@@ -59,6 +61,7 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     }
 
     tray.add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new(JOIN_DISCORD, "Join our Discord"))
         .add_item(quit)
 }
 

@@ -139,6 +139,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     menu::QUIT_MENU_ITEM => app.exit(0),
                     menu::DEV_SHOW_CONSOLE => window.open_devtools(),
+                    menu::JOIN_DISCORD => open::that(constants::DISCORD_JOIN_URL).unwrap(),
                     _ => {}
                 }
             }
