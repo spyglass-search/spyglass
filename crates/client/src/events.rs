@@ -5,9 +5,9 @@ use web_sys::{Element, HtmlInputElement};
 use yew::prelude::*;
 
 use super::{escape, open};
-use crate::pages::search::{clear_results, show_doc_results, show_lens_results};
 use crate::components::ResultListData;
 use crate::constants;
+use crate::pages::search::{clear_results, show_doc_results, show_lens_results};
 
 pub fn handle_global_key_down(
     event: &Event,

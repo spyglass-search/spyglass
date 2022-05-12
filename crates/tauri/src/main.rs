@@ -11,7 +11,10 @@ use std::time::Duration;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
-use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, WindowBuilder, WindowUrl};
+use tauri::{
+    AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, WindowBuilder,
+    WindowUrl
+};
 use tokio::sync::Mutex;
 use tokio::time;
 use tracing_log::LogTracer;

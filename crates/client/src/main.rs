@@ -58,6 +58,6 @@ pub fn app() -> Html {
 fn switch(routes: &Route) -> Html {
     match routes {
         Route::Search => html! { <Search /> },
-        Route::Status => html! { <h1>{ "status page!" }</h1> }
+        Route::Status => html! { <h1>{ "status page!" }</h1> },
     }
 }

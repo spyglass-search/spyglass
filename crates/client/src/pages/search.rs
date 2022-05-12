@@ -1,14 +1,14 @@
 use gloo::events::EventListener;
-use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{Element, HtmlElement, HtmlInputElement, window};
+use wasm_bindgen_futures::spawn_local;
+use web_sys::{window, Element, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 use shared::response;
 
-use crate::{on_clear_search, on_focus, resize_window, search_lenses, search_docs};
+use crate::components::{ResultListData, SearchResultItem, SelectedLens};
 use crate::events;
-use crate::components::{search_result_component, selected_lens_list, ResultListData};
+use crate::{on_clear_search, on_focus, resize_window, search_docs, search_lenses};
 
 #[function_component(Search)]
 pub fn search_page() -> Html {
@@ -109,7 +109,11 @@ pub fn search_page() -> Html {
     let results = search_results
         .iter()
         .enumerate()
-        .map(|(idx, res)| search_result_component(res, idx == *selected_idx))
+        .map(|(idx, res)| {
+            html! {
+                <SearchResultItem result={res.clone()} is_selected={idx == *selected_idx} />
+            }
+        })
         .collect::<Html>();
 
     let onkeyup = {
@@ -136,7 +140,7 @@ pub fn search_page() -> Html {
     html! {
         <div ref={(*node_ref).clone()}>
             <div class="query-container">
-                {selected_lens_list(&lens)}
+                <SelectedLens lens={(*lens).clone()} />
                 <input
                     ref={(*query_ref).clone()}
                     id={"searchbox"}
