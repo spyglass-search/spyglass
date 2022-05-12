@@ -1,16 +1,11 @@
-<div style="text-align: center">
-
 ![check/build workflow](https://github.com/a5huynh/spyglass/actions/workflows/rust.yml/badge.svg)
 [![](https://img.shields.io/badge/discord-join%20the%20community-blue)](https://discord.gg/663wPVBSTB)
 
 # Spyglass
 
-## tl; dr; Spyglass indexes what you want exposing it to you in a super simple & fast interface.
+## tl; dr; Spyglass indexes what you want exposing it to you in a super simple & fast interface/
 
-⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional
-and can be used to replace basic searches. ⚠️
-
-</div>
+⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
 
 ---
 
