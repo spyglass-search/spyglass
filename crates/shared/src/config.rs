@@ -174,11 +174,14 @@ impl Config {
                         .to_string(),
                 ),
                 domains: vec![
-                    "en.wikipedia.org".to_string(),
-                    "oldschool.runescape.wiki".to_string(),
-                    "wiki.factorio.com".to_string(),
+                    "blog.rust-lang.org".into(),
+                    "wiki.factorio.com".into(),
                 ],
-                urls: Vec::new(),
+                urls: vec![
+                    "https://https://en.wikipedia.org/wiki/Portal:".into(),
+                    "https://doc.rust-lang.org/book/".into(),
+                    "https://oldschool.runescape.wiki/w/".into(),
+                ],
             };
 
             fs::write(
