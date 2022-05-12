@@ -11,7 +11,7 @@ use std::time::Duration;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
-use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
+use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, WindowBuilder, WindowUrl};
 use tokio::sync::Mutex;
 use tokio::time;
 use tracing_log::LogTracer;
@@ -58,6 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
         .setup(move |app| {
+            WindowBuilder::new(app, "stats", WindowUrl::App("/stats".into()))
+                .title("Status")
+                .build()?;
+
             // hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);

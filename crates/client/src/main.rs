@@ -3,6 +3,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, Element, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
+use yew_router::prelude::*;
 
 mod components;
 mod constants;
@@ -34,6 +35,14 @@ extern "C" {
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;
 }
 
+#[derive(Clone, Routable, PartialEq)]
+enum Route {
+    #[at("/")]
+    Search,
+    #[at("/stats")]
+    Status,
+}
+
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     yew::start_app::<App>();
@@ -41,6 +50,22 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
+    html! {
+        <BrowserRouter>
+            <Switch<Route> render={Switch::render(switch)} />
+        </BrowserRouter>
+    }
+}
+
+fn switch(routes: &Route) -> Html {
+    match routes {
+        Route::Search => html! { <Search /> },
+        Route::Status => html! { <h1>{ "status page!" }</h1> }
+    }
+}
+
+#[function_component(Search)]
+pub fn search_page() -> Html {
     // Lens related data + results
     let lens = use_state_eq(Vec::new);
     // Current query string

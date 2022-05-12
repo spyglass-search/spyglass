@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 js-sys = "0.3"
 log = "0.4"
-gloo = "0.6.0"
+gloo = "0.7.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 "shared" = { path = "../shared" }
@@ -17,3 +17,4 @@ wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2.0"
 web-sys = { version = "0.3", features = ["VisibilityState"] }
 yew = "0.19.3"
+yew-router = "0.16"

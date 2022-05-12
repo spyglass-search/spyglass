@@ -12,7 +12,7 @@ pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
 pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
 pub const SHOW_SEARCHBAR: &str = "show_searchbar";
-
+pub const SHOW_CRAWL_STATUS: &str = "show_crawl_status_window";
 pub const JOIN_DISCORD: &str = "join_discord";
 
 pub const DEV_SHOW_CONSOLE: &str = "dev_show_console";
@@ -39,6 +39,9 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(
             CustomMenuItem::new("about", format!("v20{}", ctx.package_info().version)).disabled(),
+        )
+        .add_item(
+            CustomMenuItem::new(SHOW_CRAWL_STATUS.to_string(), "Show crawl status")
         )
         .add_item(
             CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
