@@ -4,7 +4,8 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{Element, HtmlInputElement};
 use yew::prelude::*;
 
-use super::{clear_results, escape, open};
+use super::{escape, open};
+use crate::pages::search::{clear_results, show_doc_results, show_lens_results};
 use crate::components::ResultListData;
 use crate::constants;
 
@@ -83,9 +84,9 @@ pub fn handle_query_change(
         let el = node_ref.cast::<Element>().unwrap();
         if query.starts_with(constants::LENS_SEARCH_PREFIX) {
             // show lens search
-            super::show_lens_results(search_results, el, selected_idx, query.to_string());
+            show_lens_results(search_results, el, selected_idx, query.to_string());
         } else {
-            super::show_doc_results(search_results, &lens, el, selected_idx, query.to_string());
+            show_doc_results(search_results, &lens, el, selected_idx, query.to_string());
         }
     }
 }
