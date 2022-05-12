@@ -19,7 +19,7 @@ use crate::scraper::html_to_text;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
-const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
+const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Default, Clone)]
