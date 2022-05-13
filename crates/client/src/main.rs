@@ -7,7 +7,7 @@ mod constants;
 mod events;
 mod pages;
 
-use crate::pages::search::Search;
+use crate::pages::{SearchPage, StatsPage};
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -57,7 +57,7 @@ pub fn app() -> Html {
 
 fn switch(routes: &Route) -> Html {
     match routes {
-        Route::Search => html! { <Search /> },
-        Route::Status => html! { <h1>{ "status page!" }</h1> },
+        Route::Search => html! { <SearchPage /> },
+        Route::Status => html! { <StatsPage /> },
     }
 }

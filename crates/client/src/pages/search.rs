@@ -10,7 +10,7 @@ use crate::components::{ResultListData, SearchResultItem, SelectedLens};
 use crate::events;
 use crate::{on_clear_search, on_focus, resize_window, search_docs, search_lenses};
 
-#[function_component(Search)]
+#[function_component(SearchPage)]
 pub fn search_page() -> Html {
     // Lens related data + results
     let lens = use_state_eq(Vec::new);
