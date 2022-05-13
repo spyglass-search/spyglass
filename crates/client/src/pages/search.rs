@@ -69,6 +69,7 @@ pub fn search_page() -> Html {
     // Handle callbacks to Tauri
     // TODO: Is this the best way to handle calls from Tauri?
     {
+        let node_clone = node_ref.clone();
         let lens = lens.clone();
         let query = query.clone();
         let query_ref = query_ref.clone();
@@ -85,12 +86,18 @@ pub fn search_page() -> Html {
 
                 let el = query_ref.cast::<HtmlInputElement>().unwrap();
                 el.set_value("");
+
+                let node= node_clone.cast::<Element>().unwrap();
+                spawn_local(async move {
+                    resize_window(node.client_height() as f64).await.unwrap();
+                });
             }) as Box<dyn Fn()>);
 
             on_clear_search(&cb).await;
             cb.forget();
         });
 
+        let node_clone = node_ref.clone();
         // Focus on the search box when we receive an "focus_window" event from
         // tauri
         spawn_local(async move {
@@ -99,6 +106,12 @@ pub fn search_page() -> Html {
                 if let Some(el) = document.get_element_by_id("searchbox") {
                     let el: HtmlElement = el.unchecked_into();
                     let _ = el.focus();
+                }
+
+                if let Some(node) = node_clone.cast::<Element>() {
+                    spawn_local(async move {
+                        resize_window(node.client_height() as f64).await.unwrap();
+                    });
                 }
             }) as Box<dyn Fn()>);
             on_focus(&cb).await;
@@ -139,13 +152,13 @@ pub fn search_page() -> Html {
 
     html! {
         <div ref={(*node_ref).clone()}>
-            <div class="query-container">
+            <div class={"flex flex-nowrap w-full"}>
                 <SelectedLens lens={(*lens).clone()} />
                 <input
                     ref={(*query_ref).clone()}
                     id={"searchbox"}
                     type={"text"}
-                    class={"search-box"}
+                    class={"bg-neutral-800 text-white text-5xl p-4 flex-1 focus:outline-none"}
                     placeholder={"Search"}
                     {onkeyup}
                     {onkeydown}
@@ -153,9 +166,7 @@ pub fn search_page() -> Html {
                     tabindex={"-1"}
                 />
             </div>
-            <div class={"search-results-list"}>
-                { results }
-            </div>
+            <div>{ results }</div>
         </div>
     }
 }

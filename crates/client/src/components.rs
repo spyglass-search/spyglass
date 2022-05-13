@@ -56,15 +56,15 @@ pub fn selected_lens_list(props: &SelectLensProps) -> Html {
         .iter()
         .map(|lens_name: &String| {
             html! {
-                <li class={"lens"}>
-                    <span class={"lens-title"}>{lens_name}</span>
+                <li class={"flex bg-cyan-700 rounded-lg my-3 ml-3"}>
+                    <span class={"text-4xl text-white p-3"}>{lens_name}</span>
                 </li>
             }
         })
         .collect::<Html>();
 
     html! {
-        <ul class={"lenses"}>
+        <ul class="flex bg-neutral-800">
             {items}
         </ul>
     }
@@ -82,9 +82,9 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     let is_selected = props.is_selected;
     let result = &props.result;
 
-    let mut selected: Option<String> = None;
+    let mut selected: String = "bg-neutral-800".into();
     if is_selected {
-        selected = Some("result-selected".to_string());
+        selected = "bg-cyan-900".into();
     }
 
     match result.result_type {
@@ -102,12 +102,15 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     .trim_start_matches(&domain);
 
                 html! {
-                    <div class={"result-url"}>
-                        <a href={url.clone()} target={"_blank"}>
-                            <img src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())} />
-                            {domain.clone()}
+                    <div class={"text-sm truncate"}>
+                        <a href={url.clone()} target={"_blank"} class="text-cyan-400">
+                            <img
+                                class="w-4 inline mr-2"
+                                src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
+                            />
+                            <span class={"align-middle"}>{domain.clone()}</span>
                         </a>
-                        <span>{format!(" → {}", path)}</span>
+                        <span class={"align-middle"}>{format!(" → {}", path)}</span>
                     </div>
                 }
             } else {
@@ -115,16 +118,20 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             };
 
             html! {
-                <div class={vec![Some("result-item".to_string()), selected]}>
+                <div class={vec!["text-white".into(), "p-4".into(), "border-t-2".into(), "border-neutral-600".into(), selected]}>
                     {url_link}
-                    <h2 class={"result-title"}>{result.title.clone()}</h2>
-                    <div class={"result-description"}>{result.description.clone()}</div>
+                    <h2 class={"text-lg truncate py-1"}>
+                        {result.title.clone()}
+                    </h2>
+                    <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>
+                        {result.description.clone()}
+                    </div>
                 </div>
             }
         }
         ResultListType::LensSearch => {
             html! {
-                <div class={vec![Some("lens-result-item".to_string()), selected]}>
+                <div>
                     <h2 class={"result-title"}>{result.title.clone()}</h2>
                     <div class={"result-description"}>{result.description.clone()}</div>
                 </div>

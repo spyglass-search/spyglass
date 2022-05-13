@@ -1,6 +1,6 @@
-use tauri::{async_runtime::spawn, LogicalSize, Size, Window};
+use tauri::{LogicalSize, Size, Window};
 
-use crate::{cmd, constants};
+use crate::constants;
 
 pub fn center_window(window: &Window) {
     if let Some(monitor) = window.primary_monitor().unwrap() {
@@ -21,7 +21,6 @@ pub fn center_window(window: &Window) {
 pub fn hide_window(window: &Window) {
     window.hide().unwrap();
     window.emit("clear_search", true).unwrap();
-    spawn(cmd::resize_window(window.clone(), constants::INPUT_HEIGHT));
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
@@ -37,6 +36,5 @@ pub fn show_window(window: &Window) {
     window.emit("focus_window", true).unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();
-    spawn(cmd::resize_window(window.clone(), constants::INPUT_HEIGHT));
     center_window(window);
 }
