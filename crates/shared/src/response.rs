@@ -1,11 +1,18 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct QueueStatus {
+    pub num_queued: u64,
+    pub num_processing: u64,
+    pub num_completed: u64,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
-    pub num_queued: u64,
-    pub num_in_progress: u64,
     pub is_paused: bool,
+    pub queue_status: HashMap<String, QueueStatus>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

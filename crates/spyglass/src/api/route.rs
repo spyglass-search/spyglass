@@ -8,7 +8,7 @@ use tracing::instrument;
 use url::Url;
 
 use shared::request;
-use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults, QueueStatus};
 
 use entities::models::crawl_queue;
 use libspyglass::search::Searcher;
@@ -107,21 +107,23 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
 
 pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     let db = &state.db;
-    let num_queued = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Queued)
-        .await
-        .unwrap();
 
-    let mut num_in_progress = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Processing)
-        .await
-        .unwrap();
+    let queue_counts = crawl_queue::queue_stats(db).await.unwrap();
+    let mut queue_status: HashMap<String, QueueStatus> = HashMap::new();
+    for count in queue_counts.iter() {
+        let entry = queue_status.entry(count.domain.clone()).or_insert(QueueStatus::default());
+        match count.status.as_str() {
+            "Completed" => entry.num_completed += count.count as u64,
+            "Processing" => entry.num_processing += count.count as u64,
+            "Queued" => entry.num_queued += count.count as u64,
+            _ => {}
+        }
+    }
 
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
     let is_paused = *paused_status == *"true";
-    if is_paused {
-        num_in_progress = 0;
-    }
 
     // Grab details about index
     let index = state.index;
@@ -129,9 +131,8 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
 
     Ok(AppStatus {
         num_docs: reader.num_docs(),
-        num_queued,
-        num_in_progress,
         is_paused,
+        queue_status,
     })
 }
 

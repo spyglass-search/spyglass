@@ -238,21 +238,5 @@ async fn update_tray_menu(app: &AppHandle) {
                 app_status.num_docs.to_formatted_string(&Locale::en)
             ))
             .unwrap();
-
-        handle
-            .get_item(menu::NUM_QUEUED_MENU_ITEM)
-            .set_title(format!(
-                "{} in queue",
-                app_status.num_queued.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
-
-        handle
-            .get_item(menu::NUM_IN_PROGRESS_MENU_ITEM)
-            .set_title(format!(
-                "{} crawling",
-                app_status.num_in_progress.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
     }
 }
