@@ -137,7 +137,7 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
 
 /// Fun stats about index size, etc.
 #[instrument(skip(state))]
-pub async fn app_stats(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+pub async fn app_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     _get_current_status(state).await
 }
 

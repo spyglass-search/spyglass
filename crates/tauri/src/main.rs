@@ -168,7 +168,7 @@ async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
     let mut rpc = rpc.lock().await;
     match rpc
         .client
-        .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
+        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
         .await
     {
         Ok(resp) => Some(resp),

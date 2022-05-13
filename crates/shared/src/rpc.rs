@@ -19,8 +19,8 @@ pub trait Rpc {
     #[rpc(name = "protocol_version")]
     fn protocol_version(&self) -> Result<String>;
 
-    #[rpc(name = "app_stats")]
-    fn app_stats(&self) -> BoxFuture<Result<AppStatus>>;
+    #[rpc(name = "app_status")]
+    fn app_status(&self) -> BoxFuture<Result<AppStatus>>;
 
     #[rpc(name = "toggle_pause")]
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;

@@ -21,8 +21,8 @@ impl Rpc for SpyglassRPC {
         Ok("version1".into())
     }
 
-    fn app_stats(&self) -> BoxFuture<Result<AppStatus>> {
-        Box::pin(route::app_stats(self.state.clone()))
+    fn app_status(&self) -> BoxFuture<Result<AppStatus>> {
+        Box::pin(route::app_status(self.state.clone()))
     }
 
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
