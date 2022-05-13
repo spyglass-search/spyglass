@@ -9,7 +9,6 @@ pub struct RpcClient {
     pub endpoint: String,
 }
 
-#[allow(dead_code)]
 pub fn check_and_start_backend() {
     let _ = Command::new_sidecar("spyglass-server")
         .expect("failed to create `spyglass-server` binary command")
@@ -25,21 +24,36 @@ async fn connect(endpoint: String) -> Result<TypedClient, ()> {
     Err(())
 }
 
+async fn try_connect(endpoint: &String) -> Result<TypedClient, ()> {
+    let retry_strategy = ExponentialBackoff::from_millis(10)
+        .map(jitter) // add jitter to delays
+        .take(10);
+
+    Retry::spawn(retry_strategy, || connect(endpoint.clone()))
+        .await
+}
+
 impl RpcClient {
+
     pub async fn new() -> Self {
         let endpoint = gen_ipc_path();
 
-        let retry_strategy = ExponentialBackoff::from_millis(10)
-            .map(jitter) // add jitter to delays
-            .take(10);
-
-        let client: TypedClient = Retry::spawn(retry_strategy, || connect(endpoint.clone()))
+        let client = try_connect(&endpoint)
             .await
-            .unwrap();
+            .expect("Unable to connect to spyglass backend!");
 
         RpcClient {
             client,
             endpoint: endpoint.clone(),
         }
+    }
+
+    pub async fn reconnect(&mut self) {
+        log::info!("Attempting to restart backend");
+        // Attempt to reconnect
+        check_and_start_backend();
+        self.client = try_connect(&self.endpoint)
+            .await
+            .expect("Unable to connect to spyglass backend!");
     }
 }

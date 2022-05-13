@@ -150,7 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
+async fn app_status(rpc: &mut rpc::RpcClient) -> Option<response::AppStatus> {
     match rpc
         .client
         .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
@@ -158,13 +158,14 @@ async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
     {
         Ok(resp) => Some(resp),
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
             None
         }
     }
 }
 
-async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
+async fn pause_crawler(rpc: &mut rpc::RpcClient) -> bool {
     match rpc
         .client
         .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
@@ -172,7 +173,8 @@ async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
     {
         Ok(resp) => resp.is_paused,
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
             false
         }
     }
@@ -199,9 +201,9 @@ fn open_folder(folder: PathBuf) {
 }
 
 async fn update_tray_menu(app: &AppHandle) {
-    let rpc = app.state::<rpc::RpcClient>().inner();
+    let mut rpc = app.state::<rpc::RpcClient>().inner();
 
-    let app_status = app_status(rpc).await;
+    let app_status = app_status(&mut rpc).await;
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {

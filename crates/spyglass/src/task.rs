@@ -50,26 +50,31 @@ pub async fn manager_task(
                 state.user_settings.clone(),
                 &prioritized_domains,
                 &prioritized_prefixes,
-            ) => res.unwrap(),
+            ) => res,
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 return;
             }
         };
 
-        if let Some(task) = next_url {
-            // Mark in progress
-            let task_id = task.id;
-            let mut update: crawl_queue::ActiveModel = task.into();
-            update.status = Set(crawl_queue::CrawlStatus::Processing);
-            update.update(&state.db).await.unwrap();
+        match next_url {
+            Err(err) => log::error!("Unable to dequeue: {}", err),
+            Ok(Some(task)) => {
+                // Mark in progress
+                let task_id = task.id;
+                let mut update: crawl_queue::ActiveModel = task.into();
+                update.status = Set(crawl_queue::CrawlStatus::Processing);
+                let _ = update.update(&state.db).await;
 
-            // Send to worker
-            let cmd = Command::Fetch(CrawlTask { id: task_id });
-            if queue.send(cmd).await.is_err() {
-                eprintln!("unable to send command to worker");
-                return;
+                // Send to worker
+                let cmd = Command::Fetch(CrawlTask { id: task_id });
+                if queue.send(cmd).await.is_err() {
+                    eprintln!("unable to send command to worker");
+                    return;
+                }
             }
+            // ignore everything else
+            _ => {}
         }
     }
 }
@@ -89,9 +94,7 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                 crawl_queue::CrawlStatus::Failed
             };
 
-            crawl_queue::mark_done(&state.db, task.id, cq_status)
-                .await
-                .unwrap();
+            let _ = crawl_queue::mark_done(&state.db, task.id, cq_status).await;
 
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
