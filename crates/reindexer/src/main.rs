@@ -4,12 +4,14 @@ use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrde
 use libspyglass::crawler::Crawler;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
+use shared::config::Config;
 use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let config = Config::new();
     // Load app configuration
-    let state = AppState::new().await;
+    let state = AppState::new(&config).await;
     let crawler = Crawler::new();
 
     let fields = Searcher::doc_fields();

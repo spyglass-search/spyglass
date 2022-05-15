@@ -17,7 +17,9 @@ mod importer;
 use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
+    let config = Config::new();
+
+    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -39,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     // Initialize/Load user preferences
-    let state = rt.block_on(AppState::new());
+    let state = rt.block_on(AppState::new(&config));
 
     // Run any migrations
     match rt.block_on(Migrator::up(&state.db, None)) {

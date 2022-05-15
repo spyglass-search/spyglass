@@ -16,29 +16,27 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new() -> Self {
-        let config = Config::new();
-
-        let db = create_connection(false)
+    pub async fn new(config: &Config) -> Self {
+        let db = create_connection(config, false)
             .await
             .expect("Unable to connect to database");
 
-        let index = Searcher::with_index(&IndexPath::LocalPath(Config::index_dir()));
+        let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()));
 
         // TODO: Load from saved preferences
         let app_state = DashMap::new();
-        app_state.insert("paused".to_string(), "false".to_string());
+        app_state.insert("paused".to_string(), "true".to_string());
 
         // Convert into dashmap
         let lenses = DashMap::new();
-        for (key, value) in config.lenses.into_iter() {
-            lenses.insert(key, value);
+        for (key, value) in config.lenses.iter() {
+            lenses.insert(key.clone(), value.clone());
         }
 
         AppState {
             db,
             app_state: Arc::new(app_state),
-            user_settings: config.user_settings,
+            user_settings: config.user_settings.clone(),
             lenses: Arc::new(lenses),
             index,
         }

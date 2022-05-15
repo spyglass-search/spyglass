@@ -28,7 +28,9 @@ mod rpc;
 mod window;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
+    let config = Config::new();
+
+    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -44,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
-    let config = Config::new();
+
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -119,6 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .on_system_tray_event(|app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
+                let config = app.state::<Config>();
                 let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").unwrap();
 
@@ -134,8 +137,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         item_handle.set_title(new_label).unwrap();
                     }
-                    menu::OPEN_LENSES_FOLDER => open_folder(Config::lenses_dir()),
-                    menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
+                    menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
+                    menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                     menu::SHOW_SEARCHBAR => {
                         if !window.is_visible().unwrap() {

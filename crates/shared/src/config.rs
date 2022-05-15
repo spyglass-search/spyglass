@@ -77,9 +77,15 @@ pub struct UserSettings {
     pub block_list: Vec<String>,
     #[serde(default = "UserSettings::default_shortcut")]
     pub shortcut: String,
+    #[serde(default = "UserSettings::default_data_dir")]
+    pub data_directory: PathBuf,
 }
 
 impl UserSettings {
+    fn default_data_dir() -> PathBuf {
+        Config::default_data_dir()
+    }
+
     fn default_shortcut() -> String {
         "CmdOrCtrl+Shift+/".to_string()
     }
@@ -114,7 +120,10 @@ impl Default for UserSettings {
             run_wizard: false,
             allow_list: Vec::new(),
             block_list: vec!["web.archive.org".to_string()],
+            // Activation shortcut
             shortcut: UserSettings::default_shortcut(),
+            // Where to store the metadata & index
+            data_directory: UserSettings::default_data_dir(),
         }
     }
 }
@@ -144,10 +153,8 @@ impl Config {
         }
     }
 
-    fn load_lenses() -> anyhow::Result<HashMap<String, Lens>> {
-        let mut lenses = HashMap::new();
-
-        let lense_dir = Self::lenses_dir();
+    fn load_lenses(&mut self) -> anyhow::Result<()> {
+        let lense_dir = self.lenses_dir();
         for entry in (fs::read_dir(lense_dir)?).flatten() {
             let path = entry.path();
             if path.is_file() && path.extension().unwrap_or_default() == "ron" {
@@ -156,14 +163,14 @@ impl Config {
                         Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
                         Ok(lens) => {
                             log::info!("Loaded lens {}", lens.name);
-                            lenses.insert(lens.name.clone(), lens);
+                            self.lenses.insert(lens.name.clone(), lens);
                         }
                     }
                 }
             }
         }
 
-        if lenses.is_empty() {
+        if self.lenses.is_empty() {
             // Create a default lens as an example.
             let lens = Lens {
                 author: "Spyglass".to_string(),
@@ -182,13 +189,13 @@ impl Config {
             };
 
             fs::write(
-                Self::lenses_dir().join("wiki.ron"),
+                self.lenses_dir().join("wiki.ron"),
                 ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
             )
             .expect("Unable to save default lens file.");
         }
 
-        Ok(lenses)
+        Ok(())
     }
 
     pub fn app_identifier() -> String {
@@ -199,17 +206,25 @@ impl Config {
         }
     }
 
-    pub fn data_dir() -> PathBuf {
+    pub fn default_data_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
         proj_dirs.data_dir().to_path_buf()
     }
 
-    pub fn index_dir() -> PathBuf {
-        Self::data_dir().join("index")
+    pub fn data_dir(&self) -> PathBuf {
+        if self.user_settings.data_directory != Self::default_data_dir() {
+            self.user_settings.data_directory.clone()
+        } else {
+            Self::default_data_dir()
+        }
     }
 
-    pub fn logs_dir() -> PathBuf {
-        Self::data_dir().join("logs")
+    pub fn index_dir(&self) -> PathBuf {
+        self.data_dir().join("index")
+    }
+
+    pub fn logs_dir(&self) -> PathBuf {
+        self.data_dir().join("logs")
     }
 
     pub fn prefs_dir() -> PathBuf {
@@ -223,25 +238,13 @@ impl Config {
         Self::prefs_dir().join("settings.ron")
     }
 
-    pub fn lenses_dir() -> PathBuf {
-        Self::data_dir().join("lenses")
+    pub fn lenses_dir(&self) -> PathBuf {
+        self.data_dir().join("lenses")
     }
 
     pub fn new() -> Self {
-        let data_dir = Config::data_dir();
-        fs::create_dir_all(&data_dir).expect("Unable to create data folder");
-
-        let index_dir = Config::index_dir();
-        fs::create_dir_all(&index_dir).expect("Unable to create index folder");
-
-        let logs_dir = Config::logs_dir();
-        fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
-
         let prefs_dir = Config::prefs_dir();
         fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
-
-        let lenses_dir = Config::lenses_dir();
-        fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
         // Gracefully handle issues loading user settings/lenses
         let user_settings = Self::load_user_settings().unwrap_or_else(|err| {
@@ -249,26 +252,39 @@ impl Config {
             Default::default()
         });
 
-        let lenses = Self::load_lenses().unwrap_or_else(|err| {
+        let mut config = Config { lenses: HashMap::new(), user_settings };
+
+        let data_dir = config.data_dir();
+        fs::create_dir_all(&data_dir).expect("Unable to create data folder");
+
+        let index_dir = config.index_dir();
+        fs::create_dir_all(&index_dir).expect("Unable to create index folder");
+
+        let logs_dir = config.logs_dir();
+        fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
+
+        let lenses_dir = config.lenses_dir();
+        fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
+
+        config.load_lenses().unwrap_or_else(|err| {
             log::warn!("Unable to load lenses! Reason: {}", err);
             Default::default()
         });
 
-        Config {
-            lenses,
-            user_settings,
-        }
+        config
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
     use crate::config::Config;
 
     #[test]
     #[ignore]
     pub fn test_load_lenses() {
-        let res = Config::load_lenses();
+        let mut config = Config { lenses: HashMap::new(), user_settings: Default::default() };
+        let res = config.load_lenses();
         assert!(!res.is_err());
     }
 }
