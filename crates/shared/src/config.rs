@@ -173,10 +173,7 @@ impl Config {
                     "Search through official user-supported wikis for knowledge, games, and more."
                         .to_string(),
                 ),
-                domains: vec![
-                    "blog.rust-lang.org".into(),
-                    "wiki.factorio.com".into(),
-                ],
+                domains: vec!["blog.rust-lang.org".into(), "wiki.factorio.com".into()],
                 urls: vec![
                     "https://https://en.wikipedia.org/wiki/Portal:".into(),
                     "https://doc.rust-lang.org/book/".into(),
