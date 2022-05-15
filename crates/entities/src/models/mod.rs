@@ -9,7 +9,10 @@ pub mod resource_rule;
 
 use shared::config::Config;
 
-pub async fn create_connection(config: &Config, is_test: bool) -> anyhow::Result<DatabaseConnection> {
+pub async fn create_connection(
+    config: &Config,
+    is_test: bool,
+) -> anyhow::Result<DatabaseConnection> {
     let db_uri: String = if is_test {
         "sqlite::memory:".to_string()
     } else {

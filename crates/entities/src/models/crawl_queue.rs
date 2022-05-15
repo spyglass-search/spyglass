@@ -1,13 +1,15 @@
 use std::collections::HashSet;
 use std::fmt;
 
+use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement};
 use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use shared::config::{Limit, UserSettings};
+use crate::regex::{regex_for_domain, regex_for_prefix};
+use shared::config::{Lens, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
 
@@ -247,22 +249,38 @@ pub enum SkipReason {
 #[derive(Default)]
 pub struct EnqueueSettings {
     pub skip_blocklist: bool,
+    pub skip_lenses: bool,
     pub crawl_type: CrawlType,
 }
 
 pub async fn enqueue_all(
     db: &DatabaseConnection,
     urls: &[String],
+    lenses: &[Lens],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
+    let mut allow_list: Vec<String> = Vec::new();
+    for lens in lenses {
+        // Build regex from domain
+        for domain in lens.domains.iter() {
+            allow_list.push(regex_for_domain(domain));
+        }
+
+        // Build regex from url rules
+        for prefix in lens.urls.iter() {
+            allow_list.push(regex_for_prefix(prefix));
+        }
+    }
+
+    let allow_list = RegexSet::new(allow_list).unwrap();
     let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
 
     // Ignore invalid URLs
     let urls: Vec<String> = urls
         .iter()
-        .filter_map(|x| {
-            if let Ok(mut parsed) = Url::parse(x) {
+        .filter_map(|url| {
+            if let Ok(mut parsed) = Url::parse(url) {
                 // Always ignore fragments, otherwise crawling
                 // https://wikipedia.org/Rust#Blah would be considered different than
                 // https://wikipedia.org/Rust
@@ -270,9 +288,20 @@ pub async fn enqueue_all(
 
                 // Ignore URLs w/ no domain/host strings
                 let domain = parsed.host_str()?;
+                let normalized = parsed.to_string();
 
                 // Ignore domains on blacklist
                 if !overrides.skip_blocklist && block_list.contains(&domain.to_string()) {
+                    return None;
+                }
+
+                // Check lense rules?
+                if !overrides.skip_lenses
+                    // Should we crawl external links?
+                    && !settings.crawl_external_links
+                    // Only allow crawls specified in our lenses
+                    && !allow_list.is_match(&normalized)
+                {
                     return None;
                 }
 
@@ -361,7 +390,7 @@ mod test {
     use crate::test::setup_test_db;
     use shared::config::{Limit, UserSettings};
 
-    use super::{gen_priority_sql, gen_priority_values};
+    use super::{gen_priority_sql, gen_priority_values, EnqueueSettings};
 
     #[tokio::test]
     async fn test_insert() {
@@ -406,7 +435,12 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-        crawl_queue::enqueue_all(&db, &url, &settings, &Default::default())
+
+        let overrides = EnqueueSettings {
+            skip_lenses: true,
+            ..Default::default()
+        };
+        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
             .await
             .unwrap();
 
@@ -426,7 +460,12 @@ mod test {
         let url = vec!["https://oldschool.runescape.wiki/".into()];
         let prioritized = vec![];
 
-        crawl_queue::enqueue_all(&db, &url, &settings, &Default::default())
+        let overrides = EnqueueSettings {
+            skip_lenses: true,
+            ..Default::default()
+        };
+
+        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
             .await
             .unwrap();
 
@@ -448,8 +487,12 @@ mod test {
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
         let prioritized = vec![];
+        let overrides = EnqueueSettings {
+            skip_lenses: true,
+            ..Default::default()
+        };
 
-        crawl_queue::enqueue_all(&db, &url, &settings, &Default::default())
+        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
             .await
             .unwrap();
         let doc = indexed_document::ActiveModel {

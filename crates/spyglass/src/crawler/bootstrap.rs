@@ -125,6 +125,7 @@ pub async fn bootstrap(
     let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
         skip_blocklist: true,
+        skip_lenses: true,
         crawl_type: crawl_queue::CrawlType::Bootstrap,
     };
 
@@ -143,7 +144,7 @@ pub async fn bootstrap(
             // Add URLs to crawl queue
             log::info!("enqueing {} urls", urls.len());
             let urls: Vec<String> = urls.into_iter().collect();
-            crawl_queue::enqueue_all(db, &urls, settings, &overrides).await?;
+            crawl_queue::enqueue_all(db, &urls, &Vec::new(), settings, &overrides).await?;
             count += urls.len();
 
             if resume.is_none() {

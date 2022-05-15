@@ -1165,6 +1165,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "log",
+ "regex",
  "sea-orm",
  "serde",
  "shared",

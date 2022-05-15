@@ -47,7 +47,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let ctx = tauri::generate_context!();
 
-
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             cmd::escape,
