@@ -35,7 +35,7 @@ impl FirefoxImporter {
             profile_path = Some(path);
         }
 
-        let imported_path = Config::data_dir().join("firefox.sqlite");
+        let imported_path = config.data_dir().join("firefox.sqlite");
         FirefoxImporter {
             profile_path,
             imported_path,
