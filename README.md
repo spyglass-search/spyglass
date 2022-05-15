@@ -161,6 +161,9 @@ file found in their directory on startup, a default one will be created.
     ],
     // Shortcut to launch the search bar
     shortcut: "CmdOrCtrl+Shift+/",
+    // Where to store your index and index metadata
+    // The exact default location is dependent on your OS
+    data_directory: "/Users/<username>/Library/Application Support/com.athlabs.spyglass"
 )
 ```
 
