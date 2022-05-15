@@ -75,10 +75,15 @@ pub struct UserSettings {
     pub allow_list: Vec<String>,
     /// Domains explicitly blocked from crawling.
     pub block_list: Vec<String>,
+    /// Search bar activation hot key
     #[serde(default = "UserSettings::default_shortcut")]
+    /// Directory for metadata & index
     pub shortcut: String,
     #[serde(default = "UserSettings::default_data_dir")]
     pub data_directory: PathBuf,
+    /// Should we crawl links that don't match our lens rules?
+    #[serde(default)]
+    pub crawl_external_links: bool,
 }
 
 impl UserSettings {
@@ -124,6 +129,7 @@ impl Default for UserSettings {
             shortcut: UserSettings::default_shortcut(),
             // Where to store the metadata & index
             data_directory: UserSettings::default_data_dir(),
+            crawl_external_links: false,
         }
     }
 }
@@ -252,7 +258,10 @@ impl Config {
             Default::default()
         });
 
-        let mut config = Config { lenses: HashMap::new(), user_settings };
+        let mut config = Config {
+            lenses: HashMap::new(),
+            user_settings,
+        };
 
         let data_dir = config.data_dir();
         fs::create_dir_all(&data_dir).expect("Unable to create data folder");
@@ -277,13 +286,16 @@ impl Config {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use crate::config::Config;
+    use std::collections::HashMap;
 
     #[test]
     #[ignore]
     pub fn test_load_lenses() {
-        let mut config = Config { lenses: HashMap::new(), user_settings: Default::default() };
+        let mut config = Config {
+            lenses: HashMap::new(),
+            user_settings: Default::default(),
+        };
         let res = config.load_lenses();
         assert!(!res.is_err());
     }

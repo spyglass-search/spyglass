@@ -4,7 +4,7 @@ use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrde
 use libspyglass::crawler::Crawler;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use shared::config::Config;
+use shared::config::{Config, Lens};
 use url::Url;
 
 #[tokio::main]
@@ -73,9 +73,15 @@ async fn main() -> Result<(), anyhow::Error> {
 
                 // Update parsed links
                 let to_add: Vec<String> = scrape.links.into_iter().collect();
+                let lenses: Vec<Lens> = state
+                    .lenses
+                    .iter()
+                    .map(|entry| entry.value().clone())
+                    .collect();
                 crawl_queue::enqueue_all(
                     &state.db,
                     &to_add,
+                    &lenses,
                     &state.user_settings,
                     &Default::default(),
                 )

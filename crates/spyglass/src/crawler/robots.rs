@@ -3,6 +3,7 @@
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
 use entities::models::resource_rule;
+use entities::regex::regex_for_robots;
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{DatabaseConnection, Set};
 
@@ -29,32 +30,6 @@ impl From<resource_rule::Model> for ParsedRule {
 }
 
 const BOT_AGENT_NAME: &str = "spyglass";
-
-/// Convert a robots.txt rule into a proper regex string
-fn rule_to_regex(rule: &str) -> Option<String> {
-    if rule.is_empty() {
-        return None;
-    }
-
-    let mut regex = String::new();
-    let mut has_end = false;
-    for ch in rule.chars() {
-        match ch {
-            '*' => regex.push_str(".*"),
-            '^' => {
-                regex.push('^');
-                has_end = true;
-            }
-            _ => regex.push_str(&regex::escape(&ch.to_string())),
-        }
-    }
-
-    if !has_end {
-        regex.push_str(".*");
-    }
-
-    Some(regex)
-}
 
 /// Convert a set of rules into a regex set for matching
 pub fn filter_set(rules: &[ParsedRule], allow: bool) -> RegexSet {
@@ -93,7 +68,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                     }
 
                     if prefix.starts_with("disallow") || prefix.starts_with("allow") {
-                        let regex = rule_to_regex(end.trim());
+                        let regex = regex_for_robots(end.trim());
                         if let Some(regex) = regex {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
@@ -104,7 +79,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                         } else if regex.is_none() && prefix.starts_with("disallow") {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
-                                regex: rule_to_regex("/").unwrap(),
+                                regex: regex_for_robots("/").unwrap(),
                                 allow_crawl: true,
                             });
                         }
@@ -210,10 +185,11 @@ pub async fn check_resource_rules(
 
 #[cfg(test)]
 mod test {
-    use super::{check_resource_rules, filter_set, parse, rule_to_regex, ParsedRule};
+    use super::{check_resource_rules, filter_set, parse, ParsedRule};
     use crate::crawler::Crawler;
 
     use entities::models::resource_rule;
+    use entities::regex::regex_for_robots;
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
     use regex::Regex;
@@ -244,7 +220,7 @@ mod test {
 
     #[test]
     fn test_rule_to_regex() {
-        let regex = rule_to_regex("/*?title=Property:").unwrap();
+        let regex = regex_for_robots("/*?title=Property:").unwrap();
         assert_eq!(regex, "/.*\\?title=Property:.*");
 
         let re = Regex::new(&regex).unwrap();

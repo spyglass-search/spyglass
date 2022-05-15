@@ -5,6 +5,7 @@ use std::{env, fs, path::PathBuf};
 
 use entities::models::crawl_queue;
 use libspyglass::state::AppState;
+use shared::config::Lens;
 
 #[allow(dead_code)]
 pub struct FirefoxImporter {
@@ -83,10 +84,11 @@ impl FirefoxImporter {
 
         let mut count = 0;
         let to_add: Vec<String> = rows.into_iter().map(|(_, x)| x).collect();
-
+        let lenses: Vec<Lens> = self.config.lenses.clone().into_values().collect();
         crawl_queue::enqueue_all(
             &state.db,
             &to_add,
+            &lenses,
             &self.config.user_settings,
             &Default::default(),
         )
