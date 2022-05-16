@@ -1,4 +1,4 @@
-pub use sea_schema::migration::prelude::*;
+pub use sea_orm_migration::prelude::*;
 
 mod m20220505_000001_create_table;
 mod m20220508_000001_lens_and_crawl_queue_update;
