@@ -7,7 +7,7 @@
 
 ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
 
-Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/Spyglass_22.5.11_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/Spyglass_22.5.11_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/spyglass_22.5.11_amd64.AppImage)
+Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/spyglass_22.5.15_amd64.AppImage)
 
 ---
 
