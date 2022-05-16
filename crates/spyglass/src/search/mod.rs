@@ -176,8 +176,6 @@ impl Searcher {
         doc.add_text(fields.url, url);
         writer.add_document(doc)?;
 
-        writer.commit()?;
-
         Ok(doc_id)
     }
 
