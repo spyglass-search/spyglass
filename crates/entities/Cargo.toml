@@ -10,7 +10,7 @@ anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
 regex = "1"
-sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
+sea-orm = { version = "^0.8", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 shared = { path = "../shared" }
 tokio = { version = "1", features = ["full"] }
