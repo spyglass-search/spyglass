@@ -1,4 +1,5 @@
 use std::io;
+use std::time::Duration;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
@@ -17,7 +18,9 @@ mod importer;
 use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
+    let config = Config::new();
+
+    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -39,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     // Initialize/Load user preferences
-    let state = rt.block_on(AppState::new());
+    let state = rt.block_on(AppState::new(&config));
 
     // Run any migrations
     match rt.block_on(Migrator::up(&state.db, None)) {
@@ -151,6 +154,21 @@ async fn start_backend(state: &AppState) {
         crawl_queue_rx,
         shutdown_tx.subscribe(),
     ));
+
+    // Clean up crew. Commit anything added to the index in the last 10s
+    {
+        let state = state.clone();
+        let _ = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(10));
+
+            loop {
+                interval.tick().await;
+                if let Err(err) = state.index.writer.lock().unwrap().commit() {
+                    log::error!("{:?}", err);
+                }
+            }
+        });
+    }
 
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {

@@ -73,7 +73,10 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
     match res.result_type {
         ResultListType::DocSearch => {
             let url_link = if res.url.is_some() {
-                let domain = res.domain.clone().unwrap_or_else(||"example.com".to_string());
+                let domain = res
+                    .domain
+                    .clone()
+                    .unwrap_or_else(|| "example.com".to_string());
                 let url = res.url.clone().unwrap();
 
                 let path = url

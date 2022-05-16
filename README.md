@@ -3,11 +3,13 @@
 
 # Spyglass
 
-> tl; dr: Spyglass is a search platform that lives on your device, indexing what
-> you want, exposing it to you in a super simple & fast interface.
+## tl; dr; Spyglass indexes what you want exposing it to you in a super simple & fast interface
 
-> ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional
-> and can be used to replace basic searches. ⚠️
+⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
+
+Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/Spyglass_22.5.11_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/Spyglass_22.5.11_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/spyglass_22.5.11_amd64.AppImage)
+
+---
 
 ## Table of Contents
 
@@ -20,6 +22,7 @@
 * [Settings](#settings)
   * [Updating the shorcut](#updating-the-shortcut)
 
+---
 
 ## Installation
 
@@ -35,11 +38,15 @@ make build-release
 
 ## Spyglass in action
 
-Once launched, press **`Cmd + Shift + /`** to open Spyglass. Queries prefixed with `/`
-will search through your installed lenses, otherwise it'll search through your index.
+Once launched, press **`Cmd + Shift + /`** to open Spyglass. If the app has been
+successfully launched, you'll see a little menubar icon like the following:
 
-Use the arrow keys to select the result you want and hit `Enter` to open the link in the
-browser of your choice!
+![Menubar icon and menu](docs/menubar-menu.png)
+
+
+Queries prefixed with `/` will search through your installed lenses, otherwise it'll
+search through your index. Use the arrow keys to select the result you want and hit
+`Enter` to open the link in the browser of your choice!
 
 [![Spyglass in action!](docs/spyglass-poc.gif)](https://www.youtube.com/embed/OzNrxtM3s_8)
 
@@ -72,6 +79,8 @@ curated set of websites with high quality recipes.
 ``` rust
 (
     version: "1",
+    // Be proud of your creation :). Maybe soon we can share these ;)
+    author: "Andrew Huynh",
     name: "recipes",
     description: Some(r#"
         A curated collection of websites with useful, high-quality recipes.
@@ -88,9 +97,13 @@ curated set of websites with high quality recipes.
         "www.vickypham.com",
     ],
 
-    // Not yet supported but ideally more ways to filter URLs within a domain
     urls: [
-        "www.reddit.com/r/recipes/*",
+        // URLs are considered prefixed, i.e. anything that starts w/ the following
+        // will be matched and crawled.
+        //
+        // https://www.reddit.com/r/recipes/ -> matches
+        // https://www.reddit.com/r/recipes_not/ -> does not matche, notice the end slash.
+        "https://www.reddit.com/r/recipes/",
     ]
 )
 ```
@@ -105,6 +118,7 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
 ``` rust
 (
     version: "1",
+    author: "Andrew Huynh",
     name: "rustlang",
     description: Some("Rustlang targeted websites"),
     domains: [
@@ -117,12 +131,9 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
         ...
     ],
 
-    // Again not yet supported but an example of indexing specific communities that
-    // are relevant to the topic
     urls: [
-        "www.reddit.com/r/rust",
-        "www.reddit.com/r/rust_gamedev",
-        "https://github.com/topics/rust"
+        "https://www.reddit.com/r/rust/",
+        "https://www.reddit.com/r/rust_gamedev/",
     ]
 )
 ```
@@ -145,13 +156,19 @@ file found in their directory on startup, a default one will be created.
     run_wizard: false,
     // Not used... yet!
     allow_list: [],
-    // Domains to completely ignore.
+    // Domains to completely ignore, regardless of the lenses you have installed.
     block_list: [
       "web.archive.org",
       "w3schools.com"
     ],
     // Shortcut to launch the search bar
     shortcut: "CmdOrCtrl+Shift+/",
+    // Where to store your index and index metadata
+    // The exact default location is dependent on your OS
+    data_directory: "/Users/<username>/Library/Application Support/com.athlabs.spyglass",
+    // By default, Spyglass will only crawl things as specified in your lenses. If you want
+    // to follow links without regard to those rules, set this to true.
+    crawl_external_links: false,
 )
 ```
 

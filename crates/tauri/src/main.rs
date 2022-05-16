@@ -2,19 +2,24 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
+use rpc::RpcMutex;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
+use tokio::sync::Mutex;
 use tokio::time;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use shared::config::Config;
 use shared::response;
+use shared::response::AppStatus;
 
 mod cmd;
 mod constants;
@@ -23,7 +28,9 @@ mod rpc;
 mod window;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
+    let config = Config::new();
+
+    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -39,7 +46,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
-    let config = Config::new();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -64,7 +70,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let _ = window.set_skip_taskbar(true);
 
             // Wait for the server to boot up
-            app.manage(tauri::async_runtime::block_on(rpc::RpcClient::new()));
+            let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
+            app.manage(Arc::new(Mutex::new(rpc)));
 
             // Load user settings
             app.manage(config.clone());
@@ -113,13 +120,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .on_system_tray_event(|app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
+                let config = app.state::<Config>();
                 let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").unwrap();
 
                 match id.as_str() {
                     menu::CRAWL_STATUS_MENU_ITEM => {
-                        let rpc = app.state::<rpc::RpcClient>().inner();
-
+                        let rpc = app.state::<RpcMutex>().inner();
                         let is_paused = tauri::async_runtime::block_on(pause_crawler(rpc));
                         let new_label = if is_paused {
                             "▶️ Resume indexing"
@@ -129,8 +136,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         item_handle.set_title(new_label).unwrap();
                     }
-                    menu::OPEN_LENSES_FOLDER => open_folder(Config::lenses_dir()),
-                    menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
+                    menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
+                    menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                     menu::SHOW_SEARCHBAR => {
                         if !window.is_visible().unwrap() {
@@ -150,7 +157,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
+async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
+    let mut rpc = rpc.lock().await;
     match rpc
         .client
         .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
@@ -158,13 +166,15 @@ async fn app_status(rpc: &rpc::RpcClient) -> Option<response::AppStatus> {
     {
         Ok(resp) => Some(resp),
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
             None
         }
     }
 }
 
-async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
+async fn pause_crawler(rpc: &rpc::RpcMutex) -> bool {
+    let mut rpc = rpc.lock().await;
     match rpc
         .client
         .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
@@ -172,7 +182,8 @@ async fn pause_crawler(rpc: &rpc::RpcClient) -> bool {
     {
         Ok(resp) => resp.is_paused,
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
             false
         }
     }
@@ -199,9 +210,8 @@ fn open_folder(folder: PathBuf) {
 }
 
 async fn update_tray_menu(app: &AppHandle) {
-    let rpc = app.state::<rpc::RpcClient>().inner();
-
-    let app_status = app_status(rpc).await;
+    let rpc = app.state::<RpcMutex>().inner();
+    let app_status: Option<AppStatus> = app_status(rpc).await;
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {

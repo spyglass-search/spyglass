@@ -1,45 +1,75 @@
+use std::sync::Arc;
+
 use jsonrpc_core_client::{transports::ipc, TypedClient};
 use shared::rpc::gen_ipc_path;
-use tauri::api::process::Command;
+use tauri::api::process::{Command, CommandEvent};
+use tokio::sync::Mutex;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
+
+pub type RpcMutex = Arc<Mutex<RpcClient>>;
 
 pub struct RpcClient {
     pub client: TypedClient,
     pub endpoint: String,
 }
 
-#[allow(dead_code)]
 pub fn check_and_start_backend() {
-    let _ = Command::new_sidecar("spyglass-server")
-        .expect("failed to create `spyglass-server` binary command")
-        .spawn()
-        .expect("Failed to spawn sidecar");
+    tauri::async_runtime::spawn(async move {
+        let (mut rx, _) = Command::new_sidecar("spyglass-server")
+            .expect("failed to create `spyglass-server` binary command")
+            .spawn()
+            .expect("Failed to spawn sidecar");
+
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Error(line) => log::error!("sidecar error: {}", line),
+                CommandEvent::Terminated(payload) => {
+                    log::error!("sidecar terminated: {:?}", payload)
+                }
+                _ => {}
+            }
+        }
+    });
 }
 
-async fn connect(endpoint: String) -> Result<TypedClient, ()> {
-    if let Ok(client) = ipc::connect(endpoint.clone()).await {
+async fn connect(endpoint: &str) -> Result<TypedClient, ()> {
+    if let Ok(client) = ipc::connect(endpoint).await {
         return Ok(client);
     }
 
     Err(())
 }
 
+async fn try_connect(endpoint: &str) -> Result<TypedClient, ()> {
+    let retry_strategy = ExponentialBackoff::from_millis(10)
+        .map(jitter) // add jitter to delays
+        .take(10);
+
+    Retry::spawn(retry_strategy, || connect(endpoint)).await
+}
+
 impl RpcClient {
     pub async fn new() -> Self {
         let endpoint = gen_ipc_path();
 
-        let retry_strategy = ExponentialBackoff::from_millis(10)
-            .map(jitter) // add jitter to delays
-            .take(10);
-
-        let client: TypedClient = Retry::spawn(retry_strategy, || connect(endpoint.clone()))
+        let client = try_connect(&endpoint)
             .await
-            .unwrap();
+            .expect("Unable to connect to spyglass backend!");
 
         RpcClient {
             client,
             endpoint: endpoint.clone(),
         }
+    }
+
+    pub async fn reconnect(&mut self) {
+        log::info!("Attempting to restart backend");
+        // Attempt to reconnect
+        check_and_start_backend();
+        self.client = try_connect(&self.endpoint)
+            .await
+            .expect("Unable to connect to spyglass backend!");
+        log::info!("restarted");
     }
 }

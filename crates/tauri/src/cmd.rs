@@ -23,7 +23,7 @@ pub async fn resize_window(window: tauri::Window, height: f64) {
 #[tauri::command]
 pub async fn search_docs<'r>(
     _: tauri::Window,
-    rpc: State<'r, rpc::RpcClient>,
+    rpc: State<'r, rpc::RpcMutex>,
     lenses: Vec<String>,
     query: &str,
 ) -> Result<Vec<response::SearchResult>, String> {
@@ -32,6 +32,7 @@ pub async fn search_docs<'r>(
         query: query.to_string(),
     };
 
+    let rpc = rpc.lock().await;
     match rpc
         .client
         .call_method::<(request::SearchParam,), response::SearchResults>("search_docs", "", (data,))
@@ -48,13 +49,14 @@ pub async fn search_docs<'r>(
 #[tauri::command]
 pub async fn search_lenses<'r>(
     _: tauri::Window,
-    rpc: State<'r, rpc::RpcClient>,
+    rpc: State<'r, rpc::RpcMutex>,
     query: &str,
 ) -> Result<Vec<response::LensResult>, String> {
     let data = request::SearchLensesParam {
         query: query.to_string(),
     };
 
+    let rpc = rpc.lock().await;
     match rpc
         .client
         .call_method::<(request::SearchLensesParam,), response::SearchLensesResp>(
