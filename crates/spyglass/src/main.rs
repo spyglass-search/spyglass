@@ -1,4 +1,5 @@
 use std::io;
+use std::time::Duration;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
@@ -153,6 +154,21 @@ async fn start_backend(state: &AppState) {
         crawl_queue_rx,
         shutdown_tx.subscribe(),
     ));
+
+    // Clean up crew. Commit anything added to the index in the last 10s
+    {
+        let state = state.clone();
+        let _ = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(10));
+
+            loop {
+                interval.tick().await;
+                if let Err(err) = state.index.writer.lock().unwrap().commit() {
+                    log::error!("{:?}", err);
+                }
+            }
+        });
+    }
 
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
