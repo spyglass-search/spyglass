@@ -156,7 +156,7 @@ file found in their directory on startup, a default one will be created.
     run_wizard: false,
     // Not used... yet!
     allow_list: [],
-    // Domains to completely ignore.
+    // Domains to completely ignore, regardless of the lenses you have installed.
     block_list: [
       "web.archive.org",
       "w3schools.com"
