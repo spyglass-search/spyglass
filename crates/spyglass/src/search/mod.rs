@@ -176,8 +176,6 @@ impl Searcher {
         doc.add_text(fields.url, url);
         writer.add_document(doc)?;
 
-        writer.commit()?;
-
         Ok(doc_id)
     }
 
@@ -306,8 +304,13 @@ mod test {
         )
         .expect("Unable to add doc");
 
+        let res = writer.commit();
+        if let Err(err) = res {
+            println!("{:?}", err);
+        }
+
         // add a small delay so that the documents can be properly committed
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 
     #[test]
