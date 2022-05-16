@@ -1,4 +1,4 @@
-use tauri::{LogicalSize, Size, Window};
+use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
 
 use crate::constants;
 
@@ -37,4 +37,17 @@ pub fn show_window(window: &Window) {
     window.show().unwrap();
     window.set_focus().unwrap();
     center_window(window);
+}
+
+pub fn show_crawl_stats_window(app: &AppHandle) -> Window {
+    if let Some(window) = app.get_window("stats") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return window;
+    }
+
+    WindowBuilder::new(app, "stats", WindowUrl::App("/stats".into()))
+        .title("Status")
+        .build()
+        .unwrap()
 }

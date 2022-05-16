@@ -87,6 +87,14 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         selected = "bg-cyan-900".into();
     }
 
+    let component_styles = vec![
+        "border-t".into(),
+        "border-neutral-600".into(),
+        "p-4".into(),
+        "text-white".into(),
+        selected,
+    ];
+
     match result.result_type {
         ResultListType::DocSearch => {
             let url_link = if result.url.is_some() {
@@ -102,15 +110,15 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     .trim_start_matches(&domain);
 
                 html! {
-                    <div class={"text-sm truncate"}>
-                        <a href={url.clone()} target={"_blank"} class="text-cyan-400">
+                    <div class={"text-xs truncate"}>
+                        <a href={url.clone()} target={"_blank"}>
                             <img
-                                class="w-4 inline mr-2"
+                                class="w-3 inline align-middle"
                                 src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
                             />
-                            <span class={"align-middle"}>{domain.clone()}</span>
+                            <span class={"align-middle text-cyan-400"}>{format!(" {}", domain.clone())}</span>
+                            <span class={"align-middle"}>{format!(" → {}", path)}</span>
                         </a>
-                        <span class={"align-middle"}>{format!(" → {}", path)}</span>
                     </div>
                 }
             } else {
@@ -118,7 +126,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             };
 
             html! {
-                <div class={vec!["text-white".into(), "p-4".into(), "border-t-2".into(), "border-neutral-600".into(), selected]}>
+                <div class={component_styles}>
                     {url_link}
                     <h2 class={"text-lg truncate py-1"}>
                         {result.title.clone()}
@@ -131,8 +139,8 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         }
         ResultListType::LensSearch => {
             html! {
-                <div class={vec!["text-white".into(), "p-4".into(), "border-t-2".into(), "border-neutral-600".into(), selected]}>
-                    <h2 class={"text-lg truncate py-1"}>
+                <div class={component_styles}>
+                    <h2 class={"text-2xl truncate py-1"}>
                         {result.title.clone()}
                     </h2>
                     <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>

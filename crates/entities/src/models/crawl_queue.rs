@@ -158,7 +158,7 @@ pub async fn num_queued(
 }
 
 pub async fn queue_stats(
-    db: &DatabaseConnection
+    db: &DatabaseConnection,
 ) -> anyhow::Result<Vec<QueueCountByStatus>, sea_orm::DbErr> {
     let res = Entity::find()
         .column_as(Column::Id.count(), "count")

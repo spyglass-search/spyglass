@@ -87,7 +87,7 @@ pub fn search_page() -> Html {
                 let el = query_ref.cast::<HtmlInputElement>().unwrap();
                 el.set_value("");
 
-                let node= node_clone.cast::<Element>().unwrap();
+                let node = node_clone.cast::<Element>().unwrap();
                 spawn_local(async move {
                     resize_window(node.client_height() as f64).await.unwrap();
                 });

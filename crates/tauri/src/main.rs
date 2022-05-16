@@ -11,10 +11,7 @@ use std::time::Duration;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
-use tauri::{
-    AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, WindowBuilder,
-    WindowUrl
-};
+use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
 use tokio::sync::Mutex;
 use tokio::time;
 use tracing_log::LogTracer;
@@ -29,6 +26,7 @@ mod constants;
 mod menu;
 mod rpc;
 mod window;
+use window::show_crawl_stats_window;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -61,10 +59,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
         .setup(move |app| {
-            WindowBuilder::new(app, "stats", WindowUrl::App("/stats".into()))
-                .title("Status")
-                .build()?;
-
             // hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -146,6 +140,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
                     menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
+                    menu::SHOW_CRAWL_STATUS => {
+                        show_crawl_stats_window(app);
+                    }
                     menu::SHOW_SEARCHBAR => {
                         if !window.is_visible().unwrap() {
                             window::show_window(&window);

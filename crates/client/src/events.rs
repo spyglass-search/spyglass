@@ -80,13 +80,13 @@ pub fn handle_query_change(
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
+    let el = node_ref.cast::<Element>().unwrap();
+    if query.starts_with(constants::LENS_SEARCH_PREFIX) {
+        // show lens search
+        return show_lens_results(search_results, el, selected_idx, query.to_string());
+    }
+
     if query.len() >= constants::MIN_CHARS {
-        let el = node_ref.cast::<Element>().unwrap();
-        if query.starts_with(constants::LENS_SEARCH_PREFIX) {
-            // show lens search
-            show_lens_results(search_results, el, selected_idx, query.to_string());
-        } else {
-            show_doc_results(search_results, &lens, el, selected_idx, query.to_string());
-        }
+        show_doc_results(search_results, &lens, el, selected_idx, query.to_string())
     }
 }
