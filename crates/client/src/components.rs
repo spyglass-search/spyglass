@@ -131,9 +131,13 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         }
         ResultListType::LensSearch => {
             html! {
-                <div>
-                    <h2 class={"result-title"}>{result.title.clone()}</h2>
-                    <div class={"result-description"}>{result.description.clone()}</div>
+                <div class={vec!["text-white".into(), "p-4".into(), "border-t-2".into(), "border-neutral-600".into(), selected]}>
+                    <h2 class={"text-lg truncate py-1"}>
+                        {result.title.clone()}
+                    </h2>
+                    <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>
+                        {result.description.clone()}
+                    </div>
                 </div>
             }
         }
