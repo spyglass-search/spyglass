@@ -35,6 +35,20 @@ pub async fn manager_task(
     log::info!("manager started");
 
     loop {
+        if state.app_state.get("paused").unwrap().to_string() == "true" {
+            // Run w/ a select on the shutdown signal otherwise we're stuck in an
+            // infinite loop
+            tokio::select! {
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
+                    continue
+                }
+                _ = shutdown_rx.recv() => {
+                    log::info!("🛑 Shutting down worker");
+                    return;
+                }
+            }
+        }
+
         let mut prioritized_domains: Vec<String> = Vec::new();
         let mut prioritized_prefixes: Vec<String> = Vec::new();
 
