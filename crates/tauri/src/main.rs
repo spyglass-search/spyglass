@@ -54,7 +54,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::open_result,
             cmd::search_docs,
             cmd::search_lenses,
-            cmd::resize_window
+            cmd::resize_window,
+            cmd::crawl_stats,
         ])
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))

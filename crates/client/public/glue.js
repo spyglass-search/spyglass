@@ -17,6 +17,10 @@ export async function onFocus(callback) {
     await listen('focus_window', callback);
 }
 
+export async function crawlStats() {
+    return await invoke("crawl_stats");
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke("search_docs", { lenses, query });
 }

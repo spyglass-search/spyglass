@@ -10,7 +10,7 @@ use url::Url;
 
 use shared::request;
 use shared::response::{
-    AppStatus, QueueStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults,
+    AppStatus, CrawlStats, QueueStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults,
 };
 
 use entities::models::{crawl_queue, lens};
@@ -109,22 +109,6 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
 }
 
 pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
-    let db = &state.db;
-
-    let queue_counts = crawl_queue::queue_stats(db).await.unwrap();
-    let mut queue_status: HashMap<String, QueueStatus> = HashMap::new();
-    for count in queue_counts.iter() {
-        let entry = queue_status
-            .entry(count.domain.clone())
-            .or_insert_with(QueueStatus::default);
-        match count.status.as_str() {
-            "Completed" => entry.num_completed += count.count as u64,
-            "Processing" => entry.num_processing += count.count as u64,
-            "Queued" => entry.num_queued += count.count as u64,
-            _ => {}
-        }
-    }
-
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
@@ -137,7 +121,6 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
     Ok(AppStatus {
         num_docs: reader.num_docs(),
         is_paused,
-        queue_status,
     })
 }
 
@@ -145,6 +128,36 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
 #[instrument(skip(state))]
 pub async fn app_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     _get_current_status(state).await
+}
+
+#[instrument(skip(state))]
+pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
+    let queue_stats = crawl_queue::queue_stats(&state.db).await;
+    if let Err(err) = queue_stats {
+        log::error!("{:?}", err);
+        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+    }
+
+    let mut by_domain = HashMap::new();
+    let queue_stats = queue_stats.unwrap();
+    for stat in queue_stats {
+        let entry = by_domain
+            .entry(stat.domain)
+            .or_insert_with(QueueStatus::default);
+        match stat.status.as_str() {
+            "Queued" => entry.num_queued += stat.count as u64,
+            "Processing" => entry.num_processing += stat.count as u64,
+            "Completed" => entry.num_completed += stat.count as u64,
+            _ => {}
+        }
+    }
+
+    let by_domain = by_domain
+        .into_iter()
+        .filter(|(_, stats)| stats.total() < 100)
+        .collect();
+
+    Ok(CrawlStats { by_domain })
 }
 
 #[instrument(skip(state))]

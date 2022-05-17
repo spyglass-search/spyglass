@@ -31,6 +31,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = "crawlStats", catch)]
+    pub async fn crawl_stats() -> Result<JsValue, JsValue>;
 }
 
 #[derive(Clone, Routable, PartialEq)]

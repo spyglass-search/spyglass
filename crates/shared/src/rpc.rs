@@ -2,7 +2,7 @@ use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_derive::rpc;
 
 use crate::request::{SearchLensesParam, SearchParam};
-use crate::response::{AppStatus, SearchLensesResp, SearchResults};
+use crate::response::{AppStatus, CrawlStats, SearchLensesResp, SearchResults};
 
 pub fn gen_ipc_path() -> String {
     if cfg!(windows) {
@@ -21,6 +21,9 @@ pub trait Rpc {
 
     #[rpc(name = "app_status")]
     fn app_status(&self) -> BoxFuture<Result<AppStatus>>;
+
+    #[rpc(name = "crawl_stats")]
+    fn crawl_stats(&self) -> BoxFuture<Result<CrawlStats>>;
 
     #[rpc(name = "toggle_pause")]
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;

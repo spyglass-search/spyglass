@@ -117,6 +117,22 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
+pub async fn queue_stats(
+    db: &DatabaseConnection,
+) -> anyhow::Result<Vec<QueueCountByStatus>, sea_orm::DbErr> {
+    let res = Entity::find()
+        .from_raw_sql(Statement::from_string(
+            DbBackend::Sqlite,
+            "SELECT count(*) as count, domain, status FROM crawl_queue GROUP BY domain, status"
+                .into(),
+        ))
+        .into_model::<QueueCountByStatus>()
+        .all(db)
+        .await?;
+
+    Ok(res)
+}
+
 pub async fn reset_processing(db: &DatabaseConnection) {
     Entity::update_many()
         .col_expr(
@@ -155,22 +171,6 @@ pub async fn num_queued(
         .await?;
 
     Ok(res.unwrap().count as u64)
-}
-
-pub async fn queue_stats(
-    db: &DatabaseConnection,
-) -> anyhow::Result<Vec<QueueCountByStatus>, sea_orm::DbErr> {
-    let res = Entity::find()
-        .column_as(Column::Id.count(), "count")
-        .column(Column::Status)
-        .column(Column::Domain)
-        .group_by(Column::Status)
-        .group_by(Column::Domain)
-        .into_model::<QueueCountByStatus>()
-        .all(db)
-        .await?;
-
-    Ok(res)
 }
 
 fn gen_priority_values(items: &[String], is_prefix: bool) -> String {

@@ -6,7 +6,7 @@ use jsonrpc_ipc_server::{Server, ServerBuilder};
 use libspyglass::state::AppState;
 
 use shared::request::{SearchLensesParam, SearchParam};
-use shared::response::{AppStatus, SearchLensesResp, SearchResults};
+use shared::response::{AppStatus, CrawlStats, SearchLensesResp, SearchResults};
 use shared::rpc::{gen_ipc_path, Rpc};
 
 mod response;
@@ -23,6 +23,10 @@ impl Rpc for SpyglassRPC {
 
     fn app_status(&self) -> BoxFuture<Result<AppStatus>> {
         Box::pin(route::app_status(self.state.clone()))
+    }
+
+    fn crawl_stats(&self) -> BoxFuture<Result<CrawlStats>> {
+        Box::pin(route::crawl_stats(self.state.clone()))
     }
 
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
