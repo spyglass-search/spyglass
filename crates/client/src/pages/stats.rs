@@ -64,6 +64,22 @@ pub fn stats_page() -> Html {
             <h1 class={"text-2xl"}>
                 {"Crawl Status"}
             </h1>
+            <div class={"py-4"}>
+                <div class={"relative w-full grid grid-cols-3 gap-2"}>
+                    <div class={"flex flex-row justify-center items-center pb-2 text-xs"}>
+                        <div class="relative flex w-4 h-4 bg-indigo-400 p-2 mr-2"></div>
+                        {"Queued"}
+                    </div>
+                    <div class={"flex flex-row justify-center items-center pb-2 text-xs"}>
+                        <div class="relative flex w-4 h-4 bg-indigo-500 p-2 mr-2"></div>
+                        {"Processing"}
+                    </div>
+                    <div class={"flex flex-row justify-center items-center pb-2 text-xs"}>
+                        <div class="relative flex w-4 h-4 bg-indigo-600 p-2 mr-2"></div>
+                        {"Completed"}
+                    </div>
+                </div>
+            </div>
             <div class={"divide-y divide-neutral-600"}>
                 {rendered}
             </div>
