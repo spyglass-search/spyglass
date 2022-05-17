@@ -34,18 +34,18 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     let mut tray = SystemTrayMenu::new();
     tray = tray
         .add_item(show)
+        .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(
             CustomMenuItem::new("about", format!("v20{}", ctx.package_info().version)).disabled(),
+        )
+        .add_item(
+            CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
         )
         .add_item(CustomMenuItem::new(
             SHOW_CRAWL_STATUS.to_string(),
             "Show crawl status",
         ))
-        .add_item(
-            CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
-        )
-        .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_lenses_folder)
         .add_item(open_settings_folder)
