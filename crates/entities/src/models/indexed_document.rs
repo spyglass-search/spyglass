@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::Set;
+use sea_orm::{FromQueryResult, QuerySelect, Set};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "indexed_document")]
@@ -44,4 +44,24 @@ impl ActiveModelBehavior for ActiveModel {
 
         Ok(self)
     }
+}
+
+#[derive(FromQueryResult)]
+pub struct CountByDomain {
+    pub count: i64,
+    pub domain: String,
+}
+
+pub async fn indexed_stats(
+    db: &DatabaseConnection,
+) -> anyhow::Result<Vec<CountByDomain>, sea_orm::DbErr> {
+    let res = Entity::find()
+        .column_as(Column::Id.count(), "count")
+        .column(Column::Domain)
+        .group_by(Column::Domain)
+        .into_model::<CountByDomain>()
+        .all(db)
+        .await?;
+
+    Ok(res)
 }

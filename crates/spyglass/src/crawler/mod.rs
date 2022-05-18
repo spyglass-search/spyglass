@@ -19,7 +19,7 @@ use crate::scraper::html_to_text;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
-const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
+const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Default, Clone)]
@@ -222,7 +222,6 @@ impl Crawler {
             crawl.url.clone()
         };
 
-        log::info!("Fetching {:?}", fetch_url);
         let url = Url::parse(&fetch_url).unwrap();
 
         // Break apart domain + path of the URL
@@ -245,6 +244,7 @@ impl Crawler {
 
         // Crawl & save the data
         let mut result = self.crawl(&url).await;
+        log::info!("fetched {} {:?}", result.status, result.url);
         // Check to see if a canonical URL was found, if not use the original
         // bootstrapped URL
         if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {

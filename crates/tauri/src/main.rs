@@ -26,6 +26,7 @@ mod constants;
 mod menu;
 mod rpc;
 mod window;
+use window::show_crawl_stats_window;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -53,7 +54,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::open_result,
             cmd::search_docs,
             cmd::search_lenses,
-            cmd::resize_window
+            cmd::resize_window,
+            cmd::crawl_stats,
         ])
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
@@ -111,10 +113,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         })
         .on_window_event(|event| {
-            if let tauri::WindowEvent::Focused(is_focused) = event.event() {
-                if !is_focused {
-                    let handle = event.window();
-                    window::hide_window(handle);
+            let window = event.window();
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Focused(is_focused) = event.event() {
+                    if !is_focused {
+                        let handle = event.window();
+                        window::hide_window(handle);
+                    }
                 }
             }
         })
@@ -139,6 +144,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
                     menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
+                    menu::SHOW_CRAWL_STATUS => {
+                        show_crawl_stats_window(app);
+                    }
                     menu::SHOW_SEARCHBAR => {
                         if !window.is_visible().unwrap() {
                             window::show_window(&window);
@@ -161,7 +169,7 @@ async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
     let mut rpc = rpc.lock().await;
     match rpc
         .client
-        .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
+        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
         .await
     {
         Ok(resp) => Some(resp),
@@ -229,22 +237,6 @@ async fn update_tray_menu(app: &AppHandle) {
             .set_title(format!(
                 "{} documents indexed",
                 app_status.num_docs.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
-
-        handle
-            .get_item(menu::NUM_QUEUED_MENU_ITEM)
-            .set_title(format!(
-                "{} in queue",
-                app_status.num_queued.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
-
-        handle
-            .get_item(menu::NUM_IN_PROGRESS_MENU_ITEM)
-            .set_title(format!(
-                "{} crawling",
-                app_status.num_in_progress.to_formatted_string(&Locale::en)
             ))
             .unwrap();
     }

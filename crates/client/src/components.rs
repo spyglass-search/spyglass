@@ -43,41 +43,66 @@ impl From<&SearchResult> for ResultListData {
     }
 }
 
+#[derive(Properties, PartialEq)]
+pub struct SelectLensProps {
+    pub lens: Vec<String>,
+}
+
 /// Render a list of selected lenses
-pub fn selected_lens_list(lens: &[String]) -> Html {
-    let items = lens
+#[function_component(SelectedLens)]
+pub fn selected_lens_list(props: &SelectLensProps) -> Html {
+    let items = props
+        .lens
         .iter()
         .map(|lens_name: &String| {
             html! {
-                <li class={"lens"}>
-                    <span class={"lens-title"}>{lens_name}</span>
+                <li class={"flex bg-cyan-700 rounded-lg my-3 ml-3"}>
+                    <span class={"text-4xl text-white p-3"}>{lens_name}</span>
                 </li>
             }
         })
         .collect::<Html>();
 
     html! {
-        <ul class={"lenses"}>
+        <ul class="flex bg-neutral-800">
             {items}
         </ul>
     }
 }
 
+#[derive(Properties, PartialEq)]
+pub struct SearchResultProps {
+    pub result: ResultListData,
+    pub is_selected: bool,
+}
+
 /// Render search results
-pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html {
-    let mut selected: Option<String> = None;
+#[function_component(SearchResultItem)]
+pub fn search_result_component(props: &SearchResultProps) -> Html {
+    let is_selected = props.is_selected;
+    let result = &props.result;
+
+    let mut selected: String = "bg-neutral-800".into();
     if is_selected {
-        selected = Some("result-selected".to_string());
+        selected = "bg-cyan-900".into();
     }
 
-    match res.result_type {
+    let component_styles = vec![
+        "border-t".into(),
+        "border-neutral-600".into(),
+        "p-4".into(),
+        "text-white".into(),
+        selected,
+    ];
+
+    match result.result_type {
         ResultListType::DocSearch => {
-            let url_link = if res.url.is_some() {
-                let domain = res
+            let url_link = if result.url.is_some() {
+                let domain = result
                     .domain
                     .clone()
                     .unwrap_or_else(|| "example.com".to_string());
-                let url = res.url.clone().unwrap();
+                let url = result.url.clone().unwrap();
 
                 let path = url
                     .trim_start_matches("http://")
@@ -85,12 +110,15 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
                     .trim_start_matches(&domain);
 
                 html! {
-                    <div class={"result-url"}>
+                    <div class={"text-xs truncate"}>
                         <a href={url.clone()} target={"_blank"}>
-                            <img src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())} />
-                            {domain.clone()}
+                            <img
+                                class="w-3 inline align-middle"
+                                src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
+                            />
+                            <span class={"align-middle text-cyan-400"}>{format!(" {}", domain.clone())}</span>
+                            <span class={"align-middle"}>{format!(" → {}", path)}</span>
                         </a>
-                        <span>{format!(" → {}", path)}</span>
                     </div>
                 }
             } else {
@@ -98,18 +126,26 @@ pub fn search_result_component(res: &ResultListData, is_selected: bool) -> Html 
             };
 
             html! {
-                <div class={vec![Some("result-item".to_string()), selected]}>
+                <div class={component_styles}>
                     {url_link}
-                    <h2 class={"result-title"}>{res.title.clone()}</h2>
-                    <div class={"result-description"}>{res.description.clone()}</div>
+                    <h2 class={"text-lg truncate py-1"}>
+                        {result.title.clone()}
+                    </h2>
+                    <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>
+                        {result.description.clone()}
+                    </div>
                 </div>
             }
         }
         ResultListType::LensSearch => {
             html! {
-                <div class={vec![Some("lens-result-item".to_string()), selected]}>
-                    <h2 class={"result-title"}>{res.title.clone()}</h2>
-                    <div class={"result-description"}>{res.description.clone()}</div>
+                <div class={component_styles}>
+                    <h2 class={"text-2xl truncate py-1"}>
+                        {result.title.clone()}
+                    </h2>
+                    <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>
+                        {result.description.clone()}
+                    </div>
                 </div>
             }
         }

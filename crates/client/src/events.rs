@@ -4,9 +4,10 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{Element, HtmlInputElement};
 use yew::prelude::*;
 
-use super::{clear_results, escape, open};
+use super::{escape, open};
 use crate::components::ResultListData;
 use crate::constants;
+use crate::pages::{clear_results, show_doc_results, show_lens_results};
 
 pub fn handle_global_key_down(
     event: &Event,
@@ -79,13 +80,13 @@ pub fn handle_query_change(
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
+    let el = node_ref.cast::<Element>().unwrap();
+    if query.starts_with(constants::LENS_SEARCH_PREFIX) {
+        // show lens search
+        return show_lens_results(search_results, el, selected_idx, query.to_string());
+    }
+
     if query.len() >= constants::MIN_CHARS {
-        let el = node_ref.cast::<Element>().unwrap();
-        if query.starts_with(constants::LENS_SEARCH_PREFIX) {
-            // show lens search
-            super::show_lens_results(search_results, el, selected_idx, query.to_string());
-        } else {
-            super::show_doc_results(search_results, &lens, el, selected_idx, query.to_string());
-        }
+        show_doc_results(search_results, &lens, el, selected_idx, query.to_string())
     }
 }

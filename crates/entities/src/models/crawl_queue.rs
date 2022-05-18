@@ -117,6 +117,22 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
+pub async fn queue_stats(
+    db: &DatabaseConnection,
+) -> anyhow::Result<Vec<QueueCountByStatus>, sea_orm::DbErr> {
+    let res = Entity::find()
+        .from_raw_sql(Statement::from_string(
+            DbBackend::Sqlite,
+            "SELECT count(*) as count, domain, status FROM crawl_queue GROUP BY domain, status"
+                .into(),
+        ))
+        .into_model::<QueueCountByStatus>()
+        .all(db)
+        .await?;
+
+    Ok(res)
+}
+
 pub async fn reset_processing(db: &DatabaseConnection) {
     Entity::update_many()
         .col_expr(
@@ -134,6 +150,13 @@ pub async fn reset_processing(db: &DatabaseConnection) {
 #[derive(FromQueryResult)]
 struct CrawlQueueCount {
     count: i64,
+}
+
+#[derive(FromQueryResult)]
+pub struct QueueCountByStatus {
+    pub count: i64,
+    pub domain: String,
+    pub status: String,
 }
 
 pub async fn num_queued(

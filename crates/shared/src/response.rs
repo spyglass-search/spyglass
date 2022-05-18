@@ -1,11 +1,28 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct QueueStatus {
+    pub num_queued: u64,
+    pub num_processing: u64,
+    pub num_completed: u64,
+    pub num_indexed: u64,
+}
+
+impl QueueStatus {
+    pub fn total(&self) -> u64 {
+        self.num_completed + self.num_indexed + self.num_processing + self.num_queued
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
-    pub num_queued: u64,
-    pub num_in_progress: u64,
     pub is_paused: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CrawlStats {
+    pub by_domain: Vec<(String, QueueStatus)>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

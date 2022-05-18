@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use entities::sea_orm::prelude::*;
+use entities::sea_orm::QueryOrder;
 use entities::sea_orm::Set;
 use jsonrpc_core::{Error, ErrorCode, Result};
 use shared::response::LensResult;
@@ -8,9 +9,11 @@ use tracing::instrument;
 use url::Url;
 
 use shared::request;
-use shared::response::{AppStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use shared::response::{
+    AppStatus, CrawlStats, QueueStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults,
+};
 
-use entities::models::crawl_queue;
+use entities::models::{crawl_queue, indexed_document, lens};
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -105,23 +108,11 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
     }
 }
 
-pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
-    let db = &state.db;
-    let num_queued = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Queued)
-        .await
-        .unwrap();
-
-    let mut num_in_progress = crawl_queue::num_queued(db, crawl_queue::CrawlStatus::Processing)
-        .await
-        .unwrap();
-
+async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
     let is_paused = *paused_status == *"true";
-    if is_paused {
-        num_in_progress = 0;
-    }
 
     // Grab details about index
     let index = state.index;
@@ -129,16 +120,58 @@ pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppSta
 
     Ok(AppStatus {
         num_docs: reader.num_docs(),
-        num_queued,
-        num_in_progress,
         is_paused,
     })
 }
 
 /// Fun stats about index size, etc.
 #[instrument(skip(state))]
-pub async fn app_stats(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+pub async fn app_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     _get_current_status(state).await
+}
+
+#[instrument(skip(state))]
+pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
+    let queue_stats = crawl_queue::queue_stats(&state.db).await;
+    if let Err(err) = queue_stats {
+        log::error!("{:?}", err);
+        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+    }
+
+    let indexed_stats = indexed_document::indexed_stats(&state.db).await;
+    if let Err(err) = indexed_stats {
+        log::error!("{:?}", err);
+        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+    }
+
+
+    let mut by_domain = HashMap::new();
+    let queue_stats = queue_stats.unwrap();
+    for stat in queue_stats {
+        let entry = by_domain
+            .entry(stat.domain)
+            .or_insert_with(QueueStatus::default);
+        match stat.status.as_str() {
+            "Queued" => entry.num_queued += stat.count as u64,
+            "Processing" => entry.num_processing += stat.count as u64,
+            "Completed" => entry.num_completed += stat.count as u64,
+            _ => {}
+        }
+    }
+
+    let indexed_stats = indexed_stats.unwrap();
+    for stat in indexed_stats {
+        let entry = by_domain.entry(stat.domain)
+            .or_insert_with(QueueStatus::default);
+        entry.num_indexed += stat.count as u64;
+    }
+
+    let by_domain = by_domain
+        .into_iter()
+        .filter(|(_, stats)| stats.total() >= 100)
+        .collect();
+
+    Ok(CrawlStats { by_domain })
 }
 
 #[instrument(skip(state))]
@@ -163,20 +196,23 @@ pub async fn search_lenses(
 ) -> Result<SearchLensesResp> {
     let mut results = Vec::new();
 
-    for entry in state.lenses.iter() {
-        let lens_name = entry.key();
-        let lens_info = entry.value();
-        log::trace!("{} - {}", lens_name, param.query);
-        if lens_name.starts_with(&param.query) {
-            results.push(LensResult {
-                title: lens_name.to_owned(),
-                description: lens_info
-                    .description
-                    .as_ref()
-                    .unwrap_or(&"".to_string())
-                    .to_owned(),
-            })
-        }
+    let query_results = lens::Entity::find()
+        .filter(lens::Column::Name.like(&format!("%{}%", &param.query)))
+        .order_by_asc(lens::Column::Name)
+        .all(&state.db)
+        .await;
+
+    if let Err(err) = query_results {
+        log::error!("Unable to search lenses: {:?}", err);
+        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+    }
+
+    let query_results = query_results.unwrap();
+    for lens in query_results {
+        results.push(LensResult {
+            title: lens.name,
+            description: lens.description.unwrap_or_else(|| "".to_string()),
+        });
     }
 
     Ok(SearchLensesResp { results })
