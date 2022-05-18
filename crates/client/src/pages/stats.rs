@@ -19,6 +19,73 @@ fn fetch_crawl_stats(stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>) {
     });
 }
 
+#[derive(Properties, PartialEq)]
+pub struct LegendIconProps {
+    pub color: String,
+    pub label: String,
+}
+
+#[function_component(LegendIcon)]
+pub fn legend_icon(props: &LegendIconProps) -> Html {
+    let legend_styles: Vec<String> = vec![
+        "relative".into(),
+        "flex".into(),
+        "w-4".into(),
+        "h-4".into(),
+        "p-2".into(),
+        "rounded-full".into(),
+        props.color.clone(),
+    ];
+
+    html! {
+        <div class={"flex flex-row items-center pb-2 text-xs mr-8"}>
+            <div class={legend_styles}></div>
+            {props.label.clone()}
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct StatsBarProps {
+    count: u64,
+    total: f64,
+    color: String,
+    #[prop_or_default]
+    is_start: bool,
+    #[prop_or_default]
+    is_end: bool,
+}
+
+#[function_component(StatsBar)]
+fn stats_bar(props: &StatsBarProps) -> Html {
+    let percent = props.count as f64 / props.total * 100.0;
+    let mut buf = Buffer::default();
+    buf.write_formatted(&props.count, &Locale::en);
+
+    let mut bar_style: Vec<String> = vec![
+        "relative".into(),
+        "flex".into(),
+        "justify-center".into(),
+        "h-8".into(),
+        "p-2".into(),
+    ];
+    bar_style.push(props.color.clone());
+
+    if props.is_start {
+        bar_style.push("rounded-l-lg".into());
+    }
+
+    if props.is_end {
+        bar_style.push("rounded-r-lg".into());
+    }
+
+    html! {
+        <div class={bar_style} style={format!("width: {}%", percent)}>
+            <span class={"text-xs"}>{buf.as_str()}</span>
+        </div>
+    }
+}
+
 #[function_component(StatsPage)]
 pub fn stats_page() -> Html {
     let stats: UseStateHandle<Vec<(String, QueueStatus)>> = use_state_eq(Vec::new);
@@ -38,46 +105,16 @@ pub fn stats_page() -> Html {
         .iter()
         .map(|(domain, stats)| {
             let total = stats.total() as f64;
-
-            let queued_per = stats.num_queued as f64 / total * 100.0;
-            let processing_per = stats.num_processing as f64 / total * 100.0;
-            let completed_per = stats.num_completed as f64 / total * 100.0;
-            let indexed_per = stats.num_indexed as f64 / total * 100.0;
-
-            let mut num_queued_buf = Buffer::default();
-            num_queued_buf.write_formatted(&stats.num_queued, &Locale::en);
-
-            let mut num_processing_buf = Buffer::default();
-            num_processing_buf.write_formatted(&stats.num_processing, &Locale::en);
-
-            let mut num_completed_buf = Buffer::default();
-            num_completed_buf.write_formatted(&stats.num_completed, &Locale::en);
-
-            let mut num_indexed_buf = Buffer::default();
-            num_indexed_buf.write_formatted(&stats.num_indexed, &Locale::en);
-
             html! {
                 <div class={"p-4 px-8"}>
                     <div class={"text-xs pb-1"}>
                         {domain}
                     </div>
                     <div class={"relative flex flex-row items-center flex-growgroup w-full"}>
-                        <div class={"relative flex justify-center h-8 bg-neutral-600 p-2 rounded-l-lg"}
-                            style={format!("width: {}%", queued_per)}>
-                            <span class={"text-xs"}>{num_queued_buf.as_str()}</span>
-                        </div>
-                        <div class={"relative flex justify-center h-8 bg-sky-600 p-2"}
-                            style={format!("width: {}%", processing_per)}>
-                            <span class={"text-xs"}>{num_processing_buf}</span>
-                        </div>
-                        <div class={"relative flex justify-center h-8 bg-lime-600 p-2"}
-                            style={format!("width: {}%", completed_per)}>
-                            <span class={"text-xs"}>{num_completed_buf}</span>
-                        </div>
-                        <div class={"relative flex justify-center h-8 bg-lime-800 p-2 rounded-r-lg"}
-                            style={format!("width: {}%", indexed_per)}>
-                            <span class={"text-xs"}>{num_indexed_buf}</span>
-                        </div>
+                        <StatsBar count={stats.num_queued} total={total} color={"bg-neutral-600"} is_start={true} />
+                        <StatsBar count={stats.num_processing} total={total} color={"bg-sky-600"} />
+                        <StatsBar count={stats.num_completed} total={total} color={"bg-lime-600"} />
+                        <StatsBar count={stats.num_indexed} total={total} color={"bg-lime-800"} is_end={true} />
                     </div>
                 </div>
             }
@@ -113,22 +150,10 @@ pub fn stats_page() -> Html {
                 </div>
                 <div class="py-2">
                     <div class="flex flex-row">
-                        <div class="flex flex-row items-center pb-2 text-xs mr-8">
-                            <div class="relative flex w-4 h-4 bg-neutral-600 p-2 rounded-full mr-2"></div>
-                            {"Queued"}
-                        </div>
-                        <div class="flex flex-row items-center pb-2 text-xs mr-8">
-                            <div class="relative flex w-4 h-4 bg-sky-600 p-2 rounded-full mr-2"></div>
-                            {"Processing"}
-                        </div>
-                        <div class="flex flex-row items-center pb-2 text-xs mr-8">
-                            <div class="relative flex w-4 h-4 bg-lime-600 p-2 rounded-full mr-2"></div>
-                            {"Completed"}
-                        </div>
-                        <div class="flex flex-row items-center pb-2 text-xs">
-                            <div class="relative flex w-4 h-4 bg-lime-800 p-2 rounded-full mr-2"></div>
-                            {"Indexed"}
-                        </div>
+                        <LegendIcon label="Queued" color="bg-neutral-600" />
+                        <LegendIcon label="Processing" color="bg-sky-600" />
+                        <LegendIcon label="Completed" color="bg-lime-600" />
+                        <LegendIcon label="Indexed" color="bg-lime-800" />
                     </div>
                 </div>
             </div>

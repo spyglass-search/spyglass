@@ -144,7 +144,6 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
         return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
     }
 
-
     let mut by_domain = HashMap::new();
     let queue_stats = queue_stats.unwrap();
     for stat in queue_stats {
@@ -161,7 +160,8 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
 
     let indexed_stats = indexed_stats.unwrap();
     for stat in indexed_stats {
-        let entry = by_domain.entry(stat.domain)
+        let entry = by_domain
+            .entry(stat.domain)
             .or_insert_with(QueueStatus::default);
         entry.num_indexed += stat.count as u64;
     }
