@@ -98,7 +98,7 @@ pub fn stats_page() -> Html {
 
     html! {
         <div class={"text-white"}>
-            <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-40 h-32">
+            <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-40 h-24">
                 <div class="flex flex-row items-center">
                     <h1 class={"text-2xl grow p-0"}>
                         {"Crawl Status"}
@@ -111,7 +111,7 @@ pub fn stats_page() -> Html {
                         </svg>
                     </button>
                 </div>
-                <div class="py-4">
+                <div class="py-2">
                     <div class="flex flex-row">
                         <div class="flex flex-row items-center pb-2 text-xs mr-8">
                             <div class="relative flex w-4 h-4 bg-neutral-600 p-2 rounded-full mr-2"></div>
@@ -121,7 +121,7 @@ pub fn stats_page() -> Html {
                             <div class="relative flex w-4 h-4 bg-sky-600 p-2 rounded-full mr-2"></div>
                             {"Processing"}
                         </div>
-                        <div class="flex flex-row items-center pb-2 text-xs">
+                        <div class="flex flex-row items-center pb-2 text-xs mr-8">
                             <div class="relative flex w-4 h-4 bg-lime-600 p-2 rounded-full mr-2"></div>
                             {"Completed"}
                         </div>
