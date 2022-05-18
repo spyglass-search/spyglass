@@ -158,7 +158,7 @@ pub fn search_page() -> Html {
                     ref={(*query_ref).clone()}
                     id={"searchbox"}
                     type={"text"}
-                    class={"bg-neutral-800 text-white text-5xl p-4 flex-1 focus:outline-none"}
+                    class={"bg-neutral-800 text-white text-5xl p-4 overflow-hidden flex-1 focus:outline-none"}
                     placeholder={"Search"}
                     {onkeyup}
                     {onkeydown}
