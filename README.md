@@ -165,6 +165,11 @@ file found in their directory on startup, a default one will be created.
     shortcut: "CmdOrCtrl+Shift+/",
     // Where to store your index and index metadata
     // The exact default location is dependent on your OS
+    //
+    // - NOTE: If you're updating this for Windows, the path needs to use double backward slashes 
+    //   like so: "E:\\spyglass\\data"
+    // - Linux & macOS uses paths like below
+    //
     data_directory: "/Users/<username>/Library/Application Support/com.athlabs.spyglass",
     // By default, Spyglass will only crawl things as specified in your lenses. If you want
     // to follow links without regard to those rules, set this to true.
