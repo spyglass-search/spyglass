@@ -113,10 +113,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         })
         .on_window_event(|event| {
-            if let tauri::WindowEvent::Focused(is_focused) = event.event() {
-                if !is_focused {
-                    let handle = event.window();
-                    window::hide_window(handle);
+            let window = event.window();
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Focused(is_focused) = event.event() {
+                    if !is_focused {
+                        let handle = event.window();
+                        window::hide_window(handle);
+                    }
                 }
             }
         })
