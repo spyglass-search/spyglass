@@ -4325,6 +4325,7 @@ dependencies = [
  "gloo 0.7.0",
  "js-sys",
  "log",
+ "num-format",
  "serde",
  "serde_json",
  "shared",

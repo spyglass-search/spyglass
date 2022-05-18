@@ -1,3 +1,4 @@
+use num_format::{Buffer, Locale};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
@@ -36,11 +37,24 @@ pub fn stats_page() -> Html {
     let mut rendered = stats
         .iter()
         .map(|(domain, stats)| {
-            let total = stats.total();
+            let total = stats.total() as f64;
 
-            let queued_per = stats.num_queued as f64 / total as f64 * 100.0;
-            let processing_per = stats.num_processing as f64 / total as f64 * 100.0;
-            let completed_per = stats.num_completed as f64 / total as f64 * 100.0;
+            let queued_per = stats.num_queued as f64 / total * 100.0;
+            let processing_per = stats.num_processing as f64 / total * 100.0;
+            let completed_per = stats.num_completed as f64 / total * 100.0;
+            let indexed_per = stats.num_indexed as f64 / total * 100.0;
+
+            let mut num_queued_buf = Buffer::default();
+            num_queued_buf.write_formatted(&stats.num_queued, &Locale::en);
+
+            let mut num_processing_buf = Buffer::default();
+            num_processing_buf.write_formatted(&stats.num_processing, &Locale::en);
+
+            let mut num_completed_buf = Buffer::default();
+            num_completed_buf.write_formatted(&stats.num_completed, &Locale::en);
+
+            let mut num_indexed_buf = Buffer::default();
+            num_indexed_buf.write_formatted(&stats.num_indexed, &Locale::en);
 
             html! {
                 <div class={"p-4 px-8"}>
@@ -50,15 +64,19 @@ pub fn stats_page() -> Html {
                     <div class={"relative flex flex-row items-center flex-growgroup w-full"}>
                         <div class={"relative flex justify-center h-8 bg-neutral-600 p-2 rounded-l-lg"}
                             style={format!("width: {}%", queued_per)}>
-                            <span class={"text-xs"}>{stats.num_queued}</span>
+                            <span class={"text-xs"}>{num_queued_buf.as_str()}</span>
                         </div>
                         <div class={"relative flex justify-center h-8 bg-sky-600 p-2"}
                             style={format!("width: {}%", processing_per)}>
-                            <span class={"text-xs"}>{stats.num_processing}</span>
+                            <span class={"text-xs"}>{num_processing_buf}</span>
                         </div>
-                        <div class={"relative flex justify-center h-8 bg-lime-600 p-2 rounded-r-lg"}
+                        <div class={"relative flex justify-center h-8 bg-lime-600 p-2"}
                             style={format!("width: {}%", completed_per)}>
-                            <span class={"text-xs"}>{stats.num_completed}</span>
+                            <span class={"text-xs"}>{num_completed_buf}</span>
+                        </div>
+                        <div class={"relative flex justify-center h-8 bg-lime-800 p-2 rounded-r-lg"}
+                            style={format!("width: {}%", indexed_per)}>
+                            <span class={"text-xs"}>{num_indexed_buf}</span>
                         </div>
                     </div>
                 </div>
@@ -106,6 +124,10 @@ pub fn stats_page() -> Html {
                         <div class="flex flex-row items-center pb-2 text-xs">
                             <div class="relative flex w-4 h-4 bg-lime-600 p-2 rounded-full mr-2"></div>
                             {"Completed"}
+                        </div>
+                        <div class="flex flex-row items-center pb-2 text-xs">
+                            <div class="relative flex w-4 h-4 bg-lime-800 p-2 rounded-full mr-2"></div>
+                            {"Indexed"}
                         </div>
                     </div>
                 </div>

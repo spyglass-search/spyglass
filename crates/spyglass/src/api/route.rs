@@ -13,7 +13,7 @@ use shared::response::{
     AppStatus, CrawlStats, QueueStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults,
 };
 
-use entities::models::{crawl_queue, lens};
+use entities::models::{crawl_queue, indexed_document, lens};
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -108,7 +108,7 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
     }
 }
 
-pub async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     // Grab crawler status
     let app_state = &state.app_state;
     let paused_status = app_state.get("paused").unwrap();
@@ -138,6 +138,13 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
         return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
     }
 
+    let indexed_stats = indexed_document::indexed_stats(&state.db).await;
+    if let Err(err) = indexed_stats {
+        log::error!("{:?}", err);
+        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+    }
+
+
     let mut by_domain = HashMap::new();
     let queue_stats = queue_stats.unwrap();
     for stat in queue_stats {
@@ -150,6 +157,13 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
             "Completed" => entry.num_completed += stat.count as u64,
             _ => {}
         }
+    }
+
+    let indexed_stats = indexed_stats.unwrap();
+    for stat in indexed_stats {
+        let entry = by_domain.entry(stat.domain)
+            .or_insert_with(QueueStatus::default);
+        entry.num_indexed += stat.count as u64;
     }
 
     let by_domain = by_domain
