@@ -165,7 +165,7 @@ impl Searcher {
     ) -> tantivy::Result<String> {
         let fields = Searcher::doc_fields();
 
-        let doc_id = Uuid::new_v4().to_hyphenated().to_string();
+        let doc_id = Uuid::new_v4().as_hyphenated().to_string();
         let mut doc = Document::default();
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
