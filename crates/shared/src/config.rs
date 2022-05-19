@@ -31,11 +31,17 @@ pub struct Lens {
     pub domains: Vec<String>,
     pub urls: Vec<String>,
     pub version: String,
+    #[serde(default = "Lens::default_is_enabled")]
+    pub is_enabled: bool,
 }
 
 impl Lens {
     fn default_author() -> String {
         "Unknown".to_string()
+    }
+
+    fn default_is_enabled() -> bool {
+        false
     }
 }
 
@@ -161,6 +167,7 @@ impl Config {
 
     fn load_lenses(&mut self) -> anyhow::Result<()> {
         let lense_dir = self.lenses_dir();
+        let mut has_disabled = false;
         for entry in (fs::read_dir(lense_dir)?).flatten() {
             let path = entry.path();
             if path.is_file() && path.extension().unwrap_or_default() == "ron" {
@@ -169,14 +176,19 @@ impl Config {
                         Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
                         Ok(lens) => {
                             log::info!("Loaded lens {}", lens.name);
-                            self.lenses.insert(lens.name.clone(), lens);
+                            if lens.is_enabled {
+                                self.lenses.insert(lens.name.clone(), lens);
+                            } else {
+                                has_disabled = true;
+                                log::info!("Skipping {}, disabled", lens.name);
+                            }
                         }
                     }
                 }
             }
         }
 
-        if self.lenses.is_empty() {
+        if self.lenses.is_empty() && !has_disabled {
             // Create a default lens as an example.
             let lens = Lens {
                 author: "Spyglass".to_string(),
@@ -192,6 +204,7 @@ impl Config {
                     "https://doc.rust-lang.org/book/".into(),
                     "https://oldschool.runescape.wiki/w/".into(),
                 ],
+                is_enabled: true,
             };
 
             fs::write(
