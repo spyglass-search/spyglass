@@ -12,7 +12,7 @@ build = "src/build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-rc.7", features = [] }
+tauri-build = { version = "1.0.0-rc.9", features = [] }
 
 [dependencies]
 jsonrpc-core = "18.0.0"
@@ -23,7 +23,7 @@ open = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 shared = { path = "../shared" }
-tauri = { version = "1.0.0-rc.8", features = ["api-all", "ayatana-tray", "devtools", "notification", "system-tray"] }
+tauri = { version = "1.0.0-rc.11", features = ["api-all", "ayatana-tray", "devtools", "notification", "system-tray"] }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"
