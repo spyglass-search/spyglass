@@ -1,14 +1,18 @@
-use entities::sea_orm::prelude::*;
-use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
-use crate::crawler::Crawler;
-use crate::search::Searcher;
-use crate::state::AppState;
-
 use entities::models::{crawl_queue, indexed_document};
-use shared::config::Lens;
+use entities::sea_orm::prelude::*;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use shared::config::{Config, Lens};
+
+use crate::crawler::Crawler;
+use crate::search::{
+    lens::{load_lenses, read_lenses},
+    Searcher,
+};
+use crate::state::AppState;
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -239,6 +243,70 @@ pub async fn worker_task(
                 Command::Fetch(task) => {
                     tokio::spawn(_handle_fetch(state.clone(), crawler.clone(), task.clone()));
                 }
+            }
+        }
+    }
+}
+
+pub async fn lens_watcher(
+    state: AppState,
+    config: Config,
+    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
+) {
+    log::info!("👀 lens watcher started");
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+    let mut watcher = RecommendedWatcher::new(move |res| {
+        futures::executor::block_on(async {
+            tx.send(res).await.unwrap();
+        })
+    })
+    .unwrap();
+
+    let _ = watcher.watch(&config.lenses_dir(), RecursiveMode::NonRecursive);
+
+    // Read + load lenses for the first time.
+    let _ = read_lenses(&state, &config).await;
+    load_lenses(state.clone()).await;
+
+    let mut last_updated = std::time::Instant::now();
+    loop {
+        let event = tokio::select! {
+            res = rx.recv() => res,
+            _ = shutdown_rx.recv() => {
+                log::info!("🛑 Shutting down lens watcher");
+                return;
+            }
+        };
+
+        if let Some(event) = event {
+            match event {
+                Ok(event) => {
+                    let mut updated_lens = false;
+                    for path in &event.paths {
+                        if path.is_file() && path.extension().unwrap_or_default() == "ron" {
+                            updated_lens = true;
+                        }
+                    }
+
+                    let now = std::time::Instant::now();
+                    if updated_lens
+                        && now.duration_since(last_updated) >= std::time::Duration::from_secs(1)
+                    {
+                        let should_reload = matches!(
+                            event.kind,
+                            EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+                        );
+
+                        if should_reload {
+                            let _ = read_lenses(&state, &config).await;
+                            load_lenses(state.clone()).await;
+                            last_updated = now;
+                        }
+                    }
+                }
+                Err(e) => log::error!("watch error: {:?}", e),
             }
         }
     }

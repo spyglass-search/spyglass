@@ -165,58 +165,6 @@ impl Config {
         }
     }
 
-    fn load_lenses(&mut self) -> anyhow::Result<()> {
-        let lense_dir = self.lenses_dir();
-        let mut has_disabled = false;
-        for entry in (fs::read_dir(lense_dir)?).flatten() {
-            let path = entry.path();
-            if path.is_file() && path.extension().unwrap_or_default() == "ron" {
-                if let Ok(file_contents) = fs::read_to_string(path) {
-                    match ron::from_str::<Lens>(&file_contents) {
-                        Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
-                        Ok(lens) => {
-                            log::info!("Loaded lens {}", lens.name);
-                            if lens.is_enabled {
-                                self.lenses.insert(lens.name.clone(), lens);
-                            } else {
-                                has_disabled = true;
-                                log::info!("Skipping {}, disabled", lens.name);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if self.lenses.is_empty() && !has_disabled {
-            // Create a default lens as an example.
-            let lens = Lens {
-                author: "Spyglass".to_string(),
-                version: "1".to_string(),
-                name: "wiki".to_string(),
-                description: Some(
-                    "Search through official user-supported wikis for knowledge, games, and more."
-                        .to_string(),
-                ),
-                domains: vec!["blog.rust-lang.org".into(), "wiki.factorio.com".into()],
-                urls: vec![
-                    "https://https://en.wikipedia.org/wiki/Portal:".into(),
-                    "https://doc.rust-lang.org/book/".into(),
-                    "https://oldschool.runescape.wiki/w/".into(),
-                ],
-                is_enabled: true,
-            };
-
-            fs::write(
-                self.lenses_dir().join("wiki.ron"),
-                ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
-            )
-            .expect("Unable to save default lens file.");
-        }
-
-        Ok(())
-    }
-
     pub fn app_identifier() -> String {
         if cfg!(debug_assertions) {
             "spyglass-dev".to_string()
@@ -271,7 +219,7 @@ impl Config {
             Default::default()
         });
 
-        let mut config = Config {
+        let config = Config {
             lenses: HashMap::new(),
             user_settings,
         };
@@ -288,28 +236,6 @@ impl Config {
         let lenses_dir = config.lenses_dir();
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
 
-        config.load_lenses().unwrap_or_else(|err| {
-            log::warn!("Unable to load lenses! Reason: {}", err);
-            Default::default()
-        });
-
         config
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::config::Config;
-    use std::collections::HashMap;
-
-    #[test]
-    #[ignore]
-    pub fn test_load_lenses() {
-        let mut config = Config {
-            lenses: HashMap::new(),
-            user_settings: Default::default(),
-        };
-        let res = config.load_lenses();
-        assert!(!res.is_err());
     }
 }

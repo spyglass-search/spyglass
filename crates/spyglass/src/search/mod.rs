@@ -11,6 +11,7 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
+pub mod lens;
 mod query;
 use crate::search::query::build_query;
 use shared::config::Lens;
