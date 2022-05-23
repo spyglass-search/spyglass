@@ -33,6 +33,7 @@ pub fn legend_icon(props: &LegendIconProps) -> Html {
         "w-4".into(),
         "h-4".into(),
         "p-2".into(),
+        "mr-2".into(),
         "rounded-full".into(),
         props.color.clone(),
     ];

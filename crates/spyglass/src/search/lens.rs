@@ -1,7 +1,8 @@
 use std::fs;
 
-use entities::models::lens;
-use shared::config::{Config, Lens};
+use entities::models::{bootstrap_queue, lens};
+use migration::sea_orm::DatabaseConnection;
+use shared::config::{Config, Lens, UserSettings};
 
 use crate::crawler::bootstrap;
 use crate::state::AppState;
@@ -32,7 +33,10 @@ async fn create_default_lens(config: &Config) {
     .expect("Unable to save default lens file.");
 }
 
+/// Read lenses into the AppState
 pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()> {
+    state.lenses.clear();
+
     let lense_dir = config.lenses_dir();
     let mut num_lenses = 0;
 
@@ -45,10 +49,7 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
                     Ok(lens) => {
                         num_lenses += 1;
                         if lens.is_enabled {
-                            log::info!("Loaded lens {}", lens.name);
                             state.lenses.insert(lens.name.clone(), lens);
-                        } else {
-                            state.lenses.remove(&lens.name.clone());
                         }
                     }
                 }
@@ -63,12 +64,14 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
     Ok(())
 }
 
+/// Loop through lenses in the AppState. Update our internal db & bootstrap anything
+/// that hasn't been bootstrapped.
 pub async fn load_lenses(state: AppState) {
-    let mut new_lenses: Vec<Lens> = Vec::new();
+    let _ = lens::reset(&state.db).await;
 
+    let mut new_lenses: Vec<Lens> = Vec::new();
     for entry in state.lenses.iter() {
         let lens = entry.value();
-
         // Have we added this lens to the database?
         match lens::add(
             &state.db,
@@ -80,38 +83,62 @@ pub async fn load_lenses(state: AppState) {
         .await
         {
             Ok(true) => {
-                log::info!("found new lens {}", lens.name);
+                log::info!("loaded lens {}", lens.name);
                 new_lenses.push(lens.clone());
             }
-            Ok(false) => log::info!("lens ({}) already added", lens.name),
+            Ok(false) => log::info!("duplicate lens ({})", lens.name),
             Err(e) => log::error!("error loading lens {}", e),
         }
     }
 
     // Bootstrap new lenses
-    log::info!("bootstraping new lenses");
     for lens in new_lenses {
         for domain in lens.domains.iter() {
-            match bootstrap::bootstrap(
-                &state.db,
-                &state.user_settings,
-                // Safe to assume domains always have HTTPS support?
-                &format!("https://{}", domain),
-            )
-            .await
-            {
-                Err(e) => log::error!("{}", e),
-                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", domain, cnt),
-            }
+            let seed_url = format!("https://{}", domain);
+            check_and_bootstrap(&state.db, &state.user_settings, &seed_url).await;
         }
 
         for prefix in lens.urls.iter() {
-            match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await {
-                Err(e) => log::error!("{}", e),
-                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", prefix, cnt),
+            check_and_bootstrap(&state.db, &state.user_settings, prefix).await;
+        }
+    }
+}
+
+/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
+async fn check_and_bootstrap(db: &DatabaseConnection, user_settings: &UserSettings, seed_url: &str) -> bool {
+    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
+        log::info!("bootstrapping {}", seed_url);
+
+        match bootstrap::bootstrap(db, user_settings, seed_url).await {
+            Err(e) => {
+                log::error!("{}", e);
+                return false;
+            },
+            Ok(cnt) => {
+                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
+                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
+                return true;
             }
         }
     }
 
-    log::info!("finished bootstrapping");
+    false
+}
+
+#[cfg(test)]
+mod test {
+    use entities::models::bootstrap_queue;
+    use entities::test::setup_test_db;
+    use shared::config::UserSettings;
+    use super::check_and_bootstrap;
+
+    #[tokio::test]
+    async fn test_check_and_bootstrap() {
+        let db = setup_test_db().await;
+        let settings = UserSettings::default();
+        let test = "https://example.com";
+
+        bootstrap_queue::enqueue(&db, test, 10).await.unwrap();
+        assert!(!check_and_bootstrap(&db, &settings, &test).await);
+    }
 }

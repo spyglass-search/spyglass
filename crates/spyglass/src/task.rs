@@ -264,7 +264,7 @@ pub async fn lens_watcher(
     })
     .unwrap();
 
-    let _ = watcher.watch(&config.lenses_dir(), RecursiveMode::NonRecursive);
+    let _ = watcher.watch(&config.lenses_dir(), RecursiveMode::Recursive);
 
     // Read + load lenses for the first time.
     let _ = read_lenses(&state, &config).await;
@@ -290,6 +290,8 @@ pub async fn lens_watcher(
                         }
                     }
 
+                    // Debounce events so that we ignore ones that are coming in quick
+                    // succession.
                     let now = std::time::Instant::now();
                     if updated_lens
                         && now.duration_since(last_updated) >= std::time::Duration::from_secs(1)
