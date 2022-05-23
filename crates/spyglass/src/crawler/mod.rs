@@ -238,7 +238,13 @@ impl Crawler {
         }
 
         // Check for robots.txt of this domain
-        if !check_resource_rules(db, &self.client, &url).await? {
+        // When looking at bootstrapped tasks, check the original URL
+        if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            let og_url = Url::parse(&crawl.url).unwrap();
+            if !check_resource_rules(db, &self.client, &og_url).await? {
+                return Ok(None);
+            }
+        } else if !check_resource_rules(db, &self.client, &url).await? {
             return Ok(None);
         }
 
