@@ -2,13 +2,7 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, Schema};
 use shared::config::Config;
 
 use crate::models::{
-    bootstrap_queue,
-    crawl_queue,
-    create_connection,
-    fetch_history,
-    indexed_document,
-    lens,
-    link,
+    bootstrap_queue, crawl_queue, create_connection, fetch_history, indexed_document, lens, link,
     resource_rule,
 };
 

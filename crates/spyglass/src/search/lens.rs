@@ -105,7 +105,11 @@ pub async fn load_lenses(state: AppState) {
 }
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
-async fn check_and_bootstrap(db: &DatabaseConnection, user_settings: &UserSettings, seed_url: &str) -> bool {
+async fn check_and_bootstrap(
+    db: &DatabaseConnection,
+    user_settings: &UserSettings,
+    seed_url: &str,
+) -> bool {
     if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
         log::info!("bootstrapping {}", seed_url);
 
@@ -113,7 +117,7 @@ async fn check_and_bootstrap(db: &DatabaseConnection, user_settings: &UserSettin
             Err(e) => {
                 log::error!("{}", e);
                 return false;
-            },
+            }
             Ok(cnt) => {
                 log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
                 let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
@@ -127,10 +131,10 @@ async fn check_and_bootstrap(db: &DatabaseConnection, user_settings: &UserSettin
 
 #[cfg(test)]
 mod test {
+    use super::check_and_bootstrap;
     use entities::models::bootstrap_queue;
     use entities::test::setup_test_db;
     use shared::config::UserSettings;
-    use super::check_and_bootstrap;
 
     #[tokio::test]
     async fn test_check_and_bootstrap() {
