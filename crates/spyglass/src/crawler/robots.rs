@@ -99,7 +99,7 @@ pub async fn check_resource_rules(
     url: &Url,
 ) -> anyhow::Result<bool> {
     let domain = url.host_str().unwrap();
-    let path = url.path();
+    let path = url[url::Position::BeforePath..].to_string();
 
     let rules = resource_rule::Entity::find()
         .filter(resource_rule::Column::Domain.eq(domain))
@@ -152,7 +152,9 @@ pub async fn check_resource_rules(
 
     let allow_filter = filter_set(&rules_into, true);
     let disallow_filter = filter_set(&rules_into, false);
-    if !allow_filter.is_match(path) && disallow_filter.is_match(path) {
+
+    if (allow_filter.is_empty() || !allow_filter.is_match(&path)) && disallow_filter.is_match(&path)
+    {
         log::info!("Unable to crawl `{}` due to rule", url.as_str());
         return Ok(false);
     }
@@ -234,6 +236,7 @@ mod test {
         let disallow = filter_set(&matches, false);
         assert!(disallow.is_match("/api.php"));
         assert!(disallow.is_match("/blah?title=Property:test"));
+        assert!(disallow.is_match("/blah?veaction=edit"));
     }
 
     #[test]
