@@ -27,6 +27,7 @@ pub fn build_query(
     query_string: &str,
 ) -> BooleanQuery {
     // Tokenize query string
+    let query_string = query_string.to_lowercase();
     let terms: Vec<&str> = query_string
         .split(' ')
         .into_iter()

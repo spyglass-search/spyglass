@@ -2,7 +2,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, Schema};
 use shared::config::Config;
 
 use crate::models::{
-    crawl_queue, create_connection, fetch_history, indexed_document, lens, link, resource_rule,
+    bootstrap_queue, crawl_queue, create_connection, fetch_history, indexed_document, lens, link,
+    resource_rule,
 };
 
 #[allow(dead_code)]
@@ -65,6 +66,15 @@ async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm::Db
         builder.build(
             schema
                 .create_table_from_entity(lens::Entity)
+                .if_not_exists(),
+        ),
+    )
+    .await?;
+
+    db.execute(
+        builder.build(
+            schema
+                .create_table_from_entity(bootstrap_queue::Entity)
                 .if_not_exists(),
         ),
     )
