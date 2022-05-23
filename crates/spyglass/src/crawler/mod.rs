@@ -277,7 +277,7 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use entities::models::crawl_queue;
+    use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
 
@@ -319,6 +319,37 @@ mod test {
         let result = crawl_result.unwrap();
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_skip() {
+        let crawler = Crawler::new();
+
+        let db = setup_test_db().await;
+
+        // Should skip this URL
+        let url =
+            Url::parse("https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit").unwrap();
+        let query = crawl_queue::ActiveModel {
+            domain: Set(url.host_str().unwrap().to_owned()),
+            url: Set(url.to_string()),
+            crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
+            ..Default::default()
+        };
+        let model = query.insert(&db).await.unwrap();
+
+        // Add resource rule to stop the crawl above
+        let rule = resource_rule::ActiveModel {
+            domain: Set("oldschool.runescape.wiki".into()),
+            rule: Set("/.*\\?veaction=.*".into()),
+            no_index: Set(false),
+            allow_crawl: Set(false),
+            ..Default::default()
+        };
+        let _ = rule.insert(&db).await.unwrap();
+
+        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        assert!(crawl_result.is_none());
     }
 
     #[test]
