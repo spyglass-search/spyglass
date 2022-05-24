@@ -33,7 +33,7 @@ pub fn regex_for_robots(rule: &str) -> Option<String> {
         }
     }
 
-    if !has_end {
+    if !has_end && !regex.ends_with(".*") {
         regex.push_str(".*");
     }
 
