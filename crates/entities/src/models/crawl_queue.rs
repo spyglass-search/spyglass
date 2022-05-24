@@ -271,8 +271,6 @@ pub enum SkipReason {
 
 #[derive(Default)]
 pub struct EnqueueSettings {
-    pub skip_blocklist: bool,
-    pub skip_lenses: bool,
     pub crawl_type: CrawlType,
 }
 
@@ -314,14 +312,12 @@ pub async fn enqueue_all(
                 let normalized = parsed.to_string();
 
                 // Ignore domains on blacklist
-                if !overrides.skip_blocklist && block_list.contains(&domain.to_string()) {
+                if block_list.contains(&domain.to_string()) {
                     return None;
                 }
 
-                // Check lense rules?
-                if !overrides.skip_lenses
-                    // Should we crawl external links?
-                    && !settings.crawl_external_links
+                // Should we crawl external links?
+                if !settings.crawl_external_links
                     // Only allow crawls specified in our lenses
                     && !allow_list.is_match(&normalized)
                 {
@@ -411,7 +407,7 @@ mod test {
 
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
-    use shared::config::{Limit, UserSettings};
+    use shared::config::{Lens, Limit, UserSettings};
 
     use super::{gen_priority_sql, gen_priority_values, EnqueueSettings};
 
@@ -458,12 +454,15 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-
-        let overrides = EnqueueSettings {
-            skip_lenses: true,
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
-        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
+
+        let overrides = EnqueueSettings {
+            ..Default::default()
+        };
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &overrides)
             .await
             .unwrap();
 
@@ -482,13 +481,16 @@ mod test {
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
         let prioritized = vec![];
-
-        let overrides = EnqueueSettings {
-            skip_lenses: true,
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
+        let overrides = EnqueueSettings {
+            ..Default::default()
+        };
+
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &overrides)
             .await
             .unwrap();
 
@@ -510,12 +512,15 @@ mod test {
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
         let prioritized = vec![];
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
+            ..Default::default()
+        };
         let overrides = EnqueueSettings {
-            skip_lenses: true,
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &overrides)
             .await
             .unwrap();
         let doc = indexed_document::ActiveModel {
