@@ -3,7 +3,7 @@
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
 use entities::models::resource_rule;
-use entities::regex::regex_for_robots;
+use entities::regex::{regex_for_robots, WildcardType};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{DatabaseConnection, Set};
 
@@ -68,7 +68,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                     }
 
                     if prefix.starts_with("disallow") || prefix.starts_with("allow") {
-                        let regex = regex_for_robots(end.trim());
+                        let regex = regex_for_robots(end.trim(), WildcardType::Regex);
                         if let Some(regex) = regex {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
@@ -79,7 +79,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                         } else if regex.is_none() && prefix.starts_with("disallow") {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
-                                regex: regex_for_robots("/").unwrap(),
+                                regex: regex_for_robots("/", WildcardType::Regex).unwrap(),
                                 allow_crawl: true,
                             });
                         }
@@ -191,7 +191,7 @@ mod test {
     use crate::crawler::Crawler;
 
     use entities::models::resource_rule;
-    use entities::regex::regex_for_robots;
+    use entities::regex::{regex_for_robots, WildcardType};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
     use regex::Regex;
@@ -222,7 +222,7 @@ mod test {
 
     #[test]
     fn test_rule_to_regex() {
-        let regex = regex_for_robots("/*?title=Property:").unwrap();
+        let regex = regex_for_robots("/*?title=Property:", WildcardType::Regex).unwrap();
         assert_eq!(regex, "/.*\\?title=Property:.*");
 
         let re = Regex::new(&regex).unwrap();

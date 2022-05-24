@@ -1,3 +1,9 @@
+#[derive(PartialEq)]
+pub enum WildcardType {
+    Database,
+    Regex,
+}
+
 pub fn regex_for_domain(domain: &str) -> String {
     let mut regex = String::new();
     for ch in domain.chars() {
@@ -15,26 +21,34 @@ pub fn regex_for_prefix(prefix: &str) -> String {
 }
 
 /// Convert a robots.txt rule into a proper regex string
-pub fn regex_for_robots(rule: &str) -> Option<String> {
+pub fn regex_for_robots(rule: &str, wildcard_type: WildcardType) -> Option<String> {
     if rule.is_empty() {
         return None;
     }
+
+    let wildcard = match wildcard_type {
+        WildcardType::Database => "%",
+        WildcardType::Regex => ".*",
+    };
 
     let mut regex = String::new();
     let mut has_end = false;
     for ch in rule.chars() {
         match ch {
-            '*' => regex.push_str(".*"),
+            '*' => regex.push_str(wildcard),
             '^' => {
-                regex.push('^');
-                has_end = true;
+                // Ignore carets when converting for database
+                if wildcard_type == WildcardType::Regex {
+                    regex.push('^');
+                    has_end = true;
+                }
             }
             _ => regex.push_str(&regex::escape(&ch.to_string())),
         }
     }
 
-    if !has_end && !regex.ends_with(".*") {
-        regex.push_str(".*");
+    if !has_end && !regex.ends_with(wildcard) {
+        regex.push_str(wildcard);
     }
 
     Some(regex)

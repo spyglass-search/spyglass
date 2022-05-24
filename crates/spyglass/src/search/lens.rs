@@ -32,7 +32,8 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
     // Build regex from rules
     for rule in lens.rules.iter() {
         match rule {
-            LensRule::SkipURL(rule_str) => skip_list.push(regex_for_robots(&rule_str).unwrap()),
+            LensRule::SkipURL(rule_str) => skip_list
+                .push(regex_for_robots(&rule_str, entities::regex::WildcardType::Regex).unwrap()),
         }
     }
 
@@ -124,7 +125,9 @@ pub async fn load_lenses(state: AppState) {
         }
     }
 
-    // Bootstrap new lenses
+    // Bootstrap lenses.
+    // Check & bootstrap will go through domains/prefixes and bootstrap a crawl queue
+    // if we have not already done so.
     for lens in new_lenses {
         for domain in lens.domains.iter() {
             let seed_url = format!("https://{}", domain);
