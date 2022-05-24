@@ -12,22 +12,21 @@ async fn create_default_lens(config: &Config) {
     let lens = Lens {
         author: "Spyglass".to_string(),
         version: "1".to_string(),
-        name: "wiki".to_string(),
+        name: "rust".to_string(),
         description: Some(
-            "Search through official user-supported wikis for knowledge, games, and more."
+            "All things Rustlang. Search through Rust blogs, the rust book, and
+            more."
                 .to_string(),
         ),
-        domains: vec!["blog.rust-lang.org".into(), "wiki.factorio.com".into()],
+        domains: vec!["blog.rust-lang.org".into()],
         urls: vec![
-            "https://https://en.wikipedia.org/wiki/Portal:".into(),
             "https://doc.rust-lang.org/book/".into(),
-            "https://oldschool.runescape.wiki/w/".into(),
         ],
         is_enabled: true,
     };
 
     fs::write(
-        config.lenses_dir().join("wiki.ron"),
+        config.lenses_dir().join("rust.ron"),
         ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
     )
     .expect("Unable to save default lens file.");
