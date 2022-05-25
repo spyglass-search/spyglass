@@ -453,7 +453,7 @@ mod test {
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
-    use shared::config::{Lens, Limit, UserSettings, LensRule};
+    use shared::config::{Lens, LensRule, Limit, UserSettings};
 
     use crate::models::{crawl_queue, indexed_document};
     use crate::regex::{regex_for_robots, WildcardType};
@@ -529,9 +529,9 @@ mod test {
         let url = vec!["https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit".into()];
         let lens = Lens {
             domains: vec!["oldschool.runescape.wiki".into()],
-            rules: vec![
-                LensRule::SkipURL("https://oldschool.runescape.wiki/*veaction=*".into())
-            ],
+            rules: vec![LensRule::SkipURL(
+                "https://oldschool.runescape.wiki/*veaction=*".into(),
+            )],
             ..Default::default()
         };
 

@@ -4369,11 +4369,13 @@ dependencies = [
 name = "spyglass-app"
 version = "0.1.3"
 dependencies = [
+ "anyhow",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "log",
  "num-format",
  "open",
+ "reqwest",
  "serde",
  "serde_json",
  "shared",
