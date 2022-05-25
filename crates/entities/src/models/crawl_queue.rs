@@ -7,8 +7,8 @@ use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement
 use serde::Serialize;
 use url::Url;
 
-use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 use super::indexed_document;
+use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 use shared::config::{Lens, LensRule, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
@@ -235,8 +235,11 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
     // Build regex from rules
     for rule in lens.rules.iter() {
         match rule {
-            LensRule::SkipURL(rule_str) => skip_list
-                .push(regex_for_robots(rule_str, WildcardType::Regex).unwrap()),
+            LensRule::SkipURL(rule_str) => {
+                if let Some(regex) = regex_for_robots(rule_str, WildcardType::Regex) {
+                    skip_list.push(regex);
+                }
+            }
         }
     }
 
@@ -317,14 +320,18 @@ pub async fn enqueue_all(
     let mut allow_list: Vec<String> = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
 
+    for domain in settings.block_list.iter() {
+        skip_list.push(regex_for_domain(domain));
+    }
+
     for lens in lenses {
         let ruleset = create_ruleset_from_lens(lens);
         allow_list.extend(ruleset.allow_list);
         skip_list.extend(ruleset.skip_list);
     }
 
-    let allow_list = RegexSet::new(allow_list).unwrap();
-    let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
+    let allow_list = RegexSet::new(allow_list).expect("Unable to create allow list");
+    let skip_list = RegexSet::new(skip_list).expect("Unable to create skip list");
 
     // Ignore invalid URLs
     let urls: Vec<String> = urls
@@ -336,12 +343,10 @@ pub async fn enqueue_all(
                 // https://wikipedia.org/Rust
                 parsed.set_fragment(None);
 
-                // Ignore URLs w/ no domain/host strings
-                let domain = parsed.host_str()?;
                 let normalized = parsed.to_string();
 
                 // Ignore domains on blacklist
-                if block_list.contains(&domain.to_string()) {
+                if skip_list.is_match(&normalized) {
                     return None;
                 }
 
@@ -448,7 +453,7 @@ mod test {
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
-    use shared::config::{Lens, Limit, UserSettings};
+    use shared::config::{Lens, Limit, UserSettings, LensRule};
 
     use crate::models::{crawl_queue, indexed_document};
     use crate::regex::{regex_for_robots, WildcardType};
@@ -515,6 +520,32 @@ mod test {
             .unwrap();
 
         assert_eq!(crawl.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_enqueue_with_rules() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = vec!["https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit".into()];
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
+            rules: vec![
+                LensRule::SkipURL("https://oldschool.runescape.wiki/*veaction=*".into())
+            ],
+            ..Default::default()
+        };
+
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
+            .await
+            .unwrap();
+
+        let crawl = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Url.eq(url[0].to_string()))
+            .all(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(crawl.len(), 0);
     }
 
     #[tokio::test]
