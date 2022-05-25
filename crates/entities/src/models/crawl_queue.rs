@@ -7,9 +7,9 @@ use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement
 use serde::Serialize;
 use url::Url;
 
+use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 use super::indexed_document;
-use crate::regex::{regex_for_domain, regex_for_prefix};
-use shared::config::{Lens, Limit, UserSettings};
+use shared::config::{Lens, LensRule, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
 
@@ -212,6 +212,39 @@ fn gen_priority_sql(p_domains: &str, p_prefixes: &str, user_settings: UserSettin
         ],
     )
 }
+struct LensRuleSets {
+    allow_list: Vec<String>,
+    skip_list: Vec<String>,
+}
+
+/// Create a set of allow/skip rules from a Lens
+fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
+    let mut allow_list = Vec::new();
+    let mut skip_list: Vec<String> = Vec::new();
+
+    // Build regex from domain
+    for domain in lens.domains.iter() {
+        allow_list.push(regex_for_domain(domain));
+    }
+
+    // Build regex from url rules
+    for prefix in lens.urls.iter() {
+        allow_list.push(regex_for_prefix(prefix));
+    }
+
+    // Build regex from rules
+    for rule in lens.rules.iter() {
+        match rule {
+            LensRule::SkipURL(rule_str) => skip_list
+                .push(regex_for_robots(rule_str, WildcardType::Regex).unwrap()),
+        }
+    }
+
+    LensRuleSets {
+        allow_list,
+        skip_list,
+    }
+}
 
 /// Get the next url in the crawl queue
 pub async fn dequeue(
@@ -282,16 +315,12 @@ pub async fn enqueue_all(
     overrides: &EnqueueSettings,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
     let mut allow_list: Vec<String> = Vec::new();
-    for lens in lenses {
-        // Build regex from domain
-        for domain in lens.domains.iter() {
-            allow_list.push(regex_for_domain(domain));
-        }
+    let mut skip_list: Vec<String> = Vec::new();
 
-        // Build regex from url rules
-        for prefix in lens.urls.iter() {
-            allow_list.push(regex_for_prefix(prefix));
-        }
+    for lens in lenses {
+        let ruleset = create_ruleset_from_lens(lens);
+        allow_list.extend(ruleset.allow_list);
+        skip_list.extend(ruleset.skip_list);
     }
 
     let allow_list = RegexSet::new(allow_list).unwrap();
@@ -579,5 +608,25 @@ mod test {
         dbg!(&regex);
         let removed = super::remove_by_rule(&db, &regex).await.unwrap();
         assert_eq!(removed, 2);
+    }
+
+    #[tokio::test]
+    async fn test_create_ruleset() {
+        let lens =
+            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/test.ron")).unwrap();
+
+        let rules = super::create_ruleset_from_lens(&lens);
+        let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
+        let block_list = regex::RegexSet::new(rules.skip_list).unwrap();
+
+        let valid = "https://walkingdead.fandom.com/wiki/18_Miles_Out";
+        let invalid = "https://walkingdead.fandom.com/wiki/Aaron_(Comic_Series)/Gallery";
+
+        assert!(allow_list.is_match(valid));
+        assert!(!block_list.is_match(valid));
+        // Allowed without the SkipURL
+        assert!(allow_list.is_match(invalid));
+        // but should now be denied
+        assert!(block_list.is_match(invalid));
     }
 }

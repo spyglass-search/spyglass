@@ -1,47 +1,13 @@
 use std::fs;
 
 use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens};
-use entities::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
+use entities::regex::{regex_for_robots, WildcardType};
 use migration::sea_orm::DatabaseConnection;
 use shared::config::{Config, Lens, LensRule, UserSettings};
 
 use crate::crawler::bootstrap;
 use crate::search::Searcher;
 use crate::state::AppState;
-
-pub struct LensRuleSets {
-    allow_list: Vec<String>,
-    skip_list: Vec<String>,
-}
-
-/// Create a set of allow/skip rules from a Lens
-fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
-    let mut allow_list = Vec::new();
-    let mut skip_list: Vec<String> = Vec::new();
-
-    // Build regex from domain
-    for domain in lens.domains.iter() {
-        allow_list.push(regex_for_domain(domain));
-    }
-
-    // Build regex from url rules
-    for prefix in lens.urls.iter() {
-        allow_list.push(regex_for_prefix(prefix));
-    }
-
-    // Build regex from rules
-    for rule in lens.rules.iter() {
-        match rule {
-            LensRule::SkipURL(rule_str) => skip_list
-                .push(regex_for_robots(rule_str, entities::regex::WildcardType::Regex).unwrap()),
-        }
-    }
-
-    LensRuleSets {
-        allow_list,
-        skip_list,
-    }
-}
 
 async fn create_default_lens(config: &Config) {
     // Create a default lens as an example.
@@ -195,11 +161,10 @@ pub async fn load_lenses(state: AppState) {
 
 #[cfg(test)]
 mod test {
-    use super::{check_and_bootstrap, create_ruleset_from_lens};
+    use super::check_and_bootstrap;
     use entities::models::bootstrap_queue;
     use entities::test::setup_test_db;
-    use regex::RegexSet;
-    use shared::config::{Lens, UserSettings};
+    use shared::config::UserSettings;
 
     #[tokio::test]
     async fn test_check_and_bootstrap() {
@@ -209,26 +174,5 @@ mod test {
 
         bootstrap_queue::enqueue(&db, test, 10).await.unwrap();
         assert!(!check_and_bootstrap(&db, &settings, &test).await);
-    }
-
-    #[tokio::test]
-    async fn test_create_ruleset() {
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/test.ron")).unwrap();
-
-        let rules = create_ruleset_from_lens(&lens);
-        let allow_list = RegexSet::new(rules.allow_list).unwrap();
-        let block_list = RegexSet::new(rules.skip_list).unwrap();
-
-        let valid = "https://walkingdead.fandom.com/wiki/18_Miles_Out";
-        let invalid = "https://walkingdead.fandom.com/wiki/Aaron_(Comic_Series)/Gallery";
-
-        assert!(allow_list.is_match(valid));
-        assert!(!block_list.is_match(valid));
-
-        // Allowed without the SkipURL
-        assert!(allow_list.is_match(invalid));
-        // but should now be denied
-        assert!(block_list.is_match(invalid));
     }
 }
