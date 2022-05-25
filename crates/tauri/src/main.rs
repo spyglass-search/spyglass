@@ -11,6 +11,7 @@ use std::time::Duration;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
+use serde::Deserialize;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
 use tokio::sync::Mutex;
 use tokio::time;
@@ -47,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
+    let app_version = format!("v20{}", ctx.package_info().version);
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -70,6 +72,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let window = app.get_window("main").unwrap();
             let _ = window.set_skip_taskbar(true);
+
+            // Check the release version against app version
+            match tauri::async_runtime::block_on(check_version()) {
+                Ok(release_ver) => {
+                    if release_ver.tag_name > app_version {
+                        // Update menu item
+                        let tray = app.tray_handle();
+                        let version_item = tray.get_item(menu::VERSION_MENU_ITEM);
+
+                        let _ = version_item.set_enabled(true);
+                        let _ = version_item.set_title("🎉 Update available!");
+                        app.manage(release_ver);
+                    }
+                }
+                Err(e) => log::error!("Unable to check version: {}", e),
+            }
 
             // Wait for the server to boot up
             let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
@@ -140,6 +158,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         };
 
                         item_handle.set_title(new_label).unwrap();
+                    }
+                    menu::VERSION_MENU_ITEM => {
+                        if let Some(version) = app.try_state::<ReleaseVersion>() {
+                            let _ = open::that(&version.html_url);
+                        }
                     }
                     menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
                     menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
@@ -240,4 +263,33 @@ async fn update_tray_menu(app: &AppHandle) {
             ))
             .unwrap();
     }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ReleaseVersion {
+    html_url: String,
+    tag_name: String,
+}
+
+async fn check_version() -> anyhow::Result<ReleaseVersion> {
+    let client = reqwest::Client::builder()
+        .user_agent(constants::APP_USER_AGENT)
+        .build()?;
+
+    let res = client
+        .get(constants::VERSION_CHECK_URL)
+        .send()
+        .await?
+        .json::<Vec<ReleaseVersion>>()
+        .await?;
+
+    if res.is_empty() {
+        return Err(anyhow::Error::msg("Empty version array"));
+    }
+
+    let latest = res
+        .first()
+        .expect("Version array shouldn't be empty")
+        .to_owned();
+    Ok(latest)
 }

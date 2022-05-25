@@ -1,6 +1,7 @@
 use shared::config::Config;
 use tauri::{CustomMenuItem, Menu, MenuItem, Submenu, SystemTrayMenu, SystemTrayMenuItem};
 
+pub const VERSION_MENU_ITEM: &str = "version";
 pub const QUIT_MENU_ITEM: &str = "quit";
 
 pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
@@ -31,14 +32,14 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
 
     let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Show logs folder");
 
+    let app_version = format!("v20{}", ctx.package_info().version);
     let mut tray = SystemTrayMenu::new();
+
     tray = tray
         .add_item(show)
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(
-            CustomMenuItem::new("about", format!("v20{}", ctx.package_info().version)).disabled(),
-        )
+        .add_item(CustomMenuItem::new(VERSION_MENU_ITEM, app_version).disabled())
         .add_item(
             CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
         )
