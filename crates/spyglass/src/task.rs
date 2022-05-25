@@ -248,6 +248,7 @@ pub async fn worker_task(
     }
 }
 
+/// Watches the lens folder for new/updated lenses & reloads the metadata.
 pub async fn lens_watcher(
     state: AppState,
     config: Config,

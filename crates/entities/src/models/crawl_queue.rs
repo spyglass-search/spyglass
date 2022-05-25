@@ -399,15 +399,31 @@ pub async fn mark_done(
     Ok(())
 }
 
+/// Remove tasks from the crawl queue that match `rule`. Rule is expected
+/// to be a SQL like statement.
+pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<u64> {
+    let res = Entity::delete_many()
+        .filter(Column::Url.like(rule))
+        .exec(db)
+        .await?;
+
+    if res.rows_affected > 0 {
+        log::info!("removed {} tasks due to '{}'", res.rows_affected, rule);
+    }
+    Ok(res.rows_affected)
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
-    use crate::models::{crawl_queue, indexed_document};
-    use crate::test::setup_test_db;
     use shared::config::{Lens, Limit, UserSettings};
+
+    use crate::models::{crawl_queue, indexed_document};
+    use crate::regex::{regex_for_robots, WildcardType};
+    use crate::test::setup_test_db;
 
     use super::{gen_priority_sql, gen_priority_values, EnqueueSettings};
 
@@ -459,10 +475,7 @@ mod test {
             ..Default::default()
         };
 
-        let overrides = EnqueueSettings {
-            ..Default::default()
-        };
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
             .await
             .unwrap();
 
@@ -486,11 +499,7 @@ mod test {
             ..Default::default()
         };
 
-        let overrides = EnqueueSettings {
-            ..Default::default()
-        };
-
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
             .await
             .unwrap();
 
@@ -516,11 +525,8 @@ mod test {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
-        let overrides = EnqueueSettings {
-            ..Default::default()
-        };
 
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
             .await
             .unwrap();
         let doc = indexed_document::ActiveModel {
@@ -543,5 +549,35 @@ mod test {
             .await
             .unwrap();
         assert!(queue.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_by_rule() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let overrides = EnqueueSettings::default();
+
+        let lens = Lens {
+            domains: vec!["en.wikipedia.com".into()],
+            ..Default::default()
+        };
+
+        let urls: Vec<String> = vec![
+            "https://en.wikipedia.com/".into(),
+            "https://en.wikipedia.org/wiki/Rust_(programming_language)".into(),
+            "https://en.wikipedia.com/wiki/Mozilla".into(),
+            "https://en.wikipedia.com/wiki/Cheese?id=13314&action=edit".into(),
+            "https://en.wikipedia.com/wiki/Testing?action=edit".into(),
+        ];
+
+        crawl_queue::enqueue_all(&db, &urls, &[lens], &settings, &overrides)
+            .await
+            .unwrap();
+
+        let rule = "https://en.wikipedia.com/*action=*";
+        let regex = regex_for_robots(rule, WildcardType::Database).unwrap();
+        dbg!(&regex);
+        let removed = super::remove_by_rule(&db, &regex).await.unwrap();
+        assert_eq!(removed, 2);
     }
 }

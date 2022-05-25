@@ -65,3 +65,58 @@ pub async fn indexed_stats(
 
     Ok(res)
 }
+
+/// Remove documents from the indexed_document table that match `rule`. Rule is expected
+/// to be a SQL like statement.
+pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {
+    let matching = Entity::find()
+        .filter(Column::Url.like(rule))
+        .all(db)
+        .await?;
+
+    let removed = matching
+        .iter()
+        .map(|x| x.doc_id.to_string())
+        .collect::<Vec<String>>();
+
+    let _ = Entity::delete_many()
+        .filter(Column::Url.like(rule))
+        .exec(db)
+        .await?;
+
+    if !removed.is_empty() {
+        log::info!("removed {} docs due to '{}'", removed.len(), rule);
+    }
+    Ok(removed)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::test::setup_test_db;
+    use sea_orm::{ActiveModelTrait, Set};
+
+    #[tokio::test]
+    async fn test_remove_by_rule() {
+        let db = setup_test_db().await;
+
+        let doc = super::ActiveModel {
+            domain: Set("en.wikipedia.com".into()),
+            url: Set("https://en.wikipedia.org/wiki/Rust_(programming_language)".into()),
+            doc_id: Set("1".into()),
+            ..Default::default()
+        };
+        doc.save(&db).await.unwrap();
+        let doc = super::ActiveModel {
+            domain: Set("en.wikipedia.com".into()),
+            url: Set("https://en.wikipedia.com/wiki/Cheese?id=13314&action=edit".into()),
+            doc_id: Set("1".into()),
+            ..Default::default()
+        };
+        doc.save(&db).await.unwrap();
+
+        let removed = super::remove_by_rule(&db, "https://en.wikipedia.com/%action=%")
+            .await
+            .unwrap();
+        assert_eq!(removed.len(), 1);
+    }
+}

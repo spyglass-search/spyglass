@@ -43,7 +43,13 @@ pub fn regex_for_robots(rule: &str, wildcard_type: WildcardType) -> Option<Strin
                     has_end = true;
                 }
             }
-            _ => regex.push_str(&regex::escape(&ch.to_string())),
+            _ => {
+                if wildcard_type == WildcardType::Regex {
+                    regex.push_str(&regex::escape(&ch.to_string()));
+                } else {
+                    regex.push(ch);
+                }
+            }
         }
     }
 

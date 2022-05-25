@@ -1,12 +1,12 @@
 use std::fs;
 
-use entities::models::{bootstrap_queue, lens};
-use entities::regex::{regex_for_domain, regex_for_prefix, regex_for_robots};
-
+use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens};
+use entities::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 use migration::sea_orm::DatabaseConnection;
 use shared::config::{Config, Lens, LensRule, UserSettings};
 
 use crate::crawler::bootstrap;
+use crate::search::Searcher;
 use crate::state::AppState;
 
 pub struct LensRuleSets {
@@ -33,7 +33,7 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
     for rule in lens.rules.iter() {
         match rule {
             LensRule::SkipURL(rule_str) => skip_list
-                .push(regex_for_robots(&rule_str, entities::regex::WildcardType::Regex).unwrap()),
+                .push(regex_for_robots(rule_str, entities::regex::WildcardType::Regex).unwrap()),
         }
     }
 
@@ -65,6 +65,31 @@ async fn create_default_lens(config: &Config) {
         ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
     )
     .expect("Unable to save default lens file.");
+}
+
+/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
+async fn check_and_bootstrap(
+    db: &DatabaseConnection,
+    user_settings: &UserSettings,
+    seed_url: &str,
+) -> bool {
+    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
+        log::info!("bootstrapping {}", seed_url);
+
+        match bootstrap::bootstrap(db, user_settings, seed_url).await {
+            Err(e) => {
+                log::error!("{}", e);
+                return false;
+            }
+            Ok(cnt) => {
+                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
+                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 /// Read lenses into the AppState
@@ -137,32 +162,35 @@ pub async fn load_lenses(state: AppState) {
         for prefix in lens.urls.iter() {
             check_and_bootstrap(&state.db, &state.user_settings, prefix).await;
         }
-    }
-}
 
-/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
-async fn check_and_bootstrap(
-    db: &DatabaseConnection,
-    user_settings: &UserSettings,
-    seed_url: &str,
-) -> bool {
-    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
-        log::info!("bootstrapping {}", seed_url);
-
-        match bootstrap::bootstrap(db, user_settings, seed_url).await {
-            Err(e) => {
-                log::error!("{}", e);
-                return false;
-            }
-            Ok(cnt) => {
-                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
-                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
-                return true;
+        // Rules will go through and remove crawl tasks AND indexed_documents that match.
+        for rule in lens.rules.iter() {
+            match rule {
+                LensRule::SkipURL(rule_str) => {
+                    if let Some(rule_like) = regex_for_robots(rule_str, WildcardType::Database) {
+                        // Remove matching crawl tasks
+                        let _ = crawl_queue::remove_by_rule(&state.db, &rule_like).await;
+                        // Remove matching indexed documents
+                        match indexed_document::remove_by_rule(&state.db, &rule_like).await {
+                            Ok(doc_ids) => {
+                                if let Ok(mut writer) = state.index.writer.lock() {
+                                    for doc_id in doc_ids {
+                                        let res = Searcher::delete(&mut writer, &doc_id);
+                                        if let Err(err) = res {
+                                            log::error!("Unable to remove docs: {:?}", err);
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => log::error!("Unable to remove docs: {:?}", e),
+                        }
+                    }
+                }
             }
         }
     }
 
-    false
+    log::info!("✅ finished lens checks")
 }
 
 #[cfg(test)]
