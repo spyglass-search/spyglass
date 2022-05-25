@@ -20,6 +20,14 @@ impl Default for Config {
     }
 }
 
+/// Different rules that filter out the URLs that would be crawled for a lens
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum LensRule {
+    /// Robots.txt regex to skip certain URLs
+    /// Skips are applied when bootstrapping & crawling
+    SkipURL(String),
+}
+
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -33,6 +41,8 @@ pub struct Lens {
     pub version: String,
     #[serde(default = "Lens::default_is_enabled")]
     pub is_enabled: bool,
+    #[serde(default)]
+    pub rules: Vec<LensRule>,
 }
 
 impl Lens {

@@ -1,0 +1,21 @@
+(
+    version: "1",
+    name: "twd",
+    author: "@test",
+    description: Some("test description"),
+    is_enabled: true,
+    domains: [],
+    urls: [
+        "https://walkingdead.fandom.com/wiki"
+    ],
+    rules: [
+        // Skip meta categories & user related pages
+        SkipURL("https://walkingdead.fandom.com/wiki/Category:*"),
+        SkipURL("https://walkingdead.fandom.com/wiki/Talk:*"),
+        SkipURL("https://walkingdead.fandom.com/wiki/Template:*"),
+        SkipURL("https://walkingdead.fandom.com/wiki/Thread:*"),
+        SkipURL("https://walkingdead.fandom.com/wiki/*/Gallery*"),
+        SkipURL("https://walkingdead.fandom.com/wiki/User:*"),
+        SkipURL("https://walkingdead.fandom.com/wiki/User_blog:*")
+    ]
+)

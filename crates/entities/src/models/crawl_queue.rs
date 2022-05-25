@@ -8,8 +8,8 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use crate::regex::{regex_for_domain, regex_for_prefix};
-use shared::config::{Lens, Limit, UserSettings};
+use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
+use shared::config::{Lens, LensRule, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
 
@@ -212,6 +212,42 @@ fn gen_priority_sql(p_domains: &str, p_prefixes: &str, user_settings: UserSettin
         ],
     )
 }
+struct LensRuleSets {
+    allow_list: Vec<String>,
+    skip_list: Vec<String>,
+}
+
+/// Create a set of allow/skip rules from a Lens
+fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
+    let mut allow_list = Vec::new();
+    let mut skip_list: Vec<String> = Vec::new();
+
+    // Build regex from domain
+    for domain in lens.domains.iter() {
+        allow_list.push(regex_for_domain(domain));
+    }
+
+    // Build regex from url rules
+    for prefix in lens.urls.iter() {
+        allow_list.push(regex_for_prefix(prefix));
+    }
+
+    // Build regex from rules
+    for rule in lens.rules.iter() {
+        match rule {
+            LensRule::SkipURL(rule_str) => {
+                if let Some(regex) = regex_for_robots(rule_str, WildcardType::Regex) {
+                    skip_list.push(regex);
+                }
+            }
+        }
+    }
+
+    LensRuleSets {
+        allow_list,
+        skip_list,
+    }
+}
 
 /// Get the next url in the crawl queue
 pub async fn dequeue(
@@ -271,8 +307,6 @@ pub enum SkipReason {
 
 #[derive(Default)]
 pub struct EnqueueSettings {
-    pub skip_blocklist: bool,
-    pub skip_lenses: bool,
     pub crawl_type: CrawlType,
 }
 
@@ -284,20 +318,20 @@ pub async fn enqueue_all(
     overrides: &EnqueueSettings,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
     let mut allow_list: Vec<String> = Vec::new();
-    for lens in lenses {
-        // Build regex from domain
-        for domain in lens.domains.iter() {
-            allow_list.push(regex_for_domain(domain));
-        }
+    let mut skip_list: Vec<String> = Vec::new();
 
-        // Build regex from url rules
-        for prefix in lens.urls.iter() {
-            allow_list.push(regex_for_prefix(prefix));
-        }
+    for domain in settings.block_list.iter() {
+        skip_list.push(regex_for_domain(domain));
     }
 
-    let allow_list = RegexSet::new(allow_list).unwrap();
-    let block_list: HashSet<String> = HashSet::from_iter(settings.block_list.iter().cloned());
+    for lens in lenses {
+        let ruleset = create_ruleset_from_lens(lens);
+        allow_list.extend(ruleset.allow_list);
+        skip_list.extend(ruleset.skip_list);
+    }
+
+    let allow_list = RegexSet::new(allow_list).expect("Unable to create allow list");
+    let skip_list = RegexSet::new(skip_list).expect("Unable to create skip list");
 
     // Ignore invalid URLs
     let urls: Vec<String> = urls
@@ -309,19 +343,15 @@ pub async fn enqueue_all(
                 // https://wikipedia.org/Rust
                 parsed.set_fragment(None);
 
-                // Ignore URLs w/ no domain/host strings
-                let domain = parsed.host_str()?;
                 let normalized = parsed.to_string();
 
                 // Ignore domains on blacklist
-                if !overrides.skip_blocklist && block_list.contains(&domain.to_string()) {
+                if skip_list.is_match(&normalized) {
                     return None;
                 }
 
-                // Check lense rules?
-                if !overrides.skip_lenses
-                    // Should we crawl external links?
-                    && !settings.crawl_external_links
+                // Should we crawl external links?
+                if !settings.crawl_external_links
                     // Only allow crawls specified in our lenses
                     && !allow_list.is_match(&normalized)
                 {
@@ -403,15 +433,31 @@ pub async fn mark_done(
     Ok(())
 }
 
+/// Remove tasks from the crawl queue that match `rule`. Rule is expected
+/// to be a SQL like statement.
+pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<u64> {
+    let res = Entity::delete_many()
+        .filter(Column::Url.like(rule))
+        .exec(db)
+        .await?;
+
+    if res.rows_affected > 0 {
+        log::info!("removed {} tasks due to '{}'", res.rows_affected, rule);
+    }
+    Ok(res.rows_affected)
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
+    use shared::config::{Lens, Limit, UserSettings, LensRule};
+
     use crate::models::{crawl_queue, indexed_document};
+    use crate::regex::{regex_for_robots, WildcardType};
     use crate::test::setup_test_db;
-    use shared::config::{Limit, UserSettings};
 
     use super::{gen_priority_sql, gen_priority_values, EnqueueSettings};
 
@@ -458,12 +504,12 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-
-        let overrides = EnqueueSettings {
-            skip_lenses: true,
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
-        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
+
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
             .await
             .unwrap();
 
@@ -477,18 +523,43 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_enqueue_with_rules() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = vec!["https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit".into()];
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
+            rules: vec![
+                LensRule::SkipURL("https://oldschool.runescape.wiki/*veaction=*".into())
+            ],
+            ..Default::default()
+        };
+
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
+            .await
+            .unwrap();
+
+        let crawl = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Url.eq(url[0].to_string()))
+            .all(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(crawl.len(), 0);
+    }
+
+    #[tokio::test]
     async fn test_dequeue() {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
         let prioritized = vec![];
-
-        let overrides = EnqueueSettings {
-            skip_lenses: true,
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
             .await
             .unwrap();
 
@@ -510,12 +581,12 @@ mod test {
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
         let prioritized = vec![];
-        let overrides = EnqueueSettings {
-            skip_lenses: true,
+        let lens = Lens {
+            domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
             .await
             .unwrap();
         let doc = indexed_document::ActiveModel {
@@ -538,5 +609,55 @@ mod test {
             .await
             .unwrap();
         assert!(queue.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_by_rule() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let overrides = EnqueueSettings::default();
+
+        let lens = Lens {
+            domains: vec!["en.wikipedia.com".into()],
+            ..Default::default()
+        };
+
+        let urls: Vec<String> = vec![
+            "https://en.wikipedia.com/".into(),
+            "https://en.wikipedia.org/wiki/Rust_(programming_language)".into(),
+            "https://en.wikipedia.com/wiki/Mozilla".into(),
+            "https://en.wikipedia.com/wiki/Cheese?id=13314&action=edit".into(),
+            "https://en.wikipedia.com/wiki/Testing?action=edit".into(),
+        ];
+
+        crawl_queue::enqueue_all(&db, &urls, &[lens], &settings, &overrides)
+            .await
+            .unwrap();
+
+        let rule = "https://en.wikipedia.com/*action=*";
+        let regex = regex_for_robots(rule, WildcardType::Database).unwrap();
+        dbg!(&regex);
+        let removed = super::remove_by_rule(&db, &regex).await.unwrap();
+        assert_eq!(removed, 2);
+    }
+
+    #[tokio::test]
+    async fn test_create_ruleset() {
+        let lens =
+            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/test.ron")).unwrap();
+
+        let rules = super::create_ruleset_from_lens(&lens);
+        let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
+        let block_list = regex::RegexSet::new(rules.skip_list).unwrap();
+
+        let valid = "https://walkingdead.fandom.com/wiki/18_Miles_Out";
+        let invalid = "https://walkingdead.fandom.com/wiki/Aaron_(Comic_Series)/Gallery";
+
+        assert!(allow_list.is_match(valid));
+        assert!(!block_list.is_match(valid));
+        // Allowed without the SkipURL
+        assert!(allow_list.is_match(invalid));
+        // but should now be denied
+        assert!(block_list.is_match(invalid));
     }
 }

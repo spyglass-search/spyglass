@@ -15,3 +15,6 @@ serde = { version = "1.0", features = ["derive"] }
 shared = { path = "../shared" }
 tokio = { version = "1", features = ["full"] }
 url = "2.2"
+
+[dev-dependencies]
+ron = "0.7"

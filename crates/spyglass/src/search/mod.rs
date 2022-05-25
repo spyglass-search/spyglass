@@ -84,8 +84,6 @@ impl Searcher {
     pub fn delete(writer: &mut IndexWriter, id: &str) -> anyhow::Result<()> {
         let fields = Searcher::doc_fields();
         writer.delete_term(Term::from_field_text(fields.id, id));
-        writer.commit()?;
-
         Ok(())
     }
 

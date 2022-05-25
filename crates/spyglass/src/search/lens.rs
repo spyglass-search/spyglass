@@ -1,10 +1,12 @@
 use std::fs;
 
-use entities::models::{bootstrap_queue, lens};
+use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens};
+use entities::regex::{regex_for_robots, WildcardType};
 use migration::sea_orm::DatabaseConnection;
-use shared::config::{Config, Lens, UserSettings};
+use shared::config::{Config, Lens, LensRule, UserSettings};
 
 use crate::crawler::bootstrap;
+use crate::search::Searcher;
 use crate::state::AppState;
 
 async fn create_default_lens(config: &Config) {
@@ -12,25 +14,48 @@ async fn create_default_lens(config: &Config) {
     let lens = Lens {
         author: "Spyglass".to_string(),
         version: "1".to_string(),
-        name: "wiki".to_string(),
+        name: "rust".to_string(),
         description: Some(
-            "Search through official user-supported wikis for knowledge, games, and more."
+            "All things Rustlang. Search through Rust blogs, the rust book, and
+            more."
                 .to_string(),
         ),
-        domains: vec!["blog.rust-lang.org".into(), "wiki.factorio.com".into()],
-        urls: vec![
-            "https://https://en.wikipedia.org/wiki/Portal:".into(),
-            "https://doc.rust-lang.org/book/".into(),
-            "https://oldschool.runescape.wiki/w/".into(),
-        ],
+        domains: vec!["blog.rust-lang.org".into()],
+        urls: vec!["https://doc.rust-lang.org/book/".into()],
         is_enabled: true,
+        rules: Vec::new(),
     };
 
     fs::write(
-        config.lenses_dir().join("wiki.ron"),
+        config.lenses_dir().join("rust.ron"),
         ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
     )
     .expect("Unable to save default lens file.");
+}
+
+/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
+async fn check_and_bootstrap(
+    db: &DatabaseConnection,
+    user_settings: &UserSettings,
+    seed_url: &str,
+) -> bool {
+    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
+        log::info!("bootstrapping {}", seed_url);
+
+        match bootstrap::bootstrap(db, user_settings, seed_url).await {
+            Err(e) => {
+                log::error!("{}", e);
+                return false;
+            }
+            Ok(cnt) => {
+                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
+                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 /// Read lenses into the AppState
@@ -91,7 +116,9 @@ pub async fn load_lenses(state: AppState) {
         }
     }
 
-    // Bootstrap new lenses
+    // Bootstrap lenses.
+    // Check & bootstrap will go through domains/prefixes and bootstrap a crawl queue
+    // if we have not already done so.
     for lens in new_lenses {
         for domain in lens.domains.iter() {
             let seed_url = format!("https://{}", domain);
@@ -101,32 +128,35 @@ pub async fn load_lenses(state: AppState) {
         for prefix in lens.urls.iter() {
             check_and_bootstrap(&state.db, &state.user_settings, prefix).await;
         }
-    }
-}
 
-/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
-async fn check_and_bootstrap(
-    db: &DatabaseConnection,
-    user_settings: &UserSettings,
-    seed_url: &str,
-) -> bool {
-    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
-        log::info!("bootstrapping {}", seed_url);
-
-        match bootstrap::bootstrap(db, user_settings, seed_url).await {
-            Err(e) => {
-                log::error!("{}", e);
-                return false;
-            }
-            Ok(cnt) => {
-                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
-                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
-                return true;
+        // Rules will go through and remove crawl tasks AND indexed_documents that match.
+        for rule in lens.rules.iter() {
+            match rule {
+                LensRule::SkipURL(rule_str) => {
+                    if let Some(rule_like) = regex_for_robots(rule_str, WildcardType::Database) {
+                        // Remove matching crawl tasks
+                        let _ = crawl_queue::remove_by_rule(&state.db, &rule_like).await;
+                        // Remove matching indexed documents
+                        match indexed_document::remove_by_rule(&state.db, &rule_like).await {
+                            Ok(doc_ids) => {
+                                if let Ok(mut writer) = state.index.writer.lock() {
+                                    for doc_id in doc_ids {
+                                        let res = Searcher::delete(&mut writer, &doc_id);
+                                        if let Err(err) = res {
+                                            log::error!("Unable to remove docs: {:?}", err);
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => log::error!("Unable to remove docs: {:?}", e),
+                        }
+                    }
+                }
             }
         }
     }
 
-    false
+    log::info!("✅ finished lens checks")
 }
 
 #[cfg(test)]

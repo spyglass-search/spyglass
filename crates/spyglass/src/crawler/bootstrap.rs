@@ -124,8 +124,6 @@ pub async fn bootstrap(
 
     let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
-        skip_blocklist: true,
-        skip_lenses: true,
         crawl_type: crawl_queue::CrawlType::Bootstrap,
     };
 
