@@ -7,7 +7,10 @@
 
 ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
 
-Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/spyglass_22.5.15_amd64.AppImage)
+Download now:
+    [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.26/Spyglass_22.5.26_x64.dmg)
+    | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.26/Spyglass_22.5.26_x64_en-US.msi)
+    | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.26/spyglass_22.5.26_amd64.AppImage)
 
 ---
 
@@ -85,6 +88,8 @@ curated set of websites with high quality recipes.
     description: Some(r#"
         A curated collection of websites with useful, high-quality recipes.
     "#),
+    // Set to false if you want to disable this lens
+    is_enabled: true,
     domains: [
 
         // Major sites that often have really good recipes
@@ -104,6 +109,17 @@ curated set of websites with high quality recipes.
         // https://www.reddit.com/r/recipes/ -> matches
         // https://www.reddit.com/r/recipes_not/ -> does not matche, notice the end slash.
         "https://www.reddit.com/r/recipes/",
+    ],
+
+    // Rules allow you to refine how the crawler determine whether it should crawl
+    // a URL or not.
+    rules: [
+        // SkipURL is a simple regex (similar to ones in robots.txt) that when matches
+        // a URL will skip crawling it.
+        //
+        // For example, below I'm skipping over any URLs that have the word "broccoli"
+        // in the path, despite the benefits to my health.
+        SkipURL("https://www.seriouseats.com/*broccoli*"),
     ]
 )
 ```
@@ -121,6 +137,7 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
     author: "Andrew Huynh",
     name: "rustlang",
     description: Some("Rustlang targeted websites"),
+    is_enabled: true,
     domains: [
         // Support for wildcards in domain names
         "*.rust-lang.org",
@@ -134,7 +151,9 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
     urls: [
         "https://www.reddit.com/r/rust/",
         "https://www.reddit.com/r/rust_gamedev/",
-    ]
+    ],
+
+    rules: []
 )
 ```
 
@@ -166,7 +185,7 @@ file found in their directory on startup, a default one will be created.
     // Where to store your index and index metadata
     // The exact default location is dependent on your OS
     //
-    // - NOTE: If you're updating this for Windows, the path needs to use double backward slashes 
+    // - NOTE: If you're updating this for Windows, the path needs to use double backward slashes
     //   like so: "E:\\spyglass\\data"
     // - Linux & macOS uses paths like below
     //
