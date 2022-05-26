@@ -52,15 +52,13 @@ pub fn delete_btn(props: &DeleteButtonProps) -> Html {
     };
 
     html! {
-        <div class="float-right pl-4 pr-0 h-28">
-            <button
-                {onclick}
-                class="hover:text-red-600 text-neutral-600 group">
-                <Tooltip label={"Delete"} />
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-            </button>
-        </div>
+        <button
+            {onclick}
+            class="hover:text-red-600 text-neutral-600 group">
+            <Tooltip label={"Delete"} />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        </button>
     }
 }

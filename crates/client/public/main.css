@@ -931,6 +931,10 @@ Ensure the default browser behavior of the `hidden` attribute.
   padding-right: 0px;
 }
 
+.pr-1 {
+  padding-right: 0.25rem;
+}
+
 .text-center {
   text-align: center;
 }

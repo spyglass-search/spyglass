@@ -97,6 +97,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "border-t".into(),
         "border-neutral-600".into(),
         "p-4".into(),
+        "pr-0".into(),
         "text-white".into(),
         selected,
     ];
@@ -133,7 +134,9 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
 
             html! {
                 <div class={component_styles}>
-                    <DeleteButton doc_id={result.id.clone()} />
+                    <div class="float-right pl-4 mr-2 h-28">
+                        <DeleteButton doc_id={result.id.clone()} />
+                    </div>
                     {url_link}
                     <h2 class={"text-lg truncate py-1"}>
                         {result.title.clone()}
