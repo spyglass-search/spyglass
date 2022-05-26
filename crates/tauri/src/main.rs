@@ -11,6 +11,7 @@ use std::time::Duration;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
+use serde::Deserialize;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
 use tokio::sync::Mutex;
 use tokio::time;
@@ -26,6 +27,7 @@ mod constants;
 mod menu;
 mod rpc;
 mod window;
+use window::show_crawl_stats_window;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -46,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
+    let app_version = format!("v20{}", ctx.package_info().version);
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -53,7 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::open_result,
             cmd::search_docs,
             cmd::search_lenses,
-            cmd::resize_window
+            cmd::resize_window,
+            cmd::crawl_stats,
+            cmd::delete_doc,
         ])
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
@@ -68,6 +73,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let window = app.get_window("main").unwrap();
             let _ = window.set_skip_taskbar(true);
+
+            // Check the release version against app version
+            match tauri::async_runtime::block_on(check_version()) {
+                Ok(release_ver) => {
+                    if release_ver.tag_name > app_version {
+                        // Update menu item
+                        let tray = app.tray_handle();
+                        let version_item = tray.get_item(menu::VERSION_MENU_ITEM);
+
+                        let _ = version_item.set_enabled(true);
+                        let _ = version_item.set_title("🎉 Update available!");
+                        app.manage(release_ver);
+                    }
+                }
+                Err(e) => log::error!("Unable to check version: {}", e),
+            }
 
             // Wait for the server to boot up
             let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
@@ -111,10 +132,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         })
         .on_window_event(|event| {
-            if let tauri::WindowEvent::Focused(is_focused) = event.event() {
-                if !is_focused {
-                    let handle = event.window();
-                    window::hide_window(handle);
+            let window = event.window();
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Focused(is_focused) = event.event() {
+                    if !is_focused {
+                        let handle = event.window();
+                        window::hide_window(handle);
+                    }
                 }
             }
         })
@@ -136,9 +160,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         item_handle.set_title(new_label).unwrap();
                     }
+                    menu::VERSION_MENU_ITEM => {
+                        if let Some(version) = app.try_state::<ReleaseVersion>() {
+                            let _ = open::that(&version.html_url);
+                        }
+                    }
                     menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
                     menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
+                    menu::SHOW_CRAWL_STATUS => {
+                        show_crawl_stats_window(app);
+                    }
                     menu::SHOW_SEARCHBAR => {
                         if !window.is_visible().unwrap() {
                             window::show_window(&window);
@@ -161,7 +193,7 @@ async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
     let mut rpc = rpc.lock().await;
     match rpc
         .client
-        .call_method::<Value, response::AppStatus>("app_stats", "", Value::Null)
+        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
         .await
     {
         Ok(resp) => Some(resp),
@@ -231,21 +263,34 @@ async fn update_tray_menu(app: &AppHandle) {
                 app_status.num_docs.to_formatted_string(&Locale::en)
             ))
             .unwrap();
-
-        handle
-            .get_item(menu::NUM_QUEUED_MENU_ITEM)
-            .set_title(format!(
-                "{} in queue",
-                app_status.num_queued.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
-
-        handle
-            .get_item(menu::NUM_IN_PROGRESS_MENU_ITEM)
-            .set_title(format!(
-                "{} crawling",
-                app_status.num_in_progress.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
     }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ReleaseVersion {
+    html_url: String,
+    tag_name: String,
+}
+
+async fn check_version() -> anyhow::Result<ReleaseVersion> {
+    let client = reqwest::Client::builder()
+        .user_agent(constants::APP_USER_AGENT)
+        .build()?;
+
+    let res = client
+        .get(constants::VERSION_CHECK_URL)
+        .send()
+        .await?
+        .json::<Vec<ReleaseVersion>>()
+        .await?;
+
+    if res.is_empty() {
+        return Err(anyhow::Error::msg("Empty version array"));
+    }
+
+    let latest = res
+        .first()
+        .expect("Version array shouldn't be empty")
+        .to_owned();
+    Ok(latest)
 }

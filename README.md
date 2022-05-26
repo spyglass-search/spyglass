@@ -7,7 +7,7 @@
 
 ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
 
-Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/Spyglass_22.5.11_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/Spyglass_22.5.11_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.11/spyglass_22.5.11_amd64.AppImage)
+Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/spyglass_22.5.15_amd64.AppImage)
 
 ---
 
@@ -165,6 +165,11 @@ file found in their directory on startup, a default one will be created.
     shortcut: "CmdOrCtrl+Shift+/",
     // Where to store your index and index metadata
     // The exact default location is dependent on your OS
+    //
+    // - NOTE: If you're updating this for Windows, the path needs to use double backward slashes 
+    //   like so: "E:\\spyglass\\data"
+    // - Linux & macOS uses paths like below
+    //
     data_directory: "/Users/<username>/Library/Application Support/com.athlabs.spyglass",
     // By default, Spyglass will only crawl things as specified in your lenses. If you want
     // to follow links without regard to those rules, set this to true.

@@ -1,5 +1,6 @@
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
+pub mod bootstrap_queue;
 pub mod crawl_queue;
 pub mod fetch_history;
 pub mod indexed_document;

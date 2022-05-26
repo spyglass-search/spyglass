@@ -19,7 +19,7 @@ use crate::scraper::html_to_text;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
-const FETCH_DELAY_MS: i64 = 100 * 60 * 60 * 24;
+const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Default, Clone)]
@@ -222,7 +222,6 @@ impl Crawler {
             crawl.url.clone()
         };
 
-        log::info!("Fetching {:?}", fetch_url);
         let url = Url::parse(&fetch_url).unwrap();
 
         // Break apart domain + path of the URL
@@ -239,12 +238,19 @@ impl Crawler {
         }
 
         // Check for robots.txt of this domain
-        if !check_resource_rules(db, &self.client, &url).await? {
+        // When looking at bootstrapped tasks, check the original URL
+        if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            let og_url = Url::parse(&crawl.url).unwrap();
+            if !check_resource_rules(db, &self.client, &og_url).await? {
+                return Ok(None);
+            }
+        } else if !check_resource_rules(db, &self.client, &url).await? {
             return Ok(None);
         }
 
         // Crawl & save the data
         let mut result = self.crawl(&url).await;
+        log::info!("fetched {} {:?}", result.status, result.url);
         // Check to see if a canonical URL was found, if not use the original
         // bootstrapped URL
         if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
@@ -271,7 +277,7 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use entities::models::crawl_queue;
+    use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
 
@@ -313,6 +319,37 @@ mod test {
         let result = crawl_result.unwrap();
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_skip() {
+        let crawler = Crawler::new();
+
+        let db = setup_test_db().await;
+
+        // Should skip this URL
+        let url =
+            Url::parse("https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit").unwrap();
+        let query = crawl_queue::ActiveModel {
+            domain: Set(url.host_str().unwrap().to_owned()),
+            url: Set(url.to_string()),
+            crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
+            ..Default::default()
+        };
+        let model = query.insert(&db).await.unwrap();
+
+        // Add resource rule to stop the crawl above
+        let rule = resource_rule::ActiveModel {
+            domain: Set("oldschool.runescape.wiki".into()),
+            rule: Set("/.*\\?veaction=.*".into()),
+            no_index: Set(false),
+            allow_crawl: Set(false),
+            ..Default::default()
+        };
+        let _ = rule.insert(&db).await.unwrap();
+
+        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        assert!(crawl_result.is_none());
     }
 
     #[test]

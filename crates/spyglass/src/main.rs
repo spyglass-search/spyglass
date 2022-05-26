@@ -1,3 +1,5 @@
+extern crate notify;
+
 use std::io;
 use std::time::Duration;
 use tokio::signal;
@@ -5,12 +7,11 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use entities::models::{crawl_queue, lens};
-use libspyglass::crawler::bootstrap;
+use entities::models::crawl_queue;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use migration::{Migrator, MigratorTrait};
-use shared::config::{Config, Lens};
+use shared::config::Config;
 
 mod api;
 mod importer;
@@ -57,65 +58,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");
-    rt.block_on(start_backend(&state));
+    rt.block_on(start_backend(&state, &config));
     server.close();
 
     Ok(())
 }
 
-async fn load_lenses(state: AppState) {
-    let mut new_lenses: Vec<Lens> = Vec::new();
-
-    for entry in state.lenses.iter() {
-        let lens = entry.value();
-
-        // Have we added this lens to the database?
-        match lens::add(
-            &state.db,
-            &lens.name,
-            &lens.author,
-            lens.description.as_ref(),
-            &lens.version,
-        )
-        .await
-        {
-            Ok(true) => {
-                log::info!("found new lens {}", lens.name);
-                new_lenses.push(lens.clone());
-            }
-            Ok(false) => log::info!("lens ({}) already added", lens.name),
-            Err(e) => log::error!("error loading lens {}", e),
-        }
-    }
-
-    // Bootstrap new lenses
-    log::info!("bootstraping new lenses");
-    for lens in new_lenses {
-        for domain in lens.domains.iter() {
-            match bootstrap::bootstrap(
-                &state.db,
-                &state.user_settings,
-                // Safe to assume domains always have HTTPS support?
-                &format!("https://{}", domain),
-            )
-            .await
-            {
-                Err(e) => log::error!("{}", e),
-                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", domain, cnt),
-            }
-        }
-
-        for prefix in lens.urls.iter() {
-            match bootstrap::bootstrap(&state.db, &state.user_settings, prefix).await {
-                Err(e) => log::error!("{}", e),
-                Ok(cnt) => log::info!("bootstrapped {} w/ {} urls", prefix, cnt),
-            }
-        }
-    }
-    log::info!("finished bootstrapping");
-}
-
-async fn start_backend(state: &AppState) {
+async fn start_backend(state: &AppState, config: &Config) {
     // TODO: Implement user-friendly start-up wizard
     // if state.config.user_settings.run_wizard {
     //     // Import data from Firefox
@@ -127,9 +76,6 @@ async fn start_backend(state: &AppState) {
     // Initialize crawl_queue, set all in-flight tasks to queued.
     crawl_queue::reset_processing(&state.db).await;
 
-    // Check lenses for updates & add any bootstrapped URLs to crawler.
-    let _ = tokio::spawn(load_lenses(state.clone()));
-
     // Create channels for scheduler / crawlers
     let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(
         state
@@ -140,6 +86,13 @@ async fn start_backend(state: &AppState) {
             .unwrap(),
     );
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
+
+    // Check lenses for updates & add any bootstrapped URLs to crawler.
+    let lens_watcher_handle = tokio::spawn(task::lens_watcher(
+        state.clone(),
+        config.clone(),
+        shutdown_tx.subscribe(),
+    ));
 
     // Crawl scheduler
     let manager_handle = tokio::spawn(task::manager_task(
@@ -173,6 +126,7 @@ async fn start_backend(state: &AppState) {
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
+            lens_watcher_handle.abort();
             log::warn!("Shutdown request received");
             shutdown_tx.send(AppShutdown::Now).unwrap();
         }

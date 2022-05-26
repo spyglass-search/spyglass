@@ -1,7 +1,7 @@
 {
   "package": {
     "productName": "Spyglass",
-    "version": "22.5.15"
+    "version": "22.5.26"
   },
   "build": {
     "distDir": "../client/dist",
@@ -55,7 +55,7 @@
       "decorations": false,
       "center": true,
       "width": 640,
-      "height": 80
+      "height": 92
     }],
     "security": {
       "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'; script-src 'unsafe-eval'"

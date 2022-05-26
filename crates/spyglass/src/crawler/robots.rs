@@ -3,7 +3,7 @@
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
 use entities::models::resource_rule;
-use entities::regex::regex_for_robots;
+use entities::regex::{regex_for_robots, WildcardType};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{DatabaseConnection, Set};
 
@@ -68,7 +68,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                     }
 
                     if prefix.starts_with("disallow") || prefix.starts_with("allow") {
-                        let regex = regex_for_robots(end.trim());
+                        let regex = regex_for_robots(end.trim(), WildcardType::Regex);
                         if let Some(regex) = regex {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
@@ -79,7 +79,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                         } else if regex.is_none() && prefix.starts_with("disallow") {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
-                                regex: regex_for_robots("/").unwrap(),
+                                regex: regex_for_robots("/", WildcardType::Regex).unwrap(),
                                 allow_crawl: true,
                             });
                         }
@@ -99,7 +99,7 @@ pub async fn check_resource_rules(
     url: &Url,
 ) -> anyhow::Result<bool> {
     let domain = url.host_str().unwrap();
-    let path = url.path();
+    let path = url[url::Position::BeforePath..].to_string();
 
     let rules = resource_rule::Entity::find()
         .filter(resource_rule::Column::Domain.eq(domain))
@@ -152,7 +152,9 @@ pub async fn check_resource_rules(
 
     let allow_filter = filter_set(&rules_into, true);
     let disallow_filter = filter_set(&rules_into, false);
-    if !allow_filter.is_match(path) && disallow_filter.is_match(path) {
+
+    if (allow_filter.is_empty() || !allow_filter.is_match(&path)) && disallow_filter.is_match(&path)
+    {
         log::info!("Unable to crawl `{}` due to rule", url.as_str());
         return Ok(false);
     }
@@ -189,7 +191,7 @@ mod test {
     use crate::crawler::Crawler;
 
     use entities::models::resource_rule;
-    use entities::regex::regex_for_robots;
+    use entities::regex::{regex_for_robots, WildcardType};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
     use regex::Regex;
@@ -220,7 +222,7 @@ mod test {
 
     #[test]
     fn test_rule_to_regex() {
-        let regex = regex_for_robots("/*?title=Property:").unwrap();
+        let regex = regex_for_robots("/*?title=Property:", WildcardType::Regex).unwrap();
         assert_eq!(regex, "/.*\\?title=Property:.*");
 
         let re = Regex::new(&regex).unwrap();
@@ -234,6 +236,7 @@ mod test {
         let disallow = filter_set(&matches, false);
         assert!(disallow.is_match("/api.php"));
         assert!(disallow.is_match("/blah?title=Property:test"));
+        assert!(disallow.is_match("/blah?veaction=edit"));
     }
 
     #[test]

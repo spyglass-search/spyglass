@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::Set;
+use sea_orm::{DeleteResult, Set};
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
@@ -30,6 +30,10 @@ impl ActiveModelBehavior for ActiveModel {
             ..ActiveModelTrait::default()
         }
     }
+}
+
+pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<DeleteResult> {
+    Ok(Entity::delete_many().exec(db).await?)
 }
 
 /// True if the lens was added, False if it already exists.

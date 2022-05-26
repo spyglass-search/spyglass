@@ -11,6 +11,7 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
+pub mod lens;
 mod query;
 use crate::search::query::build_query;
 use shared::config::Lens;
@@ -83,8 +84,6 @@ impl Searcher {
     pub fn delete(writer: &mut IndexWriter, id: &str) -> anyhow::Result<()> {
         let fields = Searcher::doc_fields();
         writer.delete_term(Term::from_field_text(fields.id, id));
-        writer.commit()?;
-
         Ok(())
     }
 
@@ -165,7 +164,7 @@ impl Searcher {
     ) -> tantivy::Result<String> {
         let fields = Searcher::doc_fields();
 
-        let doc_id = Uuid::new_v4().to_hyphenated().to_string();
+        let doc_id = Uuid::new_v4().as_hyphenated().to_string();
         let mut doc = Document::default();
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);

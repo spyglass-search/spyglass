@@ -1,7 +1,8 @@
-use shared::{request, response};
+use jsonrpc_core::Value;
 use tauri::State;
 
 use crate::{rpc, window};
+use shared::{request, response};
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
@@ -70,6 +71,51 @@ pub async fn search_lenses<'r>(
         Err(err) => {
             log::error!("{}", err);
             Ok(Vec::new())
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn crawl_stats<'r>(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+) -> Result<response::CrawlStats, String> {
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<Value, response::CrawlStats>("crawl_stats", "", Value::Null)
+        .await
+    {
+        Ok(resp) => Ok(resp),
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(response::CrawlStats {
+                by_domain: Vec::new(),
+            })
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn delete_doc<'r>(
+    window: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    id: &str,
+) -> Result<(), String> {
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<(String,), ()>("delete_doc", "", (id.into(),)).await {
+
+        Ok(_) => {
+            let _ = window.emit("refresh_results", true);
+            Ok(())
+        },
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(())
         }
     }
 }
