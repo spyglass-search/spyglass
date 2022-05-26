@@ -8,7 +8,7 @@ use shared::response;
 
 use crate::components::{ResultListData, SearchResultItem, SelectedLens};
 use crate::events;
-use crate::{on_clear_search, on_focus, resize_window, search_docs, search_lenses};
+use crate::{on_clear_search, on_focus, on_refresh_results, resize_window, search_docs, search_lenses};
 
 #[function_component(SearchPage)]
 pub fn search_page() -> Html {
@@ -115,6 +115,24 @@ pub fn search_page() -> Html {
                 }
             }) as Box<dyn Fn()>);
             on_focus(&cb).await;
+            cb.forget();
+        });
+    }
+
+    {
+        // Refresh search results
+        let query = query.clone();
+        spawn_local(async move {
+            let cb = Closure::wrap(Box::new(move || {
+                let document = gloo::utils::document();
+                if let Some(el) = document.get_element_by_id("searchbox") {
+                    let el: HtmlInputElement = el.unchecked_into();
+                    query.set("".into());
+                    query.set(el.value());
+                }
+            }) as Box<dyn Fn()>);
+
+            on_refresh_results(&cb).await;
             cb.forget();
         });
     }

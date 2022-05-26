@@ -26,6 +26,9 @@ extern "C" {
     #[wasm_bindgen(js_name = "onFocus")]
     pub async fn on_focus(callback: &Closure<dyn Fn()>);
 
+    #[wasm_bindgen(js_name = "onRefreshResults")]
+    pub async fn on_refresh_results(callback: &Closure<dyn Fn()>);
+
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
