@@ -34,6 +34,7 @@ pub struct SearchMeta {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchResult {
+    pub doc_id: String,
     pub domain: String,
     pub title: String,
     pub description: String,
