@@ -7,7 +7,10 @@
 
 ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
 
-Download now: [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64.dmg) | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/Spyglass_22.5.15_x64_en-US.msi) | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.15/spyglass_22.5.15_amd64.AppImage)
+Download now:
+    [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.26/Spyglass_22.5.26_x64.dmg)
+    | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.26/Spyglass_22.5.26_x64_en-US.msi)
+    | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.26/spyglass_22.5.26_amd64.AppImage)
 
 ---
 
@@ -166,7 +169,7 @@ file found in their directory on startup, a default one will be created.
     // Where to store your index and index metadata
     // The exact default location is dependent on your OS
     //
-    // - NOTE: If you're updating this for Windows, the path needs to use double backward slashes 
+    // - NOTE: If you're updating this for Windows, the path needs to use double backward slashes
     //   like so: "E:\\spyglass\\data"
     // - Linux & macOS uses paths like below
     //
