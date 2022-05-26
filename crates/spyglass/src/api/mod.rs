@@ -29,6 +29,10 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::crawl_stats(self.state.clone()))
     }
 
+    fn delete_doc(&self, id: String) -> BoxFuture<Result<()>> {
+        Box::pin(route::delete_doc(self.state.clone(), id))
+    }
+
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
         Box::pin(route::toggle_pause(self.state.clone()))
     }

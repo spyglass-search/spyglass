@@ -1,6 +1,9 @@
 use shared::response::{LensResult, SearchResult};
 use yew::prelude::*;
 
+pub mod btn;
+use btn::DeleteButton;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {
     DocSearch,
@@ -9,6 +12,7 @@ pub enum ResultListType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResultListData {
+    pub id: String,
     pub domain: Option<String>,
     pub title: String,
     pub description: String,
@@ -20,6 +24,7 @@ pub struct ResultListData {
 impl From<&LensResult> for ResultListData {
     fn from(x: &LensResult) -> Self {
         ResultListData {
+            id: x.title.clone(),
             description: x.description.clone(),
             domain: None,
             result_type: ResultListType::LensSearch,
@@ -33,6 +38,7 @@ impl From<&LensResult> for ResultListData {
 impl From<&SearchResult> for ResultListData {
     fn from(x: &SearchResult) -> Self {
         ResultListData {
+            id: x.doc_id.clone(),
             description: x.description.clone(),
             domain: Some(x.domain.clone()),
             result_type: ResultListType::DocSearch,
@@ -91,6 +97,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "border-t".into(),
         "border-neutral-600".into(),
         "p-4".into(),
+        "pr-0".into(),
         "text-white".into(),
         selected,
     ];
@@ -127,6 +134,9 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
 
             html! {
                 <div class={component_styles}>
+                    <div class="float-right pl-4 mr-2 h-28">
+                        <DeleteButton doc_id={result.id.clone()} />
+                    </div>
                     {url_link}
                     <h2 class={"text-lg truncate py-1"}>
                         {result.title.clone()}

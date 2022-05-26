@@ -11,6 +11,9 @@ use crate::pages::{SearchPage, StatsPage};
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
+    #[wasm_bindgen(js_name = "deleteDoc", catch)]
+    pub async fn delete_doc(id: String) -> Result<(), JsValue>;
+
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
 
@@ -22,6 +25,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "onFocus")]
     pub async fn on_focus(callback: &Closure<dyn Fn()>);
+
+    #[wasm_bindgen(js_name = "onRefreshResults")]
+    pub async fn on_refresh_results(callback: &Closure<dyn Fn()>);
 
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;

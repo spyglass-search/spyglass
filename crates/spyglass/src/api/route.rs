@@ -44,12 +44,14 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
     for (score, doc_addr) in docs {
         let retrieved = searcher.doc(doc_addr).unwrap();
 
+        let doc_id = retrieved.get_first(fields.id).unwrap();
         let domain = retrieved.get_first(fields.domain).unwrap();
         let title = retrieved.get_first(fields.title).unwrap();
         let description = retrieved.get_first(fields.description).unwrap();
         let url = retrieved.get_first(fields.url).unwrap();
 
         let result = SearchResult {
+            doc_id: doc_id.as_text().unwrap().to_string(),
             domain: domain.as_text().unwrap().to_string(),
             title: title.as_text().unwrap().to_string(),
             description: description.as_text().unwrap().to_string(),
@@ -216,4 +218,20 @@ pub async fn search_lenses(
     }
 
     Ok(SearchLensesResp { results })
+}
+
+#[instrument(skip(state))]
+pub async fn delete_doc(
+    state: AppState,
+    id: String
+) -> Result<()> {
+    if let Ok(mut writer) = state.index.writer.lock() {
+        if let Err(e) = Searcher::delete(&mut writer, &id) {
+            log::error!("Unable to delete doc {} due to {}", id, e);
+        } else {
+            let _ = writer.commit();
+        }
+    }
+
+    Ok(())
 }
