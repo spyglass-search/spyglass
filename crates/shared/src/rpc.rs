@@ -25,6 +25,9 @@ pub trait Rpc {
     #[rpc(name = "crawl_stats")]
     fn crawl_stats(&self) -> BoxFuture<Result<CrawlStats>>;
 
+    #[rpc(name = "delete_doc")]
+    fn delete_doc(&self, id: String) -> BoxFuture<Result<()>>;
+
     #[rpc(name = "toggle_pause")]
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;
 
@@ -33,4 +36,5 @@ pub trait Rpc {
 
     #[rpc(name = "search_lenses")]
     fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>>;
+
 }

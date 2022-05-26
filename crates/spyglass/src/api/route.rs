@@ -219,3 +219,19 @@ pub async fn search_lenses(
 
     Ok(SearchLensesResp { results })
 }
+
+#[instrument(skip(state))]
+pub async fn delete_doc(
+    state: AppState,
+    id: String
+) -> Result<()> {
+    if let Ok(mut writer) = state.index.writer.lock() {
+        if let Err(e) = Searcher::delete(&mut writer, &id) {
+            log::error!("Unable to delete doc {} due to {}", id, e);
+        } else {
+            let _ = writer.commit();
+        }
+    }
+
+    Ok(())
+}

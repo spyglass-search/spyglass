@@ -96,3 +96,23 @@ pub async fn crawl_stats<'r>(
         }
     }
 }
+
+#[tauri::command]
+pub async fn delete_doc<'r>(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    id: &str,
+) -> Result<(), String> {
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<(String,), ()>("delete_docs", "", (id.into(),)).await {
+
+        Ok(_) => Ok(()),
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(())
+        }
+    }
+}

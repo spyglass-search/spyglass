@@ -21,6 +21,10 @@ export async function crawlStats() {
     return await invoke("crawl_stats");
 }
 
+export async function deleteDoc(id) {
+    return await invoke("delete_doc", { id });
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke("search_docs", { lenses, query });
 }
