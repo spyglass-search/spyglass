@@ -107,6 +107,17 @@ curated set of websites with high quality recipes.
         // https://www.reddit.com/r/recipes/ -> matches
         // https://www.reddit.com/r/recipes_not/ -> does not matche, notice the end slash.
         "https://www.reddit.com/r/recipes/",
+    ],
+
+    // Rules allow you to refine how the crawler determine whether it should crawl
+    // a URL or not.
+    rules: [
+        // SkipURL is a simple regex (similar to ones in robots.txt) that when matches
+        // a URL will skip crawling it.
+        //
+        // For example, below I'm skipping over any URLs that have the word "broccoli"
+        // in the path, despite the benefits to my health.
+        SkipURL("https://www.seriouseats.com/*broccoli*"),
     ]
 )
 ```
@@ -137,7 +148,9 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
     urls: [
         "https://www.reddit.com/r/rust/",
         "https://www.reddit.com/r/rust_gamedev/",
-    ]
+    ],
+
+    rules: []
 )
 ```
 
