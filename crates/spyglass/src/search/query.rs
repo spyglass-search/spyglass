@@ -62,10 +62,22 @@ pub fn build_query(
     }
 
     let mut term_query: QueryVec = Vec::new();
+    // Boost exact matches to the full query string
+    if terms.len() > 1 {
+        term_query.push((
+            Occur::Should,
+            _boosted_term(fields.title, &query_string, 5.0),
+        ));
+        term_query.push((
+            Occur::Should,
+            _boosted_term(fields.content, &query_string, 5.0),
+        ));
+    }
+
     for term in terms {
         // Emphasize matches in the content more than words in the title
-        term_query.push((Occur::Should, _boosted_term(fields.content, term, 5.0)));
-        term_query.push((Occur::Should, _boosted_term(fields.title, term, 0.25)));
+        term_query.push((Occur::Should, _boosted_term(fields.content, term, 1.0)));
+        term_query.push((Occur::Should, _boosted_term(fields.title, term, 5.0)));
     }
 
     let mut nested_query: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
