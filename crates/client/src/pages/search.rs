@@ -172,18 +172,18 @@ pub fn search_page() -> Html {
 
     html! {
         <div ref={(*node_ref).clone()}>
-            <div class={"flex flex-nowrap w-full"}>
+            <div class="flex flex-nowrap w-full">
                 <SelectedLens lens={(*lens).clone()} />
                 <input
                     ref={(*query_ref).clone()}
-                    id={"searchbox"}
-                    type={"text"}
-                    class={"bg-neutral-800 text-white text-5xl p-4 overflow-hidden flex-1 focus:outline-none"}
-                    placeholder={"Search"}
+                    id="searchbox"
+                    type="text"
+                    class="bg-neutral-800 text-white text-5xl p-4 overflow-hidden flex-1 focus:outline-none"
+                    placeholder="Search"
                     {onkeyup}
                     {onkeydown}
-                    spellcheck={"false"}
-                    tabindex={"-1"}
+                    spellcheck="false"
+                    tabindex="-1"
                 />
             </div>
             <div>{ results }</div>

@@ -39,7 +39,7 @@ pub fn legend_icon(props: &LegendIconProps) -> Html {
     ];
 
     html! {
-        <div class={"flex flex-row items-center pb-2 text-xs mr-8"}>
+        <div class="flex flex-row items-center pb-2 text-xs mr-8">
             <div class={legend_styles}></div>
             {props.label.clone()}
         </div>
@@ -82,7 +82,7 @@ fn stats_bar(props: &StatsBarProps) -> Html {
 
     html! {
         <div class={bar_style} style={format!("width: {}%", percent)}>
-            <span class={"text-xs"}>{buf.as_str()}</span>
+            <span class="text-xs">{buf.as_str()}</span>
         </div>
     }
 }
@@ -107,11 +107,11 @@ pub fn stats_page() -> Html {
         .map(|(domain, stats)| {
             let total = stats.total() as f64;
             html! {
-                <div class={"p-4 px-8"}>
-                    <div class={"text-xs pb-1"}>
+                <div class="p-4 px-8">
+                    <div class="text-xs pb-1">
                         {domain}
                     </div>
-                    <div class={"relative flex flex-row items-center flex-growgroup w-full"}>
+                    <div class="relative flex flex-row items-center flex-growgroup w-full">
                         <StatsBar count={stats.num_queued} total={total} color={"bg-neutral-600"} is_start={true} />
                         <StatsBar count={stats.num_processing} total={total} color={"bg-sky-600"} />
                         <StatsBar count={stats.num_completed} total={total} color={"bg-lime-600"} />
@@ -135,10 +135,10 @@ pub fn stats_page() -> Html {
     }
 
     html! {
-        <div class={"text-white"}>
+        <div class="text-white">
             <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-40 h-24">
                 <div class="flex flex-row items-center">
-                    <h1 class={"text-2xl grow p-0"}>
+                    <h1 class="text-2xl grow p-0">
                         {"Crawl Status"}
                     </h1>
                     <button
@@ -158,7 +158,7 @@ pub fn stats_page() -> Html {
                     </div>
                 </div>
             </div>
-            <div class={"divide-y divide-neutral-600"}>
+            <div class="divide-y divide-neutral-600">
                 {rendered}
             </div>
         </div>
