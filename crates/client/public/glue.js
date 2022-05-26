@@ -41,6 +41,11 @@ export async function openResult(url) {
     return await invoke("open_result", { url });
 }
 
+export async function openLensFolder() {
+    return await invoke("open_lens_folder");
+}
+
+
 export async function resizeWindow(height) {
     return await invoke("resize_window", { height });
 }

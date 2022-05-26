@@ -32,6 +32,9 @@ extern "C" {
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
+    #[wasm_bindgen(js_name = "openLensFolder", catch)]
+    pub async fn open_lens_folder() -> Result<(), JsValue>;
+
     #[wasm_bindgen(js_name = "escape", catch)]
     pub async fn escape() -> Result<(), JsValue>;
 
@@ -46,7 +49,7 @@ extern "C" {
 enum Route {
     #[at("/")]
     Search,
-    #[at("/settings/lenses")]
+    #[at("/settings/lens")]
     LensManager,
     #[at("/stats")]
     Status,

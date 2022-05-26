@@ -27,7 +27,7 @@ mod constants;
 mod menu;
 mod rpc;
 mod window;
-use window::show_crawl_stats_window;
+use window::{show_crawl_stats_window, show_lens_manager_window};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -52,13 +52,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            cmd::escape,
-            cmd::open_result,
-            cmd::search_docs,
-            cmd::search_lenses,
-            cmd::resize_window,
             cmd::crawl_stats,
             cmd::delete_doc,
+            cmd::escape,
+            cmd::open_lens_folder,
+            cmd::open_result,
+            cmd::resize_window,
+            cmd::search_docs,
+            cmd::search_lenses,
         ])
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
@@ -165,7 +166,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let _ = open::that(&version.html_url);
                         }
                     }
-                    menu::OPEN_LENSES_FOLDER => open_folder(config.lenses_dir()),
+                    menu::OPEN_LENS_MANAGER => {
+                        show_lens_manager_window(app);
+                    }
                     menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                     menu::SHOW_CRAWL_STATUS => {

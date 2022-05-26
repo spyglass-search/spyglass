@@ -4,6 +4,8 @@ use yew::prelude::*;
 pub mod btn;
 use btn::DeleteButton;
 
+pub mod lens;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {
     DocSearch,

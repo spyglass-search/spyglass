@@ -7,7 +7,7 @@ pub const QUIT_MENU_ITEM: &str = "quit";
 pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
 pub const CRAWL_STATUS_MENU_ITEM: &str = "crawl_status";
 
-pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
+pub const OPEN_LENS_MANAGER: &str = "open_lens_manager";
 pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
 pub const SHOW_SEARCHBAR: &str = "show_searchbar";
@@ -25,8 +25,6 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     let pause = CustomMenuItem::new(CRAWL_STATUS_MENU_ITEM.to_string(), "");
     let quit = CustomMenuItem::new(QUIT_MENU_ITEM.to_string(), "Quit");
 
-    let open_lenses_folder =
-        CustomMenuItem::new(OPEN_LENSES_FOLDER.to_string(), "Show lenses folder");
     let open_settings_folder =
         CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Show settings folder");
 
@@ -48,7 +46,10 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
             "Show crawl status",
         ))
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(open_lenses_folder)
+        .add_item(CustomMenuItem::new(
+            OPEN_LENS_MANAGER.to_string(),
+            "Lens Manager",
+        ))
         .add_item(open_settings_folder)
         .add_item(open_logs_folder);
 

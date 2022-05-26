@@ -522,6 +522,10 @@ Ensure the default browser behavior of the `hidden` attribute.
   margin-top: -0.5rem;
 }
 
+.ml-2 {
+  margin-left: 0.5rem;
+}
+
 .block {
   display: block;
 }
@@ -558,8 +562,16 @@ Ensure the default browser behavior of the `hidden` attribute.
   height: 7rem;
 }
 
+.h-5 {
+  height: 1.25rem;
+}
+
 .h-24 {
   height: 6rem;
+}
+
+.h-20 {
+  height: 5rem;
 }
 
 .w-6 {
@@ -576,6 +588,10 @@ Ensure the default browser behavior of the `hidden` attribute.
 
 .w-3 {
   width: 0.75rem;
+}
+
+.w-5 {
+  width: 1.25rem;
 }
 
 .w-16 {
@@ -611,8 +627,16 @@ Ensure the default browser behavior of the `hidden` attribute.
   flex-direction: row;
 }
 
+.flex-col {
+  flex-direction: column;
+}
+
 .flex-nowrap {
   flex-wrap: nowrap;
+}
+
+.content-center {
+  align-content: center;
 }
 
 .items-center {
@@ -621,6 +645,18 @@ Ensure the default browser behavior of the `hidden` attribute.
 
 .justify-center {
   justify-content: center;
+}
+
+.gap-8 {
+  gap: 2rem;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
 }
 
 .divide-y > :not([hidden]) ~ :not([hidden]) {
@@ -759,12 +795,12 @@ Ensure the default browser behavior of the `hidden` attribute.
   padding: 0.75rem;
 }
 
-.p-16 {
-  padding: 4rem;
-}
-
 .p-0 {
   padding: 0px;
+}
+
+.p-16 {
+  padding: 4rem;
 }
 
 .py-4 {
@@ -812,6 +848,22 @@ Ensure the default browser behavior of the `hidden` attribute.
   padding-right: 0px;
 }
 
+.pt-2 {
+  padding-top: 0.5rem;
+}
+
+.pb-4 {
+  padding-bottom: 1rem;
+}
+
+.pt-16 {
+  padding-top: 4rem;
+}
+
+.pt-8 {
+  padding-top: 2rem;
+}
+
 .text-center {
   text-align: center;
 }
@@ -847,6 +899,11 @@ Ensure the default browser behavior of the `hidden` attribute.
 
 .text-lg {
   font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
   line-height: 1.75rem;
 }
 

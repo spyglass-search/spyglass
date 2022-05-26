@@ -1,12 +1,21 @@
 use jsonrpc_core::Value;
 use tauri::State;
 
-use crate::{rpc, window};
-use shared::{request, response};
+use crate::{open_folder, rpc, window};
+use shared::{config::Config, request, response};
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
     window::hide_window(&window);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_lens_folder<'r>(
+    _: tauri::Window,
+    config: State<'r, Config>,
+) -> Result<(), String> {
+    open_folder(config.lenses_dir());
     Ok(())
 }
 
