@@ -88,6 +88,8 @@ curated set of websites with high quality recipes.
     description: Some(r#"
         A curated collection of websites with useful, high-quality recipes.
     "#),
+    // Set to false if you want to disable this lens
+    is_enabled: true,
     domains: [
 
         // Major sites that often have really good recipes
@@ -135,6 +137,7 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
     author: "Andrew Huynh",
     name: "rustlang",
     description: Some("Rustlang targeted websites"),
+    is_enabled: true,
     domains: [
         // Support for wildcards in domain names
         "*.rust-lang.org",
