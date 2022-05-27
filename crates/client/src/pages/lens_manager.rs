@@ -1,6 +1,6 @@
+use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::components::ResultListData;
 
@@ -58,11 +58,13 @@ pub fn lens_manager_page() -> Html {
     let lenses: UseStateHandle<Vec<ResultListData>> = use_state_eq(Vec::new);
     let _request_finished = use_state(|| false);
 
-    let on_open_folder = { move |_| {
-        spawn_local(async {
-            let _ = crate::open_lens_folder().await;
-        });
-    } };
+    let on_open_folder = {
+        move |_| {
+            spawn_local(async {
+                let _ = crate::open_lens_folder().await;
+            });
+        }
+    };
 
     html! {
         <div class="text-white">
