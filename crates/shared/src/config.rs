@@ -51,7 +51,7 @@ impl Lens {
     }
 
     fn default_is_enabled() -> bool {
-        false
+        true
     }
 }
 

@@ -106,12 +106,13 @@ pub async fn delete_doc<'r>(
     let mut rpc = rpc.lock().await;
     match rpc
         .client
-        .call_method::<(String,), ()>("delete_doc", "", (id.into(),)).await {
-
+        .call_method::<(String,), ()>("delete_doc", "", (id.into(),))
+        .await
+    {
         Ok(_) => {
             let _ = window.emit("refresh_results", true);
             Ok(())
-        },
+        }
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
             rpc.reconnect().await;
