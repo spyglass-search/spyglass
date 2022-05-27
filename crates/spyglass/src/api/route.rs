@@ -170,7 +170,7 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
 
     let by_domain = by_domain
         .into_iter()
-        .filter(|(_, stats)| stats.total() >= 100)
+        .filter(|(_, stats)| stats.total() >= 10)
         .collect();
 
     Ok(CrawlStats { by_domain })

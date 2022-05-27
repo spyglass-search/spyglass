@@ -56,7 +56,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 #[function_component(LensManagerPage)]
 pub fn lens_manager_page() -> Html {
     let lenses: UseStateHandle<Vec<ResultListData>> = use_state_eq(Vec::new);
-    let request_finished = use_state(|| false);
+    let _request_finished = use_state(|| false);
 
     let on_open_folder = { move |_| {
         spawn_local(async {

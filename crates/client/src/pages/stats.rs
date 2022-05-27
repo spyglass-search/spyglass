@@ -5,7 +5,10 @@ use yew::prelude::*;
 use crate::crawl_stats;
 use shared::response::{CrawlStats, QueueStatus};
 
-fn fetch_crawl_stats(stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>) {
+fn fetch_crawl_stats(
+    stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>,
+    request_finished: UseStateHandle<bool>,
+) {
     spawn_local(async move {
         match crawl_stats().await {
             Ok(results) => {
@@ -13,8 +16,12 @@ fn fetch_crawl_stats(stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>) {
                 let mut sorted = results.by_domain;
                 sorted.sort_by(|(_, a), (_, b)| b.num_completed.cmp(&a.num_completed));
                 stats_handle.set(sorted);
+                request_finished.set(true);
             }
-            Err(e) => log::info!("Error: {:?}", e),
+            Err(e) => {
+                log::info!("Error: {:?}", e);
+                request_finished.set(true);
+            }
         }
     });
 }
@@ -90,15 +97,19 @@ fn stats_bar(props: &StatsBarProps) -> Html {
 #[function_component(StatsPage)]
 pub fn stats_page() -> Html {
     let stats: UseStateHandle<Vec<(String, QueueStatus)>> = use_state_eq(Vec::new);
-    if stats.is_empty() {
-        fetch_crawl_stats(stats.clone());
+    let request_finished = use_state(|| false);
+
+    if stats.is_empty() && !(*request_finished) {
+        fetch_crawl_stats(stats.clone(), request_finished.clone());
     }
 
     let onclick = {
+        let request_finished = request_finished.clone();
         let stats = stats.clone();
         move |_| {
+            request_finished.set(false);
             stats.set(Vec::new());
-            fetch_crawl_stats(stats.clone());
+            fetch_crawl_stats(stats.clone(), request_finished.clone());
         }
     };
 
@@ -122,12 +133,22 @@ pub fn stats_page() -> Html {
         })
         .collect::<Html>();
 
-    if stats.is_empty() {
+    if stats.is_empty() && !(*request_finished) {
         rendered = html! {
             <div class="flex justify-center">
                 <div class="p-16">
                     <svg xmlns="http://www.w3.org/2000/svg" class="animate-spin h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+            </div>
+        }
+    } else if stats.is_empty() && *request_finished {
+        rendered = html! {
+            <div class="flex justify-center">
+                <div class="block p-16 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
             </div>
