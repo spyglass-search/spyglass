@@ -107,7 +107,7 @@ pub async fn check_resource_rules(
         .await?;
 
     if rules.is_empty() {
-        log::info!("No rules found for this domain, fetching robot.txt");
+        log::info!("No rules found for <{}>, fetching robot.txt", domain);
 
         let robots_url = format!("https://{}/robots.txt", domain);
         let res = client.get(robots_url).send().await;

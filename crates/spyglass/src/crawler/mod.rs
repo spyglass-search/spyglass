@@ -51,24 +51,26 @@ impl CrawlResult {
     }
 }
 
-fn _normalize_href(url: &Url, href: &str) -> Option<String> {
+fn normalize_href(url: &str, href: &str) -> Option<String> {
     // Force HTTPS, crawler will fallback to HTTP if necessary.
-    if href.starts_with("//") {
-        // schema relative url
-        if let Ok(url) = Url::parse(&format!("{}:{}", "https", href)) {
-            return Some(url.to_string());
-        }
-    } else if href.starts_with("http://") || href.starts_with("https://") {
-        // Force HTTPS, crawler will fallback to HTTP if necessary.
-        if let Ok(url) = Url::parse(href) {
-            let mut url = url;
-            url.set_scheme("https").unwrap();
-            return Some(url.to_string());
-        }
-    } else {
-        // origin or directory relative url
-        if let Ok(url) = url.join(href) {
-            return Some(url.to_string());
+    if let Ok(url) = Url::parse(url) {
+        if href.starts_with("//") {
+            // schema relative url
+            if let Ok(url) = Url::parse(&format!("{}:{}", "https", href)) {
+                return Some(url.to_string());
+            }
+        } else if href.starts_with("http://") || href.starts_with("https://") {
+            // Force HTTPS, crawler will fallback to HTTP if necessary.
+            if let Ok(url) = Url::parse(href) {
+                let mut url = url;
+                url.set_scheme("https").unwrap();
+                return Some(url.to_string());
+            }
+        } else {
+            // origin or directory relative url
+            if let Ok(url) = url.join(href) {
+                return Some(url.to_string());
+            }
         }
     }
 
@@ -177,21 +179,13 @@ impl Crawler {
         let mut hasher = Sha256::new();
         hasher.update(&parse_result.content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-
-        // Normalize links from scrape result. If the links start with "/" they
-        // should be appended to the current URL.
-        let normalized_links = parse_result
-            .links
-            .iter()
-            .filter_map(|link| _normalize_href(url, link))
-            .collect();
+        log::trace!("content hash: {:?}", content_hash);
 
         let canonical_url = match parse_result.canonical_url {
             Some(canonical) => determine_canonical(url, &canonical),
             None => url.to_string(),
         };
 
-        log::trace!("content hash: {:?}", content_hash);
         CrawlResult {
             content_hash,
             content: Some(parse_result.content),
@@ -199,7 +193,7 @@ impl Crawler {
             status: 200,
             title: parse_result.title,
             url: canonical_url,
-            links: normalized_links,
+            links: parse_result.links,
             raw: Some(raw_body.to_string()),
         }
     }
@@ -261,6 +255,15 @@ impl Crawler {
             }
         }
 
+        // Normalize links from scrape result. If the links start with "/" they
+        // should be appended to the current URL.
+        let normalized_links = result
+            .links
+            .iter()
+            .filter_map(|link| normalize_href(&result.url, link))
+            .collect();
+        result.links = normalized_links;
+
         log::trace!(
             "crawl result: {:?} - {:?}\n{:?}",
             result.title,
@@ -277,11 +280,12 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
+    use entities::models::crawl_queue::CrawlType;
     use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
 
-    use crate::crawler::{Crawler, _normalize_href, determine_canonical};
+    use crate::crawler::{determine_canonical, normalize_href, Crawler};
 
     use url::Url;
 
@@ -293,14 +297,11 @@ mod test {
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
-
-        // All links should start w/ http
-        for link in result.links {
-            assert!(link.starts_with("https://"))
-        }
+        assert!(result.links.len() > 0);
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_fetch() {
         let crawler = Crawler::new();
 
@@ -319,6 +320,42 @@ mod test {
         let result = crawl_result.unwrap();
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
+
+        let links: Vec<String> = result.links.into_iter().collect();
+        assert!(links[0].starts_with("https://oldschool.runescape.wiki"));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_bootstrap() {
+        let crawler = Crawler::new();
+
+        let db = setup_test_db().await;
+        let url = Url::parse("https://www.ign.com/wikis/luigis-mansion").unwrap();
+        let query = crawl_queue::ActiveModel {
+            domain: Set(url.host_str().unwrap().to_owned()),
+            url: Set(url.to_string()),
+            crawl_type: Set(CrawlType::Bootstrap),
+            ..Default::default()
+        };
+        let model = query.insert(&db).await.unwrap();
+
+        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        assert!(crawl_result.is_some());
+
+        let result = crawl_result.unwrap();
+        assert_eq!(
+            result.title,
+            Some("Luigi's Mansion Wiki Guide - IGN".to_string())
+        );
+        assert_eq!(
+            result.url,
+            "https://www.ign.com/wikis/luigis-mansion/".to_string()
+        );
+
+        let links: Vec<String> = result.links.into_iter().collect();
+        for link in links {
+            assert!(!link.starts_with("https://web.archive.org"));
+        }
     }
 
     #[tokio::test]
@@ -353,31 +390,31 @@ mod test {
     }
 
     #[test]
-    fn test_normalize_href() {
-        let url = Url::parse("https://example.com").unwrap();
+    fn testnormalize_href() {
+        let url = "https://example.com";
 
         assert_eq!(
-            _normalize_href(&url, "http://foo.com"),
+            normalize_href(&url, "http://foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            _normalize_href(&url, "https://foo.com"),
+            normalize_href(&url, "https://foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            _normalize_href(&url, "//foo.com"),
+            normalize_href(&url, "//foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            _normalize_href(&url, "/foo.html"),
+            normalize_href(&url, "/foo.html"),
             Some("https://example.com/foo.html".into())
         );
         assert_eq!(
-            _normalize_href(&url, "/foo"),
+            normalize_href(&url, "/foo"),
             Some("https://example.com/foo".into())
         );
         assert_eq!(
-            _normalize_href(&url, "foo.html"),
+            normalize_href(&url, "foo.html"),
             Some("https://example.com/foo.html".into())
         );
     }

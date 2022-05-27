@@ -120,11 +120,13 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
+
             let lenses: Vec<Lens> = state
                 .lenses
                 .iter()
                 .map(|entry| entry.value().clone())
                 .collect();
+
             if let Err(err) = crawl_queue::enqueue_all(
                 &state.db,
                 &to_enqueue,
