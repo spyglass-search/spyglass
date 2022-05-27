@@ -12,6 +12,9 @@ Download now:
     | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.28/Spyglass_22.5.28_x64_en-US.msi)
     | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.28/spyglass_22.5.28_amd64.AppImage)
 
+
+Looking for lenses? Check out our [community contributions](https://github.com/spyglass-search/lens-box)!
+
 ---
 
 ## Table of Contents
@@ -22,6 +25,7 @@ Download now:
 * [How does it know what to crawl](#how-does-it-know-what-to-crawl)
   * [Example: Curated recipe searching](#curated-recipe-searching)
   * [Example: Narrowing down by a specific topic](#curated-recipe-searching)
+* [Lens Directory](#lens-directory)
 * [Settings](#settings)
   * [Updating the shorcut](#updating-the-shortcut)
 
@@ -156,6 +160,10 @@ programming language and not the Rust game / The Rust Belt / oxidation / etc.
     rules: []
 )
 ```
+
+## Lens Directory
+
+Looking for lenses? Check out our [community contributions](https://github.com/spyglass-search/lens-box)!
 
 
 ## Settings
