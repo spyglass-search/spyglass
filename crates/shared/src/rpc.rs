@@ -36,5 +36,4 @@ pub trait Rpc {
 
     #[rpc(name = "search_lenses")]
     fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>>;
-
 }

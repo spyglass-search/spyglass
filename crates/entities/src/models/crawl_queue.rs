@@ -351,17 +351,18 @@ pub async fn enqueue_all(
                 }
 
                 // Should we crawl external links?
-                if !settings.crawl_external_links
-                    // Only allow crawls specified in our lenses
-                    && (!allow_list.is_empty() && !allow_list.is_match(&normalized))
-                {
-                    return None;
+                if settings.crawl_external_links {
+                    return Some(normalized);
                 }
 
-                Some(parsed.as_str().to_string())
-            } else {
-                None
+                // If external links are not allowed, only allow crawls specified
+                // in our lenses
+                if allow_list.is_empty() || allow_list.is_match(&normalized) {
+                    return Some(normalized);
+                }
             }
+
+            None
         })
         .collect();
 

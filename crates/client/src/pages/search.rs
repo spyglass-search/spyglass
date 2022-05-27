@@ -8,7 +8,9 @@ use shared::response;
 
 use crate::components::{ResultListData, SearchResultItem, SelectedLens};
 use crate::events;
-use crate::{on_clear_search, on_focus, on_refresh_results, resize_window, search_docs, search_lenses};
+use crate::{
+    on_clear_search, on_focus, on_refresh_results, resize_window, search_docs, search_lenses,
+};
 
 #[function_component(SearchPage)]
 pub fn search_page() -> Html {
