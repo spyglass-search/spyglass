@@ -290,6 +290,7 @@ mod test {
     use url::Url;
 
     #[tokio::test]
+    #[ignore]
     async fn test_crawl() {
         let crawler = Crawler::new();
         let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
@@ -326,6 +327,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_fetch_bootstrap() {
         let crawler = Crawler::new();
 
