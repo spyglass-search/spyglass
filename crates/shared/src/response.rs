@@ -48,13 +48,14 @@ pub struct SearchResults {
     pub meta: SearchMeta,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct LensResult {
+    pub author: String,
     pub title: String,
     pub description: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
 }

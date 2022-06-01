@@ -1,10 +1,11 @@
-use shared::response::{LensResult, SearchResult};
+pub mod btn;
+pub mod icons;
+pub mod lens;
+
 use yew::prelude::*;
 
-pub mod btn;
 use btn::DeleteButton;
-
-pub mod lens;
+use shared::response::{LensResult, SearchResult};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {

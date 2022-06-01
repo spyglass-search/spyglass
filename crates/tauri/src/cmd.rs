@@ -11,9 +11,9 @@ pub async fn escape(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_lens_folder<'r>(
+pub async fn open_lens_folder(
     _: tauri::Window,
-    config: State<'r, Config>,
+    config: State<'_, Config>,
 ) -> Result<(), String> {
     open_folder(config.lenses_dir());
     Ok(())
@@ -28,6 +28,39 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn resize_window(window: tauri::Window, height: f64) {
     window::resize_window(&window, height).await;
+}
+
+#[tauri::command]
+pub async fn crawl_stats<'r>(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+) -> Result<response::CrawlStats, String> {
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<Value, response::CrawlStats>("crawl_stats", "", Value::Null)
+        .await
+    {
+        Ok(resp) => Ok(resp),
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(response::CrawlStats {
+                by_domain: Vec::new(),
+            })
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn installed_lenses(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+) -> Result<Vec<response::LensResult>, String> {
+    let mut rpc = rpc.lock().await;
+    Ok(rpc
+        .call::<Value, Vec<response::LensResult>>("installed_lenses", Value::Null)
+        .await)
 }
 
 #[tauri::command]
@@ -66,44 +99,11 @@ pub async fn search_lenses<'r>(
         query: query.to_string(),
     };
 
-    let rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(request::SearchLensesParam,), response::SearchLensesResp>(
-            "search_lenses",
-            "",
-            (data,),
-        )
-        .await
-    {
-        Ok(resp) => Ok(resp.results.to_vec()),
-        Err(err) => {
-            log::error!("{}", err);
-            Ok(Vec::new())
-        }
-    }
-}
-
-#[tauri::command]
-pub async fn crawl_stats<'r>(
-    _: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-) -> Result<response::CrawlStats, String> {
     let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::CrawlStats>("crawl_stats", "", Value::Null)
-        .await
-    {
-        Ok(resp) => Ok(resp),
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(response::CrawlStats {
-                by_domain: Vec::new(),
-            })
-        }
-    }
+    let resp = rpc
+        .call::<(request::SearchLensesParam,), response::SearchLensesResp>("search_lenses", (data,))
+        .await;
+    Ok(resp.results)
 }
 
 #[tauri::command]

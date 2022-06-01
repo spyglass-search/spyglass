@@ -2,7 +2,7 @@ use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_derive::rpc;
 
 use crate::request::{SearchLensesParam, SearchParam};
-use crate::response::{AppStatus, CrawlStats, SearchLensesResp, SearchResults};
+use crate::response::{AppStatus, CrawlStats, LensResult, SearchLensesResp, SearchResults};
 
 pub fn gen_ipc_path() -> String {
     if cfg!(windows) {
@@ -28,12 +28,15 @@ pub trait Rpc {
     #[rpc(name = "delete_doc")]
     fn delete_doc(&self, id: String) -> BoxFuture<Result<()>>;
 
-    #[rpc(name = "toggle_pause")]
-    fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;
+    #[rpc(name = "installed_lenses")]
+    fn installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
 
     #[rpc(name = "search_docs")]
     fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>>;
 
     #[rpc(name = "search_lenses")]
     fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>>;
+
+    #[rpc(name = "toggle_pause")]
+    fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;
 }

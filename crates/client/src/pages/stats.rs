@@ -2,6 +2,7 @@ use num_format::{Buffer, Locale};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
+use crate::components::icons;
 use crate::crawl_stats;
 use shared::response::{CrawlStats, QueueStatus};
 
@@ -137,9 +138,7 @@ pub fn stats_page() -> Html {
         rendered = html! {
             <div class="flex justify-center">
                 <div class="p-16">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="animate-spin h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <icons::RefreshIcon size={16} animate_spin={true} />
                 </div>
             </div>
         }
@@ -147,9 +146,7 @@ pub fn stats_page() -> Html {
         rendered = html! {
             <div class="flex justify-center">
                 <div class="block p-16 text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <icons::EmojiSadIcon size={16} />
                 </div>
             </div>
         }
@@ -165,9 +162,7 @@ pub fn stats_page() -> Html {
                     <button
                         {onclick}
                         class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <icons::RefreshIcon size={4} />
                     </button>
                 </div>
                 <div class="py-2">

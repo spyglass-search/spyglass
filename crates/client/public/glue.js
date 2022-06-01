@@ -29,6 +29,10 @@ export async function deleteDoc(id) {
     return await invoke("delete_doc", { id });
 }
 
+export async function installedLenses() {
+    return await invoke("installed_lenses");
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke("search_docs", { lenses, query });
 }
@@ -44,7 +48,6 @@ export async function openResult(url) {
 export async function openLensFolder() {
     return await invoke("open_lens_folder");
 }
-
 
 export async function resizeWindow(height) {
     return await invoke("resize_window", { height });

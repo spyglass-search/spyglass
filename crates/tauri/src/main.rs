@@ -55,6 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::crawl_stats,
             cmd::delete_doc,
             cmd::escape,
+            cmd::installed_lenses,
             cmd::open_lens_folder,
             cmd::open_result,
             cmd::resize_window,

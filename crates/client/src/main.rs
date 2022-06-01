@@ -14,6 +14,9 @@ extern "C" {
     #[wasm_bindgen(js_name = "deleteDoc", catch)]
     pub async fn delete_doc(id: String) -> Result<(), JsValue>;
 
+    #[wasm_bindgen(js_name = "installedLenses", catch)]
+    pub async fn installed_lenses() -> Result<JsValue, JsValue>;
+
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
 

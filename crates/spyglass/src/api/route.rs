@@ -212,6 +212,7 @@ pub async fn search_lenses(
     let query_results = query_results.unwrap();
     for lens in query_results {
         results.push(LensResult {
+            author: lens.author,
             title: lens.name,
             description: lens.description.unwrap_or_else(|| "".to_string()),
         });
@@ -231,4 +232,18 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub async fn installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
+    let lenses: Vec<LensResult> = state
+        .lenses
+        .iter()
+        .map(|lens| LensResult {
+            author: lens.author.clone(),
+            title: lens.name.clone(),
+            description: lens.description.clone().unwrap_or_else(|| "".into()),
+        })
+        .collect();
+
+    Ok(lenses)
 }
