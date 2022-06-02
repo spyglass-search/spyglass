@@ -4,7 +4,7 @@ use yew::function_component;
 use yew::prelude::*;
 
 use crate::components::icons;
-use crate::{installed_lenses, installable_lenses};
+use crate::{installable_lenses, installed_lenses};
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -14,19 +14,14 @@ pub struct LensProps {
     pub is_installed: bool,
 }
 
-fn fetch_installed_lenses(
-    lenses_handle: UseStateHandle<Vec<LensResult>>,
-    request_finished: UseStateHandle<bool>,
-) {
+fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>) {
     spawn_local(async move {
         match installed_lenses().await {
             Ok(results) => {
                 lenses_handle.set(results.into_serde().unwrap());
-                request_finished.set(true);
             }
             Err(e) => {
                 log::info!("Error: {:?}", e);
-                request_finished.set(true);
             }
         }
     });
@@ -37,7 +32,8 @@ fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
         match installable_lenses().await {
             Ok(results) => {
                 let lenses: Vec<InstallableLens> = results.into_serde().unwrap();
-                let parsed: Vec<LensResult> = lenses.iter()
+                let parsed: Vec<LensResult> = lenses
+                    .iter()
                     .map(|lens| LensResult {
                         author: lens.author.to_owned(),
                         title: lens.name.to_owned(),
@@ -114,7 +110,8 @@ pub fn lens_manager_page() -> Html {
 
     let ui_req_finished = use_state(|| false);
     if user_installed.is_empty() && !(*ui_req_finished) {
-        fetch_installed_lenses(user_installed.clone(), ui_req_finished);
+        ui_req_finished.set(true);
+        fetch_installed_lenses(user_installed.clone());
     }
 
     let i_req_finished = use_state(|| false);

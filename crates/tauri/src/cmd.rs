@@ -2,7 +2,11 @@ use jsonrpc_core::Value;
 use tauri::State;
 
 use crate::{constants, open_folder, rpc, window};
-use shared::{config::Config, request, response::{self, InstallableLens}};
+use shared::{
+    config::Config,
+    request,
+    response::{self, InstallableLens},
+};
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
@@ -61,7 +65,9 @@ pub async fn installed_lenses(
 }
 
 #[tauri::command]
-pub async fn installable_lenses(_: tauri::Window) -> Result<Vec<response::InstallableLens>, String> {
+pub async fn installable_lenses(
+    _: tauri::Window,
+) -> Result<Vec<response::InstallableLens>, String> {
     let client = reqwest::Client::builder()
         .user_agent(constants::APP_USER_AGENT)
         .build()
@@ -71,8 +77,8 @@ pub async fn installable_lenses(_: tauri::Window) -> Result<Vec<response::Instal
         if let Ok(file_contents) = res.text().await {
             return match ron::from_str::<Vec<InstallableLens>>(&file_contents) {
                 Ok(json) => Ok(json),
-                Err(e) => Err(format!("Unable to parse index: {}", e))
-            }
+                Err(e) => Err(format!("Unable to parse index: {}", e)),
+            };
         }
     }
 
