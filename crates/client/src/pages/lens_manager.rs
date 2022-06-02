@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use shared::response::LensResult;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
@@ -127,6 +128,13 @@ pub fn lens_manager_page() -> Html {
             });
         }
     };
+
+    let already_installed: HashSet<String> = user_installed.iter().map(|x| x.title.clone()).collect();
+    installable.set(installable
+        .iter()
+        .filter(|x| !already_installed.contains(&x.title))
+        .map(|x| x.to_owned())
+        .collect::<Vec<LensResult>>());
 
     html! {
         <div class="text-white">
