@@ -25,6 +25,23 @@ pub struct CrawlStats {
     pub by_domain: Vec<(String, QueueStatus)>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+pub struct InstallableLens {
+    pub author: String,
+    pub description: String,
+    pub name: String,
+    pub sha: String,
+    pub download_url: String,
+    pub html_url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct LensResult {
+    pub author: String,
+    pub title: String,
+    pub description: String,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,
@@ -46,13 +63,6 @@ pub struct SearchResult {
 pub struct SearchResults {
     pub results: Vec<SearchResult>,
     pub meta: SearchMeta,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct LensResult {
-    pub author: String,
-    pub title: String,
-    pub description: String,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]

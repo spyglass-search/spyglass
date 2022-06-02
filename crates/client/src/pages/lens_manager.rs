@@ -4,7 +4,8 @@ use yew::function_component;
 use yew::prelude::*;
 
 use crate::components::icons;
-use crate::installed_lenses;
+use crate::{installed_lenses, installable_lenses};
+use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
 pub struct LensProps {
@@ -26,6 +27,28 @@ fn fetch_installed_lenses(
             Err(e) => {
                 log::info!("Error: {:?}", e);
                 request_finished.set(true);
+            }
+        }
+    });
+}
+
+fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
+    spawn_local(async move {
+        match installable_lenses().await {
+            Ok(results) => {
+                let lenses: Vec<InstallableLens> = results.into_serde().unwrap();
+                let parsed: Vec<LensResult> = lenses.iter()
+                    .map(|lens| LensResult {
+                        author: lens.author.to_owned(),
+                        title: lens.name.to_owned(),
+                        description: lens.description.to_owned(),
+                    })
+                    .collect();
+
+                data_handle.set(parsed);
+            }
+            Err(e) => {
+                log::info!("Error: {:?}", e);
             }
         }
     });
@@ -86,11 +109,18 @@ pub fn lens_component(props: &LensProps) -> Html {
 
 #[function_component(LensManagerPage)]
 pub fn lens_manager_page() -> Html {
-    let installed: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
-    let request_finished = use_state(|| false);
+    let user_installed: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
+    let installable: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
 
-    if installed.is_empty() && !(*request_finished) {
-        fetch_installed_lenses(installed.clone(), request_finished);
+    let ui_req_finished = use_state(|| false);
+    if user_installed.is_empty() && !(*ui_req_finished) {
+        fetch_installed_lenses(user_installed.clone(), ui_req_finished);
+    }
+
+    let i_req_finished = use_state(|| false);
+    if installable.is_empty() && !(*i_req_finished) {
+        i_req_finished.set(true);
+        fetch_installable_lenses(installable.clone());
     }
 
     let on_open_folder = {
@@ -120,8 +150,13 @@ pub fn lens_manager_page() -> Html {
             </div>
             <div class="px-8">
                 {
-                    installed.iter().map(|data| {
+                    user_installed.iter().map(|data| {
                         html! {<Lens result={data.clone()} is_installed={true} /> }
+                    }).collect::<Html>()
+                }
+                {
+                    installable.iter().map(|data| {
+                        html! {<Lens result={data.clone()} is_installed={false} /> }
                     }).collect::<Html>()
                 }
             </div>

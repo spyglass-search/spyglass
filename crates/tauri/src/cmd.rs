@@ -1,8 +1,8 @@
 use jsonrpc_core::Value;
 use tauri::State;
 
-use crate::{open_folder, rpc, window};
-use shared::{config::Config, request, response};
+use crate::{constants, open_folder, rpc, window};
+use shared::{config::Config, request, response::{self, InstallableLens}};
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
@@ -11,10 +11,7 @@ pub async fn escape(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_lens_folder(
-    _: tauri::Window,
-    config: State<'_, Config>,
-) -> Result<(), String> {
+pub async fn open_lens_folder(_: tauri::Window, config: State<'_, Config>) -> Result<(), String> {
     open_folder(config.lenses_dir());
     Ok(())
 }
@@ -61,6 +58,25 @@ pub async fn installed_lenses(
     Ok(rpc
         .call::<Value, Vec<response::LensResult>>("installed_lenses", Value::Null)
         .await)
+}
+
+#[tauri::command]
+pub async fn installable_lenses(_: tauri::Window) -> Result<Vec<response::InstallableLens>, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(constants::APP_USER_AGENT)
+        .build()
+        .expect("Unable to create reqwest client");
+
+    if let Ok(res) = client.get(constants::LENS_DIRECTORY_INDEX_URL).send().await {
+        if let Ok(file_contents) = res.text().await {
+            return match ron::from_str::<Vec<InstallableLens>>(&file_contents) {
+                Ok(json) => Ok(json),
+                Err(e) => Err(format!("Unable to parse index: {}", e))
+            }
+        }
+    }
+
+    Ok(Vec::new())
 }
 
 #[tauri::command]

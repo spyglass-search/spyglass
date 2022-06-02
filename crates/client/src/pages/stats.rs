@@ -138,7 +138,7 @@ pub fn stats_page() -> Html {
         rendered = html! {
             <div class="flex justify-center">
                 <div class="p-16">
-                    <icons::RefreshIcon size={16} animate_spin={true} />
+                    <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
                 </div>
             </div>
         }
@@ -146,7 +146,7 @@ pub fn stats_page() -> Html {
         rendered = html! {
             <div class="flex justify-center">
                 <div class="block p-16 text-center">
-                    <icons::EmojiSadIcon size={16} />
+                    <icons::EmojiSadIcon height={"h-16"} width={"w-16"} />
                 </div>
             </div>
         }
@@ -162,7 +162,7 @@ pub fn stats_page() -> Html {
                     <button
                         {onclick}
                         class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
-                        <icons::RefreshIcon size={4} />
+                        <icons::RefreshIcon height={"h-4"} width={"w-4"} />
                     </button>
                 </div>
                 <div class="py-2">

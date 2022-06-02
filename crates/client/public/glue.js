@@ -33,6 +33,10 @@ export async function installedLenses() {
     return await invoke("installed_lenses");
 }
 
+export async function installableLenses() {
+    return await invoke("installable_lenses");
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke("search_docs", { lenses, query });
 }

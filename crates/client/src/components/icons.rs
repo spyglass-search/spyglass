@@ -5,8 +5,10 @@ use yew::prelude::*;
 pub struct IconProps {
     #[prop_or_default]
     pub animate_spin: bool,
-    #[prop_or(5)]
-    pub size: usize,
+    #[prop_or("h-5".into())]
+    pub height: String,
+    #[prop_or("w-5".into())]
+    pub width: String,
 }
 
 impl IconProps {
@@ -17,7 +19,7 @@ impl IconProps {
             None
         };
 
-        vec![animated, Some(format!("h-{} w-{}", self.size, self.size))]
+        vec![animated, Some(format!("{} {}", self.height, self.width))]
     }
 }
 

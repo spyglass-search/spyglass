@@ -58,7 +58,7 @@ pub fn delete_btn(props: &DeleteButtonProps) -> Html {
             {onclick}
             class="hover:text-red-600 text-neutral-600 group">
             <Tooltip label={"Delete"} />
-            <icons::TrashIcon size={4} />
+            <icons::TrashIcon height={"h-4"} width={"w-4"} />
         </button>
     }
 }
