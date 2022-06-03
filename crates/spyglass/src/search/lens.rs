@@ -9,30 +9,6 @@ use crate::crawler::bootstrap;
 use crate::search::Searcher;
 use crate::state::AppState;
 
-async fn create_default_lens(config: &Config) {
-    // Create a default lens as an example.
-    let lens = Lens {
-        author: "Spyglass".to_string(),
-        version: "1".to_string(),
-        name: "rust".to_string(),
-        description: Some(
-            "All things Rustlang. Search through Rust blogs, the rust book, and
-            more."
-                .to_string(),
-        ),
-        domains: vec!["blog.rust-lang.org".into()],
-        urls: vec!["https://doc.rust-lang.org/book/".into()],
-        is_enabled: true,
-        rules: Vec::new(),
-    };
-
-    fs::write(
-        config.lenses_dir().join("rust.ron"),
-        ron::ser::to_string_pretty(&lens, Default::default()).unwrap(),
-    )
-    .expect("Unable to save default lens file.");
-}
-
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
 async fn check_and_bootstrap(
     db: &DatabaseConnection,
@@ -63,7 +39,6 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
     state.lenses.clear();
 
     let lense_dir = config.lenses_dir();
-    let mut num_lenses = 0;
 
     for entry in (fs::read_dir(lense_dir)?).flatten() {
         let path = entry.path();
@@ -72,7 +47,6 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
                 match ron::from_str::<Lens>(&file_contents) {
                     Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
                     Ok(lens) => {
-                        num_lenses += 1;
                         if lens.is_enabled {
                             state.lenses.insert(lens.name.clone(), lens);
                         }
@@ -80,10 +54,6 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
                 }
             }
         }
-    }
-
-    if num_lenses == 0 {
-        create_default_lens(config).await;
     }
 
     Ok(())
