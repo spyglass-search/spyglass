@@ -26,9 +26,9 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     let quit = CustomMenuItem::new(QUIT_MENU_ITEM.to_string(), "Quit");
 
     let open_settings_folder =
-        CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Show settings folder");
+        CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Open settings folder");
 
-    let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Show logs folder");
+    let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
 
     let app_version = format!("v20{}", ctx.package_info().version);
     let mut tray = SystemTrayMenu::new();
@@ -45,11 +45,11 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
             SHOW_CRAWL_STATUS.to_string(),
             "Show crawl status",
         ))
-        .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(
             OPEN_LENS_MANAGER.to_string(),
             "Manage/install lenses",
         ))
+        .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_settings_folder)
         .add_item(open_logs_folder);
 
@@ -57,7 +57,7 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     if cfg!(debug_assertions) {
         tray = tray
             .add_native_item(SystemTrayMenuItem::Separator)
-            .add_item(CustomMenuItem::new(DEV_SHOW_CONSOLE, "Show console"));
+            .add_item(CustomMenuItem::new(DEV_SHOW_CONSOLE, "Open dev console"));
     }
 
     tray.add_native_item(SystemTrayMenuItem::Separator)
