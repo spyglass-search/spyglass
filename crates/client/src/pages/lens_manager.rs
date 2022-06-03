@@ -6,7 +6,9 @@ use yew::function_component;
 use yew::prelude::*;
 
 use crate::components::icons;
-use crate::{install_lens, list_installable_lenses, list_installed_lenses, on_refresh_lens_manager};
+use crate::{
+    install_lens, list_installable_lenses, list_installed_lenses, on_refresh_lens_manager,
+};
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -30,7 +32,10 @@ impl RequestState {
     }
 }
 
-fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>, req_state: UseStateHandle<RequestState>) {
+fn fetch_installed_lenses(
+    lenses_handle: UseStateHandle<Vec<LensResult>>,
+    req_state: UseStateHandle<RequestState>,
+) {
     spawn_local(async move {
         match list_installed_lenses().await {
             Ok(results) => {
@@ -45,7 +50,10 @@ fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>, req_st
     });
 }
 
-fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>, req_state: UseStateHandle<RequestState>) {
+fn fetch_installable_lenses(
+    data_handle: UseStateHandle<Vec<LensResult>>,
+    req_state: UseStateHandle<RequestState>,
+) {
     spawn_local(async move {
         match list_installable_lenses().await {
             Ok(results) => {
@@ -234,7 +242,7 @@ pub fn lens_manager_page() -> Html {
     }
 
     let contents = if ui_req_state.is_done() && i_req_state.is_done() {
-        html!{
+        html! {
             <>
             {
                 user_installed.iter().map(|data| {
