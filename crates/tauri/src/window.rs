@@ -40,27 +40,35 @@ pub fn show_window(window: &Window) {
 }
 
 pub fn show_crawl_stats_window(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window("settings") {
+    if let Some(window) = app.get_window(constants::STATS_WIN_NAME) {
         let _ = window.show();
         let _ = window.set_focus();
         return window;
     }
 
-    WindowBuilder::new(app, "settings", WindowUrl::App("/stats".into()))
-        .title("Status")
-        .build()
-        .unwrap()
+    WindowBuilder::new(
+        app,
+        constants::STATS_WIN_NAME,
+        WindowUrl::App("/stats".into()),
+    )
+    .title("Status")
+    .build()
+    .unwrap()
 }
 
 pub fn show_lens_manager_window(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window("settings") {
+    if let Some(window) = app.get_window(constants::LENS_MANAGER_WIN_NAME) {
         let _ = window.show();
         let _ = window.set_focus();
         return window;
     }
 
-    WindowBuilder::new(app, "settings", WindowUrl::App("/settings/lens".into()))
-        .title("Lens Manager")
-        .build()
-        .unwrap()
+    WindowBuilder::new(
+        app,
+        constants::LENS_MANAGER_WIN_NAME,
+        WindowUrl::App("/settings/lens".into()),
+    )
+    .title("Lens Manager")
+    .build()
+    .unwrap()
 }
