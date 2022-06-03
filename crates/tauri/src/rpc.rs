@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use jsonrpc_core_client::{transports::ipc, TypedClient};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use shared::rpc::gen_ipc_path;
 use tauri::api::process::{Command, CommandEvent};
 use tokio::sync::Mutex;
@@ -60,6 +62,21 @@ impl RpcClient {
         RpcClient {
             client,
             endpoint: endpoint.clone(),
+        }
+    }
+
+    pub async fn call<T: Serialize, R: DeserializeOwned + Default>(
+        &mut self,
+        method: &str,
+        args: T,
+    ) -> R {
+        match self.client.call_method::<T, R>(method, "", args).await {
+            Ok(resp) => resp,
+            Err(err) => {
+                log::error!("Error sending RPC: {}", err);
+                self.reconnect().await;
+                R::default()
+            }
         }
     }
 

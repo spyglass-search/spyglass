@@ -4376,6 +4376,7 @@ dependencies = [
  "num-format",
  "open",
  "reqwest",
+ "ron",
  "serde",
  "serde_json",
  "shared",
@@ -4387,6 +4388,7 @@ dependencies = [
  "tracing-appender",
  "tracing-log",
  "tracing-subscriber",
+ "url 2.2.2",
 ]
 
 [[package]]

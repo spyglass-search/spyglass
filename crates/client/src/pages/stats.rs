@@ -2,10 +2,14 @@ use num_format::{Buffer, Locale};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
+use crate::components::icons;
 use crate::crawl_stats;
 use shared::response::{CrawlStats, QueueStatus};
 
-fn fetch_crawl_stats(stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>) {
+fn fetch_crawl_stats(
+    stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>,
+    request_finished: UseStateHandle<bool>,
+) {
     spawn_local(async move {
         match crawl_stats().await {
             Ok(results) => {
@@ -13,8 +17,12 @@ fn fetch_crawl_stats(stats_handle: UseStateHandle<Vec<(String, QueueStatus)>>) {
                 let mut sorted = results.by_domain;
                 sorted.sort_by(|(_, a), (_, b)| b.num_completed.cmp(&a.num_completed));
                 stats_handle.set(sorted);
+                request_finished.set(true);
             }
-            Err(e) => log::info!("Error: {:?}", e),
+            Err(e) => {
+                log::info!("Error: {:?}", e);
+                request_finished.set(true);
+            }
         }
     });
 }
@@ -39,7 +47,7 @@ pub fn legend_icon(props: &LegendIconProps) -> Html {
     ];
 
     html! {
-        <div class={"flex flex-row items-center pb-2 text-xs mr-8"}>
+        <div class="flex flex-row items-center pb-2 text-xs mr-8">
             <div class={legend_styles}></div>
             {props.label.clone()}
         </div>
@@ -82,7 +90,7 @@ fn stats_bar(props: &StatsBarProps) -> Html {
 
     html! {
         <div class={bar_style} style={format!("width: {}%", percent)}>
-            <span class={"text-xs"}>{buf.as_str()}</span>
+            <span class="text-xs">{buf.as_str()}</span>
         </div>
     }
 }
@@ -90,15 +98,19 @@ fn stats_bar(props: &StatsBarProps) -> Html {
 #[function_component(StatsPage)]
 pub fn stats_page() -> Html {
     let stats: UseStateHandle<Vec<(String, QueueStatus)>> = use_state_eq(Vec::new);
-    if stats.is_empty() {
-        fetch_crawl_stats(stats.clone());
+    let request_finished = use_state(|| false);
+
+    if stats.is_empty() && !(*request_finished) {
+        fetch_crawl_stats(stats.clone(), request_finished.clone());
     }
 
     let onclick = {
+        let request_finished = request_finished.clone();
         let stats = stats.clone();
         move |_| {
+            request_finished.set(false);
             stats.set(Vec::new());
-            fetch_crawl_stats(stats.clone());
+            fetch_crawl_stats(stats.clone(), request_finished.clone());
         }
     };
 
@@ -107,11 +119,11 @@ pub fn stats_page() -> Html {
         .map(|(domain, stats)| {
             let total = stats.total() as f64;
             html! {
-                <div class={"p-4 px-8"}>
-                    <div class={"text-xs pb-1"}>
+                <div class="p-4 px-8">
+                    <div class="text-xs pb-1">
                         {domain}
                     </div>
-                    <div class={"relative flex flex-row items-center flex-growgroup w-full"}>
+                    <div class="relative flex flex-row items-center flex-growgroup w-full">
                         <StatsBar count={stats.num_queued} total={total} color={"bg-neutral-600"} is_start={true} />
                         <StatsBar count={stats.num_processing} total={total} color={"bg-sky-600"} />
                         <StatsBar count={stats.num_completed} total={total} color={"bg-lime-600"} />
@@ -122,31 +134,35 @@ pub fn stats_page() -> Html {
         })
         .collect::<Html>();
 
-    if stats.is_empty() {
+    if stats.is_empty() && !(*request_finished) {
         rendered = html! {
             <div class="flex justify-center">
                 <div class="p-16">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="animate-spin h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                </div>
+            </div>
+        }
+    } else if stats.is_empty() && *request_finished {
+        rendered = html! {
+            <div class="flex justify-center">
+                <div class="block p-16 text-center">
+                    <icons::EmojiSadIcon height={"h-16"} width={"w-16"} />
                 </div>
             </div>
         }
     }
 
     html! {
-        <div class={"text-white"}>
+        <div class="text-white">
             <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-40 h-24">
                 <div class="flex flex-row items-center">
-                    <h1 class={"text-2xl grow p-0"}>
+                    <h1 class="text-2xl grow p-0">
                         {"Crawl Status"}
                     </h1>
                     <button
                         {onclick}
                         class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <icons::RefreshIcon height={"h-4"} width={"w-4"} />
                     </button>
                 </div>
                 <div class="py-2">
@@ -158,7 +174,7 @@ pub fn stats_page() -> Html {
                     </div>
                 </div>
             </div>
-            <div class={"divide-y divide-neutral-600"}>
+            <div class="divide-y divide-neutral-600">
                 {rendered}
             </div>
         </div>

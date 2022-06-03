@@ -1,8 +1,11 @@
-use shared::response::{LensResult, SearchResult};
+pub mod btn;
+pub mod icons;
+pub mod lens;
+
 use yew::prelude::*;
 
-pub mod btn;
 use btn::DeleteButton;
+use shared::response::{LensResult, SearchResult};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {
@@ -62,8 +65,8 @@ pub fn selected_lens_list(props: &SelectLensProps) -> Html {
         .iter()
         .map(|lens_name: &String| {
             html! {
-                <li class={"flex bg-cyan-700 rounded-lg my-3 ml-3"}>
-                    <span class={"text-4xl text-white p-3"}>{lens_name}</span>
+                <li class="flex bg-cyan-700 rounded-lg my-3 ml-3">
+                    <span class="text-4xl text-white p-3">{lens_name}</span>
                 </li>
             }
         })
@@ -117,14 +120,14 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     .trim_start_matches(&domain);
 
                 html! {
-                    <div class={"text-xs truncate"}>
-                        <a href={url.clone()} target={"_blank"}>
+                    <div class="text-xs truncate">
+                        <a href={url.clone()} target="_blank">
                             <img
                                 class="w-3 inline align-middle"
                                 src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
                             />
-                            <span class={"align-middle text-cyan-400"}>{format!(" {}", domain.clone())}</span>
-                            <span class={"align-middle"}>{format!(" → {}", path)}</span>
+                            <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span>
+                            <span class="align-middle">{format!(" → {}", path)}</span>
                         </a>
                     </div>
                 }
@@ -138,10 +141,10 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                         <DeleteButton doc_id={result.id.clone()} />
                     </div>
                     {url_link}
-                    <h2 class={"text-lg truncate py-1"}>
+                    <h2 class="text-lg truncate py-1">
                         {result.title.clone()}
                     </h2>
-                    <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>
+                    <div class="text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis">
                         {result.description.clone()}
                     </div>
                 </div>
@@ -150,10 +153,10 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         ResultListType::LensSearch => {
             html! {
                 <div class={component_styles}>
-                    <h2 class={"text-2xl truncate py-1"}>
+                    <h2 class="text-2xl truncate py-1">
                         {result.title.clone()}
                     </h2>
-                    <div class={"text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis"}>
+                    <div class="text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis">
                         {result.description.clone()}
                     </div>
                 </div>
