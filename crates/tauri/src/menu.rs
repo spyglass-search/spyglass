@@ -48,7 +48,7 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(
             OPEN_LENS_MANAGER.to_string(),
-            "Lens Manager",
+            "Manage/install lenses",
         ))
         .add_item(open_settings_folder)
         .add_item(open_logs_folder);
