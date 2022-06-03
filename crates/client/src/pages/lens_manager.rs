@@ -1,11 +1,11 @@
-use std::collections::HashSet;
 use shared::response::LensResult;
+use std::collections::HashSet;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
 use crate::components::icons;
-use crate::{installable_lenses, installed_lenses};
+use crate::{list_installable_lenses, list_installed_lenses};
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -17,7 +17,7 @@ pub struct LensProps {
 
 fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>) {
     spawn_local(async move {
-        match installed_lenses().await {
+        match list_installed_lenses().await {
             Ok(results) => {
                 lenses_handle.set(results.into_serde().unwrap());
             }
@@ -30,7 +30,7 @@ fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>) {
 
 fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
     spawn_local(async move {
-        match installable_lenses().await {
+        match list_installable_lenses().await {
             Ok(results) => {
                 let lenses: Vec<InstallableLens> = results.into_serde().unwrap();
                 let parsed: Vec<LensResult> = lenses
@@ -39,6 +39,8 @@ fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
                         author: lens.author.to_owned(),
                         title: lens.name.to_owned(),
                         description: lens.description.to_owned(),
+                        html_url: Some(lens.html_url.to_owned()),
+                        download_url: Some(lens.download_url.to_owned()),
                     })
                     .collect();
 
@@ -51,6 +53,42 @@ fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
     });
 }
 
+#[derive(Properties, PartialEq)]
+pub struct InstallBtnProps {
+    pub download_url: String,
+}
+
+#[function_component(InstallButton)]
+pub fn install_btn(props: &InstallBtnProps) -> Html {
+    let is_installing = use_state_eq(|| false);
+
+    let onclick = {
+        let is_installing = is_installing.clone();
+        move |_| {
+            is_installing.set(true);
+            // Download to lens directory
+        }
+    };
+
+    if *is_installing {
+        html! {
+            <div class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white">
+                <icons::RefreshIcon animate_spin={true} />
+                <div class="ml-2">{"Installing"}</div>
+            </div>
+        }
+    } else {
+        html! {
+            <button
+                {onclick}
+                class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white">
+                <icons::DocumentDownloadIcon />
+                <div class="ml-2">{"Install"}</div>
+            </button>
+        }
+    }
+}
+
 #[function_component(Lens)]
 pub fn lens_component(props: &LensProps) -> Html {
     let component_styles: Vec<String> = vec![
@@ -61,24 +99,30 @@ pub fn lens_component(props: &LensProps) -> Html {
         "text-white".into(),
         "bg-netural-800".into(),
     ];
+    let result = &props.result;
 
     let installed_el = if props.is_installed {
         html! {
-            <a class="flex flex-row text-green-400 text-sm">
+            <div class="flex flex-row text-green-400 text-sm">
                 <icons::BadgeCheckIcon />
                 <div class="ml-2">{"Installed"}</div>
+            </div>
+        }
+    } else {
+        html! { <InstallButton download_url={result.download_url.clone().unwrap()} /> }
+    };
+
+    let view_link = if result.html_url.is_some() {
+        html! {
+            <a href={result.html_url.clone()} target="_blank" class="flex flex-row text-neutral-400 text-sm cursor-pointer hover:text-white">
+                <icons::EyeIcon />
+                <div class="ml-2">{"View Source"}</div>
             </a>
         }
     } else {
-        html! {
-            <a class="flex flex-row text-cyan-400 text-sm">
-                <icons::DocumentDownloadIcon />
-                <div class="ml-2">{"Install"}</div>
-            </a>
-        }
+        html! {}
     };
 
-    let result = &props.result;
     html! {
         <div class={component_styles}>
             <h2 class="text-xl truncate p-0">
@@ -95,10 +139,7 @@ pub fn lens_component(props: &LensProps) -> Html {
             </div>
             <div class="pt-2 flex flex-row gap-8">
                 {installed_el}
-                <a class="flex flex-row text-neutral-400 text-sm">
-                    <icons::EyeIcon />
-                    <div class="ml-2">{"View Source"}</div>
-                </a>
+                {view_link}
             </div>
         </div>
     }
@@ -129,12 +170,15 @@ pub fn lens_manager_page() -> Html {
         }
     };
 
-    let already_installed: HashSet<String> = user_installed.iter().map(|x| x.title.clone()).collect();
-    installable.set(installable
-        .iter()
-        .filter(|x| !already_installed.contains(&x.title))
-        .map(|x| x.to_owned())
-        .collect::<Vec<LensResult>>());
+    let already_installed: HashSet<String> =
+        user_installed.iter().map(|x| x.title.clone()).collect();
+    installable.set(
+        installable
+            .iter()
+            .filter(|x| !already_installed.contains(&x.title))
+            .map(|x| x.to_owned())
+            .collect::<Vec<LensResult>>(),
+    );
 
     html! {
         <div class="text-white">

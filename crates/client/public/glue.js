@@ -29,12 +29,12 @@ export async function deleteDoc(id) {
     return await invoke("delete_doc", { id });
 }
 
-export async function installedLenses() {
-    return await invoke("installed_lenses");
+export async function listInstalledLenses() {
+    return await invoke("list_installed_lenses");
 }
 
-export async function installableLenses() {
-    return await invoke("installable_lenses");
+export async function listInstallableLenses() {
+    return await invoke("list_installable_lenses");
 }
 
 export async function searchDocs(lenses, query) {

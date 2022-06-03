@@ -54,18 +54,18 @@ pub async fn crawl_stats<'r>(
 }
 
 #[tauri::command]
-pub async fn installed_lenses(
+pub async fn list_installed_lenses(
     _: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
 ) -> Result<Vec<response::LensResult>, String> {
     let mut rpc = rpc.lock().await;
     Ok(rpc
-        .call::<Value, Vec<response::LensResult>>("installed_lenses", Value::Null)
+        .call::<Value, Vec<response::LensResult>>("list_installed_lenses", Value::Null)
         .await)
 }
 
 #[tauri::command]
-pub async fn installable_lenses(
+pub async fn list_installable_lenses(
     _: tauri::Window,
 ) -> Result<Vec<response::InstallableLens>, String> {
     let client = reqwest::Client::builder()

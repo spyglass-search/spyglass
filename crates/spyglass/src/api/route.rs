@@ -19,74 +19,6 @@ use libspyglass::state::AppState;
 
 use super::response;
 
-#[instrument(skip(state))]
-pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
-    let fields = Searcher::doc_fields();
-
-    let index = state.index;
-    let searcher = index.reader.searcher();
-
-    // Create a copy of the lenses for this search
-    let mut lenses = HashMap::new();
-    for entry in state.lenses.iter() {
-        lenses.insert(entry.key().clone(), entry.value().clone());
-    }
-
-    let docs = Searcher::search_with_lens(
-        &lenses,
-        &index.index,
-        &index.reader,
-        &search_req.lenses,
-        &search_req.query,
-    );
-
-    let mut results: Vec<SearchResult> = Vec::new();
-    for (score, doc_addr) in docs {
-        let retrieved = searcher.doc(doc_addr).unwrap();
-
-        let doc_id = retrieved.get_first(fields.id).unwrap();
-        let domain = retrieved.get_first(fields.domain).unwrap();
-        let title = retrieved.get_first(fields.title).unwrap();
-        let description = retrieved.get_first(fields.description).unwrap();
-        let url = retrieved.get_first(fields.url).unwrap();
-
-        let result = SearchResult {
-            doc_id: doc_id.as_text().unwrap().to_string(),
-            domain: domain.as_text().unwrap().to_string(),
-            title: title.as_text().unwrap().to_string(),
-            description: description.as_text().unwrap().to_string(),
-            url: url.as_text().unwrap().to_string(),
-            score,
-        };
-
-        results.push(result);
-    }
-
-    let meta = SearchMeta {
-        query: search_req.query,
-        num_docs: searcher.num_docs(),
-        wall_time_ms: 1000,
-    };
-
-    Ok(SearchResults { results, meta })
-}
-
-/// Show the list of URLs in the queue and their status
-#[instrument(skip(state))]
-pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
-    let db = &state.db;
-    let queue = crawl_queue::Entity::find().all(db).await;
-
-    match queue {
-        Ok(queue) => Ok(response::ListQueue { queue }),
-        Err(err) => Err(Error {
-            code: ErrorCode::InternalError,
-            message: err.to_string(),
-            data: None,
-        }),
-    }
-}
-
 /// Add url to queue
 #[instrument(skip(state))]
 pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> Result<String> {
@@ -176,6 +108,55 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
     Ok(CrawlStats { by_domain })
 }
 
+/// Remove a doc from the index
+#[instrument(skip(state))]
+pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
+    if let Ok(mut writer) = state.index.writer.lock() {
+        if let Err(e) = Searcher::delete(&mut writer, &id) {
+            log::error!("Unable to delete doc {} due to {}", id, e);
+        } else {
+            let _ = writer.commit();
+        }
+    }
+
+    Ok(())
+}
+
+/// List of installed lenses
+#[instrument(skip(state))]
+pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
+    let mut lenses: Vec<LensResult> = state
+        .lenses
+        .iter()
+        .map(|lens| LensResult {
+            author: lens.author.clone(),
+            title: lens.name.clone(),
+            description: lens.description.clone().unwrap_or_else(|| "".into()),
+            ..Default::default()
+        })
+        .collect();
+
+    lenses.sort_by(|x, y| x.title.cmp(&y.title));
+
+    Ok(lenses)
+}
+
+/// Show the list of URLs in the queue and their status
+#[instrument(skip(state))]
+pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
+    let db = &state.db;
+    let queue = crawl_queue::Entity::find().all(db).await;
+
+    match queue {
+        Ok(queue) => Ok(response::ListQueue { queue }),
+        Err(err) => Err(Error {
+            code: ErrorCode::InternalError,
+            message: err.to_string(),
+            data: None,
+        }),
+    }
+}
+
 #[instrument(skip(state))]
 pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     // Scope so that the app_state mutex is correctly released.
@@ -191,6 +172,60 @@ pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     _get_current_status(state.clone()).await
 }
 
+/// Search the user's indexed documents
+#[instrument(skip(state))]
+pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
+    let fields = Searcher::doc_fields();
+
+    let index = state.index;
+    let searcher = index.reader.searcher();
+
+    // Create a copy of the lenses for this search
+    let mut lenses = HashMap::new();
+    for entry in state.lenses.iter() {
+        lenses.insert(entry.key().clone(), entry.value().clone());
+    }
+
+    let docs = Searcher::search_with_lens(
+        &lenses,
+        &index.index,
+        &index.reader,
+        &search_req.lenses,
+        &search_req.query,
+    );
+
+    let mut results: Vec<SearchResult> = Vec::new();
+    for (score, doc_addr) in docs {
+        let retrieved = searcher.doc(doc_addr).unwrap();
+
+        let doc_id = retrieved.get_first(fields.id).unwrap();
+        let domain = retrieved.get_first(fields.domain).unwrap();
+        let title = retrieved.get_first(fields.title).unwrap();
+        let description = retrieved.get_first(fields.description).unwrap();
+        let url = retrieved.get_first(fields.url).unwrap();
+
+        let result = SearchResult {
+            doc_id: doc_id.as_text().unwrap().to_string(),
+            domain: domain.as_text().unwrap().to_string(),
+            title: title.as_text().unwrap().to_string(),
+            description: description.as_text().unwrap().to_string(),
+            url: url.as_text().unwrap().to_string(),
+            score,
+        };
+
+        results.push(result);
+    }
+
+    let meta = SearchMeta {
+        query: search_req.query,
+        num_docs: searcher.num_docs(),
+        wall_time_ms: 1000,
+    };
+
+    Ok(SearchResults { results, meta })
+}
+
+/// Search the user's installed lenses
 #[instrument(skip(state))]
 pub async fn search_lenses(
     state: AppState,
@@ -215,35 +250,9 @@ pub async fn search_lenses(
             author: lens.author,
             title: lens.name,
             description: lens.description.unwrap_or_else(|| "".to_string()),
+            ..Default::default()
         });
     }
 
     Ok(SearchLensesResp { results })
-}
-
-#[instrument(skip(state))]
-pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
-    if let Ok(mut writer) = state.index.writer.lock() {
-        if let Err(e) = Searcher::delete(&mut writer, &id) {
-            log::error!("Unable to delete doc {} due to {}", id, e);
-        } else {
-            let _ = writer.commit();
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
-    let lenses: Vec<LensResult> = state
-        .lenses
-        .iter()
-        .map(|lens| LensResult {
-            author: lens.author.clone(),
-            title: lens.name.clone(),
-            description: lens.description.clone().unwrap_or_else(|| "".into()),
-        })
-        .collect();
-
-    Ok(lenses)
 }

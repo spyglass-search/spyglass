@@ -28,8 +28,8 @@ pub trait Rpc {
     #[rpc(name = "delete_doc")]
     fn delete_doc(&self, id: String) -> BoxFuture<Result<()>>;
 
-    #[rpc(name = "installed_lenses")]
-    fn installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
+    #[rpc(name = "list_installed_lenses")]
+    fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
 
     #[rpc(name = "search_docs")]
     fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>>;

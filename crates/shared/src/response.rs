@@ -35,11 +35,14 @@ pub struct InstallableLens {
     pub html_url: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct LensResult {
     pub author: String,
     pub title: String,
     pub description: String,
+    // Only relevant for installable lenses
+    pub html_url: Option<String>,
+    pub download_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
