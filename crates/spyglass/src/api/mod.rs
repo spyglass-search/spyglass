@@ -6,7 +6,7 @@ use jsonrpc_ipc_server::{Server, ServerBuilder};
 use libspyglass::state::AppState;
 
 use shared::request::{SearchLensesParam, SearchParam};
-use shared::response::{AppStatus, CrawlStats, SearchLensesResp, SearchResults};
+use shared::response::{AppStatus, CrawlStats, LensResult, SearchLensesResp, SearchResults};
 use shared::rpc::{gen_ipc_path, Rpc};
 
 mod response;
@@ -33,8 +33,8 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::delete_doc(self.state.clone(), id))
     }
 
-    fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
-        Box::pin(route::toggle_pause(self.state.clone()))
+    fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>> {
+        Box::pin(route::list_installed_lenses(self.state.clone()))
     }
 
     fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>> {
@@ -43,6 +43,10 @@ impl Rpc for SpyglassRPC {
 
     fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>> {
         Box::pin(route::search_lenses(self.state.clone(), query))
+    }
+
+    fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
+        Box::pin(route::toggle_pause(self.state.clone()))
     }
 }
 

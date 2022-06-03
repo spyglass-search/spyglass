@@ -21,12 +21,28 @@ export async function onRefreshResults(callback) {
     await listen('refresh_results', callback);
 }
 
+export async function on_refresh_lens_manager(callback) {
+    await listen('refresh_lens_manager', callback);
+}
+
 export async function crawlStats() {
     return await invoke("crawl_stats");
 }
 
 export async function deleteDoc(id) {
     return await invoke("delete_doc", { id });
+}
+
+export async function install_lens(downloadUrl) {
+    return await invoke("install_lens", { downloadUrl })
+}
+
+export async function listInstalledLenses() {
+    return await invoke("list_installed_lenses");
+}
+
+export async function listInstallableLenses() {
+    return await invoke("list_installable_lenses");
 }
 
 export async function searchDocs(lenses, query) {
@@ -39,6 +55,10 @@ export async function searchLenses(query) {
 
 export async function openResult(url) {
     return await invoke("open_result", { url });
+}
+
+export async function openLensFolder() {
+    return await invoke("open_lens_folder");
 }
 
 export async function resizeWindow(height) {

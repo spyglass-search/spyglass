@@ -7,12 +7,21 @@ mod constants;
 mod events;
 mod pages;
 
-use crate::pages::{SearchPage, StatsPage};
+use crate::pages::{LensManagerPage, SearchPage, StatsPage};
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
     #[wasm_bindgen(js_name = "deleteDoc", catch)]
     pub async fn delete_doc(id: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = "listInstalledLenses", catch)]
+    pub async fn list_installed_lenses() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_name = "listInstallableLenses", catch)]
+    pub async fn list_installable_lenses() -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
@@ -29,8 +38,14 @@ extern "C" {
     #[wasm_bindgen(js_name = "onRefreshResults")]
     pub async fn on_refresh_results(callback: &Closure<dyn Fn()>);
 
+    #[wasm_bindgen]
+    pub async fn on_refresh_lens_manager(callback: &Closure<dyn Fn()>);
+
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(js_name = "openLensFolder", catch)]
+    pub async fn open_lens_folder() -> Result<(), JsValue>;
 
     #[wasm_bindgen(js_name = "escape", catch)]
     pub async fn escape() -> Result<(), JsValue>;
@@ -46,6 +61,8 @@ extern "C" {
 enum Route {
     #[at("/")]
     Search,
+    #[at("/settings/lens")]
+    LensManager,
     #[at("/stats")]
     Status,
 }
@@ -66,6 +83,7 @@ pub fn app() -> Html {
 
 fn switch(routes: &Route) -> Html {
     match routes {
+        Route::LensManager => html! { <LensManagerPage /> },
         Route::Search => html! { <SearchPage /> },
         Route::Status => html! { <StatsPage /> },
     }

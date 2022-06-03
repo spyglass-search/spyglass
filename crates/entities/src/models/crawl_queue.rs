@@ -152,7 +152,7 @@ struct CrawlQueueCount {
     count: i64,
 }
 
-#[derive(FromQueryResult)]
+#[derive(Debug, FromQueryResult)]
 pub struct QueueCountByStatus {
     pub count: i64,
     pub domain: String,

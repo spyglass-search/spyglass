@@ -46,7 +46,7 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
-#[derive(FromQueryResult)]
+#[derive(Debug, FromQueryResult)]
 pub struct CountByDomain {
     pub count: i64,
     pub domain: String,

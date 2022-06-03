@@ -7,7 +7,7 @@ pub const QUIT_MENU_ITEM: &str = "quit";
 pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
 pub const CRAWL_STATUS_MENU_ITEM: &str = "crawl_status";
 
-pub const OPEN_LENSES_FOLDER: &str = "open_lenses_folder";
+pub const OPEN_LENS_MANAGER: &str = "open_lens_manager";
 pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
 pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
 pub const SHOW_SEARCHBAR: &str = "show_searchbar";
@@ -25,12 +25,10 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     let pause = CustomMenuItem::new(CRAWL_STATUS_MENU_ITEM.to_string(), "");
     let quit = CustomMenuItem::new(QUIT_MENU_ITEM.to_string(), "Quit");
 
-    let open_lenses_folder =
-        CustomMenuItem::new(OPEN_LENSES_FOLDER.to_string(), "Show lenses folder");
     let open_settings_folder =
-        CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Show settings folder");
+        CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Open settings folder");
 
-    let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Show logs folder");
+    let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
 
     let app_version = format!("v20{}", ctx.package_info().version);
     let mut tray = SystemTrayMenu::new();
@@ -47,8 +45,11 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
             SHOW_CRAWL_STATUS.to_string(),
             "Show crawl status",
         ))
+        .add_item(CustomMenuItem::new(
+            OPEN_LENS_MANAGER.to_string(),
+            "Manage/install lenses",
+        ))
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(open_lenses_folder)
         .add_item(open_settings_folder)
         .add_item(open_logs_folder);
 
@@ -56,7 +57,7 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
     if cfg!(debug_assertions) {
         tray = tray
             .add_native_item(SystemTrayMenuItem::Separator)
-            .add_item(CustomMenuItem::new(DEV_SHOW_CONSOLE, "Show console"));
+            .add_item(CustomMenuItem::new(DEV_SHOW_CONSOLE, "Open dev console"));
     }
 
     tray.add_native_item(SystemTrayMenuItem::Separator)
