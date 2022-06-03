@@ -1,5 +1,8 @@
+use std::fs;
+
 use jsonrpc_core::Value;
 use tauri::State;
+use url::Url;
 
 use crate::{constants, open_folder, rpc, window};
 use shared::{
@@ -150,4 +153,46 @@ pub async fn delete_doc<'r>(
             Ok(())
         }
     }
+}
+
+/// Install a lens (assumes correct format) from a URL
+#[tauri::command]
+pub async fn install_lens<'r>(
+    window: tauri::Window,
+    config: State<'_, Config>,
+    download_url: &str,
+) -> Result<(), String> {
+    log::trace!("installing lens from <{}>", download_url);
+
+    let client = reqwest::Client::builder()
+        .user_agent(constants::APP_USER_AGENT)
+        .build()
+        .expect("Unable to create reqwest client");
+
+    if let Ok(resp) = client.get(download_url).send().await {
+        if let Ok(file_contents) = resp.text().await {
+            // Grab the file name from the end of the URL
+            let url = Url::parse(download_url).unwrap();
+            let mut segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
+            let file_name = segments.pop().unwrap();
+            // Create path from file name + lens directory
+            let lens_path = config.lenses_dir().join(file_name);
+            log::info!("installing lens to {:?}", lens_path);
+
+            if let Err(e) = fs::write(lens_path.clone(), file_contents) {
+                log::error!(
+                    "Unable to install lens {} to {:?} due to error: {}",
+                    download_url,
+                    lens_path,
+                    e
+                );
+            } else {
+                // Sleep for a second to let the app reload the lenses and then let the client know we're done.
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                let _ = window.emit("refresh_lens_manager", true);
+            }
+        }
+    }
+
+    Ok(())
 }

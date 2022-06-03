@@ -538,6 +538,10 @@ Ensure the default browser behavior of the `hidden` attribute.
   display: flex;
 }
 
+.contents {
+  display: contents;
+}
+
 .hidden {
   display: none;
 }

@@ -1,11 +1,12 @@
 use shared::response::LensResult;
 use std::collections::HashSet;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
 use crate::components::icons;
-use crate::{list_installable_lenses, list_installed_lenses};
+use crate::{install_lens, list_installable_lenses, list_installed_lenses, on_refresh_lens_manager};
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -15,20 +16,36 @@ pub struct LensProps {
     pub is_installed: bool,
 }
 
-fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>) {
+#[derive(PartialEq)]
+enum RequestState {
+    NotStarted,
+    InProgress,
+    Finished,
+    Error,
+}
+
+impl RequestState {
+    pub fn is_done(&self) -> bool {
+        *self == Self::Finished || *self == Self::Error
+    }
+}
+
+fn fetch_installed_lenses(lenses_handle: UseStateHandle<Vec<LensResult>>, req_state: UseStateHandle<RequestState>) {
     spawn_local(async move {
         match list_installed_lenses().await {
             Ok(results) => {
                 lenses_handle.set(results.into_serde().unwrap());
+                req_state.set(RequestState::Finished);
             }
             Err(e) => {
                 log::info!("Error: {:?}", e);
+                req_state.set(RequestState::Error);
             }
         }
     });
 }
 
-fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
+fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>, req_state: UseStateHandle<RequestState>) {
     spawn_local(async move {
         match list_installable_lenses().await {
             Ok(results) => {
@@ -45,10 +62,20 @@ fn fetch_installable_lenses(data_handle: UseStateHandle<Vec<LensResult>>) {
                     .collect();
 
                 data_handle.set(parsed);
+                req_state.set(RequestState::Finished);
             }
             Err(e) => {
                 log::info!("Error: {:?}", e);
+                req_state.set(RequestState::Error);
             }
+        }
+    });
+}
+
+fn handle_install_lens(download_url: String) {
+    spawn_local(async move {
+        if let Err(e) = install_lens(download_url.clone()).await {
+            log::error!("error installing lens: {} {:?}", download_url.clone(), e);
         }
     });
 }
@@ -61,12 +88,14 @@ pub struct InstallBtnProps {
 #[function_component(InstallButton)]
 pub fn install_btn(props: &InstallBtnProps) -> Html {
     let is_installing = use_state_eq(|| false);
+    let download_url = props.download_url.clone();
 
     let onclick = {
         let is_installing = is_installing.clone();
         move |_| {
             is_installing.set(true);
             // Download to lens directory
+            handle_install_lens(download_url.clone());
         }
     };
 
@@ -150,16 +179,16 @@ pub fn lens_manager_page() -> Html {
     let user_installed: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
     let installable: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
 
-    let ui_req_finished = use_state(|| false);
-    if user_installed.is_empty() && !(*ui_req_finished) {
-        ui_req_finished.set(true);
-        fetch_installed_lenses(user_installed.clone());
+    let ui_req_state = use_state_eq(|| RequestState::NotStarted);
+    if *ui_req_state == RequestState::NotStarted {
+        ui_req_state.set(RequestState::InProgress);
+        fetch_installed_lenses(user_installed.clone(), ui_req_state.clone());
     }
 
-    let i_req_finished = use_state(|| false);
-    if installable.is_empty() && !(*i_req_finished) {
-        i_req_finished.set(true);
-        fetch_installable_lenses(installable.clone());
+    let i_req_state = use_state_eq(|| RequestState::NotStarted);
+    if *i_req_state == RequestState::NotStarted {
+        i_req_state.set(RequestState::InProgress);
+        fetch_installable_lenses(installable.clone(), i_req_state.clone());
     }
 
     let on_open_folder = {
@@ -167,6 +196,15 @@ pub fn lens_manager_page() -> Html {
             spawn_local(async {
                 let _ = crate::open_lens_folder().await;
             });
+        }
+    };
+
+    let on_refresh = {
+        let ui_req_state = ui_req_state.clone();
+        let i_req_state = i_req_state.clone();
+        move |_| {
+            ui_req_state.set(RequestState::NotStarted);
+            i_req_state.set(RequestState::NotStarted);
         }
     };
 
@@ -180,6 +218,46 @@ pub fn lens_manager_page() -> Html {
             .collect::<Vec<LensResult>>(),
     );
 
+    // Handle refreshing the list
+    {
+        let ui_req_state = ui_req_state.clone();
+        let i_req_state = i_req_state.clone();
+        spawn_local(async move {
+            let cb = Closure::wrap(Box::new(move || {
+                ui_req_state.set(RequestState::NotStarted);
+                i_req_state.set(RequestState::NotStarted);
+            }) as Box<dyn Fn()>);
+
+            on_refresh_lens_manager(&cb).await;
+            cb.forget();
+        });
+    }
+
+    let contents = if ui_req_state.is_done() && i_req_state.is_done() {
+        html!{
+            <>
+            {
+                user_installed.iter().map(|data| {
+                    html! {<Lens result={data.clone()} is_installed={true} /> }
+                }).collect::<Html>()
+            }
+            {
+                installable.iter().map(|data| {
+                    html! {<Lens result={data.clone()} is_installed={false} /> }
+                }).collect::<Html>()
+            }
+            </>
+        }
+    } else {
+        html! {
+            <div class="flex justify-center">
+                <div class="p-16">
+                    <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                </div>
+            </div>
+        }
+    };
+
     html! {
         <div class="text-white">
             <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-400 h-20">
@@ -192,22 +270,14 @@ pub fn lens_manager_page() -> Html {
                         <div class="ml-2">{"Lens folder"}</div>
                     </button>
                     <button
+                        onclick={on_refresh}
                         class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
                         <icons::RefreshIcon />
                     </button>
                 </div>
             </div>
             <div class="px-8">
-                {
-                    user_installed.iter().map(|data| {
-                        html! {<Lens result={data.clone()} is_installed={true} /> }
-                    }).collect::<Html>()
-                }
-                {
-                    installable.iter().map(|data| {
-                        html! {<Lens result={data.clone()} is_installed={false} /> }
-                    }).collect::<Html>()
-                }
+                {contents}
             </div>
         </div>
     }

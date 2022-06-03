@@ -4388,6 +4388,7 @@ dependencies = [
  "tracing-appender",
  "tracing-log",
  "tracing-subscriber",
+ "url 2.2.2",
 ]
 
 [[package]]

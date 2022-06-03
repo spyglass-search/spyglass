@@ -14,6 +14,9 @@ extern "C" {
     #[wasm_bindgen(js_name = "deleteDoc", catch)]
     pub async fn delete_doc(id: String) -> Result<(), JsValue>;
 
+    #[wasm_bindgen(catch)]
+    pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
+
     #[wasm_bindgen(js_name = "listInstalledLenses", catch)]
     pub async fn list_installed_lenses() -> Result<JsValue, JsValue>;
 
@@ -34,6 +37,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "onRefreshResults")]
     pub async fn on_refresh_results(callback: &Closure<dyn Fn()>);
+
+    #[wasm_bindgen]
+    pub async fn on_refresh_lens_manager(callback: &Closure<dyn Fn()>);
 
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;

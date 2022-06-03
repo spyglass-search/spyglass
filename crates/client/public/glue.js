@@ -21,12 +21,20 @@ export async function onRefreshResults(callback) {
     await listen('refresh_results', callback);
 }
 
+export async function on_refresh_lens_manager(callback) {
+    await listen('refresh_lens_manager', callback);
+}
+
 export async function crawlStats() {
     return await invoke("crawl_stats");
 }
 
 export async function deleteDoc(id) {
     return await invoke("delete_doc", { id });
+}
+
+export async function install_lens(downloadUrl) {
+    return await invoke("install_lens", { downloadUrl })
 }
 
 export async function listInstalledLenses() {
