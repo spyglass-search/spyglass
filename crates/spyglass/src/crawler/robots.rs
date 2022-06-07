@@ -163,9 +163,7 @@ pub async fn check_resource_rules(
     }
 
     // Check the content-type of the URL, only crawl HTML pages for now
-    let res = client.head(&url).await;
-
-    match res {
+    match client.head(url).await {
         Err(err) => {
             log::info!("Unable to check content-type: {}", err.to_string());
             return Ok(false);
