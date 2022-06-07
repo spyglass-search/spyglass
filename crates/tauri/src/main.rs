@@ -35,7 +35,7 @@ use window::{show_crawl_stats_window, show_lens_manager_window};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
 
-    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
+    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -160,7 +160,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .on_system_tray_event(|app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
-                let config = app.state::<Config>();
                 let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").unwrap();
 
@@ -184,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     menu::OPEN_LENS_MANAGER => {
                         show_lens_manager_window(app);
                     }
-                    menu::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
+                    menu::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
                     menu::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                     menu::SHOW_CRAWL_STATUS => {
                         show_crawl_stats_window(app);

@@ -94,9 +94,7 @@ pub async fn manager_task(
                 }
             }
             // ignore everything else
-            _ => {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            }
+            _ => {}
         }
     }
 }

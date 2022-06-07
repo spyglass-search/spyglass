@@ -3,7 +3,8 @@ use std::fmt;
 
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
-use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement};
+use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
+use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement, QueryTrait, ConnectionTrait};
 use serde::Serialize;
 use url::Url;
 
@@ -366,15 +367,6 @@ pub async fn enqueue_all(
         })
         .collect();
 
-    // Ignore urls already in queue
-    let is_queued: HashSet<String> = Entity::find()
-        .filter(Column::Url.is_in(urls.clone()))
-        .all(db)
-        .await?
-        .iter()
-        .map(|f| f.url.to_string())
-        .collect();
-
     // Igore urls already indexed
     let is_indexed: HashSet<String> = indexed_document::Entity::find()
         .filter(indexed_document::Column::Url.is_in(urls.clone()))
@@ -386,7 +378,7 @@ pub async fn enqueue_all(
 
     let to_add: Vec<ActiveModel> = urls
         .into_iter()
-        .filter(|url| !is_queued.contains(url) && !is_indexed.contains(url))
+        .filter(|url| !is_indexed.contains(url))
         .map(|url| {
             let parsed = Url::parse(&url).unwrap();
             let domain = parsed.host_str().unwrap();
@@ -404,7 +396,15 @@ pub async fn enqueue_all(
         return Ok(());
     }
 
-    match Entity::insert_many(to_add).exec(db).await {
+    let (sql, values) = Entity::insert_many(to_add)
+        .query()
+        .on_conflict(OnConflict::column(Column::Url).do_nothing().to_owned())
+        .build(SqliteQueryBuilder);
+
+    let values: Vec<Value> = values.iter()
+        .map(|x| x.to_owned())
+        .collect();
+    match db.execute(Statement::from_sql_and_values(DbBackend::Sqlite, &sql, values)).await {
         Ok(_) => {}
         Err(e) => log::error!("insert_many error: {:?}", e),
     }
