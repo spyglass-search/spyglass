@@ -18,6 +18,9 @@ use tokio::time;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
+#[cfg(target_os = "macos")]
+use cocoa::appkit::NSWindow;
+
 use shared::config::Config;
 use shared::response;
 use shared::response::AppStatus;
@@ -67,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
         .setup(move |app| {
-            // hide from dock (also hides menu bar)
+            // macOS: hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -77,6 +80,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let window = app.get_window("main").unwrap();
             let _ = window.set_skip_taskbar(true);
+
+            // macOS: Handle multiple spaces correctly
+            #[cfg(target_os = "macos")]
+            {
+                unsafe {
+                    let ns_window = window.ns_window().unwrap() as cocoa::base::id;
+                    ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
+                }
+            }
 
             // Check the release version against app version
             match tauri::async_runtime::block_on(check_version()) {

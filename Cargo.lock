@@ -4311,6 +4311,7 @@ name = "spyglass-app"
 version = "0.1.3"
 dependencies = [
  "anyhow",
+ "cocoa",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "log",
