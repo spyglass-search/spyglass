@@ -200,8 +200,8 @@ impl Config {
         self.data_dir().join("index")
     }
 
-    pub fn logs_dir(&self) -> PathBuf {
-        self.data_dir().join("logs")
+    pub fn logs_dir() -> PathBuf {
+        Self::default_data_dir().join("logs")
     }
 
     pub fn prefs_dir() -> PathBuf {
@@ -225,7 +225,7 @@ impl Config {
 
         // Gracefully handle issues loading user settings/lenses
         let user_settings = Self::load_user_settings().unwrap_or_else(|err| {
-            log::warn!("Invalid user settings file! Reason: {}", err);
+            log::error!("Invalid user settings file! Reason: {}", err);
             Default::default()
         });
 
@@ -240,7 +240,7 @@ impl Config {
         let index_dir = config.index_dir();
         fs::create_dir_all(&index_dir).expect("Unable to create index folder");
 
-        let logs_dir = config.logs_dir();
+        let logs_dir = Config::logs_dir();
         fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
 
         let lenses_dir = config.lenses_dir();

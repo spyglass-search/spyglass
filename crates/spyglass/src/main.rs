@@ -19,9 +19,7 @@ mod importer;
 use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::new();
-
-    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
+    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -36,6 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
+    let config = Config::new();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-backend")
