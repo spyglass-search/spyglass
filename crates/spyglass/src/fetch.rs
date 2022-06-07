@@ -1,4 +1,5 @@
 use anyhow::Result;
+use http::StatusCode;
 use reqwest::{Client, Error, Response};
 use url::Url;
 
@@ -53,7 +54,18 @@ impl HTTPClient {
         if let Err(e) = &res {
             if e.is_request() {
                 url.set_scheme("http").expect("Unable to set scheme to HTTP");
-                res = self.client.get(url).send().await;
+                res = self.client.get(url.clone()).send().await;
+            }
+        }
+
+        // Handle 429s
+        if let Err(e) = &res {
+            if let Some(status) = e.status() {
+                if status == StatusCode::TOO_MANY_REQUESTS {
+                    // Probably overkill, but if this becomes a problem we can revisit
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    res = self.client.get(url).send().await;
+                }
             }
         }
 
