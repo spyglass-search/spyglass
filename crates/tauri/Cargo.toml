@@ -35,6 +35,9 @@ tracing-log = "0.1.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "std"] }
 url = "2.2"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.24"
+
 [features]
 default = [ "custom-protocol" ]
 custom-protocol = [ "tauri/custom-protocol" ]

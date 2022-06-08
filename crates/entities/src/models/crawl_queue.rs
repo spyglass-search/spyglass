@@ -3,7 +3,8 @@ use std::fmt;
 
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
-use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement};
+use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
+use sea_orm::{sea_query, DbBackend, FromQueryResult, QuerySelect, Set, Statement, QueryTrait, ConnectionTrait};
 use serde::Serialize;
 use url::Url;
 
@@ -367,20 +368,7 @@ pub async fn enqueue_all(
         .collect();
 
     // Ignore urls already in queue
-    let mut is_queued_or_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
-
-    for chunk in urls.chunks(10000) {
-        let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
-        for entry in Entity::find()
-            .filter(Column::Url.is_in(chunk.clone()))
-            .all(db)
-            .await?
-            .iter()
-        {
-            is_queued_or_indexed.insert(entry.url.to_string());
-        }
-    }
-
+    let mut is_ndexed: HashSet<String> = HashSet::with_capacity(urls.len());
     // Igore urls already indexed
     for chunk in urls.chunks(10000) {
         let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
@@ -390,7 +378,7 @@ pub async fn enqueue_all(
             .await?
             .iter()
         {
-            is_queued_or_indexed.insert(entry.url.to_string());
+            is_indexed.insert(entry.url.to_string());
         }
     }
 
@@ -402,7 +390,7 @@ pub async fn enqueue_all(
         .into_iter()
         .filter_map(|url| {
             let mut result = None;
-            if !is_queued_or_indexed.contains(&url) {
+            if !is_indexed.contains(&url) {
                 if let Ok(parsed) = Url::parse(&url) {
                     if let Some(domain) = parsed.host_str() {
                         result = Some(ActiveModel {
@@ -413,6 +401,7 @@ pub async fn enqueue_all(
                         });
                     }
                 }
+
             }
             result
         })
@@ -427,10 +416,18 @@ pub async fn enqueue_all(
             .map(|r| r.to_owned())
             .collect::<Vec<_>>();
 
-        match Entity::insert_many(owned).exec(db).await {
-            Ok(_) => {}
-            Err(e) => log::error!("insert_many error: {:?}", e),
-        }
+    let (sql, values) = Entity::insert_many(owned)
+        .query()
+        .on_conflict(OnConflict::column(Column::Url).do_nothing().to_owned())
+        .build(SqliteQueryBuilder);
+
+    let values: Vec<Value> = values.iter()
+        .map(|x| x.to_owned())
+        .collect();
+    match db.execute(Statement::from_sql_and_values(DbBackend::Sqlite, &sql, values)).await {
+        Ok(_) => {}
+        Err(e) => log::error!("insert_many error: {:?}", e),
+      }
     }
 
     Ok(())
