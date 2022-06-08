@@ -15,7 +15,7 @@ use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, Wildcar
 use shared::config::{Lens, LensRule, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
-const BATCH_SIZE: u32 = 10000;
+const BATCH_SIZE: usize = 10000;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
