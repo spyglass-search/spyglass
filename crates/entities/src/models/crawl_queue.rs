@@ -334,7 +334,7 @@ pub async fn enqueue_all(
     let skip_list = RegexSet::new(skip_list).expect("Unable to create skip list");
 
     // Ignore invalid URLs
-    let urls: Vec<String> = urls
+    let mut urls: Vec<String> = urls
         .iter()
         .filter_map(|url| {
             if let Ok(mut parsed) = Url::parse(url) {
@@ -367,46 +367,71 @@ pub async fn enqueue_all(
         .collect();
 
     // Ignore urls already in queue
-    let is_queued: HashSet<String> = Entity::find()
-        .filter(Column::Url.is_in(urls.clone()))
-        .all(db)
-        .await?
-        .iter()
-        .map(|f| f.url.to_string())
-        .collect();
+    let mut is_queued_or_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
+
+    for chunk in urls.chunks(10000) {
+        let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
+        for entry in Entity::find()
+            .filter(Column::Url.is_in(chunk.clone()))
+            .all(db)
+            .await?
+            .iter()
+        {
+            is_queued_or_indexed.insert(entry.url.to_string());
+        }
+    }
 
     // Igore urls already indexed
-    let is_indexed: HashSet<String> = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.is_in(urls.clone()))
-        .all(db)
-        .await?
-        .iter()
-        .map(|x| x.url.to_string())
-        .collect();
+    for chunk in urls.chunks(10000) {
+        let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
+        for entry in indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.is_in(chunk.clone()))
+            .all(db)
+            .await?
+            .iter()
+        {
+            is_queued_or_indexed.insert(entry.url.to_string());
+        }
+    }
+
+    // urls can contain duplicates which causes index errors
+    urls.sort();
+    urls.dedup();
 
     let to_add: Vec<ActiveModel> = urls
         .into_iter()
-        .filter(|url| !is_queued.contains(url) && !is_indexed.contains(url))
-        .map(|url| {
-            let parsed = Url::parse(&url).unwrap();
-            let domain = parsed.host_str().unwrap();
-
-            ActiveModel {
-                domain: Set(domain.to_string()),
-                crawl_type: Set(overrides.crawl_type.clone()),
-                url: Set(url),
-                ..Default::default()
+        .filter_map(|url| {
+            let mut result = None;
+            if !is_queued_or_indexed.contains(&url) {
+                if let Ok(parsed) = Url::parse(&url) {
+                    if let Some(domain) = parsed.host_str() {
+                        result = Some(ActiveModel {
+                            domain: Set(domain.to_string()),
+                            crawl_type: Set(overrides.crawl_type.clone()),
+                            url: Set(url.to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
             }
+            result
         })
         .collect();
 
     if to_add.is_empty() {
         return Ok(());
     }
+    for to_add in to_add.chunks(1000) {
+        let owned = to_add
+            .clone()
+            .iter()
+            .map(|r| r.to_owned())
+            .collect::<Vec<_>>();
 
-    match Entity::insert_many(to_add).exec(db).await {
-        Ok(_) => {}
-        Err(e) => log::error!("insert_many error: {:?}", e),
+        match Entity::insert_many(owned).exec(db).await {
+            Ok(_) => {}
+            Err(e) => log::error!("insert_many error: {:?}", e),
+        }
     }
 
     Ok(())
@@ -637,7 +662,6 @@ mod test {
 
         let rule = "https://en.wikipedia.com/*action=*";
         let regex = regex_for_robots(rule, WildcardType::Database).unwrap();
-        dbg!(&regex);
         let removed = super::remove_by_rule(&db, &regex).await.unwrap();
         assert_eq!(removed, 2);
     }

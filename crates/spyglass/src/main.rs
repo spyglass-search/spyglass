@@ -1,5 +1,5 @@
 extern crate notify;
-
+//use crate::importer::FirefoxImporter;
 use std::io;
 use std::time::Duration;
 use tokio::signal;
@@ -69,7 +69,7 @@ async fn start_backend(state: &AppState, config: &Config) {
     // if state.config.user_settings.run_wizard {
     //     // Import data from Firefox
     //     // TODO: Ask user what browser/profiles to import on first startup.
-    //     let importer = FirefoxImporter::new(&state.config);
+    //     let importer = FirefoxImporter::new(&config);
     //     let _ = importer.import(&state).await;
     // }
 
@@ -117,7 +117,7 @@ async fn start_backend(state: &AppState, config: &Config) {
             loop {
                 interval.tick().await;
                 if let Err(err) = state.index.writer.lock().unwrap().commit() {
-                    log::error!("{:?}", err);
+                    log::error!("loop tick{:?}", err);
                 }
             }
         });

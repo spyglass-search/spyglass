@@ -108,7 +108,7 @@ pub async fn search_docs<'r>(
     {
         Ok(resp) => Ok(resp.results.to_vec()),
         Err(err) => {
-            log::error!("{}", err);
+            log::error!("rpc resp {}", err);
             Ok(Vec::new())
         }
     }
