@@ -337,7 +337,7 @@ pub async fn enqueue_all(
     let skip_list = RegexSet::new(skip_list).expect("Unable to create skip list");
 
     // Ignore invalid URLs
-    let mut urls: Vec<String> = urls
+    let urls: Vec<String> = urls
         .iter()
         .filter_map(|url| {
             if let Ok(mut parsed) = Url::parse(url) {
@@ -383,10 +383,6 @@ pub async fn enqueue_all(
             is_indexed.insert(entry.url.to_string());
         }
     }
-
-    // urls can contain duplicates which causes index errors
-    urls.sort();
-    urls.dedup();
 
     let to_add: Vec<ActiveModel> = urls
         .into_iter()
