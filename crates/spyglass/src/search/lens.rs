@@ -20,7 +20,7 @@ async fn check_and_bootstrap(
 
         match bootstrap::bootstrap(db, user_settings, seed_url).await {
             Err(e) => {
-                log::error!("{}", e);
+                log::error!("bootstrap {}", e);
                 return false;
             }
             Ok(cnt) => {
