@@ -15,6 +15,7 @@ use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, Wildcar
 use shared::config::{Lens, LensRule, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
+const BATCH_SIZE: u32 = 10000;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
@@ -372,7 +373,7 @@ pub async fn enqueue_all(
     // Ignore urls already indexed
     let mut is_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
     // Igore urls already indexed
-    for chunk in urls.chunks(10000) {
+    for chunk in urls.chunks(BATCH_SIZE) {
         let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
         for entry in indexed_document::Entity::find()
             .filter(indexed_document::Column::Url.is_in(chunk.clone()))
@@ -407,7 +408,7 @@ pub async fn enqueue_all(
     if to_add.is_empty() {
         return Ok(());
     }
-    for to_add in to_add.chunks(1000) {
+    for to_add in to_add.chunks(BATCH_SIZE) {
         let owned = to_add.iter().map(|r| r.to_owned()).collect::<Vec<_>>();
 
         let (sql, values) = Entity::insert_many(owned)
