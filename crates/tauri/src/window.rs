@@ -36,6 +36,7 @@ pub fn show_window(window: &Window) {
     window.emit("focus_window", true).unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();
+    window.set_always_on_top(true).unwrap();
     center_window(window);
 }
 
