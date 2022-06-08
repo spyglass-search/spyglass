@@ -423,7 +423,6 @@ pub async fn enqueue_all(
     }
     for to_add in to_add.chunks(1000) {
         let owned = to_add
-            .clone()
             .iter()
             .map(|r| r.to_owned())
             .collect::<Vec<_>>();
