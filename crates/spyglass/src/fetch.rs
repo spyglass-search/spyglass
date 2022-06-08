@@ -9,7 +9,7 @@ static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_P
 /// downgrading from HTTPS -> HTTP, 429 too many requests, etc.
 #[derive(Clone, Debug)]
 pub struct HTTPClient {
-    client: Client
+    client: Client,
 }
 
 impl Default for HTTPClient {
@@ -33,11 +33,13 @@ impl HTTPClient {
     pub async fn head(&self, url: &Url) -> Result<Response, Error> {
         let mut url = url.clone();
 
-        url.set_scheme("https").expect("Unable to set scheme to HTTPS");
+        url.set_scheme("https")
+            .expect("Unable to set scheme to HTTPS");
         let mut res = self.client.head(url.clone()).send().await;
         if let Err(e) = &res {
             if e.is_request() {
-                url.set_scheme("http").expect("Unable to set scheme to HTTP");
+                url.set_scheme("http")
+                    .expect("Unable to set scheme to HTTP");
                 res = self.client.head(url).send().await;
             }
         }
@@ -49,11 +51,13 @@ impl HTTPClient {
         let mut url = url.clone();
 
         // Attempt HTTPS first, if that fails switch to HTTP
-        url.set_scheme("https").expect("Unable to set scheme to HTTPS");
+        url.set_scheme("https")
+            .expect("Unable to set scheme to HTTPS");
         let mut res = self.client.get(url.clone()).send().await;
         if let Err(e) = &res {
             if e.is_request() {
-                url.set_scheme("http").expect("Unable to set scheme to HTTP");
+                url.set_scheme("http")
+                    .expect("Unable to set scheme to HTTP");
                 res = self.client.get(url.clone()).send().await;
             }
         }

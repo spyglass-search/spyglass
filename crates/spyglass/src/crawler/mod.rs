@@ -128,7 +128,9 @@ fn determine_canonical(original: &Url, extracted: &Url) -> String {
 
 impl Crawler {
     pub fn new() -> Self {
-        Crawler { client: HTTPClient::new() }
+        Crawler {
+            client: HTTPClient::new(),
+        }
     }
 
     /// Fetches and parses the content of a page.
