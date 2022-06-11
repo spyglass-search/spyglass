@@ -134,32 +134,32 @@ pub fn html_to_text(doc: &str) -> ScrapeResult {
     filter_text_nodes(&root, &mut content, &mut links);
     content = content.trim().to_string();
 
-    let description = {
-        if meta.contains_key("description") {
-            meta.get("description").unwrap().to_string()
-        } else if meta.contains_key("og:description") {
-            meta.get("og:description").unwrap().to_string()
-        } else if !content.is_empty() {
-            // Extract first paragraph from content w/ text to use as the description
-            let mut p_list = Vec::new();
-            filter_p_nodes(&root, &mut p_list);
-
-            let text = p_list.iter().find(|content| !content.is_empty());
-            if text.is_none() {
-                // Still nothing? Grab the first 256 words-ish
-                content
-                    .split(' ')
-                    .into_iter()
-                    .take(DEFAULT_DESC_LENGTH)
-                    .collect::<Vec<&str>>()
-                    .join(" ")
-            } else {
-                text.unwrap_or(&String::from("")).trim().to_owned()
-            }
-        } else {
-            "".to_string()
-        }
+    let mut description = if meta.contains_key("description") {
+        meta.get("description").unwrap().to_string()
+    } else if meta.contains_key("og:description") {
+        meta.get("og:description").unwrap().to_string()
+    } else {
+        "".to_string()
     };
+
+    if description.is_empty() && !content.is_empty() {
+        // Extract first paragraph from content w/ text to use as the description
+        let mut p_list = Vec::new();
+        filter_p_nodes(&root, &mut p_list);
+
+        let text = p_list.iter().find(|p_content| !p_content.trim().is_empty());
+        if text.is_some() && !text.unwrap().is_empty() {
+            description = text.unwrap_or(&String::from("")).trim().to_owned()
+        } else if !content.is_empty() {
+            // Still nothing? Grab the first 256 words-ish
+            description = content
+                .split(' ')
+                .into_iter()
+                .take(DEFAULT_DESC_LENGTH)
+                .collect::<Vec<&str>>()
+                .join(" ")
+        }
+    }
 
     // If there's a canonical URL on this page, attempt to determine whether it's valid.
     // More info about canonical URLS:
@@ -207,12 +207,12 @@ mod test {
             doc.title.unwrap(),
             "Rust (programming language) - Wikipedia"
         );
-        assert_eq!(doc.description, "Rust is a multi-paradigm, general-purpose programming language designed for performance and safety, especially safe concurrency. Rust is syntactically similar to C++, but can guarantee memory safety by using a borrow checker to validate references. Rust achieves memory safety without garbage collection, and reference counting is optional. Rust has been called a systems programming language, and in addition to high-level features such as functional programming it also offers mechanisms for low-levelmemory management.");
+        assert_eq!(doc.description, "Rust is a multi-paradigm, general-purpose programming language designed for performance and safety, especially safe concurrency. Rust is syntactically similar to C++, but can guarantee memory safety by using a borrow checker to validate references. Rust achieves memory safety without garbage collection, and reference counting is optional. Rust has been called a systems programming language, and in addition to high-level features such as functional programming it also offers mechanisms for low-level memory management.");
 
         let html = include_str!("../../../../fixtures/html/personal_blog.html");
         let doc = html_to_text(html);
         // ugh need to fix this
-        assert_eq!(doc.description, "2020 July 15 - San Francisco |855 words");
+        assert_eq!(doc.description, "2020 July 15 - San Francisco |  855 words");
     }
 
     #[test]
