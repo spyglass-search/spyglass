@@ -272,9 +272,11 @@ impl TreeSink for Html {
             }
 
             NodeOrText::AppendText(text) => {
-                // Skip over whitespace nodes
+                let mut text = text;
+                // Convert new lines, etc into a single space.
                 if text.trim().is_empty() {
-                    return;
+                    text.clear();
+                    text.push_char(' ');
                 }
 
                 let can_concat = parent
