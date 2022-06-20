@@ -33,7 +33,7 @@ test:
 
 setup-dev:
 # Install tauri-cli & trunk for client development
-	cargo install tauri-cli --locked --version ^1.0.0-rc.8
+	cargo install tauri-cli --locked --version ^1.0.0
 	cargo install --locked trunk
 
 run-client-dev:
