@@ -59,7 +59,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: tauri
-        args: build
+        args: build --verbose
     # Build backend crates
     - name: Build backend
       uses: actions-rs/cargo@v1
