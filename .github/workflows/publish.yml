@@ -24,6 +24,8 @@ jobs:
         toolchain: stable
     - name: install wasm target
       run: rustup target add wasm32-unknown-unknown
+    - name: install tauri-cli
+      run: cargo install tauri-cli --git https://github.com/tauri-apps/tauri
     - name: install trunk
       run: cargo install --locked trunk
     - name: install dependencies (ubuntu only)
