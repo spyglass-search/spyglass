@@ -13,7 +13,7 @@
   "tauri": {
     "bundle": {
       "active": true,
-      "targets": ["deb", "app", "msi", "dmg"],
+      "targets": "all",
       "identifier": "com.athlabs.spyglass",
       "icon": [
         "icons/32x32.png",
@@ -45,7 +45,12 @@
       }
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+          "https://raw.githubusercontent.com/a5huynh/spyglass/main/VERSION.json"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFREEwQzA5QjA1NjM5NDUKUldSRk9WYXdDUXphYm5keUUvY2V3VUh2cjl3YlB0MlBuV1NJd3VjUnk5ektjVTExY3JKVGdRNHUK"
     },
     "allowlist": {
       "all": true

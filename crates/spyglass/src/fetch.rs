@@ -83,6 +83,7 @@ mod test {
     use url::Url;
 
     #[tokio::test]
+    #[ignore]
     async fn test_http_switch() {
         let client = HTTPClient::new();
         let url = Url::parse("https://paulgraham.com").unwrap();
