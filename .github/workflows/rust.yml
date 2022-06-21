@@ -63,6 +63,8 @@ jobs:
       with:
         command: tauri
         args: build --verbose
+      env:
+        TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
     # Build backend crates
     - name: Build backend
       uses: actions-rs/cargo@v1
