@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use addr::parse_domain_name;
 use chrono::prelude::*;
 use chrono::Duration;
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
 use url::{Host, Url};
 
@@ -15,12 +15,12 @@ pub mod bootstrap;
 pub mod robots;
 
 use crate::crawler::bootstrap::create_archive_url;
+use crate::fetch::HTTPClient;
 use crate::scraper::html_to_text;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
-static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Default, Clone)]
 pub struct CrawlResult {
@@ -80,7 +80,7 @@ fn normalize_href(url: &str, href: &str) -> Option<String> {
 
 #[derive(Debug, Clone)]
 pub struct Crawler {
-    pub client: Client,
+    pub client: HTTPClient,
 }
 
 impl Default for Crawler {
@@ -128,23 +128,17 @@ fn determine_canonical(original: &Url, extracted: &Url) -> String {
 
 impl Crawler {
     pub fn new() -> Self {
-        let client = Client::builder()
-            .user_agent(APP_USER_AGENT)
-            // TODO: Make configurable
-            .timeout(std::time::Duration::from_secs(60))
-            .build()
-            .expect("Unable to create reqwest client");
-
-        Crawler { client }
+        Crawler {
+            client: HTTPClient::new(),
+        }
     }
+
     /// Fetches and parses the content of a page.
     async fn crawl(&self, url: &Url) -> CrawlResult {
-        // Force HTTPs
-        let mut url = url.clone();
-        url.set_scheme("https").unwrap();
+        let url = url.clone();
 
         // Fetch & store page data.
-        let res = self.client.get(url.as_str()).send().await;
+        let res = self.client.get(&url).await;
         if res.is_err() {
             // Unable to connect to host
             return CrawlResult {

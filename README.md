@@ -8,9 +8,9 @@
 ⚠️ Spyglass is very much in its early stages, but it’s in a place where it's functional and can be used to replace basic searches. ⚠️
 
 Download now:
-    [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.5.28/Spyglass_22.5.28_x64.dmg)
-    | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.5.28/Spyglass_22.5.28_x64_en-US.msi)
-    | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.5.28/spyglass_22.5.28_amd64.AppImage)
+    [Mac](https://github.com/a5huynh/spyglass/releases/download/v2022.6.1/Spyglass_22.6.1_x64.dmg)
+    | [Windows](https://github.com/a5huynh/spyglass/releases/download/v2022.6.1/Spyglass_22.6.1_x64_en-US.msi)
+    | [Linux (AppImage)](https://github.com/a5huynh/spyglass/releases/download/v2022.6.1/spyglass_22.6.1_amd64.AppImage)
 
 
 Looking for lenses? Check out our [community contributions](https://github.com/spyglass-search/lens-box)!
@@ -50,7 +50,6 @@ successfully launched, you'll see a little menubar icon like the following:
 
 ![Menubar icon and menu](docs/menubar-menu.png)
 
-
 Queries prefixed with `/` will search through your installed lenses, otherwise it'll
 search through your index. Use the arrow keys to select the result you want and hit
 `Enter` to open the link in the browser of your choice!
@@ -75,8 +74,13 @@ Brave Search Team.
 [googles-paper]: https://brave.com/static-assets/files/goggles.pdf
 
 You can add different lenses that clue the application into what you want to have indexed.
-Here are some examples that I've been personally using:
+Click on "Manage/install lenses" from the menubar icon to open up the "Lens Manager" as
+seen below. From here, you can one-click install lenses from our community and the crawler
+will happily go out and start indexing.
 
+![Lens manager](docs/lens-manager.png)
+
+You can also create your own lenses, here are some examples that I've been personally using:
 
 ### Curated recipe searching
 

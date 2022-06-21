@@ -68,13 +68,13 @@ pub async fn app_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
 pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
     let queue_stats = crawl_queue::queue_stats(&state.db).await;
     if let Err(err) = queue_stats {
-        log::error!("{:?}", err);
+        log::error!("queue_stats {:?}", err);
         return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
     }
 
     let indexed_stats = indexed_document::indexed_stats(&state.db).await;
     if let Err(err) = indexed_stats {
-        log::error!("{:?}", err);
+        log::error!("index_stats {:?}", err);
         return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
     }
 

@@ -20,7 +20,7 @@ impl FirefoxImporter {
     fn default_profile_path() -> Result<PathBuf, &'static str> {
         let home = home_dir().expect("No home directory detected");
         match env::consts::OS {
-            // "linux" => {},
+            "linux" => Ok(home.join(".mozilla/firefox")),
             "macos" => Ok(home.join("Library/Application Support/Firefox/Profiles")),
             // "windows" => {},
             _ => Err("Platform not supported"),
@@ -84,15 +84,32 @@ impl FirefoxImporter {
 
         let mut count = 0;
         let to_add: Vec<String> = rows.into_iter().map(|(_, x)| x).collect();
-        let lenses: Vec<Lens> = self.config.lenses.clone().into_values().collect();
-        crawl_queue::enqueue_all(
+        // import firefox with its own lens to allow domains.
+        let firefox_lens = Lens {
+            author: "SpyGlass".into(),
+            name: "Firefox".into(),
+            description: Some("Firefox history dump".to_string()),
+            domains: vec!["*".to_string()],
+            urls: vec![],
+            version: "1".into(),
+            is_enabled: true,
+            rules: vec![],
+        };
+        let lenses: Vec<Lens> = vec![firefox_lens];
+        match crawl_queue::enqueue_all(
             &state.db,
             &to_add,
             &lenses,
             &self.config.user_settings,
             &Default::default(),
         )
-        .await?;
+        .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!("Importer firefox crawl_queue {}", e);
+            }
+        }
         count += to_add.len();
 
         log::info!("imported {} urls", count);
@@ -104,7 +121,6 @@ impl FirefoxImporter {
     pub async fn import(&self, state: &AppState) -> anyhow::Result<PathBuf> {
         let profiles = self.detect_profiles();
         let path = profiles.first().expect("No Firefox history detected");
-
         // TODO: Check when the file was last updated and copy if newer.
         if !self.imported_path.exists() {
             fs::copy(path, &self.imported_path)?;

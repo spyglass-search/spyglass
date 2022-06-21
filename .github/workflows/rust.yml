@@ -37,11 +37,14 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y \
             libwebkit2gtk-4.0-dev \
+            build-essential \
+            curl \
+            wget \
+            libssl-dev \
             libgtk-3-dev \
-            libappindicator3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-        cargo install tauri-cli --locked --version ^1.0.0-rc.8
+        cargo install tauri-cli --git https://github.com/tauri-apps/tauri
         cargo install --locked trunk
 
     - name: Build sidecar
@@ -56,10 +59,13 @@ jobs:
         cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
     # Build front-end client
     - name: Build client
+      env:
+        TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+        TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
       uses: actions-rs/cargo@v1
       with:
         command: tauri
-        args: build
+        args: build --verbose
     # Build backend crates
     - name: Build backend
       uses: actions-rs/cargo@v1

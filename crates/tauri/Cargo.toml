@@ -12,7 +12,7 @@ build = "src/build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-rc.9", features = [] }
+tauri-build = { version = "1.0.0", features = [] }
 
 [dependencies]
 anyhow = "1.0"
@@ -26,7 +26,7 @@ ron = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 shared = { path = "../shared" }
-tauri = { version = "1.0.0-rc.11", features = ["api-all", "ayatana-tray", "devtools", "notification", "system-tray"] }
+tauri = { version = "1.0.0", features = ["api-all", "devtools", "notification", "system-tray", "updater"] }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"
@@ -34,6 +34,9 @@ tracing-appender = "0.2"
 tracing-log = "0.1.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "std"] }
 url = "2.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.24"
 
 [features]
 default = [ "custom-protocol" ]

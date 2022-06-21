@@ -1,5 +1,5 @@
 extern crate notify;
-
+//use crate::importer::FirefoxImporter;
 use std::io;
 use std::time::Duration;
 use tokio::signal;
@@ -19,9 +19,7 @@ mod importer;
 use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::new();
-
-    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
+    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -36,6 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
+    let config = Config::new();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-backend")
@@ -69,7 +68,7 @@ async fn start_backend(state: &AppState, config: &Config) {
     // if state.config.user_settings.run_wizard {
     //     // Import data from Firefox
     //     // TODO: Ask user what browser/profiles to import on first startup.
-    //     let importer = FirefoxImporter::new(&state.config);
+    //     let importer = FirefoxImporter::new(&config);
     //     let _ = importer.import(&state).await;
     // }
 
@@ -117,7 +116,7 @@ async fn start_backend(state: &AppState, config: &Config) {
             loop {
                 interval.tick().await;
                 if let Err(err) = state.index.writer.lock().unwrap().commit() {
-                    log::error!("{:?}", err);
+                    log::error!("loop tick{:?}", err);
                 }
             }
         });

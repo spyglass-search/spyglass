@@ -1,4 +1,4 @@
-.PHONY: build-backend build-client build-release check clippy fmt test setup-dev run-client-dev
+.PHONY: build-backend build-client build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
 
@@ -33,8 +33,19 @@ test:
 
 setup-dev:
 # Install tauri-cli & trunk for client development
-	cargo install tauri-cli --locked --version ^1.0.0-rc.8
+	cargo install tauri-cli --locked --version ^1.0.0
 	cargo install --locked trunk
+
+setup-dev-linux:
+	sudo apt install \
+		libwebkit2gtk-4.0-dev \
+		build-essential \
+		curl \
+		wget \
+		libssl-dev \
+		libgtk-3-dev \
+		libayatana-appindicator3-dev \
+		librsvg2-dev
 
 run-client-dev:
 	cargo tauri dev
