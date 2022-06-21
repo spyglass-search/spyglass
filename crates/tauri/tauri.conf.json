@@ -13,7 +13,7 @@
   "tauri": {
     "bundle": {
       "active": true,
-      "targets": ["deb", "app", "msi", "dmg", "updater"],
+      "targets": "all",
       "identifier": "com.athlabs.spyglass",
       "icon": [
         "icons/32x32.png",
