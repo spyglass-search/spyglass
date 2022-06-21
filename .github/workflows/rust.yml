@@ -41,7 +41,7 @@ jobs:
             libappindicator3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-        cargo install tauri-cli --locked --version ^1.0.0-rc.8
+        cargo install tauri-cli --locked --version ^1.0.0
         cargo install --locked trunk
 
     - name: Build sidecar
@@ -59,7 +59,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: tauri
-        args: build
+        args: build --verbose
     # Build backend crates
     - name: Build backend
       uses: actions-rs/cargo@v1
