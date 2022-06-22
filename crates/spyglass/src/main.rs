@@ -116,7 +116,7 @@ async fn start_backend(state: &AppState, config: &Config) {
             loop {
                 interval.tick().await;
                 if let Err(err) = state.index.writer.lock().unwrap().commit() {
-                    log::error!("loop tick{:?}", err);
+                    log::error!("commit loop error: {:?}", err);
                 }
             }
         });
