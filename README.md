@@ -27,7 +27,7 @@ Looking for lenses? Check out our [community contributions](https://github.com/s
   * [Example: Narrowing down by a specific topic](#curated-recipe-searching)
 * [Lens Directory](#lens-directory)
 * [Settings](#settings)
-  * [Updating the shorcut](#updating-the-shortcut)
+  * [Updating the shortcut](#updating-the-shortcut)
 
 ---
 
