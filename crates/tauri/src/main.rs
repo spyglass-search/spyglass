@@ -61,6 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::install_lens,
             cmd::list_installable_lenses,
             cmd::list_installed_lenses,
+            cmd::network_change,
             cmd::open_lens_folder,
             cmd::open_result,
             cmd::resize_window,

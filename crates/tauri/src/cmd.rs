@@ -196,3 +196,41 @@ pub async fn install_lens<'r>(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn network_change(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    is_offline: bool,
+) -> Result<(), String> {
+    log::info!(
+        "network change detected ({}), toggling crawler",
+        if is_offline { "offline" } else { "online" }
+    );
+
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
+        .await
+    {
+        Ok(status) => {
+            // Pause the crawler if we're offline and we're currently crawling.
+            let should_toggle =
+                (!status.is_paused && is_offline) || (status.is_paused && !is_offline);
+
+            if should_toggle {
+                let _ = rpc
+                    .client
+                    .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
+                    .await;
+            }
+        }
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+        }
+    }
+
+    Ok(())
+}

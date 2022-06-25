@@ -26,7 +26,7 @@ pub async fn create_connection(
     // See https://www.sea-ql.org/SeaORM/docs/install-and-config/connection
     // for more connection options
     let mut opt = ConnectOptions::new(db_uri);
-    opt.max_connections(5).sqlx_logging(false);
+    opt.max_connections(1).sqlx_logging(false);
 
     Ok(Database::connect(opt).await?)
 }

@@ -1,4 +1,6 @@
+use gloo::events::EventListener;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
@@ -55,6 +57,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "crawlStats", catch)]
     pub async fn crawl_stats() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen]
+    pub async fn network_change(is_offline: bool);
 }
 
 #[derive(Clone, Routable, PartialEq)]
@@ -74,6 +79,30 @@ fn main() {
 
 #[function_component(App)]
 pub fn app() -> Html {
+    // Global events we're interested in
+
+    // Detect loss of internet access
+    use_effect(move || {
+        let window = gloo::utils::window();
+
+        let offline_listener = EventListener::new(&window, "offline", move |_| {
+            spawn_local(async move {
+                network_change(true).await;
+            });
+        });
+
+        let online_listener = EventListener::new(&window, "online", move |_| {
+            spawn_local(async move {
+                network_change(false).await;
+            });
+        });
+
+        || {
+            drop(offline_listener);
+            drop(online_listener);
+        }
+    });
+
     html! {
         <BrowserRouter>
             <Switch<Route> render={Switch::render(switch)} />
