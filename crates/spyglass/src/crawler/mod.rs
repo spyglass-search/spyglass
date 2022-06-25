@@ -144,8 +144,8 @@ impl Crawler {
             log::warn!("Unable to fetch <{}> due to {}", &url, res.unwrap_err());
             // Unable to connect to host
             return CrawlResult {
-                // Service unavilable
-                status: 503_u16,
+                // TODO: Have our own internal error codes we can refer too later on
+                status: 600_u16,
                 url: url.to_string(),
                 ..Default::default()
             };
