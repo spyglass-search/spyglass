@@ -241,7 +241,12 @@ impl Crawler {
 
         // Crawl & save the data
         let mut result = self.crawl(&url).await;
-        log::info!("fetched {} {:?}", result.status, result.url);
+        if result.is_bad_request() {
+            log::warn!("issue fetching {} {:?}", result.status, result.url);
+        } else {
+            log::trace!("fetched {} {:?}", result.status, result.url);
+        }
+
         // Check to see if a canonical URL was found, if not use the original
         // bootstrapped URL
         if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
