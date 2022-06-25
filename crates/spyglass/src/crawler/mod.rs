@@ -140,6 +140,8 @@ impl Crawler {
         // Fetch & store page data.
         let res = self.client.get(&url).await;
         if res.is_err() {
+            // Log out reason for failure.
+            log::warn!("Unable to fetch <{}> due to {}", &url, res.unwrap_err());
             // Unable to connect to host
             return CrawlResult {
                 // Service unavilable
@@ -152,10 +154,11 @@ impl Crawler {
         let res = res.unwrap();
         let status = res.status().as_u16();
         if status == StatusCode::OK {
-            let raw_body = res.text().await.unwrap();
-            let mut scrape_result = self.scrape_page(&url, &raw_body).await;
-            scrape_result.status = status;
-            return scrape_result;
+            if let Ok(raw_body) = res.text().await {
+                let mut scrape_result = self.scrape_page(&url, &raw_body).await;
+                scrape_result.status = status;
+                return scrape_result;
+            }
         }
 
         CrawlResult {
