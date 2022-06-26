@@ -104,7 +104,7 @@ pub async fn load_lenses(state: AppState) {
 
                 // Remove the '$' suffix and add to the crawl queue
                 let url = prefix.strip_suffix('$').unwrap();
-                match crawl_queue::enqueue_all(
+                if let Err(err) = crawl_queue::enqueue_all(
                     &state.db,
                     &[url.to_owned()],
                     &Vec::new(),
@@ -113,10 +113,7 @@ pub async fn load_lenses(state: AppState) {
                 )
                 .await
                 {
-                    Err(err) => {
-                        log::warn!("unable to enqueue <{}> due to {}", prefix, err)
-                    }
-                    _ => {}
+                    log::warn!("unable to enqueue <{}> due to {}", prefix, err)
                 }
             } else {
                 check_and_bootstrap(&state.db, &state.user_settings, prefix).await;

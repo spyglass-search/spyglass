@@ -15,7 +15,7 @@ use url::Url;
 
 use entities::models::crawl_queue;
 use entities::sea_orm::DatabaseConnection;
-use shared::config::{Limit, UserSettings};
+use shared::config::UserSettings;
 
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
