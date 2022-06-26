@@ -17,7 +17,11 @@ pub fn regex_for_domain(domain: &str) -> String {
 }
 
 pub fn regex_for_prefix(prefix: &str) -> String {
-    format!("{}.*", prefix)
+    if prefix.ends_with('$') {
+        return prefix.to_string();
+    }
+
+    return format!("{}.*", prefix);
 }
 
 /// Convert a robots.txt rule into a proper regex string
@@ -103,6 +107,26 @@ mod test {
             "https://sub.roll20.net",
             "https://en.wikipedia.org",
             "https://localhost",
+        ] {
+            assert!(!regex.is_match(test));
+        }
+    }
+
+    #[test]
+    fn test_regex_for_singular_url() {
+        let prefix = "https://roll20.net/compendium/dnd5e$";
+        let regex = Regex::new(&regex_for_prefix(prefix)).unwrap();
+        // Successes
+        for test in [
+            "https://roll20.net/compendium/dnd5e",
+        ] {
+            assert!(regex.is_match(test));
+        }
+
+        // Failures
+        for test in [
+            "https://roll20.net/compendium/dnd5e/monsters",
+            "https://roll20.net/compendium/dnd5e.html",
         ] {
             assert!(!regex.is_match(test));
         }

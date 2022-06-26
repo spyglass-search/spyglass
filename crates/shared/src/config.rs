@@ -132,7 +132,7 @@ impl UserSettings {
 impl Default for UserSettings {
     fn default() -> Self {
         UserSettings {
-            domain_crawl_limit: Limit::Finite(10000),
+            domain_crawl_limit: Limit::Finite(500000),
             // 10 total crawlers at a time
             inflight_crawl_limit: Limit::Finite(10),
             // Limit to 2 crawlers for a domain

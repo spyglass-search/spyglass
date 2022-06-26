@@ -15,7 +15,7 @@ use url::Url;
 
 use entities::models::crawl_queue;
 use entities::sea_orm::DatabaseConnection;
-use shared::config::{Limit, UserSettings};
+use shared::config::UserSettings;
 
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
@@ -131,14 +131,6 @@ pub async fn bootstrap(
     loop {
         log::info!("fetching page from cdx");
         if let Ok((urls, resume)) = fetch_cdx(&client, prefix, 1000, resume_key.clone()).await {
-            // Some URLs/domains might have a crazy amount of crawls, so we limit
-            // how much data to bootstrap based on user settings
-            if let Limit::Finite(limit) = settings.domain_crawl_limit {
-                if count > limit as usize {
-                    return Ok(count);
-                }
-            }
-
             // Add URLs to crawl queue
             log::info!("enqueing {} urls", urls.len());
             let urls: Vec<String> = urls.into_iter().collect();
