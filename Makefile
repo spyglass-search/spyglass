@@ -1,4 +1,4 @@
-.PHONY: build-backend build-client build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
+.PHONY: build-backend build-client build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
 
@@ -10,12 +10,10 @@ build-backend:
 build-client:
 	cargo build -p spyglass-client -p spyglass-app
 
-build-release:
-# Build backend binaries
-	cargo build -p spyglass --release
-	mkdir -p crates/tauri/binaries
-	cp target/release/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
-# Build client
+build-styles:
+	cd ./crates/client && npx tailwindcss -i ./public/input.css -o ./public/main.css
+
+build-release: build-backend build-styles
 	cargo tauri build
 # Run macOS binary signing utility
 
@@ -35,10 +33,11 @@ setup-dev:
 # Install tauri-cli & trunk for client development
 	cargo install tauri-cli --locked --version ^1.0.0
 	cargo install --locked trunk
+# Install tailwind
+	cd ./crates/client && npm install
 
 setup-dev-linux:
-	sudo apt install \
-		libwebkit2gtk-4.0-dev \
+	sudo apt install libwebkit2gtk-4.0-dev \
 		build-essential \
 		curl \
 		wget \
