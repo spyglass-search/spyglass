@@ -203,7 +203,6 @@ impl Searcher {
 
     pub fn search_with_lens(
         lenses: &HashMap<String, Lens>,
-        _index: &Index,
         reader: &IndexReader,
         applied_lens: &[String],
         query_string: &str,
@@ -339,13 +338,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(
-            &lenses,
-            &searcher.index,
-            &searcher.reader,
-            &applied_lens,
-            query,
-        );
+        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
         assert_eq!(results.len(), 1);
     }
 
@@ -367,13 +360,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(
-            &lenses,
-            &searcher.index,
-            &searcher.reader,
-            &applied_lens,
-            query,
-        );
+        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
         assert_eq!(results.len(), 1);
     }
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use entities::regex::regex_for_prefix;
 use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, RegexQuery, TermQuery};
 use tantivy::schema::*;
 use tantivy::Score;
@@ -51,11 +52,10 @@ pub fn build_query(
             }
 
             for prefix in &lens.urls {
+                let regex = regex_for_prefix(prefix);
                 lense_queries.push((
                     Occur::Should,
-                    Box::new(
-                        RegexQuery::from_pattern(&format!("{}.*", prefix), fields.url).unwrap(),
-                    ),
+                    Box::new(RegexQuery::from_pattern(&regex, fields.url).unwrap()),
                 ))
             }
         }
