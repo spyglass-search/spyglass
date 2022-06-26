@@ -363,4 +363,26 @@ mod test {
         let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
         assert_eq!(results.len(), 1);
     }
+
+    #[test]
+    pub fn test_singular_url_lens_search() {
+        let lens = Lens {
+            name: "wiki".to_string(),
+            domains: Vec::new(),
+            urls: vec!["https://en.wikipedia.org/mice$".to_string()],
+            ..Default::default()
+        };
+
+        let applied_lens = vec!["wiki".to_string()];
+
+        let mut lenses = HashMap::new();
+        lenses.insert("wiki".to_string(), lens.clone());
+
+        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        _build_test_index(&mut searcher);
+
+        let query = "salinas";
+        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        assert_eq!(results.len(), 0);
+    }
 }

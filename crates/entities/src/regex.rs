@@ -111,4 +111,24 @@ mod test {
             assert!(!regex.is_match(test));
         }
     }
+
+    #[test]
+    fn test_regex_for_singular_url() {
+        let prefix = "https://roll20.net/compendium/dnd5e$";
+        let regex = Regex::new(&regex_for_prefix(prefix)).unwrap();
+        // Successes
+        for test in [
+            "https://roll20.net/compendium/dnd5e",
+        ] {
+            assert!(regex.is_match(test));
+        }
+
+        // Failures
+        for test in [
+            "https://roll20.net/compendium/dnd5e/monsters",
+            "https://roll20.net/compendium/dnd5e.html",
+        ] {
+            assert!(!regex.is_match(test));
+        }
+    }
 }
