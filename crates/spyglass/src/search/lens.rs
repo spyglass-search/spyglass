@@ -96,7 +96,31 @@ pub async fn load_lenses(state: AppState) {
         }
 
         for prefix in lens.urls.iter() {
-            check_and_bootstrap(&state.db, &state.user_settings, prefix).await;
+            // Handle singular URL matches
+            if prefix.ends_with('$') {
+                let overrides = crawl_queue::EnqueueSettings {
+                    crawl_type: crawl_queue::CrawlType::Bootstrap,
+                };
+
+                // Remove the '$' suffix and add to the crawl queue
+                let url = prefix.strip_suffix('$').unwrap();
+                match crawl_queue::enqueue_all(
+                    &state.db,
+                    &[url.to_owned()],
+                    &Vec::new(),
+                    &state.user_settings,
+                    &overrides,
+                )
+                .await
+                {
+                    Err(err) => {
+                        log::warn!("unable to enqueue <{}> due to {}", prefix, err)
+                    }
+                    _ => {}
+                }
+            } else {
+                check_and_bootstrap(&state.db, &state.user_settings, prefix).await;
+            }
         }
 
         // Rules will go through and remove crawl tasks AND indexed_documents that match.

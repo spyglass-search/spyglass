@@ -17,7 +17,11 @@ pub fn regex_for_domain(domain: &str) -> String {
 }
 
 pub fn regex_for_prefix(prefix: &str) -> String {
-    format!("{}.*", prefix)
+    if prefix.ends_with('$') {
+        return prefix.to_string();
+    }
+
+    return format!("{}.*", prefix);
 }
 
 /// Convert a robots.txt rule into a proper regex string
