@@ -44,7 +44,7 @@ jobs:
             libgtk-3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-        cargo install tauri-cli --git https://github.com/tauri-apps/tauri
+        cargo install tauri-cli --git https://github.com/tauri-apps/tauri --rev 23a049c593e5394b347b0abdf0f4f37f36a29873
         cargo install --locked trunk
 
     - name: Build sidecar
