@@ -36,7 +36,8 @@
         "minimumSystemVersion": "",
         "exceptionDomain": "",
         "signingIdentity": null,
-        "entitlements": null
+        "entitlements": null,
+        "providerShortName": "AndrewHuynh1092684215"
       },
       "windows": {
         "certificateThumbprint": null,
