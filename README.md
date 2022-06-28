@@ -28,7 +28,7 @@
     <br />
     <br />
     <img src="https://github.com/a5huynh/spyglass/actions/workflows/rust.yml/badge.svg">
-    <a href="https://discord.gg/663wPVBSTB"><img src="https://img.shields.io/badge/Discord-join%20the%20community-blue"></a>
+    <a href="https://discord.gg/663wPVBSTB"><img src="https://img.shields.io/badge/Discord-Join%20Now-blue"></a>
   </p>
 </p>
 
@@ -39,58 +39,61 @@
     <img src="docs/spyglass-poc.gif">
 </p>
 
-
 ## Introduction
 
-Spyglass is an app that lives on your device, crawling & indexing topics that you're
-interested in using a set of basic rules.
+Spyglass lives on your device crawling & indexing websites __you__ want with a basic
+set of rules.
 
-Web pages when condensed down to text to index & search are surprisingly small
-with todays' incredibly fast CPUs with tons of disk space its a no brainer to be
-able to create your own personal library of wikis, blog posts, etc. that can be
-referenced instanaeously.
+Web pages when condensed down to text are surprisingly small with todays' incredibly
+fast CPUs and tons of disk space. Its a no brainer that you should be able to create a
+personal library of wikis, blog posts, etc. that can be referenced instanaeously. Cut
+through the SEO spam of the internet by building your own index.
 
 For users who have been frustrated with the current state of search and the internet,
 Spyglass offers a powerful solution to find _exactly_ what you want.
 
-> See [Using Spyglass](https://docs.spyglass.fyi/usage/index.html) to get started.
+> See [Launching & Using Spyglass](https://docs.spyglass.fyi/usage/index.html) to get started.
 
 ## Traditional web search sucks
+
+> The short answer is that Google search results are clearly dying. The long answer
+> is that most of the web has become too inauthentic to trust.
+>
+> - https://dkb.io/post/google-search-is-dying
 
 Spyglass is a solution to the following common issues when searching the web:
 
 - Do you add terms such as `reddit` or `wiki` to your searches to narrow it down?
 - Do you get frustrated with overzealous autocorrect on your search terms?
+- Do you get frustrated with the terrible search some wikis/sites offer?
 - Do you scroll past dozens of SEO spam pages to find the recipe/review/blog post you were looking for?
 - Do you skip over a full-page of ads before getting to your actual search results?
 - Do you have private websites / data / documents that you'd like to search through?
 
-> The short answer is that Google search results are clearly dying. The long answer
-> is that most of the web has become too inauthentic to trust.
-> - https://dkb.io/post/google-search-is-dying
-
 ## How does it know what to crawl?
 
 Spyglass expands on the ideas outlined in [this paper][googles-paper] by the
-Brave Search Team.
+Brave Search Team. There are currently a simple set of rules that will point Spyglass
+at a website and crawl only what you want. When available, crawling is initially
+bootstrap w/ data from the Internet Archive so that we do not overwhelm smaller websites.
 
-You can add different lenses that clue the application into what you want to have indexed.
-Click on "Manage/install lenses" from the menubar icon to open up the "Lens Manager" as
-seen below. From here, you can one-click install lenses from our community and the crawler
-will happily go out and start indexing.
+Not all websites & not all data can be crawled by Spyglass. If you have something
+that you'd like to index and would like some help, feel free to ping me on
+our [Discord server](https://discord.gg/663wPVBSTB)!
 
 > See [Community Lenses](https://docs.spyglass.fyi/usage/lenses/community.html) to install
 > lenses others in the community have built.
 
 > See [Building your own lens](https://docs.spyglass.fyi/usage/lenses/build.html) to see
-> how easy it is to build your own lens.
+> how easy it is to build your own lens. Please share w/ the community when you're done!
 
 [googles-paper]: https://brave.com/static-assets/files/goggles.pdf
 
-
 ## Developer Guide
 
-If you'd like to help, please join our [Discord server](https://discord.gg/663wPVBSTB) and ping me!
+If you'd like to help, reach out to use on our [Discord server](https://discord.gg/663wPVBSTB)
+to see what is currently being developed and how you can help usher in a new,
+better search.
 
 > See [Building from source](https://docs.spyglass.fyi/build.html) to get started
 > building & contributing to Spyglass.
