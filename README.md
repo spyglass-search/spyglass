@@ -36,7 +36,7 @@
 
 <p align="center">
     <br/>
-    <img src="docs/spyglass-poc.gif">
+    <img src="./docs/spyglass-poc.gif">
 </p>
 
 Spyglass is an open-source, cross-platform search engine that lives on your machine,
