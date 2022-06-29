@@ -117,9 +117,7 @@ mod test {
         let prefix = "https://roll20.net/compendium/dnd5e$";
         let regex = Regex::new(&regex_for_prefix(prefix)).unwrap();
         // Successes
-        for test in [
-            "https://roll20.net/compendium/dnd5e",
-        ] {
+        for test in ["https://roll20.net/compendium/dnd5e"] {
             assert!(regex.is_match(test));
         }
 
