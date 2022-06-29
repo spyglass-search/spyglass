@@ -1,4 +1,5 @@
 use gloo::events::EventListener;
+use gloo::timers::callback::Timeout;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, Element, HtmlElement, HtmlInputElement};
@@ -11,6 +12,15 @@ use crate::events;
 use crate::{
     on_clear_search, on_focus, on_refresh_results, resize_window, search_docs, search_lenses,
 };
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = "clearTimeout")]
+    fn clear_timeout(handle: i32);
+}
+
+type TimeoutId = i32;
+const QUERY_DEBOUNCE_MS: u32 = 256;
 
 #[function_component(SearchPage)]
 pub fn search_page() -> Html {
@@ -25,6 +35,7 @@ pub fn search_page() -> Html {
     let selected_idx = use_state_eq(|| 0);
 
     let node_ref = use_state_eq(NodeRef::default);
+    let query_debounce: UseStateHandle<Option<TimeoutId>> = use_state(|| None);
 
     // Handle key events
     {
@@ -59,9 +70,27 @@ pub fn search_page() -> Html {
         let search_results = search_results.clone();
         let selected_idx = selected_idx.clone();
         let node_ref = node_ref.clone();
+
         use_effect_with_deps(
             move |query| {
-                events::handle_query_change(query, node_ref, lens, search_results, selected_idx);
+                if let Some(timeout_id) = *query_debounce {
+                    clear_timeout(timeout_id);
+                    query_debounce.set(None);
+                }
+
+                let query = query.clone();
+                let handle = Timeout::new(QUERY_DEBOUNCE_MS, move || {
+                    events::handle_query_change(
+                        &query,
+                        node_ref,
+                        lens,
+                        search_results,
+                        selected_idx,
+                    )
+                });
+
+                let id = handle.forget();
+                query_debounce.set(Some(id));
                 || ()
             },
             (*query).clone(),
