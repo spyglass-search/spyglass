@@ -1,7 +1,7 @@
 {
   "package": {
     "productName": "Spyglass",
-    "version": "22.6.4"
+    "version": "22.6.5"
   },
   "build": {
     "distDir": "../client/dist",
@@ -36,7 +36,8 @@
         "minimumSystemVersion": "",
         "exceptionDomain": "",
         "signingIdentity": null,
-        "entitlements": null
+        "entitlements": null,
+        "providerShortName": "AndrewHuynh1092684215"
       },
       "windows": {
         "certificateThumbprint": null,

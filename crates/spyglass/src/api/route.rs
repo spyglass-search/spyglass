@@ -188,7 +188,6 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
 
     let docs = Searcher::search_with_lens(
         &lenses,
-        &index.index,
         &index.reader,
         &search_req.lenses,
         &search_req.query,
