@@ -44,10 +44,10 @@
 Spyglass lives on your device crawling & indexing websites __you__ want with a basic
 set of rules.
 
-Web pages when condensed down to text are surprisingly small with todays' incredibly
-fast CPUs and tons of disk space. Its a no brainer that you should be able to create a
-personal library of wikis, blog posts, etc. that can be referenced instanaeously. Cut
-through the SEO spam of the internet by building your own index.
+Web pages when condensed down to text are surprisingly small. With todays' incredibly
+fast CPUs and ample amounts of of disk space, you can easily create a personal library of 
+wikis, blog posts, etc. that can be referenced instantaneously. Cut through the SEO spam of 
+the internet by building your own index.
 
 For users who have been frustrated with the current state of search and the internet,
 Spyglass offers a powerful solution to find _exactly_ what you want.
