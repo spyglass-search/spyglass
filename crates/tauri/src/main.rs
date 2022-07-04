@@ -68,8 +68,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::search_docs,
             cmd::search_lenses,
         ])
-        .menu(menu::get_app_menu())
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&config)))
+        .menu(menu::get_app_menu(&ctx))
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config)))
         .setup(move |app| {
             // macOS: hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
