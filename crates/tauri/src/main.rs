@@ -6,15 +6,13 @@
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
-use serde::Deserialize;
-use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent};
+use tauri::{AppHandle, GlobalShortcutManager, Manager, SystemTray, SystemTrayEvent, Window};
 use tokio::sync::Mutex;
-use tokio::time;
+use tokio::{time, time::Duration};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
@@ -51,7 +49,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
-    let app_version = format!("v20{}", ctx.package_info().version);
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -91,21 +88,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            // Check the release version against app version
-            match tauri::async_runtime::block_on(check_version()) {
-                Ok(release_ver) => {
-                    if release_ver.tag_name > app_version {
-                        // Update menu item
-                        let tray = app.tray_handle();
-                        let version_item = tray.get_item(menu::VERSION_MENU_ITEM);
-
-                        let _ = version_item.set_enabled(true);
-                        let _ = version_item.set_title("🎉 Update available!");
-                        app.manage(release_ver);
-                    }
-                }
-                Err(e) => log::error!("Unable to check version: {}", e),
-            }
+            // Spawn a version checking background task. Check every couple hours
+            // for a new version.
+            tauri::async_runtime::spawn(check_version_interval(window.clone()));
 
             // Wait for the server to boot up
             let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
@@ -175,11 +160,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         };
 
                         item_handle.set_title(new_label).unwrap();
-                    }
-                    menu::VERSION_MENU_ITEM => {
-                        if let Some(version) = app.try_state::<ReleaseVersion>() {
-                            let _ = open::that(&version.html_url);
-                        }
                     }
                     menu::OPEN_LENS_MANAGER => {
                         show_lens_manager_window(app);
@@ -284,31 +264,12 @@ async fn update_tray_menu(app: &AppHandle) {
     }
 }
 
-#[derive(Clone, Deserialize)]
-pub struct ReleaseVersion {
-    html_url: String,
-    tag_name: String,
-}
-
-async fn check_version() -> anyhow::Result<ReleaseVersion> {
-    let client = reqwest::Client::builder()
-        .user_agent(constants::APP_USER_AGENT)
-        .build()?;
-
-    let res = client
-        .get(constants::VERSION_CHECK_URL)
-        .send()
-        .await?
-        .json::<Vec<ReleaseVersion>>()
-        .await?;
-
-    if res.is_empty() {
-        return Err(anyhow::Error::msg("Empty version array"));
+async fn check_version_interval(window: Window) {
+    let mut interval =
+        tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
+    loop {
+        interval.tick().await;
+        log::info!("checking for update...");
+        window.trigger_global("tauri://update", None);
     }
-
-    let latest = res
-        .first()
-        .expect("Version array shouldn't be empty")
-        .to_owned();
-    Ok(latest)
 }
