@@ -1,5 +1,8 @@
 use shared::config::Config;
-use tauri::{CustomMenuItem, Menu, MenuItem, Submenu, SystemTrayMenu, SystemTrayMenuItem};
+use tauri::{
+    utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu,
+    SystemTrayMenu, SystemTrayMenuItem,
+};
 
 pub const VERSION_MENU_ITEM: &str = "version";
 pub const QUIT_MENU_ITEM: &str = "quit";
@@ -16,9 +19,7 @@ pub const JOIN_DISCORD: &str = "join_discord";
 
 pub const DEV_SHOW_CONSOLE: &str = "dev_show_console";
 
-pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
-    let ctx = tauri::generate_context!();
-
+pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTrayMenu {
     let show = CustomMenuItem::new(SHOW_SEARCHBAR.to_string(), "Show search")
         .accelerator(config.user_settings.shortcut.clone());
 
@@ -65,12 +66,10 @@ pub fn get_tray_menu(config: &Config) -> SystemTrayMenu {
         .add_item(quit)
 }
 
-pub fn get_app_menu() -> Menu {
+pub fn get_app_menu(ctx: &Context<EmbeddedAssets>) -> Menu {
     if cfg!(target_os = "linux") {
         return Menu::new();
     }
-
-    let ctx = tauri::generate_context!();
 
     Menu::new().add_submenu(Submenu::new(
         &ctx.package_info().name,
