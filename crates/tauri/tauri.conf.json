@@ -48,6 +48,7 @@
     "updater": {
       "active": true,
       "endpoints": [
+          "https://spyglass-update-check.spyglass.workers.dev",
           "https://raw.githubusercontent.com/a5huynh/spyglass/main/VERSION.json"
       ],
       "dialog": true,
