@@ -31,6 +31,9 @@ pub trait Rpc {
     #[rpc(name = "list_installed_lenses")]
     fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
 
+    #[rpc(name = "recrawl_domain")]
+    fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>>;
+
     #[rpc(name = "search_docs")]
     fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>>;
 

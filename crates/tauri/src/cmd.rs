@@ -234,3 +234,26 @@ pub async fn network_change(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn recrawl_domain(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    domain: &str,
+) -> Result<(), String> {
+    log::info!("recrawling {}", domain);
+    let mut rpc = rpc.lock().await;
+
+    match rpc
+        .client
+        .call_method::<(String,), ()>("recrawl_domain", "", (domain.into(),))
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(())
+        }
+    }
+}

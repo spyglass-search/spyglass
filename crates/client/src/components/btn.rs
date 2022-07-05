@@ -69,10 +69,24 @@ pub struct RecrawlButtonProps {
     pub domain: String,
 }
 
+fn handle_recrawl(domain: String) {
+    spawn_local(async move {
+        let _ = crate::recrawl_domain(domain.clone()).await;
+    })
+}
+
 #[function_component(RecrawlButton)]
 pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
+    let onclick = {
+        let domain = props.domain.clone();
+        move |_| {
+            handle_recrawl(domain.clone());
+        }
+    };
+
     html! {
         <button
+            {onclick}
             class="hover:text-red-600 text-neutral-600 group flex flex-row">
             <icons::RefreshIcon height={"h-4"} width={"w-4"} />
             <span class="pl-1">{"Recrawl"}</span>
