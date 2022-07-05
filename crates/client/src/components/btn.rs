@@ -67,21 +67,27 @@ pub fn delete_btn(props: &DeleteButtonProps) -> Html {
 #[derive(Properties, PartialEq)]
 pub struct RecrawlButtonProps {
     pub domain: String,
-}
-
-fn handle_recrawl(domain: String) {
-    spawn_local(async move {
-        let _ = crate::recrawl_domain(domain.clone()).await;
-    })
+    pub onrecrawl: Option<Callback<MouseEvent>>,
 }
 
 #[function_component(RecrawlButton)]
 pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
     let onclick = {
         let domain = props.domain.clone();
-        move |_| {
-            handle_recrawl(domain.clone());
-        }
+        let callback = props.onrecrawl.clone();
+
+        Callback::from(move |me| {
+            let domain = domain.clone();
+            let callback = callback.clone();
+
+            spawn_local(async move {
+                let _ = crate::recrawl_domain(domain.clone()).await;
+            });
+
+            if let Some(callback) = callback {
+                callback.emit(me);
+            }
+        })
     };
 
     html! {

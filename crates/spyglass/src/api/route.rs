@@ -158,16 +158,17 @@ pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
 
 #[instrument(skip(state))]
 pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
+    log::info!("handling recrawl domain: {}", domain);
     let db = &state.db;
 
     let res = crawl_queue::Entity::update_many()
         .col_expr(
-            crawl_queue::Column::Domain,
+            crawl_queue::Column::Status,
             sea_query::Expr::value(sea_query::Value::String(Some(Box::new(
                 CrawlStatus::Queued.to_string(),
             )))),
         )
-        .filter(crawl_queue::Column::Domain.contains(&domain))
+        .filter(crawl_queue::Column::Domain.eq(domain.clone()))
         .exec(db)
         .await;
 
