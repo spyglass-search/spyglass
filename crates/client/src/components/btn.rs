@@ -39,19 +39,16 @@ pub struct DeleteButtonProps {
     pub doc_id: String,
 }
 
-fn handle_delete(doc_id: String) {
-    spawn_local(async move {
-        let _ = crate::delete_doc(doc_id.clone()).await;
-    });
-}
-
 #[function_component(DeleteButton)]
 pub fn delete_btn(props: &DeleteButtonProps) -> Html {
     let onclick = {
         let doc_id = props.doc_id.clone();
-        move |_| {
-            handle_delete(doc_id.clone());
-        }
+        Callback::from(move |_| {
+            let doc_id = doc_id.clone();
+            spawn_local(async move {
+                let _ = crate::delete_doc(doc_id.clone()).await;
+            });
+        })
     };
 
     html! {
