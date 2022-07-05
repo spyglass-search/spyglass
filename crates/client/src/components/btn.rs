@@ -24,6 +24,7 @@ pub fn tooltip(props: &TooltipProps) -> Html {
         "text-center",
         "bg-neutral-900",
         "text-sm",
+        "text-right",
     ];
 
     html! {
@@ -59,6 +60,22 @@ pub fn delete_btn(props: &DeleteButtonProps) -> Html {
             class="hover:text-red-600 text-neutral-600 group">
             <Tooltip label={"Delete"} />
             <icons::TrashIcon height={"h-4"} width={"w-4"} />
+        </button>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct RecrawlButtonProps {
+    pub domain: String,
+}
+
+#[function_component(RecrawlButton)]
+pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
+    html! {
+        <button
+            class="hover:text-red-600 text-neutral-600 group flex flex-row">
+            <icons::RefreshIcon height={"h-4"} width={"w-4"} />
+            <span class="pl-1">{"Recrawl"}</span>
         </button>
     }
 }
