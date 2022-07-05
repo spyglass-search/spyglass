@@ -49,6 +49,10 @@ export async function network_change(isOffline) {
     return await invoke('network_change', { isOffline });
 }
 
+export async function recrawl_domain(domain) {
+    return await invoke('recrawl_domain', { domain });
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke('search_docs', { lenses, query });
 }

@@ -60,6 +60,9 @@ extern "C" {
 
     #[wasm_bindgen]
     pub async fn network_change(is_offline: bool);
+
+    #[wasm_bindgen(catch)]
+    pub async fn recrawl_domain(domain: String) -> Result<(), JsValue>;
 }
 
 #[derive(Clone, Routable, PartialEq)]
