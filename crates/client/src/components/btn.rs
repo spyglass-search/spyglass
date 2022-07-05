@@ -24,6 +24,7 @@ pub fn tooltip(props: &TooltipProps) -> Html {
         "text-center",
         "bg-neutral-900",
         "text-sm",
+        "text-right",
     ];
 
     html! {
@@ -38,19 +39,16 @@ pub struct DeleteButtonProps {
     pub doc_id: String,
 }
 
-fn handle_delete(doc_id: String) {
-    spawn_local(async move {
-        let _ = crate::delete_doc(doc_id.clone()).await;
-    });
-}
-
 #[function_component(DeleteButton)]
 pub fn delete_btn(props: &DeleteButtonProps) -> Html {
     let onclick = {
         let doc_id = props.doc_id.clone();
-        move |_| {
-            handle_delete(doc_id.clone());
-        }
+        Callback::from(move |_| {
+            let doc_id = doc_id.clone();
+            spawn_local(async move {
+                let _ = crate::delete_doc(doc_id.clone()).await;
+            });
+        })
     };
 
     html! {
@@ -59,6 +57,42 @@ pub fn delete_btn(props: &DeleteButtonProps) -> Html {
             class="hover:text-red-600 text-neutral-600 group">
             <Tooltip label={"Delete"} />
             <icons::TrashIcon height={"h-4"} width={"w-4"} />
+        </button>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct RecrawlButtonProps {
+    pub domain: String,
+    pub onrecrawl: Option<Callback<MouseEvent>>,
+}
+
+#[function_component(RecrawlButton)]
+pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
+    let onclick = {
+        let domain = props.domain.clone();
+        let callback = props.onrecrawl.clone();
+
+        Callback::from(move |me| {
+            let domain = domain.clone();
+            let callback = callback.clone();
+
+            spawn_local(async move {
+                let _ = crate::recrawl_domain(domain.clone()).await;
+            });
+
+            if let Some(callback) = callback {
+                callback.emit(me);
+            }
+        })
+    };
+
+    html! {
+        <button
+            {onclick}
+            class="hover:text-red-600 text-neutral-600 group flex flex-row">
+            <icons::RefreshIcon height={"h-4"} width={"w-4"} />
+            <span class="pl-1">{"Recrawl"}</span>
         </button>
     }
 }

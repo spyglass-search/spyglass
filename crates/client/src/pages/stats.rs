@@ -2,7 +2,7 @@ use num_format::{Buffer, Locale};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::icons;
+use crate::components::{btn, icons};
 use crate::crawl_stats;
 use shared::response::{CrawlStats, QueueStatus};
 
@@ -107,11 +107,11 @@ pub fn stats_page() -> Html {
     let onclick = {
         let request_finished = request_finished.clone();
         let stats = stats.clone();
-        move |_| {
+        Callback::from(move |_| {
             request_finished.set(false);
             stats.set(Vec::new());
             fetch_crawl_stats(stats.clone(), request_finished.clone());
-        }
+        })
     };
 
     let mut rendered = stats
@@ -120,8 +120,9 @@ pub fn stats_page() -> Html {
             let total = stats.total() as f64;
             html! {
                 <div class="p-4 px-8">
-                    <div class="text-xs pb-1">
-                        {domain}
+                    <div class="text-xs pb-2 flex flex-row">
+                        <div class="flex-grow">{domain}</div>
+                        <btn::RecrawlButton onrecrawl={onclick.clone()} domain={domain.clone()} />
                     </div>
                     <div class="relative flex flex-row items-center flex-growgroup w-full">
                         <StatsBar count={stats.num_queued} total={total} color={"bg-neutral-600"} is_start={true} />

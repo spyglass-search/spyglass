@@ -37,6 +37,10 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::list_installed_lenses(self.state.clone()))
     }
 
+    fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>> {
+        Box::pin(route::recrawl_domain(self.state.clone(), domain))
+    }
+
     fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>> {
         Box::pin(route::search(self.state.clone(), query))
     }

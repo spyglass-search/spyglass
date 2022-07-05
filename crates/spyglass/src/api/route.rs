@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 
-use entities::sea_orm::prelude::*;
-use entities::sea_orm::QueryOrder;
-use entities::sea_orm::Set;
+use entities::models::crawl_queue::CrawlStatus;
 use jsonrpc_core::{Error, ErrorCode, Result};
-use shared::response::LensResult;
 use tracing::instrument;
 use url::Url;
 
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, QueueStatus, SearchLensesResp, SearchMeta, SearchResult, SearchResults,
+    AppStatus, CrawlStats, LensResult, QueueStatus, SearchLensesResp, SearchMeta, SearchResult,
+    SearchResults,
 };
 
 use entities::models::{crawl_queue, indexed_document, lens};
+use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -158,18 +157,27 @@ pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
-    // Scope so that the app_state mutex is correctly released.
-    {
-        let app_state = &state.app_state;
-        let mut paused_status = app_state.get_mut("paused").unwrap();
+pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
+    log::info!("handling recrawl domain: {}", domain);
+    let db = &state.db;
 
-        let current_status = paused_status.to_string() == "true";
-        let updated_status = !current_status;
-        *paused_status = updated_status.to_string();
+    let res = crawl_queue::Entity::update_many()
+        .col_expr(
+            crawl_queue::Column::Status,
+            sea_query::Expr::value(sea_query::Value::String(Some(Box::new(
+                CrawlStatus::Queued.to_string(),
+            )))),
+        )
+        .filter(crawl_queue::Column::Domain.eq(domain.clone()))
+        .exec(db)
+        .await;
+
+    // Log out issues
+    if let Err(e) = res {
+        log::error!("Error recrawling domain {}: {}", domain, e);
     }
 
-    _get_current_status(state.clone()).await
+    Ok(())
 }
 
 /// Search the user's indexed documents
@@ -254,4 +262,19 @@ pub async fn search_lenses(
     }
 
     Ok(SearchLensesResp { results })
+}
+
+#[instrument(skip(state))]
+pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+    // Scope so that the app_state mutex is correctly released.
+    {
+        let app_state = &state.app_state;
+        let mut paused_status = app_state.get_mut("paused").unwrap();
+
+        let current_status = paused_status.to_string() == "true";
+        let updated_status = !current_status;
+        *paused_status = updated_status.to_string();
+    }
+
+    _get_current_status(state.clone()).await
 }
