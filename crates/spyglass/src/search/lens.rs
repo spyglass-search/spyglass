@@ -98,10 +98,6 @@ pub async fn load_lenses(state: AppState) {
         for prefix in lens.urls.iter() {
             // Handle singular URL matches
             if prefix.ends_with('$') {
-                let overrides = crawl_queue::EnqueueSettings {
-                    crawl_type: crawl_queue::CrawlType::Bootstrap,
-                };
-
                 // Remove the '$' suffix and add to the crawl queue
                 let url = prefix.strip_suffix('$').unwrap();
                 if let Err(err) = crawl_queue::enqueue_all(
@@ -109,7 +105,7 @@ pub async fn load_lenses(state: AppState) {
                     &[url.to_owned()],
                     &Vec::new(),
                     &state.user_settings,
-                    &overrides,
+                    &Default::default(),
                 )
                 .await
                 {
