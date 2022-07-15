@@ -7,6 +7,8 @@ members = [
     "crates/shared",
     "crates/spyglass",
     "crates/tauri",
+    # Default plugins
+    "plugins/chrome-importer",
 ]
 
 [profile.release]
