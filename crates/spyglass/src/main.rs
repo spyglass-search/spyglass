@@ -26,7 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(
             EnvFilter::from_default_env()
                 .add_directive(tracing::Level::INFO.into())
-                .add_directive("tantivy=WARN".parse().unwrap()),
+                .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive("wasmer_compiler_cranelift=WARN".parse().expect("Invalid EnvFilter")),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
         .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
@@ -53,6 +54,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Exit from app
             return Ok(());
         }
+    }
+
+    // Start plugin serve
+    if let Err(e) = libspyglass::plugins::test_plugin() {
+        log::error!("Error running plugin: {}", e);
+    } else {
+        log::info!("Plugin ran succesfully");
     }
 
     // Start IPC server
