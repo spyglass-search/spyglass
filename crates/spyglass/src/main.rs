@@ -142,6 +142,8 @@ async fn start_backend(state: &mut AppState, config: &Config) {
 
     // Plugin server
     let pm_handle = tokio::spawn(plugins::plugin_manager(
+        state.clone(),
+        config.clone(),
         plugin_cmd_tx.clone(),
         plugin_cmd_rx,
         shutdown_tx.subscribe(),

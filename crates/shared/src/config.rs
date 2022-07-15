@@ -215,6 +215,10 @@ impl Config {
         Self::prefs_dir().join("settings.ron")
     }
 
+    pub fn plugins_dir(&self) -> PathBuf {
+        self.data_dir().join("plugins")
+    }
+
     pub fn lenses_dir(&self) -> PathBuf {
         self.data_dir().join("lenses")
     }

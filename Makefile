@@ -1,4 +1,4 @@
-.PHONY: build-backend build-client build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
+.PHONY: build-backend build-client build-plugins build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
 
@@ -12,6 +12,11 @@ build-client:
 
 build-styles:
 	cd ./crates/client && npx tailwindcss -i ./public/input.css -o ./public/main.css
+
+build-plugins-dev:
+# Build chrome-importer plugin
+	cargo build -p chrome-importer
+	cp target/wasm32-wasi/debug/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
 
 build-release: build-backend build-styles
 	cargo tauri build

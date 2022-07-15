@@ -1,4 +1,4 @@
 (
     name: "chrome-importer",
-    plugin_type: PluginType::Lens
+    plugin_type: Lens
 )

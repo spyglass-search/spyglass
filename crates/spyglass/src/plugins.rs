@@ -1,13 +1,16 @@
+use std::fs;
 use std::path::PathBuf;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use shared::config::Config;
 use tokio::sync::{broadcast, mpsc};
 use wasmer::{Instance, Module, Store};
 use wasmer_wasi::WasiState;
 
+use crate::state::AppState;
 use crate::task::AppShutdown;
 
-#[derive(Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub enum PluginType {
     // - Registers itself as a lens.
     // - Enqueues URLs to the crawl queue.
@@ -15,7 +18,7 @@ pub enum PluginType {
     Lens,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct PluginData {
     pub name: String,
     #[serde(default)]
@@ -36,12 +39,15 @@ pub enum PluginResponse {
 /// Manages plugin events
 #[tracing::instrument(skip_all)]
 pub async fn plugin_manager(
+    _state: AppState,
+    config: Config,
     cmd_writer: mpsc::Sender<PluginCommand>,
     mut cmd_queue: mpsc::Receiver<PluginCommand>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("plugin manager started");
-    plugin_load(cmd_writer).await;
+    // Initial load, send some basic configuration to the plugins
+    plugin_load(config, cmd_writer).await;
 
     loop {
         // Wait for next command / handle shutdown responses
@@ -55,11 +61,8 @@ pub async fn plugin_manager(
 
         match next_cmd {
             Some(PluginCommand::Initialize(plugin)) => {
-                log::info!("intializing plugin <{}>", plugin.name);
                 if let Err(e) = plugin_init(&plugin) {
                     log::error!("Unable to init plugin <{}>: {}", plugin.name, e);
-                } else {
-                    log::info!("plugin <{}> initialized", plugin.name);
                 }
             }
             // Nothing to do
@@ -68,20 +71,52 @@ pub async fn plugin_manager(
     }
 }
 
-pub async fn plugin_load(cmds: mpsc::Sender<PluginCommand>) {
-    let _ = cmds
-        .send(PluginCommand::Initialize(PluginData {
-            name: "hello-world".into(),
-            path: Some("assets/plugins/chrome-importer/main.wasm".into()),
-            plugin_type: PluginType::Lens,
-        }))
-        .await;
+pub async fn plugin_load(config: Config, cmds: mpsc::Sender<PluginCommand>) {
+    log::info!("🔌 loading plugins");
+
+    let plugins_dir = config.plugins_dir();
+    let plugin_files = fs::read_dir(plugins_dir).expect("Invalid plugin directory");
+
+    for entry in plugin_files.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            // Load plugin info
+            let plugin_config = path.join("plugin.ron");
+            if !plugin_config.exists() || !plugin_config.is_file() {
+                log::warn!("Invalid plugin structure: {}", path.as_path().display());
+                continue;
+            }
+
+            match fs::read_to_string(plugin_config) {
+                Ok(file_contents) => match ron::from_str::<PluginData>(&file_contents) {
+                    Ok(config) => {
+                        let mut config = config.clone();
+                        config.path = Some(path.join("main.wasm"));
+                        if cmds
+                            .send(PluginCommand::Initialize(config.clone()))
+                            .await
+                            .is_ok()
+                        {
+                            log::info!("<{}> plugin found", &config.name);
+                        } else {
+                            log::error!("Couldn't send plugin cmd");
+                        }
+                    }
+                    Err(e) => log::error!("Couldn't parse plugin config: {}", e),
+                },
+                Err(e) => log::error!("Couldn't read plugin config: {}", e),
+            }
+        }
+    }
 }
 
 pub fn plugin_init(plugin: &PluginData) -> anyhow::Result<()> {
     if plugin.path.is_none() {
         // Nothing to do if theres no WASM file to load.
-        return Err(anyhow::Error::msg("Unable to find plugin path"));
+        return Err(anyhow::Error::msg(format!(
+            "Unable to find plugin path: {:?}",
+            plugin.path
+        )));
     }
 
     let path = plugin.path.as_ref().expect("Unable to extract plugin path");
