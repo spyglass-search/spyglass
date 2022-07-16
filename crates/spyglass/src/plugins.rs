@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use shared::config::Config;
 use tokio::sync::{broadcast, mpsc};
-use wasmer::{Instance, Module, Store};
+use wasmer::{Instance, Module, Store, WasmerEnv, Function, Exports};
 use wasmer_wasi::WasiState;
 
 use crate::state::AppState;
@@ -31,9 +31,10 @@ pub enum PluginCommand {
     Queue,
 }
 
-pub enum PluginResponse {
-    Success,
-    Error,
+// Basic environment information for the plugin
+#[derive(WasmerEnv, Clone)]
+pub (crate) struct PluginEnv {
+    plugin_id: u32,
 }
 
 /// Manages plugin events
@@ -124,10 +125,20 @@ pub fn plugin_init(plugin: &PluginData) -> anyhow::Result<()> {
     let module = Module::from_file(&store, &path)?;
 
     // Create the `WasiEnv`
-    let mut wasi_env = WasiState::new(&plugin.name).args(&["Gordon"]).finalize()?;
+    let log_func = Function::new_native_with_env(
+        &store,
+        PluginEnv { plugin_id: 1 },
+        plugin_log
+    );
 
-    // Generate an `ImportObject`
-    let import_object = wasi_env.import_object(&module)?;
+    let mut env = Exports::new();
+    env.insert("plugin_log", log_func);
+
+    let mut wasi_env = WasiState::new(&plugin.name)
+        .finalize()?;
+
+    let mut import_object = wasi_env.import_object(&module)?;
+    import_object.register("spyglass", env);
 
     // Insantiate the module wn the imports
     let instance = Instance::new(&module, &import_object)?;
@@ -136,5 +147,14 @@ pub fn plugin_init(plugin: &PluginData) -> anyhow::Result<()> {
     let start = instance.exports.get_function("_start")?;
     start.call(&[])?;
 
+    let sum = instance.exports.get_native_function::<(i32, i32), i32>("sum")?;
+    let result: i32 = sum.call(3, 4)?;
+    log::info!("exported func call: {}", result);
+
     Ok(())
+}
+
+#[tracing::instrument(skip_all)]
+fn plugin_log(env: &PluginEnv) {
+    log::info!("{}: {}", env.plugin_id, " log called");
 }

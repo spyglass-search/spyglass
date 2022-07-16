@@ -15,7 +15,7 @@ build-styles:
 
 build-plugins-dev:
 # Build chrome-importer plugin
-	cargo build -p chrome-importer
+	cargo build -p chrome-importer --target wasm32-wasi
 	cp target/wasm32-wasi/debug/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
 
 build-release: build-backend build-styles

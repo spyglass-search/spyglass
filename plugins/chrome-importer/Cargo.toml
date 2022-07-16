@@ -1,7 +1,7 @@
 [package]
 name = "chrome-importer"
 version = "0.1.0"
-authors = ["Andrew Huynh <a5thuynh@gmail.com>"]
+edition = "2021"
 license = "MIT"
 
 [[bin]]
@@ -9,3 +9,4 @@ name = "chrome-importer"
 path = "src/main.rs"
 
 [dependencies]
+spyglass-plugin = { path = "../../crates/spyglass-plugin" }

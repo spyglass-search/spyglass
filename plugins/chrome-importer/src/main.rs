@@ -1,3 +1,12 @@
+use spyglass_plugin::*;
+
 fn main() {
-    println!("Hello, {:?}", std::env::args().nth(1));
+    // basic plugin initialization
+    println!("plugin init");
+    log();
+}
+
+#[no_mangle]
+pub fn sum(a: i32, b: i32) -> i32 {
+    a + b
 }

@@ -6,6 +6,7 @@ members = [
     "crates/reindexer",
     "crates/shared",
     "crates/spyglass",
+    "crates/spyglass-plugin",
     "crates/tauri",
     # Default plugins
     "plugins/chrome-importer",
