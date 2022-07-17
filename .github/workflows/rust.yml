@@ -74,6 +74,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
+        args: -p spyglass
     # Run tests
     - name: Run tests
       uses: actions-rs/cargo@v1
