@@ -1,6 +1,6 @@
 data
 _notebooks
-
+*.wasm
 
 # Added by cargo
 target
