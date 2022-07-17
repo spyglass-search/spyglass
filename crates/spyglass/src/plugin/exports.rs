@@ -67,7 +67,7 @@ pub(crate) fn plugin_sync_file(env: &PluginEnv) {
 
 pub(crate) fn plugin_enqueue(env: &PluginEnv) {
     if let Ok(request) = wasi_read::<PluginEnqueueRequest>(&env.wasi_env) {
-        log::trace!("requesting enqueue for <{}>", request.url);
+        log::info!("{} enqueuing {} urls", env.name, request.urls.len());
         let state = env.app_state.clone();
         // Grab a handle to the plugin manager runtime
         let rt = tokio::runtime::Handle::current();
@@ -75,7 +75,7 @@ pub(crate) fn plugin_enqueue(env: &PluginEnv) {
             let state = state.clone();
             match enqueue_all(
                 &state.db.clone(),
-                &[request.url],
+                &request.urls,
                 &[],
                 &state.user_settings,
                 &Default::default(),

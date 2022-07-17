@@ -40,5 +40,5 @@ pub struct PluginMountRequest {
 
 #[derive(Deserialize, Serialize)]
 pub struct PluginEnqueueRequest {
-    pub url: String,
+    pub urls: Vec<String>,
 }

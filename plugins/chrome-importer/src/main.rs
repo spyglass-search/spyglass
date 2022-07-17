@@ -130,6 +130,9 @@ impl Plugin {
         self.parse_children(&root["other"]["children"], &mut to_add);
         self.parse_children(&root["synced"]["children"], &mut to_add);
 
+        // Add URLs to queue.
+        enqueue_all(&to_add);
+
         Ok(to_add.len())
     }
 }
