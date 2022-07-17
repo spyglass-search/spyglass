@@ -28,6 +28,9 @@ jobs:
         toolchain: stable
         target: wasm32-unknown-unknown
         components: clippy
+    # Setup wasm32-wasi toolchain
+    - name: setup wasm32-wasi toolchain
+      run: rustup target add wasm32-wasi
     # Should help bring down build times
     - uses: Swatinem/rust-cache@v1
       with:
