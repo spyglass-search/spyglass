@@ -4,8 +4,8 @@ use std::io;
 use crate::{PluginEnqueueRequest, PluginMountRequest};
 
 /// Add an item to the Spyglass crawl queue
-pub fn enqueue_all(urls: &Vec<String>) {
-    if object_to_stdout(&PluginEnqueueRequest { urls: urls.clone() }).is_ok() {
+pub fn enqueue_all(urls: &[String]) {
+    if object_to_stdout(&PluginEnqueueRequest { urls: urls.to_owned() }).is_ok() {
         unsafe {
             plugin_enqueue();
         }
