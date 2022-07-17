@@ -6,7 +6,7 @@ use entities::sea_orm::DatabaseConnection;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    plugins::PluginCommand,
+    plugin::PluginCommand,
     search::{IndexPath, Searcher},
 };
 use shared::config::{Config, Lens, UserSettings};

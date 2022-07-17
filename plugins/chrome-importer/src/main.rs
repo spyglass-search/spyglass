@@ -1,12 +1,16 @@
 use spyglass_plugin::*;
 
-fn main() {
-    // basic plugin initialization
-    println!("plugin init");
-    log();
-}
+#[derive(Default)]
+struct Plugin;
 
-#[no_mangle]
-pub fn sum(a: i32, b: i32) -> i32 {
-    a + b
+register_plugin!(Plugin);
+
+impl SpyglassPlugin for Plugin {
+    fn load(&self) {
+        log("plugin load".into());
+    }
+
+    fn request_queue(&self) {
+        log("request_queue".into());
+    }
 }

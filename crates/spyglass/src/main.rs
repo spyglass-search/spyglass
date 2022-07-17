@@ -8,7 +8,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use entities::models::crawl_queue;
-use libspyglass::plugins;
+use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use migration::{Migrator, MigratorTrait};
@@ -141,7 +141,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     }
 
     // Plugin server
-    let pm_handle = tokio::spawn(plugins::plugin_manager(
+    let pm_handle = tokio::spawn(plugin::plugin_manager(
         state.clone(),
         config.clone(),
         plugin_cmd_tx.clone(),
