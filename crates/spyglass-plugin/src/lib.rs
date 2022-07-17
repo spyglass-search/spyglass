@@ -1,3 +1,4 @@
+pub mod consts;
 mod shims;
 use serde::{Deserialize, Serialize};
 pub use shims::*;
@@ -16,16 +17,19 @@ macro_rules! register_plugin {
         }
 
         #[no_mangle]
-        pub fn request_queue() {
+        pub fn update() {
             STATE.with(|state| {
-                state.borrow_mut().request_queue();
+                state.borrow_mut().update();
             })
         }
     };
 }
 pub trait SpyglassPlugin {
+    /// Initial plugin load, setup any configuration you need here as well as
+    /// subscribe to specific events.
     fn load(&self);
-    fn request_queue(&self);
+    /// Request plugin for updates
+    fn update(&self);
 }
 
 #[derive(Deserialize, Serialize)]

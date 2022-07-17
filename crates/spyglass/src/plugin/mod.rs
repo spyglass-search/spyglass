@@ -120,9 +120,9 @@ pub async fn plugin_manager(
             },
             Some(PluginCommand::RequestQueue(plugin_id)) => {
                 if let Some(plugin) = manager.plugins.get(&plugin_id) {
-                    if let Ok(func) = plugin.instance.exports.get_function("request_queue") {
+                    if let Ok(func) = plugin.instance.exports.get_function("update") {
                         if let Err(e) = func.call(&[]) {
-                            log::error!("request_queue failed: {}", e);
+                            log::error!("update failed: {}", e);
                         }
                     }
                 } else {
@@ -202,10 +202,26 @@ pub fn plugin_init(state: &AppState, plugin: &PluginConfig) -> anyhow::Result<In
     let store = Store::default();
     let module = Module::from_file(&store, &path)?;
     let user_settings = &plugin.user_settings;
+
+    // Detect base data dir and send that to the plugin
+    let base_config_dir = directories::BaseDirs::new()
+        .map(|base| base.config_dir().display().to_string())
+        .map_or_else(|| "".to_string(), |dir| dir);
+
+    let base_data_dir: String = directories::BaseDirs::new()
+        .map(|base| base.data_local_dir().display().to_string())
+        .map_or_else(|| "".to_string(), |dir| dir);
+
     let mut wasi_env = WasiState::new(&plugin.name)
         // Attach the plugin data directory
         .map_dir("/data", plugin.data_folder())
         .expect("Unable to mount plugin data folder")
+        .env(spyglass_plugin::consts::env::HOST_OS, std::env::consts::OS)
+        .env(
+            spyglass_plugin::consts::env::BASE_CONFIG_DIR,
+            base_config_dir,
+        )
+        .env(spyglass_plugin::consts::env::BASE_DATA_DIR, base_data_dir)
         // Load user settings as environment variables
         .envs(user_settings.iter())
         // Override stdin/out with pipes for comms
