@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
@@ -17,9 +18,10 @@ mod exports;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub enum PluginType {
-    // - Registers itself as a lens.
-    // - Enqueues URLs to the crawl queue.
-    // - Register to handle specific URLs.
+    /// A more complex lens than a simple list of URLs
+    /// - Registers itself as a lens, under some "trigger" label.
+    /// - Enqueues URLs to the crawl queue.
+    /// - Can register to handle specific protocols if not HTTP
     Lens,
 }
 
@@ -29,6 +31,18 @@ pub struct PluginConfig {
     #[serde(default)]
     pub path: Option<PathBuf>,
     pub plugin_type: PluginType,
+    pub user_settings: HashMap<String, String>,
+}
+
+impl PluginConfig {
+    pub fn data_folder(&self) -> PathBuf {
+        self.path
+            .as_ref()
+            .expect("Unable to find plugin path")
+            .parent()
+            .expect("Unable to find parent plugin directory")
+            .join("data")
+    }
 }
 
 type PluginId = usize;
@@ -36,14 +50,14 @@ pub enum PluginCommand {
     Initialize(PluginConfig),
     // Request queued items from plugin
     RequestQueue(PluginId),
-    // A queued item has been fetched, now parse into text
-    RequestParse(PluginId),
 }
 
 // Basic environment information for the plugin
 #[derive(WasmerEnv, Clone)]
 pub(crate) struct PluginEnv {
     name: String,
+    app_state: AppState,
+    data_dir: PathBuf,
     wasi_env: WasiEnv,
 }
 
@@ -64,7 +78,7 @@ struct PluginManager {
 /// Manages plugin events
 #[tracing::instrument(skip_all)]
 pub async fn plugin_manager(
-    _state: AppState,
+    state: AppState,
     config: Config,
     cmd_writer: mpsc::Sender<PluginCommand>,
     mut cmd_queue: mpsc::Receiver<PluginCommand>,
@@ -87,7 +101,7 @@ pub async fn plugin_manager(
         };
 
         match next_cmd {
-            Some(PluginCommand::Initialize(plugin)) => match plugin_init(&plugin) {
+            Some(PluginCommand::Initialize(plugin)) => match plugin_init(&state, &plugin) {
                 Ok(instance) => {
                     let plugin_id = manager.plugins.len();
                     manager.plugins.insert(
@@ -139,15 +153,24 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
 
             match fs::read_to_string(plugin_config) {
                 Ok(file_contents) => match ron::from_str::<PluginConfig>(&file_contents) {
-                    Ok(config) => {
-                        let mut config = config.clone();
-                        config.path = Some(path.join("main.wasm"));
+                    Ok(plug) => {
+                        let mut plug = plug.clone();
+                        plug.path = Some(path.join("main.wasm"));
+                        // If any user settings are found, override default ones
+                        // from plugin config file.
+                        if let Some(user_settings) = config.plugin_settings.get(&plug.name) {
+                            for (key, value) in user_settings.iter() {
+                                plug.user_settings
+                                    .insert(key.to_string(), value.to_string());
+                            }
+                        }
+
                         if cmds
-                            .send(PluginCommand::Initialize(config.clone()))
+                            .send(PluginCommand::Initialize(plug.clone()))
                             .await
                             .is_ok()
                         {
-                            log::info!("<{}> plugin found", &config.name);
+                            log::info!("<{}> plugin found", &plug.name);
                         } else {
                             log::error!("Couldn't send plugin cmd");
                         }
@@ -160,7 +183,7 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
     }
 }
 
-pub fn plugin_init(plugin: &PluginConfig) -> anyhow::Result<Instance> {
+pub fn plugin_init(state: &AppState, plugin: &PluginConfig) -> anyhow::Result<Instance> {
     if plugin.path.is_none() {
         // Nothing to do if theres no WASM file to load.
         return Err(anyhow::Error::msg(format!(
@@ -169,13 +192,23 @@ pub fn plugin_init(plugin: &PluginConfig) -> anyhow::Result<Instance> {
         )));
     }
 
+    // Make sure data folder exists
+    std::fs::create_dir_all(plugin.data_folder()).expect("Unable to create plugin data folder");
+
     let path = plugin.path.as_ref().expect("Unable to extract plugin path");
     let output = Pipe::new();
     let input = Pipe::new();
 
     let store = Store::default();
     let module = Module::from_file(&store, &path)?;
+    let user_settings = &plugin.user_settings;
     let mut wasi_env = WasiState::new(&plugin.name)
+        // Attach the plugin data directory
+        .map_dir("/data", plugin.data_folder())
+        .expect("Unable to mount plugin data folder")
+        // Load user settings as environment variables
+        .envs(user_settings.iter())
+        // Override stdin/out with pipes for comms
         .stdin(Box::new(input))
         .stdout(Box::new(output))
         .finalize()?;
@@ -184,7 +217,7 @@ pub fn plugin_init(plugin: &PluginConfig) -> anyhow::Result<Instance> {
     // Register exported functions
     import_object.register(
         "spyglass",
-        exports::register_exports(plugin, &store, &wasi_env),
+        exports::register_exports(state, plugin, &store, &wasi_env),
     );
 
     // Instantiate the module wn the imports

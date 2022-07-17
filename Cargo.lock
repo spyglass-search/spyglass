@@ -612,6 +612,8 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "chrome-importer"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "spyglass-plugin",
 ]
 
@@ -4775,6 +4777,7 @@ dependencies = [
  "serde",
  "sha2",
  "shared",
+ "spyglass-plugin",
  "sqlx",
  "tantivy",
  "tendril",
