@@ -8,6 +8,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use entities::models::crawl_queue;
+use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
 use migration::{Migrator, MigratorTrait};
@@ -26,7 +27,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(
             EnvFilter::from_default_env()
                 .add_directive(tracing::Level::INFO.into())
-                .add_directive("tantivy=WARN".parse().unwrap()),
+                .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive(
+                    "wasmer_compiler_cranelift=WARN"
+                        .parse()
+                        .expect("Invalid EnvFilter"),
+                ),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
         .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
@@ -39,10 +45,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .enable_all()
         .thread_name("spyglass-backend")
         .build()
-        .unwrap();
+        .expect("Unable to create tokio runtime");
 
     // Initialize/Load user preferences
-    let state = rt.block_on(AppState::new(&config));
+    let mut state = rt.block_on(AppState::new(&config));
 
     // Run any migrations
     match rt.block_on(Migrator::up(&state.db, None)) {
@@ -57,13 +63,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");
-    rt.block_on(start_backend(&state, &config));
+    rt.block_on(start_backend(&mut state, &config));
     server.close();
 
     Ok(())
 }
 
-async fn start_backend(state: &AppState, config: &Config) {
+async fn start_backend(state: &mut AppState, config: &Config) {
     // TODO: Implement user-friendly start-up wizard
     // if state.config.user_settings.run_wizard {
     //     // Import data from Firefox
@@ -82,9 +88,15 @@ async fn start_backend(state: &AppState, config: &Config) {
             .inflight_crawl_limit
             .value()
             .try_into()
-            .unwrap(),
+            .expect("Unable to parse inflight_crawl_limit"),
     );
+
+    // Channel for shutdown listeners
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
+
+    // Channel for plugin commands
+    let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
+    state.plugin_cmd_tx = Some(plugin_cmd_tx.clone());
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
     let lens_watcher_handle = tokio::spawn(task::lens_watcher(
@@ -115,23 +127,43 @@ async fn start_backend(state: &AppState, config: &Config) {
 
             loop {
                 interval.tick().await;
-                if let Err(err) = state.index.writer.lock().unwrap().commit() {
+                if let Err(err) = state
+                    .index
+                    .writer
+                    .lock()
+                    .expect("Unable to get index lock")
+                    .commit()
+                {
                     log::error!("commit loop error: {:?}", err);
                 }
             }
         });
     }
 
+    // Plugin server
+    let pm_handle = tokio::spawn(plugin::plugin_manager(
+        state.clone(),
+        config.clone(),
+        plugin_cmd_tx.clone(),
+        plugin_cmd_rx,
+        shutdown_tx.subscribe(),
+    ));
+
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
             lens_watcher_handle.abort();
+            pm_handle.abort();
             log::warn!("Shutdown request received");
-            shutdown_tx.send(AppShutdown::Now).unwrap();
+            shutdown_tx
+                .send(AppShutdown::Now)
+                .expect("Unable to send AppShutdown cmd");
         }
         Err(err) => {
             log::error!("Unable to listen for shutdown signal: {}", err);
-            shutdown_tx.send(AppShutdown::Now).unwrap();
+            shutdown_tx
+                .send(AppShutdown::Now)
+                .expect("Unable to send AppShutdown cmd");
         }
     }
 

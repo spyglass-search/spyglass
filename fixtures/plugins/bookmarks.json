@@ -1,0 +1,62 @@
+{
+    "checksum": "54e47d35aec9b1e0bde3a0cf382d1818",
+    "roots": {
+       "bookmark_bar": {
+          "children": [ {
+             "date_added": "13302495254502629",
+             "guid": "8d9b7184-ee05-4515-b7fd-973216ddd46e",
+             "id": "5",
+             "name": "D&D Beyond",
+             "type": "url",
+             "url": "https://dndbeyond.com/join"
+          }, {
+             "children": [ {
+                "date_added": "13302555696619626",
+                "guid": "3edf13c5-5ed6-4ef9-9318-37cbaabf8901",
+                "id": "7",
+                "name": "Hacker News",
+                "type": "url",
+                "url": "https://news.ycombinator.com/"
+             } ],
+             "date_added": "13302555707155285",
+             "date_modified": "13302555715897067",
+             "guid": "b7b5aeb2-88de-4196-9988-986a5b87c73e",
+             "id": "8",
+             "name": "Tech Stuff",
+             "type": "folder"
+          } ],
+          "date_added": "13302495236528998",
+          "date_modified": "13302555696619626",
+          "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+          "id": "1",
+          "name": "Bookmarks Bar",
+          "type": "folder"
+       },
+       "other": {
+          "children": [ {
+             "date_added": "13302555715897067",
+             "guid": "fa4c966c-f118-4337-9fbf-cbda7989ae4e",
+             "id": "9",
+             "name": "GitHub - a5huynh/spyglass: A personal search engine",
+             "type": "url",
+             "url": "https://github.com/a5huynh/spyglass"
+          } ],
+          "date_added": "13302495236528998",
+          "date_modified": "13302555721235676",
+          "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+          "id": "2",
+          "name": "Other Bookmarks",
+          "type": "folder"
+       },
+       "synced": {
+          "children": [  ],
+          "date_added": "13302495236529000",
+          "date_modified": "0",
+          "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+          "id": "3",
+          "name": "Mobile Bookmarks",
+          "type": "folder"
+       }
+    },
+    "version": 1
+ }

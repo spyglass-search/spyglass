@@ -28,6 +28,7 @@ ron = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 shared = { path = "../shared" }
+spyglass-plugin = { path = "../spyglass-plugin" }
 sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono"] }
 tantivy = "0.18"
 tendril = "0.4.2"
@@ -39,6 +40,8 @@ tracing-log = "0.1.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
 url = "2.2"
 uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
+wasmer = "2.3.0"
+wasmer-wasi = "2.3.0"
 
 [lib]
 name = "libspyglass"
