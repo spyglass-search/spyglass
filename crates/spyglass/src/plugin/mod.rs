@@ -177,7 +177,7 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
         let path = entry.path();
         if path.is_dir() {
             // Load plugin settings
-            let plugin_config = path.join("plugin.ron");
+            let plugin_config = path.join("manifest.ron");
             if !plugin_config.exists() || !plugin_config.is_file() {
                 log::warn!("Invalid plugin structure: {}", path.as_path().display());
                 continue;
