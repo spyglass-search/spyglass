@@ -13,6 +13,9 @@ register_plugin!(Plugin);
 impl SpyglassPlugin for Plugin {
     fn load(&self) {
         let path = {
+            // Let the host know we want to check for updates on a regular interval.
+            subscribe(PluginEvent::CheckUpdateInterval);
+
             // If the user has set the CHROME_DATA_FOLDER setting, use that
             if let Ok(folder) = std::env::var("CHROME_DATA_FOLDER") {
                 Some(Path::new(&folder).join(BOOKMARK_FILE))
@@ -73,7 +76,7 @@ impl SpyglassPlugin for Plugin {
                     log(format!("Unable to parse bookmark file: {}", e));
                 }
             }
-            Err(e) => eprintln!("Unable to read {}: {}", path.display(), e),
+            Err(e) => log(format!("Unable to read {}: {}", path.display(), e)),
         }
     }
 }

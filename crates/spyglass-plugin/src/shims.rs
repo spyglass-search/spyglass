@@ -1,7 +1,15 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
 
-use crate::{PluginEnqueueRequest, PluginMountRequest};
+use crate::{PluginCommandRequest, PluginEnqueueRequest, PluginEvent, PluginMountRequest};
+
+pub fn subscribe(event: PluginEvent) {
+    if object_to_stdout(&PluginCommandRequest::Subscribe(event)).is_ok() {
+        unsafe {
+            plugin_cmd();
+        }
+    }
+}
 
 /// Add an item to the Spyglass crawl queue
 pub fn enqueue_all(urls: &[String]) {
@@ -35,6 +43,7 @@ pub fn sync_file(dst: String, src: String) {
 
 #[link(wasm_import_module = "spyglass")]
 extern "C" {
+    fn plugin_cmd();
     fn plugin_enqueue();
     fn plugin_log();
     fn plugin_sync_file();

@@ -33,6 +33,17 @@ pub trait SpyglassPlugin {
 }
 
 #[derive(Deserialize, Serialize)]
+pub enum PluginEvent {
+    /// Check for updates at a fixed interval
+    CheckUpdateInterval,
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum PluginCommandRequest {
+    Subscribe(PluginEvent),
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct PluginMountRequest {
     pub dst: String,
     pub src: String,
