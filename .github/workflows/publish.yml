@@ -54,6 +54,8 @@ jobs:
         cargo build -p spyglass --verbose --release
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+    - name: build default plugins
+      run: make build-plugins-release
     - uses: tauri-apps/tauri-action@v0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
