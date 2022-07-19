@@ -22,7 +22,9 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "resources": [],
+      "resources": [
+        "../../assets/*"
+      ],
       "externalBin": ["binaries/spyglass-server"],
       "copyright": "(C) 2022 Andrew Huynh",
       "category": "DeveloperTool",
