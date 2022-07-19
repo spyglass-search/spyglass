@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use entities::models::crawl_queue;
+use entities::models::{crawl_queue, lens};
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown};
@@ -80,6 +80,9 @@ async fn start_backend(state: &mut AppState, config: &Config) {
 
     // Initialize crawl_queue, set all in-flight tasks to queued.
     crawl_queue::reset_processing(&state.db).await;
+    if let Err(e) = lens::reset(&state.db).await {
+        log::error!("Unable to reset lenses: {}", e);
+    }
 
     // Create channels for scheduler / crawlers
     let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(

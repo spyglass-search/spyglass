@@ -11,6 +11,7 @@ use tokio::sync::{broadcast, mpsc};
 use wasmer::{Instance, Module, Store, WasmerEnv};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
+use entities::models::lens;
 use shared::config::Config;
 use spyglass_plugin::PluginEvent;
 
@@ -19,7 +20,7 @@ use crate::task::AppShutdown;
 
 mod exports;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub enum PluginType {
     /// A more complex lens than a simple list of URLs
     /// - Registers itself as a lens, under some "trigger" label.
@@ -31,6 +32,9 @@ pub enum PluginType {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct PluginConfig {
     pub name: String,
+    pub author: String,
+    pub description: String,
+    pub version: String,
     #[serde(default)]
     pub path: Option<PathBuf>,
     pub plugin_type: PluginType,
@@ -130,7 +134,7 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::Initialize(plugin)) => {
-                match plugin_init(plugin_id, &state, &cmd_writer, &plugin) {
+                match plugin_init(plugin_id, &state, &cmd_writer, &plugin).await {
                     Ok(instance) => {
                         manager.plugins.insert(
                             plugin_id,
@@ -167,6 +171,7 @@ pub async fn plugin_manager(
     }
 }
 
+// Loop through plugins found in the plugins directory, enabling
 pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
     log::info!("🔌 loading plugins");
 
@@ -179,12 +184,13 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
             // Load plugin settings
             let plugin_config = path.join("manifest.ron");
             if !plugin_config.exists() || !plugin_config.is_file() {
-                log::warn!("Invalid plugin structure: {}", path.as_path().display());
+                log::warn!("Invalid plugin manifest: {}", path.as_path().display());
                 continue;
             }
 
             match fs::read_to_string(plugin_config) {
                 Ok(file_contents) => match ron::from_str::<PluginConfig>(&file_contents) {
+                    // Successfully loaded plugin manifest
                     Ok(plug) => {
                         let mut plug = plug.clone();
                         plug.path = Some(path.join("main.wasm"));
@@ -215,7 +221,7 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
     }
 }
 
-pub fn plugin_init(
+pub async fn plugin_init(
     plugin_id: PluginId,
     state: &AppState,
     cmd_writer: &mpsc::Sender<PluginCommand>,
@@ -227,6 +233,24 @@ pub fn plugin_init(
             "Unable to find plugin path: {:?}",
             plugin.path
         )));
+    }
+
+    // Enable plugins that are lenses, this is the only type right so technically they
+    // all will be enabled as a lens.
+    if plugin.plugin_type == PluginType::Lens {
+        match lens::add_or_enable(
+            &state.db,
+            &plugin.name,
+            &plugin.author,
+            Some(&plugin.description),
+            &plugin.version,
+            lens::LensType::Plugin,
+        )
+        .await
+        {
+            Ok(is_new) => log::info!("loaded lens {}, new? {}", plugin.name, is_new),
+            Err(e) => log::error!("Unable to add lens: {}", e),
+        }
     }
 
     // Make sure data folder exists

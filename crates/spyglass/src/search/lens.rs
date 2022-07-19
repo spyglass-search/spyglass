@@ -62,8 +62,6 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
 /// Loop through lenses in the AppState. Update our internal db & bootstrap anything
 /// that hasn't been bootstrapped.
 pub async fn load_lenses(state: AppState) {
-    let _ = lens::reset(&state.db).await;
-
     let mut new_lenses: Vec<Lens> = Vec::new();
     for entry in state.lenses.iter() {
         let lens = entry.value();
@@ -78,8 +76,8 @@ pub async fn load_lenses(state: AppState) {
         )
         .await
         {
-            Ok(new_lens) => {
-                log::info!("loaded lens {}, new? {}", lens.name, new_lens);
+            Ok(is_new) => {
+                log::info!("loaded lens {}, new? {}", lens.name, is_new);
                 new_lenses.push(lens.clone());
             }
             Err(e) => log::error!("error loading lens {}", e),
