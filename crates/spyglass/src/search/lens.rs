@@ -68,20 +68,20 @@ pub async fn load_lenses(state: AppState) {
     for entry in state.lenses.iter() {
         let lens = entry.value();
         // Have we added this lens to the database?
-        match lens::add(
+        match lens::add_or_enable(
             &state.db,
             &lens.name,
             &lens.author,
             lens.description.as_ref(),
             &lens.version,
+            lens::LensType::Simple,
         )
         .await
         {
-            Ok(true) => {
-                log::info!("loaded lens {}", lens.name);
+            Ok(new_lens) => {
+                log::info!("loaded lens {}, new? {}", lens.name, new_lens);
                 new_lenses.push(lens.clone());
             }
-            Ok(false) => log::info!("duplicate lens ({})", lens.name),
             Err(e) => log::error!("error loading lens {}", e),
         }
     }
