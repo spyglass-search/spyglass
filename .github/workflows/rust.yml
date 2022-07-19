@@ -80,7 +80,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --verbose --all --exclude chrome-importer
+        args: --verbose --all
     # Run clippy
     - name: Run clippy
       uses: actions-rs/cargo@v1
