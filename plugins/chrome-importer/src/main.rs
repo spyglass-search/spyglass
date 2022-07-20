@@ -71,11 +71,10 @@ impl SpyglassPlugin for Plugin {
         }
 
         match fs::read_to_string(path.clone()) {
-            Ok(blob) => {
-                if let Err(e) = self.parse_and_queue_bookmarks(&blob) {
-                    log(format!("Unable to parse bookmark file: {}", e));
-                }
-            }
+            Ok(blob) => match self.parse_and_queue_bookmarks(&blob) {
+                Ok(to_add) => enqueue_all(&to_add),
+                Err(e) => log(format!("Unable to parse bookmark file: {}", e)),
+            },
             Err(e) => log(format!("Unable to read {}: {}", path.display(), e)),
         }
     }
@@ -110,20 +109,30 @@ impl Plugin {
     }
 
     // Attempt to parse bookmark json
-    pub fn parse_and_queue_bookmarks(&self, blob: &str) -> Result<usize, serde_json::Error> {
+    pub fn parse_and_queue_bookmarks(&self, blob: &str) -> Result<Vec<String>, serde_json::Error> {
         let v: Value = serde_json::from_str(blob)?;
+        let checksum_path = Path::new(DATA_DIR).join("checksum");
+
+        // Previous checksum
+        let previous_checksum = std::fs::read_to_string(checksum_path.clone()).ok();
 
         // Write out the checksum so we know when it was last checked
         let checksum = &v["checksum"];
         if let Some(checksum) = checksum.as_str() {
-            let checksum_file = Path::new(DATA_DIR).join("checksum");
-            let _ = std::fs::write(checksum_file, checksum);
+            let _ = std::fs::write(checksum_path, checksum);
+            // If have a previous checksum saved, check it against the current one
+            // and skip parsing bookmarks if they're the same.
+            if let Some(previous_checksum) = previous_checksum {
+                if previous_checksum == checksum {
+                    return Ok(Vec::new());
+                }
+            }
         }
 
         // Return early if there is no root
         let root = &v["roots"];
         if !root.is_object() {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         let mut to_add: Vec<String> = Vec::new();
@@ -133,10 +142,7 @@ impl Plugin {
         self.parse_children(&root["other"]["children"], &mut to_add);
         self.parse_children(&root["synced"]["children"], &mut to_add);
 
-        // Add URLs to queue.
-        enqueue_all(&to_add);
-
-        Ok(to_add.len())
+        Ok(to_add)
     }
 }
 
@@ -151,6 +157,6 @@ mod test {
 
         let res = plugin.parse_and_queue_bookmarks(&blob.to_string());
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), 3);
+        assert_eq!(res.unwrap().len(), 3);
     }
 }
