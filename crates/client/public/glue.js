@@ -72,3 +72,7 @@ export async function openLensFolder() {
 export async function resizeWindow(height) {
     return await invoke('resize_window', { height });
 }
+
+export async function toggle_plugin(name) {
+    return await invoke('toggle_plugin', { name })
+}

@@ -268,3 +268,17 @@ pub async fn list_plugins(
         .call::<Value, Vec<response::PluginResult>>("list_plugins", Value::Null)
         .await)
 }
+
+#[tauri::command]
+pub async fn toggle_plugin(
+    window: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    name: &str,
+) -> Result<(), String> {
+    let mut rpc = rpc.lock().await;
+    rpc.call::<(String,), ()>("toggle_plugin", (name.into(),))
+        .await;
+    let _ = window.emit("refresh_plugin_manager", true);
+
+    Ok(())
+}

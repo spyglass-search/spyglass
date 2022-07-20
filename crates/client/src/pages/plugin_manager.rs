@@ -1,4 +1,4 @@
-use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
@@ -6,8 +6,8 @@ use yew::prelude::*;
 use shared::response::PluginResult;
 
 use crate::components::icons;
-use crate::invoke;
 use crate::utils::RequestState;
+use crate::{invoke, listen, toggle_plugin};
 
 fn fetch_installed_plugins(
     plugins_handle: UseStateHandle<Vec<PluginResult>>,
@@ -27,6 +27,65 @@ fn fetch_installed_plugins(
     });
 }
 
+#[derive(Properties, PartialEq)]
+pub struct PluginProps {
+    pub plugin: PluginResult,
+}
+
+#[function_component(Plugin)]
+pub fn plugin_comp(props: &PluginProps) -> Html {
+    let plugin = &props.plugin;
+    let component_styles: Vec<String> = vec![
+        "border-t".into(),
+        "border-neutral-600".into(),
+        "p-4".into(),
+        "pr-0".into(),
+        "text-white".into(),
+        "bg-netural-800".into(),
+    ];
+
+    let btn_label = if plugin.is_enabled {
+        "Disable"
+    } else {
+        "Enable"
+    };
+
+    let onclick = {
+        let plugin_name = plugin.title.clone();
+        Callback::from(move |_| {
+            let plugin_name = plugin_name.clone();
+            spawn_local(async move {
+                if let Err(e) = toggle_plugin(&plugin_name).await {
+                    log::error!("Error toggling plugin: {:?}", e);
+                }
+            })
+        })
+    };
+
+    html! {
+        <div class={component_styles}>
+            <h2 class="text-xl truncate p-0">
+                {plugin.title.clone()}
+            </h2>
+            <h2 class="text-xs truncate py-1 text-neutral-400">
+                {"Crafted By:"}
+                <span class="ml-2 text-cyan-400">{plugin.author.clone()}</span>
+            </h2>
+            <div class="leading-relaxed text-neutral-400 h-6 overflow-hidden text-ellipsis">
+                {plugin.description.clone()}
+            </div>
+            <div class="pt-2 flex flex-row gap-8">
+                <button
+                    onclick={onclick}
+                    class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white border-2 border-neutral-600 rounded"
+                >
+                    <div class="px-2">{btn_label}</div>
+                </button>
+            </div>
+        </div>
+    }
+}
+
 #[function_component(PluginManagerPage)]
 pub fn plugin_manager_page() -> Html {
     let req_state = use_state_eq(|| RequestState::NotStarted);
@@ -41,9 +100,9 @@ pub fn plugin_manager_page() -> Html {
         html! {
             <>
             {
-                plugins.iter().map(|_| {
-                    html! { <span>{"PLUGIN!"}</span> }
-                }).collect::<Html>()
+                plugins.iter()
+                    .map(|plugin| html! { <Plugin plugin={plugin.clone()} /> })
+                    .collect::<Html>()
             }
             </>
         }
@@ -56,6 +115,19 @@ pub fn plugin_manager_page() -> Html {
             </div>
         }
     };
+
+    // Listen for updates from plugins
+    {
+        spawn_local(async move {
+            let cb = Closure::wrap(Box::new(move || {
+                log::info!("refresh!");
+                req_state.set(RequestState::NotStarted);
+            }) as Box<dyn Fn()>);
+
+            let _ = listen("refresh_plugin_manager", &cb).await;
+            cb.forget();
+        });
+    }
 
     html! {
         <div class="text-white">

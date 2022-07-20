@@ -56,6 +56,10 @@ impl Rpc for SpyglassRPC {
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
         Box::pin(route::toggle_pause(self.state.clone()))
     }
+
+    fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>> {
+        Box::pin(route::toggle_plugin(self.state.clone(), name))
+    }
 }
 
 pub fn start_api_ipc(state: &AppState) -> anyhow::Result<Server, ()> {

@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::resize_window,
             cmd::search_docs,
             cmd::search_lenses,
+            cmd::toggle_plugin,
         ])
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config)))

@@ -47,4 +47,7 @@ pub trait Rpc {
 
     #[rpc(name = "toggle_pause")]
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;
+
+    #[rpc(name = "toggle_plugin")]
+    fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>>;
 }
