@@ -5,10 +5,11 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use crate::components::icons;
 use crate::{
     install_lens, list_installable_lenses, list_installed_lenses, on_refresh_lens_manager,
 };
+use crate::components::icons;
+use crate::utils::RequestState;
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -16,20 +17,6 @@ pub struct LensProps {
     pub result: LensResult,
     #[prop_or_default]
     pub is_installed: bool,
-}
-
-#[derive(PartialEq)]
-enum RequestState {
-    NotStarted,
-    InProgress,
-    Finished,
-    Error,
-}
-
-impl RequestState {
-    pub fn is_done(&self) -> bool {
-        *self == Self::Finished || *self == Self::Error
-    }
 }
 
 fn fetch_installed_lenses(
@@ -80,14 +67,6 @@ fn fetch_installable_lenses(
     });
 }
 
-fn handle_install_lens(download_url: String) {
-    spawn_local(async move {
-        if let Err(e) = install_lens(download_url.clone()).await {
-            log::error!("error installing lens: {} {:?}", download_url.clone(), e);
-        }
-    });
-}
-
 #[derive(Properties, PartialEq)]
 pub struct InstallBtnProps {
     pub download_url: String,
@@ -100,11 +79,16 @@ pub fn install_btn(props: &InstallBtnProps) -> Html {
 
     let onclick = {
         let is_installing = is_installing.clone();
-        move |_| {
+        Callback::from(move |_| {
+            let download_url = download_url.clone();
             is_installing.set(true);
             // Download to lens directory
-            handle_install_lens(download_url.clone());
-        }
+            spawn_local(async move {
+                if let Err(e) = install_lens(download_url.clone()).await {
+                    log::error!("error installing lens: {} {:?}", download_url.clone(), e);
+                }
+            });
+        })
     };
 
     if *is_installing {

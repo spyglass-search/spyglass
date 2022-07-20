@@ -8,6 +8,7 @@ mod components;
 mod constants;
 mod events;
 mod pages;
+mod utils;
 
 use crate::pages::{LensManagerPage, PluginManagerPage, SearchPage, StatsPage};
 
