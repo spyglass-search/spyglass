@@ -1,35 +1,41 @@
 use shared::config::Config;
+use strum_macros::{Display, EnumString};
 use tauri::{
     utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu,
     SystemTrayMenu, SystemTrayMenuItem,
 };
 
-pub const VERSION_MENU_ITEM: &str = "version";
-pub const QUIT_MENU_ITEM: &str = "quit";
-
-pub const NUM_DOCS_MENU_ITEM: &str = "num_docs";
-pub const CRAWL_STATUS_MENU_ITEM: &str = "crawl_status";
-
-pub const OPEN_LENS_MANAGER: &str = "open_lens_manager";
-pub const OPEN_SETTINGS_FOLDER: &str = "open_settings_folder";
-pub const OPEN_LOGS_FOLDER: &str = "open_logs_folder";
-pub const SHOW_SEARCHBAR: &str = "show_searchbar";
-pub const SHOW_CRAWL_STATUS: &str = "show_crawl_status_window";
-pub const JOIN_DISCORD: &str = "join_discord";
-
-pub const DEV_SHOW_CONSOLE: &str = "dev_show_console";
+#[derive(Display, Debug, EnumString)]
+#[allow(non_camel_case_types)]
+pub enum MenuID {
+    CRAWL_STATUS,
+    DEV_SHOW_CONSOLE,
+    JOIN_DISCORD,
+    NUM_DOCS,
+    OPEN_LENS_MANAGER,
+    OPEN_LOGS_FOLDER,
+    OPEN_PLUGIN_MANAGER,
+    OPEN_SETTINGS_FOLDER,
+    QUIT,
+    SHOW_CRAWL_STATUS,
+    SHOW_SEARCHBAR,
+    VERSION,
+}
 
 pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTrayMenu {
-    let show = CustomMenuItem::new(SHOW_SEARCHBAR.to_string(), "Show search")
+    let show = CustomMenuItem::new(MenuID::SHOW_SEARCHBAR.to_string(), "Show search")
         .accelerator(config.user_settings.shortcut.clone());
 
-    let pause = CustomMenuItem::new(CRAWL_STATUS_MENU_ITEM.to_string(), "");
-    let quit = CustomMenuItem::new(QUIT_MENU_ITEM.to_string(), "Quit");
+    let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "");
+    let quit = CustomMenuItem::new(MenuID::QUIT.to_string(), "Quit");
 
-    let open_settings_folder =
-        CustomMenuItem::new(OPEN_SETTINGS_FOLDER.to_string(), "Open settings folder");
+    let open_settings_folder = CustomMenuItem::new(
+        MenuID::OPEN_SETTINGS_FOLDER.to_string(),
+        "Open settings folder",
+    );
 
-    let open_logs_folder = CustomMenuItem::new(OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
+    let open_logs_folder =
+        CustomMenuItem::new(MenuID::OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
 
     let app_version = format!("v20{}", ctx.package_info().version);
     let mut tray = SystemTrayMenu::new();
@@ -38,16 +44,16 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_item(show)
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(VERSION_MENU_ITEM, app_version).disabled())
+        .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
         .add_item(
-            CustomMenuItem::new(NUM_DOCS_MENU_ITEM.to_string(), "XX documents indexed").disabled(),
+            CustomMenuItem::new(MenuID::NUM_DOCS.to_string(), "XX documents indexed").disabled(),
         )
         .add_item(CustomMenuItem::new(
-            SHOW_CRAWL_STATUS.to_string(),
+            MenuID::SHOW_CRAWL_STATUS.to_string(),
             "Show crawl status",
         ))
         .add_item(CustomMenuItem::new(
-            OPEN_LENS_MANAGER.to_string(),
+            MenuID::OPEN_LENS_MANAGER.to_string(),
             "Manage/install lenses",
         ))
         .add_native_item(SystemTrayMenuItem::Separator)
@@ -58,11 +64,17 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
     if cfg!(debug_assertions) {
         tray = tray
             .add_native_item(SystemTrayMenuItem::Separator)
-            .add_item(CustomMenuItem::new(DEV_SHOW_CONSOLE, "Open dev console"));
+            .add_item(CustomMenuItem::new(
+                MenuID::DEV_SHOW_CONSOLE.to_string(),
+                "Open dev console",
+            ));
     }
 
     tray.add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(JOIN_DISCORD, "Join our Discord"))
+        .add_item(CustomMenuItem::new(
+            MenuID::JOIN_DISCORD.to_string(),
+            "Join our Discord",
+        ))
         .add_item(quit)
 }
 
