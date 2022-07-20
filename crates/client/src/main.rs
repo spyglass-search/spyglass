@@ -9,7 +9,7 @@ mod constants;
 mod events;
 mod pages;
 
-use crate::pages::{LensManagerPage, SearchPage, StatsPage};
+use crate::pages::{LensManagerPage, PluginManagerPage, SearchPage, StatsPage};
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -73,6 +73,8 @@ enum Route {
     LensManager,
     #[at("/stats")]
     Status,
+    #[at("/settings/plugins")]
+    PluginManager,
 }
 
 fn main() {
@@ -116,6 +118,7 @@ pub fn app() -> Html {
 fn switch(routes: &Route) -> Html {
     match routes {
         Route::LensManager => html! { <LensManagerPage /> },
+        Route::PluginManager => html! { <PluginManagerPage /> },
         Route::Search => html! { <SearchPage /> },
         Route::Status => html! { <StatsPage /> },
     }
