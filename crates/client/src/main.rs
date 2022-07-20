@@ -12,6 +12,12 @@ mod utils;
 
 use crate::pages::{LensManagerPage, PluginManagerPage, SearchPage, StatsPage};
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__"], catch)]
+    pub async fn invoke(fn_name: &str, val: JsValue) -> Result<JsValue, JsValue>;
+}
+
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
     #[wasm_bindgen(js_name = "deleteDoc", catch)]

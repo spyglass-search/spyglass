@@ -257,3 +257,14 @@ pub async fn recrawl_domain(
         }
     }
 }
+
+#[tauri::command]
+pub async fn list_plugins(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+) -> Result<Vec<response::PluginResult>, String> {
+    let mut rpc = rpc.lock().await;
+    Ok(rpc
+        .call::<Value, Vec<response::PluginResult>>("list_plugins", Value::Null)
+        .await)
+}

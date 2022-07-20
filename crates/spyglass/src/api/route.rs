@@ -7,8 +7,8 @@ use url::Url;
 
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, QueueStatus, SearchLensesResp, SearchMeta, SearchResult,
-    SearchResults,
+    AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
+    SearchResult, SearchResults,
 };
 
 use entities::models::{crawl_queue, indexed_document, lens};
@@ -138,6 +138,24 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
     lenses.sort_by(|x, y| x.title.cmp(&y.title));
 
     Ok(lenses)
+}
+
+pub async fn list_plugins(_state: AppState) -> Result<Vec<PluginResult>> {
+    let mut test = Vec::new();
+    test.push(PluginResult {
+        author: "a5huynh".into(),
+        title: "chrome-importer".into(),
+        description: "lorem".into(),
+        is_enabled: false,
+    });
+    test.push(PluginResult {
+        author: "a5huynh".into(),
+        title: "firefox-importer".into(),
+        description: "lorem".into(),
+        is_enabled: true,
+    });
+
+    Ok(test)
 }
 
 /// Show the list of URLs in the queue and their status

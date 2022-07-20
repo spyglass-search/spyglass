@@ -5,11 +5,11 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
+use crate::components::icons;
+use crate::utils::RequestState;
 use crate::{
     install_lens, list_installable_lenses, list_installed_lenses, on_refresh_lens_manager,
 };
-use crate::components::icons;
-use crate::utils::RequestState;
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -30,7 +30,7 @@ fn fetch_installed_lenses(
                 req_state.set(RequestState::Finished);
             }
             Err(e) => {
-                log::info!("Error: {:?}", e);
+                log::info!("Error fetching lenses: {:?}", e);
                 req_state.set(RequestState::Error);
             }
         }

@@ -37,6 +37,10 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::list_installed_lenses(self.state.clone()))
     }
 
+    fn list_plugins(&self) -> BoxFuture<Result<Vec<shared::response::PluginResult>>> {
+        Box::pin(route::list_plugins(self.state.clone()))
+    }
+
     fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>> {
         Box::pin(route::recrawl_domain(self.state.clone(), domain))
     }

@@ -2,7 +2,9 @@ use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_derive::rpc;
 
 use crate::request::{SearchLensesParam, SearchParam};
-use crate::response::{AppStatus, CrawlStats, LensResult, SearchLensesResp, SearchResults};
+use crate::response::{
+    AppStatus, CrawlStats, LensResult, PluginResult, SearchLensesResp, SearchResults,
+};
 
 pub fn gen_ipc_path() -> String {
     if cfg!(windows) {
@@ -30,6 +32,9 @@ pub trait Rpc {
 
     #[rpc(name = "list_installed_lenses")]
     fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
+
+    #[rpc(name = "list_plugins")]
+    fn list_plugins(&self) -> BoxFuture<Result<Vec<PluginResult>>>;
 
     #[rpc(name = "recrawl_domain")]
     fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>>;
