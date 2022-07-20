@@ -72,7 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config)))
         .setup(move |app| {
             // Copy default plugins to data directory to be picked up by the backend
-            copy_plugins(app.path_resolver());
+            if let Err(e) = copy_plugins(&config, app.path_resolver()) {
+                log::error!("Unable to copy default plugins: {}", e);
+            }
 
             // macOS: hide from dock (also hides menu bar)
             #[cfg(target_os = "macos")]
@@ -280,16 +282,24 @@ async fn check_version_interval(window: Window) {
     }
 }
 
-fn copy_plugins(resolver: PathResolver) -> anyhow::Result<()> {
+fn copy_plugins(config: &Config, resolver: PathResolver) -> anyhow::Result<()> {
     // Copy default plugins to data directory to be picked up by the backend
     let plugin_path = resolver.resolve_resource("../../assets/plugins");
+    let base_plugin_dir = config.plugins_dir();
 
     if let Some(plugin_path) = plugin_path {
         for entry in std::fs::read_dir(plugin_path)? {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if path.is_dir() {
-                    dbg!(path);
+            let path = entry?.path();
+            if path.is_dir() {
+                let plugin_name = path.file_name().expect("Unable to parse folder");
+                let plugin_dir = base_plugin_dir.join(plugin_name);
+                // Create folder for plugin
+                std::fs::create_dir_all(plugin_dir.join(plugin_name))?;
+                // Copy plugin contents to folder
+                for file in std::fs::read_dir(path)? {
+                    let file = file?;
+                    let new_file_path = plugin_dir.join(file.file_name());
+                    std::fs::copy(file.path(), new_file_path)?;
                 }
             }
         }
