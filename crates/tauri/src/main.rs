@@ -32,7 +32,7 @@ mod menu;
 use menu::MenuID;
 mod rpc;
 mod window;
-use window::{show_crawl_stats_window, show_lens_manager_window};
+use window::{show_crawl_stats_window, show_lens_manager_window, show_plugin_manager};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -174,7 +174,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             item_handle.set_title(new_label).unwrap();
                         }
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
-                        MenuID::OPEN_PLUGIN_MANAGER => { show_lens_manager_window(app); },
+                        MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                         MenuID::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
                         MenuID::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                         MenuID::SHOW_CRAWL_STATUS => {

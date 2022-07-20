@@ -73,3 +73,20 @@ pub fn show_lens_manager_window(app: &AppHandle) -> Window {
     .build()
     .unwrap()
 }
+
+pub fn show_plugin_manager(app: &AppHandle) -> Window {
+    if let Some(window) = app.get_window(constants::PLUGIN_MANAGER_WIN_NAME) {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return window;
+    }
+
+    WindowBuilder::new(
+        app,
+        constants::PLUGIN_MANAGER_WIN_NAME,
+        WindowUrl::App("/settings/plugins".into()),
+    )
+    .title("Plugins Manager")
+    .build()
+    .unwrap()
+}

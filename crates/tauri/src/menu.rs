@@ -56,6 +56,10 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
             MenuID::OPEN_LENS_MANAGER.to_string(),
             "Manage/install lenses",
         ))
+        .add_item(CustomMenuItem::new(
+            MenuID::OPEN_PLUGIN_MANAGER.to_string(),
+            "Manage plugins",
+        ))
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_settings_folder)
         .add_item(open_logs_folder);
