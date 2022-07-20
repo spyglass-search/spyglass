@@ -2,6 +2,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
 use sea_orm::Set;
 use serde::Serialize;
+use shared::config::Lens;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
@@ -86,12 +87,16 @@ pub async fn add_or_enable(
         .one(db)
         .await?;
 
-    // If it already exists, simply enable it.
+    // If it already exists & is not a plugin, simply enable it.
     if let Some(existing) = exists {
-        let mut updated: ActiveModel = existing.clone().into();
-        updated.is_enabled = Set(true);
-        updated.update(db).await?;
-        return Ok(false);
+        // TODO: This is super hacky, think about a long term way of storing
+        // enabled/disabled lenses/plugins etc.
+        if lens_type == LensType::Simple {
+            let mut updated: ActiveModel = existing.clone().into();
+            updated.is_enabled = Set(true);
+            updated.update(db).await?;
+            return Ok(false);
+        }
     }
 
     // Otherwise add the lens & enable it.
