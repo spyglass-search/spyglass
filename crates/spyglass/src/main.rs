@@ -15,7 +15,6 @@ use migration::{Migrator, MigratorTrait};
 use shared::config::Config;
 
 mod api;
-mod importer;
 
 use crate::api::start_api_ipc;
 
