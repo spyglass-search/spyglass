@@ -94,8 +94,9 @@ pub async fn add_or_enable(
             let mut updated: ActiveModel = existing.clone().into();
             updated.is_enabled = Set(true);
             updated.update(db).await?;
-            return Ok(false);
         }
+
+        return Ok(false);
     }
 
     // Otherwise add the lens & enable it.
