@@ -3,6 +3,15 @@ use std::path::{Path, PathBuf};
 
 const DATA_DIR: &str = "/data";
 const DB_FILE: &str = "places.sqlite";
+const BOOKMARK_QUERY: &str = "
+    SELECT
+        DISTINCT url
+    FROM moz_bookmarks
+    JOIN moz_places on moz_places.id = moz_bookmarks.fk
+    WHERE
+        moz_places.hidden = 0
+        AND url like 'http%'
+";
 
 #[derive(Default)]
 struct Plugin;
@@ -68,7 +77,7 @@ impl Plugin {
     }
 
     fn read_bookmarks(&self) {
-        let urls = sqlite3_query("places.sqlite", "SELECT url FROM moz_places LIMIT 10");
+        let urls = sqlite3_query("places.sqlite", BOOKMARK_QUERY);
         if let Ok(urls) = urls {
             for url in urls {
                 eprintln!("{}", url);
