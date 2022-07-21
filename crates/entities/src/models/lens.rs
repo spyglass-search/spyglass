@@ -2,6 +2,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
 use sea_orm::Set;
 use serde::Serialize;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
@@ -13,6 +14,15 @@ pub enum LensType {
     // source is.
     #[sea_orm(string_value = "Plugin")]
     Plugin,
+}
+
+impl fmt::Display for LensType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LensType::Simple => write!(f, "Simple"),
+            LensType::Plugin => write!(f, "Plugin"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
@@ -55,6 +65,7 @@ impl ActiveModelBehavior for ActiveModel {
 pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
         .col_expr(Column::IsEnabled, sea_query::Expr::value(false))
+        .filter(Column::LensType.contains(&LensType::Simple.to_string()))
         .exec(db)
         .await?;
 
@@ -75,11 +86,16 @@ pub async fn add_or_enable(
         .one(db)
         .await?;
 
-    // If it already exists, simply enable it.
+    // If it already exists & is not a plugin, simply enable it.
     if let Some(existing) = exists {
-        let mut updated: ActiveModel = existing.clone().into();
-        updated.is_enabled = Set(true);
-        updated.update(db).await?;
+        // TODO: This is super hacky, think about a long term way of storing
+        // enabled/disabled lenses/plugins etc.
+        if lens_type == LensType::Simple {
+            let mut updated: ActiveModel = existing.clone().into();
+            updated.is_enabled = Set(true);
+            updated.update(db).await?;
+        }
+
         return Ok(false);
     }
 

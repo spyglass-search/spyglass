@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
 use entities::models::crawl_queue::CrawlStatus;
+use entities::models::lens::LensType;
 use jsonrpc_core::{Error, ErrorCode, Result};
 use tracing::instrument;
 use url::Url;
 
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, QueueStatus, SearchLensesResp, SearchMeta, SearchResult,
-    SearchResults,
+    AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
+    SearchResult, SearchResults,
 };
 
 use entities::models::{crawl_queue, indexed_document, lens};
@@ -138,6 +139,27 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
     lenses.sort_by(|x, y| x.title.cmp(&y.title));
 
     Ok(lenses)
+}
+
+pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>> {
+    let mut plugins = Vec::new();
+    let result = lens::Entity::find()
+        .filter(lens::Column::LensType.eq(LensType::Plugin))
+        .all(&state.db)
+        .await;
+
+    if let Ok(results) = result {
+        for plugin in results {
+            plugins.push(PluginResult {
+                author: plugin.author,
+                title: plugin.name,
+                description: plugin.description.clone().unwrap_or_default(),
+                is_enabled: plugin.is_enabled,
+            });
+        }
+    }
+
+    Ok(plugins)
 }
 
 /// Show the list of URLs in the queue and their status
@@ -277,4 +299,22 @@ pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     }
 
     _get_current_status(state.clone()).await
+}
+
+#[instrument(skip(state))]
+pub async fn toggle_plugin(state: AppState, name: String) -> jsonrpc_core::Result<()> {
+    // Find the plugin
+    let plugin = lens::Entity::find()
+        .filter(lens::Column::Name.eq(name))
+        .filter(lens::Column::LensType.eq(LensType::Plugin))
+        .one(&state.db)
+        .await;
+
+    if let Ok(Some(plugin)) = plugin {
+        let mut updated: lens::ActiveModel = plugin.clone().into();
+        updated.is_enabled = Set(!plugin.is_enabled);
+        let _ = updated.update(&state.db).await;
+    }
+
+    Ok(())
 }

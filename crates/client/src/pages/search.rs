@@ -5,13 +5,11 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, Element, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
-use shared::response;
+use shared::{event::ClientEvent, response};
 
 use crate::components::{ResultListData, SearchResultItem, SelectedLens};
 use crate::events;
-use crate::{
-    on_clear_search, on_focus, on_refresh_results, resize_window, search_docs, search_lenses,
-};
+use crate::{listen, resize_window, search_docs, search_lenses};
 
 #[wasm_bindgen]
 extern "C" {
@@ -124,7 +122,7 @@ pub fn search_page() -> Html {
                 });
             }) as Box<dyn Fn()>);
 
-            on_clear_search(&cb).await;
+            let _ = listen(&ClientEvent::ClearSearch.to_string(), &cb).await;
             cb.forget();
         });
 
@@ -145,7 +143,7 @@ pub fn search_page() -> Html {
                     });
                 }
             }) as Box<dyn Fn()>);
-            on_focus(&cb).await;
+            let _ = listen(&ClientEvent::FocusWindow.to_string(), &cb).await;
             cb.forget();
         });
     }
@@ -162,8 +160,7 @@ pub fn search_page() -> Html {
                     query.set(el.value());
                 }
             }) as Box<dyn Fn()>);
-
-            on_refresh_results(&cb).await;
+            let _ = listen(&ClientEvent::RefreshSearchResults.to_string(), &cb).await;
             cb.forget();
         });
     }

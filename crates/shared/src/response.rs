@@ -45,6 +45,14 @@ pub struct LensResult {
     pub download_url: Option<String>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct PluginResult {
+    pub author: String,
+    pub title: String,
+    pub description: String,
+    pub is_enabled: bool,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,
