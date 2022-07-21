@@ -21,7 +21,7 @@ build-plugins-dev:
 
 build-plugins-release:
 	cargo build -p chrome-importer --target wasm32-wasi --release
-	cp target/wasm32-wasi/debug/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
+	cp target/wasm32-wasi/release/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
 
 build-release: build-backend build-styles
 	cargo tauri build
