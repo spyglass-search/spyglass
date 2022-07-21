@@ -2,7 +2,6 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
 use sea_orm::Set;
 use serde::Serialize;
-use shared::config::Lens;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
