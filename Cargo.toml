@@ -8,8 +8,9 @@ members = [
     "crates/spyglass",
     "crates/spyglass-plugin",
     "crates/tauri",
+    # Default plugins
+    "plugins/chrome-importer",
 ]
-exclude = ["plugins"]
 
 [profile.release]
 panic = "abort"
