@@ -30,7 +30,7 @@ pub fn list_dir(path: &str) -> Result<Vec<String>, ron::Error> {
         unsafe {
             plugin_cmd();
         }
-        return Ok(object_from_stdin::<Vec<String>>()?);
+        return object_from_stdin::<Vec<String>>();
     }
 
     Ok(Vec::new())
@@ -42,6 +42,17 @@ pub fn log(msg: String) {
     unsafe {
         plugin_log();
     }
+}
+
+/// Hacky workaround until rusqlite can compile to wasm easily.
+/// Path is expected to be rooted in the plugins data directory.
+pub fn sqlite3_query(path: &str, query: &str) -> Result<Vec<String>, ron::Error> {
+    if object_to_stdout(&PluginCommandRequest::SqliteQuery { path: path.to_string(), query: query.to_string() }).is_ok() {
+        unsafe { plugin_cmd() };
+        return object_from_stdin::<Vec<String>>();
+    }
+
+    Ok(Vec::new())
 }
 
 /// Adds / updates a file in the plugin VFS from the host.

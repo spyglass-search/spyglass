@@ -21,7 +21,10 @@ impl SpyglassPlugin for Plugin {
     }
 
     fn update(&self) {
-
+        let path = Path::new(DATA_DIR).join("places.sqlite");
+        if let Err(e) = self.read_bookmarks(&path) {
+            eprintln!("{}", e);
+        }
     }
 }
 
@@ -61,5 +64,14 @@ impl Plugin {
         }
 
         None
+    }
+
+    fn read_bookmarks(&self, path: &PathBuf) -> Result<()> {
+        let urls = sqlite3_query("places.sqlite", "SELECT url FROM moz_places LIMIT 10");
+        for url in urls {
+            eprintln!("{:?}", url);
+        }
+
+        Ok(())
     }
 }
