@@ -4656,6 +4656,8 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.2",
  "url 2.2.2",
 ]
 

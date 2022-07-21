@@ -6,10 +6,10 @@ use yew::function_component;
 use yew::prelude::*;
 
 use crate::components::icons;
+use crate::listen;
 use crate::utils::RequestState;
-use crate::{
-    install_lens, list_installable_lenses, list_installed_lenses, on_refresh_lens_manager,
-};
+use crate::{install_lens, list_installable_lenses, list_installed_lenses};
+use shared::event::ClientEvent;
 use shared::response::InstallableLens;
 
 #[derive(Properties, PartialEq)]
@@ -220,7 +220,7 @@ pub fn lens_manager_page() -> Html {
                 i_req_state.set(RequestState::NotStarted);
             }) as Box<dyn Fn()>);
 
-            on_refresh_lens_manager(&cb).await;
+            let _ = listen(&ClientEvent::RefreshLensManager.to_string(), &cb).await;
             cb.forget();
         });
     }

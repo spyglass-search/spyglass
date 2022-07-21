@@ -7,6 +7,7 @@ use url::Url;
 use crate::{constants, open_folder, rpc, window};
 use shared::{
     config::Config,
+    event::ClientEvent,
     request,
     response::{self, InstallableLens},
 };
@@ -144,7 +145,7 @@ pub async fn delete_doc<'r>(
         .await
     {
         Ok(_) => {
-            let _ = window.emit("refresh_results", true);
+            let _ = window.emit(&ClientEvent::RefreshSearchResults.to_string(), true);
             Ok(())
         }
         Err(err) => {
@@ -189,7 +190,7 @@ pub async fn install_lens<'r>(
             } else {
                 // Sleep for a second to let the app reload the lenses and then let the client know we're done.
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                let _ = window.emit("refresh_lens_manager", true);
+                let _ = window.emit(&ClientEvent::RefreshLensManager.to_string(), true);
             }
         }
     }
@@ -278,7 +279,7 @@ pub async fn toggle_plugin(
     let mut rpc = rpc.lock().await;
     rpc.call::<(String,), ()>("toggle_plugin", (name.into(),))
         .await;
-    let _ = window.emit("refresh_plugin_manager", true);
+    let _ = window.emit(&ClientEvent::RefreshPluginManager.to_string(), true);
 
     Ok(())
 }

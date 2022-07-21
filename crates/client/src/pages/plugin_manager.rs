@@ -1,3 +1,4 @@
+use shared::event::ClientEvent;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
@@ -124,7 +125,7 @@ pub fn plugin_manager_page() -> Html {
                 req_state.set(RequestState::NotStarted);
             }) as Box<dyn Fn()>);
 
-            let _ = listen("refresh_plugin_manager", &cb).await;
+            let _ = listen(&ClientEvent::RefreshPluginManager.to_string(), &cb).await;
             cb.forget();
         });
     }

@@ -9,22 +9,6 @@ export async function escape() {
     return await invoke('escape');
 }
 
-export async function onClearSearch(callback) {
-    await listen('clear_search', callback);
-}
-
-export async function onFocus(callback) {
-    await listen('focus_window', callback);
-}
-
-export async function onRefreshResults(callback) {
-    await listen('refresh_results', callback);
-}
-
-export async function on_refresh_lens_manager(callback) {
-    await listen('refresh_lens_manager', callback);
-}
-
 export async function crawlStats() {
     return await invoke('crawl_stats');
 }

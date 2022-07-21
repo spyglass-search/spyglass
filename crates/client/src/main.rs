@@ -42,18 +42,6 @@ extern "C" {
     #[wasm_bindgen(js_name = "searchLenses", catch)]
     pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(js_name = "onClearSearch")]
-    pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
-
-    #[wasm_bindgen(js_name = "onFocus")]
-    pub async fn on_focus(callback: &Closure<dyn Fn()>);
-
-    #[wasm_bindgen(js_name = "onRefreshResults")]
-    pub async fn on_refresh_results(callback: &Closure<dyn Fn()>);
-
-    #[wasm_bindgen]
-    pub async fn on_refresh_lens_manager(callback: &Closure<dyn Fn()>);
-
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
