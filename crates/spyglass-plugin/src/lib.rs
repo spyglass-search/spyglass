@@ -40,6 +40,7 @@ pub enum PluginEvent {
 
 #[derive(Deserialize, Serialize)]
 pub enum PluginCommandRequest {
+    ListDir(String),
     Subscribe(PluginEvent),
 }
 

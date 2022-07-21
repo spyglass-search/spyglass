@@ -24,6 +24,18 @@ pub fn enqueue_all(urls: &[String]) {
     }
 }
 
+/// List dir
+pub fn list_dir(path: &str) -> Result<Vec<String>, ron::Error> {
+    if object_to_stdout(&PluginCommandRequest::ListDir(path.to_string())).is_ok() {
+        unsafe {
+            plugin_cmd();
+        }
+        return Ok(object_from_stdin::<Vec<String>>()?);
+    }
+
+    Ok(Vec::new())
+}
+
 /// Utility function to log to spyglass logs
 pub fn log(msg: String) {
     println!("{}", msg);

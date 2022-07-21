@@ -3,7 +3,9 @@ use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
-use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
+use super::{
+    wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
+};
 use crate::state::AppState;
 use entities::models::crawl_queue::enqueue_all;
 use spyglass_plugin::{PluginCommandRequest, PluginEnqueueRequest, PluginMountRequest};
@@ -48,6 +50,20 @@ pub fn register_exports(
 pub(crate) fn plugin_cmd(env: &PluginEnv) {
     if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
         match cmd {
+            PluginCommandRequest::ListDir(path) => {
+                let entries = if let Ok(entries) = std::fs::read_dir(path) {
+                    entries
+                        .flatten()
+                        .map(|entry| entry.path().display().to_string())
+                        .collect::<Vec<String>>()
+                } else {
+                    Vec::new()
+                };
+
+                if let Err(e) = wasi_write(&env.wasi_env, &entries) {
+                    log::error!("<{}> unable to list dir: {}", env.id, e);
+                }
+            }
             PluginCommandRequest::Subscribe(event) => {
                 let writer = env.cmd_writer.clone();
                 let plugin_id = env.id;
@@ -78,8 +94,8 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 pub(crate) fn plugin_sync_file(env: &PluginEnv) {
     if let Ok(mount_request) = wasi_read::<PluginMountRequest>(&env.wasi_env) {
         log::info!(
-            "requesting access to folder: {}: {}",
-            mount_request.dst,
+            "<{}> requesting access to folder: {}",
+            env.name,
             mount_request.src
         );
 
