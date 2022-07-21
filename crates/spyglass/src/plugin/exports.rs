@@ -1,3 +1,4 @@
+use rusqlite::Connection;
 use std::path::Path;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
@@ -79,6 +80,23 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
                     }
                 });
             }
+            PluginCommandRequest::SqliteQuery { path, query } => {
+                let path = env.data_dir.join(path);
+                if let Ok(conn) = Connection::open(path) {
+                    let stmt = conn.prepare(&query);
+                    if let Ok(mut stmt) = stmt {
+                        let results =
+                            stmt.query_map([], |row| Ok(row.get::<usize, String>(0).unwrap()));
+
+                        if let Ok(results) = results {
+                            let collected = results.map(|x| x.unwrap()).collect::<Vec<String>>();
+                            if let Err(e) = wasi_write(&env.wasi_env, &collected) {
+                                log::error!("{}", e);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -120,7 +138,7 @@ pub(crate) fn plugin_enqueue(env: &PluginEnv) {
         let rt = tokio::runtime::Handle::current();
         rt.spawn(async move {
             let state = state.clone();
-            match enqueue_all(
+            if let Err(e) = enqueue_all(
                 &state.db.clone(),
                 &request.urls,
                 &[],
@@ -129,8 +147,7 @@ pub(crate) fn plugin_enqueue(env: &PluginEnv) {
             )
             .await
             {
-                Ok(_) => log::info!("enqueue successful"),
-                Err(e) => log::error!("error adding to queue: {}", e),
+                log::error!("error adding to queue: {}", e);
             }
         });
     }

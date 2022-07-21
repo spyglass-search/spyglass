@@ -2,6 +2,7 @@ use spyglass_plugin::*;
 use std::path::{Path, PathBuf};
 
 const DATA_DIR: &str = "/data";
+const DB_FILE: &str = "places.sqlite";
 
 #[derive(Default)]
 struct Plugin;
@@ -21,9 +22,9 @@ impl SpyglassPlugin for Plugin {
     }
 
     fn update(&self) {
-        let path = Path::new(DATA_DIR).join("places.sqlite");
-        if let Err(e) = self.read_bookmarks(&path) {
-            eprintln!("{}", e);
+        let path = Path::new(DATA_DIR).join(DB_FILE);
+        if path.exists() {
+            self.read_bookmarks();
         }
     }
 }
@@ -57,7 +58,7 @@ impl Plugin {
             if let Ok(entries) = list_dir(&profiles_dir.display().to_string()) {
                 for path in entries {
                     if path.ends_with(".default") || path.ends_with(".default-release") {
-                        return Some(Path::new(&path).join("places.sqlite"));
+                        return Some(Path::new(&path).join(DB_FILE));
                     }
                 }
             }
@@ -66,12 +67,12 @@ impl Plugin {
         None
     }
 
-    fn read_bookmarks(&self, path: &PathBuf) -> Result<()> {
+    fn read_bookmarks(&self) {
         let urls = sqlite3_query("places.sqlite", "SELECT url FROM moz_places LIMIT 10");
-        for url in urls {
-            eprintln!("{:?}", url);
+        if let Ok(urls) = urls {
+            for url in urls {
+                eprintln!("{}", url);
+            }
         }
-
-        Ok(())
     }
 }
