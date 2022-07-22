@@ -1300,6 +1300,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
+name = "fallible-streaming-iterator"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
+
+[[package]]
 name = "fastdivide"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1344,6 +1350,13 @@ dependencies = [
  "libc",
  "redox_syscall",
  "windows-sys 0.36.1",
+]
+
+[[package]]
+name = "firefox-importer"
+version = "0.1.0"
+dependencies = [
+ "spyglass-plugin",
 ]
 
 [[package]]
@@ -4095,6 +4108,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
 
 [[package]]
+name = "rusqlite"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85127183a999f7db96d1a976a309eebbfb6ea3b0b400ddd8340190129de6eb7a"
+dependencies = [
+ "bitflags",
+ "fallible-iterator",
+ "fallible-streaming-iterator",
+ "hashlink",
+ "libsqlite3-sys",
+ "memchr",
+ "smallvec",
+]
+
+[[package]]
 name = "rust-stemmers"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4776,11 +4804,11 @@ dependencies = [
  "regex",
  "reqwest",
  "ron",
+ "rusqlite",
  "serde",
  "sha2",
  "shared",
  "spyglass-plugin",
- "sqlx",
  "tantivy",
  "tendril",
  "tokio",

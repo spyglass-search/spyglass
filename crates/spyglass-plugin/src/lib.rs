@@ -40,7 +40,9 @@ pub enum PluginEvent {
 
 #[derive(Deserialize, Serialize)]
 pub enum PluginCommandRequest {
+    ListDir(String),
     Subscribe(PluginEvent),
+    SqliteQuery { path: String, query: String },
 }
 
 #[derive(Deserialize, Serialize)]

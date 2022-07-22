@@ -10,6 +10,7 @@ members = [
     "crates/tauri",
     # Default plugins
     "plugins/chrome-importer",
+    "plugins/firefox-importer",
 ]
 
 [profile.release]

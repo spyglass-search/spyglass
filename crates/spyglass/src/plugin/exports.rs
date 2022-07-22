@@ -1,9 +1,12 @@
+use rusqlite::Connection;
 use std::path::Path;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
-use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
+use super::{
+    wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
+};
 use crate::state::AppState;
 use entities::models::crawl_queue::enqueue_all;
 use spyglass_plugin::{PluginCommandRequest, PluginEnqueueRequest, PluginMountRequest};
@@ -48,6 +51,20 @@ pub fn register_exports(
 pub(crate) fn plugin_cmd(env: &PluginEnv) {
     if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
         match cmd {
+            PluginCommandRequest::ListDir(path) => {
+                let entries = if let Ok(entries) = std::fs::read_dir(path) {
+                    entries
+                        .flatten()
+                        .map(|entry| entry.path().display().to_string())
+                        .collect::<Vec<String>>()
+                } else {
+                    Vec::new()
+                };
+
+                if let Err(e) = wasi_write(&env.wasi_env, &entries) {
+                    log::error!("<{}> unable to list dir: {}", env.id, e);
+                }
+            }
             PluginCommandRequest::Subscribe(event) => {
                 let writer = env.cmd_writer.clone();
                 let plugin_id = env.id;
@@ -62,6 +79,23 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
                         log::error!("Unable to subscribe plugin <{}> to event: {}", plugin_id, e);
                     }
                 });
+            }
+            PluginCommandRequest::SqliteQuery { path, query } => {
+                let path = env.data_dir.join(path);
+                if let Ok(conn) = Connection::open(path) {
+                    let stmt = conn.prepare(&query);
+                    if let Ok(mut stmt) = stmt {
+                        let results =
+                            stmt.query_map([], |row| Ok(row.get::<usize, String>(0).unwrap()));
+
+                        if let Ok(results) = results {
+                            let collected = results.map(|x| x.unwrap()).collect::<Vec<String>>();
+                            if let Err(e) = wasi_write(&env.wasi_env, &collected) {
+                                log::error!("{}", e);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -78,8 +112,8 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 pub(crate) fn plugin_sync_file(env: &PluginEnv) {
     if let Ok(mount_request) = wasi_read::<PluginMountRequest>(&env.wasi_env) {
         log::info!(
-            "requesting access to folder: {}: {}",
-            mount_request.dst,
+            "<{}> requesting access to folder: {}",
+            env.name,
             mount_request.src
         );
 
@@ -104,7 +138,7 @@ pub(crate) fn plugin_enqueue(env: &PluginEnv) {
         let rt = tokio::runtime::Handle::current();
         rt.spawn(async move {
             let state = state.clone();
-            match enqueue_all(
+            if let Err(e) = enqueue_all(
                 &state.db.clone(),
                 &request.urls,
                 &[],
@@ -113,8 +147,7 @@ pub(crate) fn plugin_enqueue(env: &PluginEnv) {
             )
             .await
             {
-                Ok(_) => log::info!("enqueue successful"),
-                Err(e) => log::error!("error adding to queue: {}", e),
+                log::error!("error adding to queue: {}", e);
             }
         });
     }

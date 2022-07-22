@@ -13,7 +13,7 @@ use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 use entities::models::lens;
 use shared::config::Config;
-use spyglass_plugin::PluginEvent;
+use spyglass_plugin::{consts::env, PluginEvent};
 
 use crate::state::AppState;
 use crate::task::AppShutdown;
@@ -273,16 +273,18 @@ pub async fn plugin_init(
         .map(|base| base.data_local_dir().display().to_string())
         .map_or_else(|| "".to_string(), |dir| dir);
 
+    let home_dir: String = directories::BaseDirs::new()
+        .map(|base| base.home_dir().display().to_string())
+        .map_or_else(|| "".to_string(), |dir| dir);
+
     let mut wasi_env = WasiState::new(&plugin.name)
         // Attach the plugin data directory
         .map_dir("/data", plugin.data_folder())
         .expect("Unable to mount plugin data folder")
-        .env(spyglass_plugin::consts::env::HOST_OS, std::env::consts::OS)
-        .env(
-            spyglass_plugin::consts::env::BASE_CONFIG_DIR,
-            base_config_dir,
-        )
-        .env(spyglass_plugin::consts::env::BASE_DATA_DIR, base_data_dir)
+        .env(env::BASE_CONFIG_DIR, base_config_dir)
+        .env(env::BASE_DATA_DIR, base_data_dir)
+        .env(env::HOST_HOME_DIR, home_dir)
+        .env(env::HOST_OS, std::env::consts::OS)
         // Load user settings as environment variables
         .envs(user_settings.iter())
         // Override stdin/out with pipes for comms
@@ -343,7 +345,6 @@ fn wasi_read<T: DeserializeOwned>(env: &WasiEnv) -> anyhow::Result<T> {
     Ok(ron::from_str(&buf)?)
 }
 
-#[allow(dead_code)]
 fn wasi_write(env: &WasiEnv, obj: &(impl Serialize + ?Sized)) -> anyhow::Result<()> {
     wasi_write_string(env, &ron::to_string(&obj)?)
 }

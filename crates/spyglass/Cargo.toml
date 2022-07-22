@@ -25,11 +25,11 @@ notify = "5.0.0-pre.15"
 regex = "1"
 reqwest = "0.11"
 ron = "0.7"
+rusqlite = { version = "*", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 shared = { path = "../shared" }
 spyglass-plugin = { path = "../spyglass-plugin" }
-sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "chrono"] }
 tantivy = "0.18"
 tendril = "0.4.2"
 tokio = { version = "1", features = ["full"] }
