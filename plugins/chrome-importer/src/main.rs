@@ -12,50 +12,52 @@ register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
     fn load(&self) {
-        let path = {
-            // Let the host know we want to check for updates on a regular interval.
-            subscribe(PluginEvent::CheckUpdateInterval);
+        // Let the host know we want to check for updates on a regular interval.
+        subscribe(PluginEvent::CheckUpdateInterval);
 
-            // If the user has set the CHROME_DATA_FOLDER setting, use that
-            if let Ok(folder) = std::env::var("CHROME_DATA_FOLDER") {
-                Some(Path::new(&folder).join(BOOKMARK_FILE))
-            } else {
-                // Else detect the current HOST_OS and use the default folder
-                // locations
-                let host_os_res = std::env::var(consts::env::HOST_OS);
-                let base_data_res = std::env::var(consts::env::BASE_DATA_DIR);
-                let base_config_res = std::env::var(consts::env::BASE_CONFIG_DIR);
+        let mut path = None;
 
-                if let (Ok(host_os), Ok(base_config_dir), Ok(base_data_dir)) =
-                    (host_os_res, base_config_res, base_data_res)
-                {
-                    match host_os.as_str() {
-                        // Linux is a little different and stores the bookmarks under ~/.config
-                        // base_config_dir: /home/alice/.config
-                        "linux" => Some(
-                            Path::new(&base_config_dir)
-                                .join("google-chrome/Default")
-                                .join(BOOKMARK_FILE),
-                        ),
-                        // base_data_dir: /Users/alice/Library/Application Support
-                        "macos" => Some(
-                            Path::new(&base_data_dir)
-                                .join("Google/Chrome/Default")
-                                .join(BOOKMARK_FILE),
-                        ),
-                        // base_data_dir: C:\Users\Alice\AppData\Roaming
-                        "windows" => Some(
-                            Path::new(&base_data_dir)
-                                .join("Google/Chrome/User Data/Default")
-                                .join(BOOKMARK_FILE),
-                        ),
-                        _ => None,
-                    }
-                } else {
-                    None
+        // If the user has set the CHROME_DATA_FOLDER setting, use that
+        if let Ok(folder) = std::env::var("CHROME_DATA_FOLDER") {
+            if folder.len() > 0 {
+                path = Some(Path::new(&folder).join(BOOKMARK_FILE))
+            }
+        }
+
+        if path.is_none() {
+            // Else detect the current HOST_OS and use the default folder
+            // locations
+            let host_os_res = std::env::var(consts::env::HOST_OS);
+            let base_data_res = std::env::var(consts::env::BASE_DATA_DIR);
+            let base_config_res = std::env::var(consts::env::BASE_CONFIG_DIR);
+
+            if let (Ok(host_os), Ok(base_config_dir), Ok(base_data_dir)) =
+                (host_os_res, base_config_res, base_data_res)
+            {
+                path = match host_os.as_str() {
+                    // Linux is a little different and stores the bookmarks under ~/.config
+                    // base_config_dir: /home/alice/.config
+                    "linux" => Some(
+                        Path::new(&base_config_dir)
+                            .join("google-chrome/Default")
+                            .join(BOOKMARK_FILE),
+                    ),
+                    // base_data_dir: /Users/alice/Library/Application Support
+                    "macos" => Some(
+                        Path::new(&base_data_dir)
+                            .join("Google/Chrome/Default")
+                            .join(BOOKMARK_FILE),
+                    ),
+                    // base_data_dir: C:\Users\Alice\AppData\Roaming
+                    "windows" => Some(
+                        Path::new(&base_data_dir)
+                            .join("Google/Chrome/User Data/Default")
+                            .join(BOOKMARK_FILE),
+                    ),
+                    _ => None,
                 }
             }
-        };
+        }
 
         // Grab bookmark file from chrome data folder, if available
         if let Some(path) = path {
