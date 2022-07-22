@@ -33,7 +33,7 @@ impl SpyglassPlugin for Plugin {
     fn update(&self) {
         let path = Path::new(DATA_DIR).join(DB_FILE);
         if path.exists() {
-            self.read_bookmarks();
+            enqueue_all(&self.read_bookmarks());
         }
     }
 }
@@ -76,12 +76,12 @@ impl Plugin {
         None
     }
 
-    fn read_bookmarks(&self) {
+    fn read_bookmarks(&self) -> Vec<String> {
         let urls = sqlite3_query("places.sqlite", BOOKMARK_QUERY);
         if let Ok(urls) = urls {
-            for url in urls {
-                eprintln!("{}", url);
-            }
+            return urls;
         }
+
+        Vec::new()
     }
 }
