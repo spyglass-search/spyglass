@@ -105,7 +105,8 @@ pub async fn add_or_enable(
         author: Set(author.to_owned()),
         description: Set(description.map(String::from)),
         version: Set(version.to_owned()),
-        is_enabled: Set(true),
+        // NOTE: Only automatically enable simple lenses
+        is_enabled: Set(lens_type == LensType::Simple),
         trigger: Set(Some(name.to_owned())),
         lens_type: Set(lens_type),
         ..Default::default()
