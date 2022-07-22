@@ -14,6 +14,7 @@ use shared::response::{
 
 use entities::models::{crawl_queue, indexed_document, lens};
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
+use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -343,8 +344,23 @@ pub async fn toggle_plugin(state: AppState, name: String) -> jsonrpc_core::Resul
 
     if let Ok(Some(plugin)) = plugin {
         let mut updated: lens::ActiveModel = plugin.clone().into();
-        updated.is_enabled = Set(!plugin.is_enabled);
+        let plugin_enabled = !plugin.is_enabled;
+        updated.is_enabled = Set(plugin_enabled);
         let _ = updated.update(&state.db).await;
+
+        let mut cmd_tx = state.plugin_cmd_tx.lock().await;
+        match &mut *cmd_tx {
+            Some(cmd_tx) => {
+                let cmd = if plugin_enabled {
+                    PluginCommand::EnablePlugin(plugin.name)
+                } else {
+                    PluginCommand::DisablePlugin(plugin.name)
+                };
+
+                let _ = cmd_tx.send(cmd).await;
+            }
+            None => {}
+        }
     }
 
     Ok(())
