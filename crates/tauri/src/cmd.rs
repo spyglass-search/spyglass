@@ -160,7 +160,7 @@ pub async fn delete_doc<'r>(
 pub async fn delete_domain<'r>(
     window: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
-    domain: &str
+    domain: &str,
 ) -> Result<(), String> {
     let mut rpc = rpc.lock().await;
     match rpc

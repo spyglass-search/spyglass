@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use dashmap::DashMap;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
@@ -107,7 +108,7 @@ pub async fn plugin_manager(
     let mut manager = PluginManager::default();
 
     // Initial load, send some basic configuration to the plugins
-    plugin_load(config, &cmd_writer).await;
+    plugin_load(&state, config, &cmd_writer).await;
 
     // Subscribe plugins check for updates every hour
     let mut interval = tokio::time::interval(Duration::from_secs(60 * 60));
@@ -172,7 +173,7 @@ pub async fn plugin_manager(
 }
 
 // Loop through plugins found in the plugins directory, enabling
-pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
+pub async fn plugin_load(state: &AppState, config: Config, cmds: &mpsc::Sender<PluginCommand>) {
     log::info!("🔌 loading plugins");
 
     let plugins_dir = config.plugins_dir();
@@ -200,6 +201,38 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
                             for (key, value) in user_settings.iter() {
                                 plug.user_settings
                                     .insert(key.to_string(), value.to_string());
+                            }
+                        }
+
+                        // Enable plugins that are lenses, this is the only type right so technically they
+                        // all will be enabled as a lens.
+                        if plug.plugin_type == PluginType::Lens {
+                            match lens::add_or_enable(
+                                &state.db,
+                                &plug.name,
+                                &plug.author,
+                                Some(&plug.description),
+                                &plug.version,
+                                lens::LensType::Plugin,
+                            )
+                            .await
+                            {
+                                Ok(is_new) => {
+                                    log::info!("loaded lens {}, new? {}", plug.name, is_new)
+                                }
+                                Err(e) => log::error!("Unable to add lens: {}", e),
+                            }
+                        }
+
+                        // Is this plugin enabled?
+                        let lens_config = lens::Entity::find()
+                            .filter(lens::Column::Name.eq(plug.name.clone()))
+                            .one(&state.db)
+                            .await;
+
+                        if let Ok(Some(lens_config)) = lens_config {
+                            if !lens_config.is_enabled {
+                                continue;
                             }
                         }
 
@@ -233,24 +266,6 @@ pub async fn plugin_init(
             "Unable to find plugin path: {:?}",
             plugin.path
         )));
-    }
-
-    // Enable plugins that are lenses, this is the only type right so technically they
-    // all will be enabled as a lens.
-    if plugin.plugin_type == PluginType::Lens {
-        match lens::add_or_enable(
-            &state.db,
-            &plugin.name,
-            &plugin.author,
-            Some(&plugin.description),
-            &plugin.version,
-            lens::LensType::Plugin,
-        )
-        .await
-        {
-            Ok(is_new) => log::info!("loaded lens {}, new? {}", plugin.name, is_new),
-            Err(e) => log::error!("Unable to add lens: {}", e),
-        }
     }
 
     // Make sure data folder exists
