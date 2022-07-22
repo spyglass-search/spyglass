@@ -25,7 +25,7 @@ impl SpyglassPlugin for Plugin {
 
         let mut profile_path = None;
         if let Ok(folder) = std::env::var("FIREFOX_DATA_FOLDER") {
-            if folder.len() > 0 {
+            if !folder.is_empty() {
                 profile_path = Some(Path::new(&folder).join(DB_FILE))
             }
         }

@@ -19,7 +19,7 @@ impl SpyglassPlugin for Plugin {
 
         // If the user has set the CHROME_DATA_FOLDER setting, use that
         if let Ok(folder) = std::env::var("CHROME_DATA_FOLDER") {
-            if folder.len() > 0 {
+            if !folder.is_empty() {
                 path = Some(Path::new(&folder).join(BOOKMARK_FILE))
             }
         }
