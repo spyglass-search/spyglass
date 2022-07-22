@@ -30,6 +30,9 @@ pub trait Rpc {
     #[rpc(name = "delete_doc")]
     fn delete_doc(&self, id: String) -> BoxFuture<Result<()>>;
 
+    #[rpc(name = "delete_domain")]
+    fn delete_domain(&self, domain: String) -> BoxFuture<Result<()>>;
+
     #[rpc(name = "list_installed_lenses")]
     fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
 

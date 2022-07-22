@@ -28,6 +28,9 @@ extern "C" {
     pub async fn delete_doc(id: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
+    pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
     pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(js_name = "listInstalledLenses", catch)]

@@ -122,6 +122,37 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
     Ok(())
 }
 
+/// Remove a domain from crawl queue & index
+#[instrument(skip(state))]
+pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
+    // Remove items from crawl queue
+    let res = crawl_queue::Entity::delete_many()
+        .filter(crawl_queue::Column::Domain.eq(domain.clone()))
+        .exec(&state.db)
+        .await;
+
+    if let Ok(res) = res {
+        log::info!("removed {} items from crawl queue", res.rows_affected);
+    }
+
+    // Remove items from index
+    let indexed = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Domain.eq(domain))
+        .all(&state.db)
+        .await;
+
+    if let (Ok(indexed), Ok(mut writer)) = (indexed, state.index.writer.lock()) {
+        for result in indexed {
+            let _ = Searcher::delete(&mut writer, &result.doc_id);
+            let _ = result.delete(&state.db);
+        }
+
+        let _ = writer.commit();
+    }
+
+    Ok(())
+}
+
 /// List of installed lenses
 #[instrument(skip(state))]
 pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {

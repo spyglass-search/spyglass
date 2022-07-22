@@ -17,6 +17,10 @@ export async function deleteDoc(id) {
     return await invoke('delete_doc', { id });
 }
 
+export async function delete_domain(domain) {
+    return await invoke('delete_domain', { domain });
+}
+
 export async function install_lens(downloadUrl) {
     return await invoke('install_lens', { downloadUrl })
 }
