@@ -58,6 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
             cmd::delete_doc,
+            cmd::delete_domain,
             cmd::escape,
             cmd::install_lens,
             cmd::list_installable_lenses,

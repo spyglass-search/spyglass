@@ -14,6 +14,7 @@ use shared::response::{
 
 use entities::models::{crawl_queue, indexed_document, lens};
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
+use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -117,6 +118,37 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
         } else {
             let _ = writer.commit();
         }
+    }
+
+    Ok(())
+}
+
+/// Remove a domain from crawl queue & index
+#[instrument(skip(state))]
+pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
+    // Remove items from crawl queue
+    let res = crawl_queue::Entity::delete_many()
+        .filter(crawl_queue::Column::Domain.eq(domain.clone()))
+        .exec(&state.db)
+        .await;
+
+    if let Ok(res) = res {
+        log::info!("removed {} items from crawl queue", res.rows_affected);
+    }
+
+    // Remove items from index
+    let indexed = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Domain.eq(domain))
+        .all(&state.db)
+        .await;
+
+    if let (Ok(indexed), Ok(mut writer)) = (indexed, state.index.writer.lock()) {
+        for result in indexed {
+            let _ = Searcher::delete(&mut writer, &result.doc_id);
+            let _ = result.delete(&state.db);
+        }
+
+        let _ = writer.commit();
     }
 
     Ok(())
@@ -312,8 +344,23 @@ pub async fn toggle_plugin(state: AppState, name: String) -> jsonrpc_core::Resul
 
     if let Ok(Some(plugin)) = plugin {
         let mut updated: lens::ActiveModel = plugin.clone().into();
-        updated.is_enabled = Set(!plugin.is_enabled);
+        let plugin_enabled = !plugin.is_enabled;
+        updated.is_enabled = Set(plugin_enabled);
         let _ = updated.update(&state.db).await;
+
+        let mut cmd_tx = state.plugin_cmd_tx.lock().await;
+        match &mut *cmd_tx {
+            Some(cmd_tx) => {
+                let cmd = if plugin_enabled {
+                    PluginCommand::EnablePlugin(plugin.name)
+                } else {
+                    PluginCommand::DisablePlugin(plugin.name)
+                };
+
+                let _ = cmd_tx.send(cmd).await;
+            }
+            None => {}
+        }
     }
 
     Ok(())

@@ -33,6 +33,10 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::delete_doc(self.state.clone(), id))
     }
 
+    fn delete_domain(&self, domain: String) -> BoxFuture<Result<()>> {
+        Box::pin(route::delete_domain(self.state.clone(), domain))
+    }
+
     fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>> {
         Box::pin(route::list_installed_lenses(self.state.clone()))
     }

@@ -1,10 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use dashmap::DashMap;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
@@ -39,6 +40,8 @@ pub struct PluginConfig {
     pub path: Option<PathBuf>,
     pub plugin_type: PluginType,
     pub user_settings: HashMap<String, String>,
+    #[serde(default)]
+    pub is_enabled: bool,
 }
 
 impl PluginConfig {
@@ -56,6 +59,8 @@ type PluginId = usize;
 pub enum PluginCommand {
     /// Check subscribe plugins for updates
     CheckForUpdate,
+    DisablePlugin(String),
+    EnablePlugin(String),
     Initialize(PluginConfig),
     // Request queued items from plugin
     RequestQueue(PluginId),
@@ -81,17 +86,27 @@ pub(crate) struct PluginEnv {
 
 #[derive(Clone)]
 struct PluginInstance {
-    #[allow(dead_code)]
     id: PluginId,
-    #[allow(dead_code)]
     config: PluginConfig,
     instance: Instance,
 }
 
 #[derive(Default)]
 struct PluginManager {
-    check_update_subs: Vec<PluginId>,
+    check_update_subs: HashSet<PluginId>,
     plugins: DashMap<PluginId, PluginInstance>,
+}
+
+impl PluginManager {
+    pub fn find_by_name(&self, name: String) -> Option<PluginInstance> {
+        for entry in &self.plugins {
+            if entry.config.name == name {
+                return Some(entry.value().clone());
+            }
+        }
+
+        None
+    }
 }
 
 /// Manages plugin events
@@ -107,7 +122,7 @@ pub async fn plugin_manager(
     let mut manager = PluginManager::default();
 
     // Initial load, send some basic configuration to the plugins
-    plugin_load(config, &cmd_writer).await;
+    plugin_load(&state, config, &cmd_writer).await;
 
     // Subscribe plugins check for updates every hour
     let mut interval = tokio::time::interval(Duration::from_secs(60 * 60));
@@ -123,7 +138,6 @@ pub async fn plugin_manager(
             }
         };
 
-        let plugin_id = manager.plugins.len();
         match next_cmd {
             // Queue update checks for subscribed plugins
             Some(PluginCommand::CheckForUpdate) => {
@@ -133,7 +147,33 @@ pub async fn plugin_manager(
                         .await;
                 }
             }
+            Some(PluginCommand::DisablePlugin(plugin_name)) => {
+                log::info!("disabling plugin {}", plugin_name);
+                if let Some(plugin) = manager.find_by_name(plugin_name) {
+                    if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
+                        instance.config.is_enabled = false;
+                        manager.check_update_subs.remove(&plugin.id);
+                    }
+                }
+            }
+            Some(PluginCommand::EnablePlugin(plugin_name)) => {
+                log::info!("enabling plugin {}", plugin_name);
+                if let Some(plugin) = manager.find_by_name(plugin_name) {
+                    if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
+                        instance.config.is_enabled = true;
+                        // Re-initialize plugin
+                        let _ = cmd_writer
+                            .send(PluginCommand::Initialize(instance.config.clone()))
+                            .await;
+                    } else {
+                        log::info!("AFADJLFDA: cant get plugin");
+                    }
+                } else {
+                    log::info!("AFADJLFDA: cant get plugin find_by_name");
+                }
+            }
             Some(PluginCommand::Initialize(plugin)) => {
+                let plugin_id = manager.plugins.len();
                 match plugin_init(plugin_id, &state, &cmd_writer, &plugin).await {
                     Ok(instance) => {
                         manager.plugins.insert(
@@ -144,18 +184,23 @@ pub async fn plugin_manager(
                                 instance: instance.clone(),
                             },
                         );
-                        let _ = cmd_writer
-                            .send(PluginCommand::RequestQueue(plugin_id))
-                            .await;
+
+                        if plugin.is_enabled {
+                            let _ = cmd_writer
+                                .send(PluginCommand::RequestQueue(plugin_id))
+                                .await;
+                        }
                     }
                     Err(e) => log::error!("Unable to init plugin <{}>: {}", plugin.name, e),
                 }
             }
             Some(PluginCommand::RequestQueue(plugin_id)) => {
                 if let Some(plugin) = manager.plugins.get(&plugin_id) {
-                    if let Ok(func) = plugin.instance.exports.get_function("update") {
-                        if let Err(e) = func.call(&[]) {
-                            log::error!("update failed: {}", e);
+                    if plugin.config.is_enabled {
+                        if let Ok(func) = plugin.instance.exports.get_function("update") {
+                            if let Err(e) = func.call(&[]) {
+                                log::error!("update failed: {}", e);
+                            }
                         }
                     }
                 } else {
@@ -163,7 +208,9 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::Subscribe(plugin_id, event)) => match event {
-                PluginEvent::CheckUpdateInterval => manager.check_update_subs.push(plugin_id),
+                PluginEvent::CheckUpdateInterval => {
+                    manager.check_update_subs.insert(plugin_id);
+                }
             },
             // Nothing to do
             _ => tokio::time::sleep(tokio::time::Duration::from_secs(1)).await,
@@ -172,7 +219,7 @@ pub async fn plugin_manager(
 }
 
 // Loop through plugins found in the plugins directory, enabling
-pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
+pub async fn plugin_load(state: &AppState, config: Config, cmds: &mpsc::Sender<PluginCommand>) {
     log::info!("🔌 loading plugins");
 
     let plugins_dir = config.plugins_dir();
@@ -203,14 +250,42 @@ pub async fn plugin_load(config: Config, cmds: &mpsc::Sender<PluginCommand>) {
                             }
                         }
 
+                        // Enable plugins that are lenses, this is the only type right so technically they
+                        // all will be enabled as a lens.
+                        if plug.plugin_type == PluginType::Lens {
+                            match lens::add_or_enable(
+                                &state.db,
+                                &plug.name,
+                                &plug.author,
+                                Some(&plug.description),
+                                &plug.version,
+                                lens::LensType::Plugin,
+                            )
+                            .await
+                            {
+                                Ok(is_new) => {
+                                    log::info!("loaded lens {}, new? {}", plug.name, is_new)
+                                }
+                                Err(e) => log::error!("Unable to add lens: {}", e),
+                            }
+                        }
+
+                        // Is this plugin enabled?
+                        let lens_config = lens::Entity::find()
+                            .filter(lens::Column::Name.eq(plug.name.clone()))
+                            .one(&state.db)
+                            .await;
+
+                        if let Ok(Some(lens_config)) = lens_config {
+                            plug.is_enabled = lens_config.is_enabled;
+                        }
+
                         if cmds
                             .send(PluginCommand::Initialize(plug.clone()))
                             .await
                             .is_ok()
                         {
                             log::info!("<{}> plugin found", &plug.name);
-                        } else {
-                            log::error!("Couldn't send plugin cmd");
                         }
                     }
                     Err(e) => log::error!("Couldn't parse plugin config: {}", e),
@@ -233,24 +308,6 @@ pub async fn plugin_init(
             "Unable to find plugin path: {:?}",
             plugin.path
         )));
-    }
-
-    // Enable plugins that are lenses, this is the only type right so technically they
-    // all will be enabled as a lens.
-    if plugin.plugin_type == PluginType::Lens {
-        match lens::add_or_enable(
-            &state.db,
-            &plugin.name,
-            &plugin.author,
-            Some(&plugin.description),
-            &plugin.version,
-            lens::LensType::Plugin,
-        )
-        .await
-        {
-            Ok(is_new) => log::info!("loaded lens {}, new? {}", plugin.name, is_new),
-            Err(e) => log::error!("Unable to add lens: {}", e),
-        }
     }
 
     // Make sure data folder exists
@@ -303,8 +360,11 @@ pub async fn plugin_init(
     let instance = Instance::new(&module, &import_object)?;
 
     // Lets call the `_start` function, which is our `main` function in Rust
-    let start = instance.exports.get_function("_start")?;
-    start.call(&[])?;
+    if plugin.is_enabled {
+        log::info!("STARTING <{}>", plugin.name);
+        let start = instance.exports.get_function("_start")?;
+        start.call(&[])?;
+    }
 
     Ok(instance)
 }

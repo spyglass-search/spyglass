@@ -156,6 +156,30 @@ pub async fn delete_doc<'r>(
     }
 }
 
+#[tauri::command]
+pub async fn delete_domain<'r>(
+    window: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    domain: &str,
+) -> Result<(), String> {
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<(String,), ()>("delete_domain", "", (domain.into(),))
+        .await
+    {
+        Ok(_) => {
+            let _ = window.emit(&ClientEvent::RefreshSearchResults.to_string(), true);
+            Ok(())
+        }
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(())
+        }
+    }
+}
+
 /// Install a lens (assumes correct format) from a URL
 #[tauri::command]
 pub async fn install_lens<'r>(

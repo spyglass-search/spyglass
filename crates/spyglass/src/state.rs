@@ -4,6 +4,7 @@ use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
 
 use crate::{
     plugin::PluginCommand,
@@ -19,7 +20,7 @@ pub struct AppState {
     pub user_settings: UserSettings,
     pub index: Searcher,
     // Plugin command/control
-    pub plugin_cmd_tx: Option<Sender<PluginCommand>>,
+    pub plugin_cmd_tx: Arc<Mutex<Option<Sender<PluginCommand>>>>,
 }
 
 impl AppState {
@@ -46,7 +47,7 @@ impl AppState {
             user_settings: config.user_settings.clone(),
             lenses: Arc::new(lenses),
             index,
-            plugin_cmd_tx: None,
+            plugin_cmd_tx: Arc::new(Mutex::new(None)),
         }
     }
 }

@@ -120,9 +120,10 @@ pub fn stats_page() -> Html {
             let total = stats.total() as f64;
             html! {
                 <div class="p-4 px-8">
-                    <div class="text-xs pb-2 flex flex-row">
+                    <div class="text-xs pb-2 flex flex-row gap-2">
                         <div class="flex-grow">{domain}</div>
                         <btn::RecrawlButton onrecrawl={onclick.clone()} domain={domain.clone()} />
+                        <btn::DeleteDomainButton ondelete={onclick.clone()} domain={domain.clone()} />
                     </div>
                     <div class="relative flex flex-row items-center flex-growgroup w-full">
                         <StatsBar count={stats.num_queued} total={total} color={"bg-neutral-600"} is_start={true} />

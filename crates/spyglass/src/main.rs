@@ -98,7 +98,11 @@ async fn start_backend(state: &mut AppState, config: &Config) {
 
     // Channel for plugin commands
     let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
-    state.plugin_cmd_tx = Some(plugin_cmd_tx.clone());
+    state
+        .plugin_cmd_tx
+        .lock()
+        .await
+        .replace(plugin_cmd_tx.clone());
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
     let lens_watcher_handle = tokio::spawn(task::lens_watcher(
