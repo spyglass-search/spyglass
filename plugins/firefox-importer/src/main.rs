@@ -23,9 +23,15 @@ impl SpyglassPlugin for Plugin {
         // Let the host know we want to check for updates on a regular interval.
         subscribe(PluginEvent::CheckUpdateInterval);
 
+        let profile_path = if let Ok(folder) = std::env::var("FIREFOX_DATA_FOLDER") {
+            Some(Path::new(&folder).join(DB_FILE))
+        } else {
+            self.default_profile_path()
+        };
+
         // Grab a copy of the firefox data into our plugin data folder.
         // This is required because Firefox locks the file when running.
-        if let Some(profile_path) = self.default_profile_path() {
+        if let Some(profile_path) = profile_path {
             sync_file(DATA_DIR.to_string(), profile_path.display().to_string());
         }
     }
