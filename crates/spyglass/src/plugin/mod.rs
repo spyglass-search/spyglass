@@ -148,7 +148,7 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::DisablePlugin(plugin_name)) => {
-                log::info!("disabling plugin {}", plugin_name);
+                log::info!("disabling plugin <{}>", plugin_name);
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = false;
@@ -157,7 +157,7 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
-                log::info!("enabling plugin {}", plugin_name);
+                log::info!("enabling plugin <{}>", plugin_name);
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = true;
@@ -165,11 +165,7 @@ pub async fn plugin_manager(
                         let _ = cmd_writer
                             .send(PluginCommand::Initialize(instance.config.clone()))
                             .await;
-                    } else {
-                        log::info!("AFADJLFDA: cant get plugin");
                     }
-                } else {
-                    log::info!("AFADJLFDA: cant get plugin find_by_name");
                 }
             }
             Some(PluginCommand::Initialize(plugin)) => {
