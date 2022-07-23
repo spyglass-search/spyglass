@@ -25,6 +25,15 @@ pub async fn open_lens_folder(_: tauri::Window, config: State<'_, Config>) -> Re
 }
 
 #[tauri::command]
+pub async fn open_plugins_folder(
+    _: tauri::Window,
+    config: State<'_, Config>,
+) -> Result<(), String> {
+    open_folder(config.plugins_dir());
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     open::that(url).unwrap();
     Ok(())
@@ -145,7 +154,7 @@ pub async fn delete_doc<'r>(
         .await
     {
         Ok(_) => {
-            let _ = window.emit(&ClientEvent::RefreshSearchResults.to_string(), true);
+            let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
             Ok(())
         }
         Err(err) => {
@@ -169,7 +178,7 @@ pub async fn delete_domain<'r>(
         .await
     {
         Ok(_) => {
-            let _ = window.emit(&ClientEvent::RefreshSearchResults.to_string(), true);
+            let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
             Ok(())
         }
         Err(err) => {
@@ -214,7 +223,7 @@ pub async fn install_lens<'r>(
             } else {
                 // Sleep for a second to let the app reload the lenses and then let the client know we're done.
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                let _ = window.emit(&ClientEvent::RefreshLensManager.to_string(), true);
+                let _ = window.emit(ClientEvent::RefreshLensManager.as_ref(), true);
             }
         }
     }
@@ -303,7 +312,7 @@ pub async fn toggle_plugin(
     let mut rpc = rpc.lock().await;
     rpc.call::<(String,), ()>("toggle_plugin", (name.into(),))
         .await;
-    let _ = window.emit(&ClientEvent::RefreshPluginManager.to_string(), true);
+    let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
 
     Ok(())
 }

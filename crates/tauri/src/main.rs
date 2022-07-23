@@ -66,6 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::list_plugins,
             cmd::network_change,
             cmd::open_lens_folder,
+            cmd::open_plugins_folder,
             cmd::open_result,
             cmd::recrawl_domain,
             cmd::resize_window,

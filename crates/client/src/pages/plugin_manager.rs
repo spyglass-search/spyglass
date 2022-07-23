@@ -4,6 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
+use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
 use crate::components::icons;
@@ -63,6 +64,34 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
         })
     };
 
+    let on_edit_settings = {
+        Callback::from(move |_| {
+            spawn_local(async move {
+                let _ = invoke(&ClientInvoke::EditPluginSettings.to_string(), JsValue::NULL).await;
+            });
+        })
+    };
+
+    let toggle_button = html! {
+        <button
+            onclick={onclick}
+            class={vec!["flex", "flex-row", "text-sm", "cursor-pointer", "hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" }]}
+        >
+            <icons::LightningBoltIcon />
+            <div class="ml-2">{btn_label}</div>
+        </button>
+    };
+
+    let view_settings = html! {
+        <button
+            onclick={on_edit_settings}
+            class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white"
+        >
+            <icons::PencilIcon />
+            <div class="ml-2">{"Edit/View Settings"}</div>
+        </button>
+    };
+
     html! {
         <div class={component_styles}>
             <h2 class="text-xl truncate p-0">
@@ -76,12 +105,8 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
                 {plugin.description.clone()}
             </div>
             <div class="pt-2 flex flex-row gap-8">
-                <button
-                    onclick={onclick}
-                    class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white border-2 border-neutral-600 rounded"
-                >
-                    <div class="px-2">{btn_label}</div>
-                </button>
+                {toggle_button}
+                {view_settings}
             </div>
         </div>
     }
@@ -125,7 +150,7 @@ pub fn plugin_manager_page() -> Html {
                 req_state.set(RequestState::NotStarted);
             }) as Box<dyn Fn()>);
 
-            let _ = listen(&ClientEvent::RefreshPluginManager.to_string(), &cb).await;
+            let _ = listen(ClientEvent::RefreshPluginManager.as_ref(), &cb).await;
             cb.forget();
         });
     }

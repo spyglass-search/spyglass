@@ -118,11 +118,12 @@ pub async fn plugin_manager(
     mut cmd_queue: mpsc::Receiver<PluginCommand>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
+    let mut config = config.clone();
     log::info!("plugin manager started");
     let mut manager = PluginManager::default();
 
     // Initial load, send some basic configuration to the plugins
-    plugin_load(&state, config, &cmd_writer).await;
+    plugin_load(&state, &mut config, &cmd_writer).await;
 
     // Subscribe plugins check for updates every hour
     let mut interval = tokio::time::interval(Duration::from_secs(60 * 60));
@@ -148,7 +149,7 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::DisablePlugin(plugin_name)) => {
-                log::info!("disabling plugin {}", plugin_name);
+                log::info!("disabling plugin <{}>", plugin_name);
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = false;
@@ -157,7 +158,7 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
-                log::info!("enabling plugin {}", plugin_name);
+                log::info!("enabling plugin <{}>", plugin_name);
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = true;
@@ -165,11 +166,7 @@ pub async fn plugin_manager(
                         let _ = cmd_writer
                             .send(PluginCommand::Initialize(instance.config.clone()))
                             .await;
-                    } else {
-                        log::info!("AFADJLFDA: cant get plugin");
                     }
-                } else {
-                    log::info!("AFADJLFDA: cant get plugin find_by_name");
                 }
             }
             Some(PluginCommand::Initialize(plugin)) => {
@@ -219,7 +216,11 @@ pub async fn plugin_manager(
 }
 
 // Loop through plugins found in the plugins directory, enabling
-pub async fn plugin_load(state: &AppState, config: Config, cmds: &mpsc::Sender<PluginCommand>) {
+pub async fn plugin_load(
+    state: &AppState,
+    config: &mut Config,
+    cmds: &mpsc::Sender<PluginCommand>,
+) {
     log::info!("🔌 loading plugins");
 
     let plugins_dir = config.plugins_dir();
@@ -243,12 +244,21 @@ pub async fn plugin_load(state: &AppState, config: Config, cmds: &mpsc::Sender<P
                         plug.path = Some(path.join("main.wasm"));
                         // If any user settings are found, override default ones
                         // from plugin config file.
-                        if let Some(user_settings) = config.plugin_settings.get(&plug.name) {
-                            for (key, value) in user_settings.iter() {
-                                plug.user_settings
-                                    .insert(key.to_string(), value.to_string());
-                            }
+                        let user_settings = config
+                            .plugin_settings
+                            .entry(plug.name.clone())
+                            .or_insert_with(HashMap::new);
+
+                        // Loop through plugin settings and use any user overrides found.
+                        for (key, value) in plug.user_settings.iter_mut() {
+                            let user_override = user_settings
+                                .entry(key.to_string())
+                                .or_insert_with(|| value.to_string());
+                            *value = user_override.to_string();
                         }
+                        // Update the user settings file in case any new setting entries
+                        // were added.
+                        let _ = config.save_plugin_settings(&config.plugin_settings);
 
                         // Enable plugins that are lenses, this is the only type right so technically they
                         // all will be enabled as a lens.

@@ -5,14 +5,6 @@ if (window.__TAURI__) {
     listen = window.__TAURI__.event.listen;
 }
 
-export async function escape() {
-    return await invoke('escape');
-}
-
-export async function crawlStats() {
-    return await invoke('crawl_stats');
-}
-
 export async function deleteDoc(id) {
     return await invoke('delete_doc', { id });
 }
@@ -23,14 +15,6 @@ export async function delete_domain(domain) {
 
 export async function install_lens(downloadUrl) {
     return await invoke('install_lens', { downloadUrl })
-}
-
-export async function listInstalledLenses() {
-    return await invoke('list_installed_lenses');
-}
-
-export async function listInstallableLenses() {
-    return await invoke('list_installable_lenses');
 }
 
 export async function network_change(isOffline) {
@@ -51,10 +35,6 @@ export async function searchLenses(query) {
 
 export async function openResult(url) {
     return await invoke('open_result', { url });
-}
-
-export async function openLensFolder() {
-    return await invoke('open_lens_folder');
 }
 
 export async function resizeWindow(height) {
