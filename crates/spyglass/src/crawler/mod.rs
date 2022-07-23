@@ -191,7 +191,8 @@ impl Crawler {
             title: parse_result.title,
             url: canonical_url,
             links: parse_result.links,
-            raw: Some(raw_body.to_string()),
+            // No need to store the raw HTML for now.
+            raw: None, // Some(raw_body.to_string()),
         }
     }
 
