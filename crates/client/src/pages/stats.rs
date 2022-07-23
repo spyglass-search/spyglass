@@ -1,9 +1,11 @@
 use num_format::{Buffer, Locale};
+use shared::event::ClientInvoke;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::{btn, icons};
-use crate::crawl_stats;
+use crate::invoke;
 use shared::response::{CrawlStats, QueueStatus};
 
 fn fetch_crawl_stats(
@@ -11,7 +13,7 @@ fn fetch_crawl_stats(
     request_finished: UseStateHandle<bool>,
 ) {
     spawn_local(async move {
-        match crawl_stats().await {
+        match invoke(ClientInvoke::GetCrawlStats.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 let results: CrawlStats = results.into_serde().unwrap();
                 let mut sorted = results.by_domain;

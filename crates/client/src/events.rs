@@ -5,7 +5,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{Element, HtmlInputElement};
 use yew::prelude::*;
 
-use super::{open, invoke};
+use super::{invoke, open};
 use crate::components::ResultListData;
 use crate::constants;
 use crate::pages::{clear_results, show_doc_results, show_lens_results};

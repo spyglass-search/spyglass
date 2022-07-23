@@ -1,3 +1,4 @@
+use shared::event::ClientInvoke;
 use shared::response::LensResult;
 use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
@@ -8,7 +9,7 @@ use yew::prelude::*;
 use crate::components::icons;
 use crate::listen;
 use crate::utils::RequestState;
-use crate::{install_lens, list_installable_lenses, list_installed_lenses};
+use crate::{install_lens, invoke};
 use shared::event::ClientEvent;
 use shared::response::InstallableLens;
 
@@ -24,7 +25,7 @@ fn fetch_installed_lenses(
     req_state: UseStateHandle<RequestState>,
 ) {
     spawn_local(async move {
-        match list_installed_lenses().await {
+        match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 lenses_handle.set(results.into_serde().unwrap());
                 req_state.set(RequestState::Finished);
@@ -42,7 +43,7 @@ fn fetch_installable_lenses(
     req_state: UseStateHandle<RequestState>,
 ) {
     spawn_local(async move {
-        match list_installable_lenses().await {
+        match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 let lenses: Vec<InstallableLens> = results.into_serde().unwrap();
                 let parsed: Vec<LensResult> = lenses
@@ -186,7 +187,7 @@ pub fn lens_manager_page() -> Html {
     let on_open_folder = {
         move |_| {
             spawn_local(async {
-                let _ = crate::open_lens_folder().await;
+                let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
             });
         }
     };

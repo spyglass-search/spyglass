@@ -33,12 +33,6 @@ extern "C" {
     #[wasm_bindgen(catch)]
     pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(js_name = "listInstalledLenses", catch)]
-    pub async fn list_installed_lenses() -> Result<JsValue, JsValue>;
-
-    #[wasm_bindgen(js_name = "listInstallableLenses", catch)]
-    pub async fn list_installable_lenses() -> Result<JsValue, JsValue>;
-
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
 
@@ -48,14 +42,8 @@ extern "C" {
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(js_name = "openLensFolder", catch)]
-    pub async fn open_lens_folder() -> Result<(), JsValue>;
-
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(js_name = "crawlStats", catch)]
-    pub async fn crawl_stats() -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen]
     pub async fn network_change(is_offline: bool);
