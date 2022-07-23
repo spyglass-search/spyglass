@@ -5,13 +5,13 @@
     <br />
     <br />
         Download now:
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.6.5/Spyglass_22.6.5_x64.dmg">
+        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.7.1/Spyglass_22.7.1_x64.dmg">
             <strong>macOS</strong>
         </a> |
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.6.5/Spyglass_22.6.5_x64_en-US.msi">
+        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.7.1/Spyglass_22.7.1_x64_en-US.msi">
             <strong>Windows</strong>
         </a> |
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.6.5/spyglass_22.6.5_amd64.AppImage">
+        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.7.1/spyglass_22.7.1_amd64.AppImage">
             <strong>Linux (AppImage)</strong>
         </a>
     <br />
@@ -45,8 +45,8 @@ Spyglass lives on your device crawling & indexing websites __you__ want with a b
 set of rules.
 
 Web pages when condensed down to text are surprisingly small. With todays' incredibly
-fast CPUs and ample amounts of of disk space, you can easily create a personal library of 
-wikis, blog posts, etc. that can be referenced instantaneously. Cut through the SEO spam of 
+fast CPUs and ample amounts of of disk space, you can easily create a personal library of
+wikis, blog posts, etc. that can be referenced instantly. Cut through the SEO spam of
 the internet by building your own index.
 
 For users who have been frustrated with the current state of search and the internet,
@@ -74,8 +74,8 @@ Spyglass is a solution to the following common issues when searching the web:
 
 Spyglass expands on the ideas outlined in [this paper][googles-paper] by the
 Brave Search Team. There are currently a simple set of rules that will point Spyglass
-at a website and crawl only what you want. When available, crawling is initially
-bootstrap w/ data from the Internet Archive so that we do not overwhelm smaller websites.
+at a website and crawl only what you want. When available, crawling is
+bootstrapped w/ data from the Internet Archive to not overwhelm smaller websites.
 
 Not all websites & not all data can be crawled by Spyglass. If you have something
 that you'd like to index and would like some help, feel free to ping me on
@@ -91,7 +91,7 @@ our [Discord server](https://discord.gg/663wPVBSTB)!
 
 ## Developer Guide
 
-If you'd like to help, reach out to use on our [Discord server](https://discord.gg/663wPVBSTB)
+If you'd like to help, reach out on our [Discord server](https://discord.gg/663wPVBSTB)
 to see what is currently being developed and how you can help usher in a new,
 better search.
 

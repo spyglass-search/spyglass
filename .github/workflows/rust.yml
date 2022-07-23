@@ -28,6 +28,9 @@ jobs:
         toolchain: stable
         target: wasm32-unknown-unknown
         components: clippy
+    # Setup wasm32-wasi toolchain
+    - name: setup wasm32-wasi toolchain
+      run: rustup target add wasm32-wasi
     # Should help bring down build times
     - uses: Swatinem/rust-cache@v1
       with:
@@ -71,15 +74,23 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
+        args: -p spyglass
     # Run tests
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --verbose
+        args: --verbose --all
     # Run clippy
     - name: Run clippy
       uses: actions-rs/cargo@v1
       with:
         command: clippy
         args: -- -D warnings
+    # make sure we ran fmt
+    - name: run fmt check
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: --all --check
+

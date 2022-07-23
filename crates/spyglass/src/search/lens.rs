@@ -62,26 +62,24 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
 /// Loop through lenses in the AppState. Update our internal db & bootstrap anything
 /// that hasn't been bootstrapped.
 pub async fn load_lenses(state: AppState) {
-    let _ = lens::reset(&state.db).await;
-
     let mut new_lenses: Vec<Lens> = Vec::new();
     for entry in state.lenses.iter() {
         let lens = entry.value();
         // Have we added this lens to the database?
-        match lens::add(
+        match lens::add_or_enable(
             &state.db,
             &lens.name,
             &lens.author,
             lens.description.as_ref(),
             &lens.version,
+            lens::LensType::Simple,
         )
         .await
         {
-            Ok(true) => {
-                log::info!("loaded lens {}", lens.name);
+            Ok(is_new) => {
+                log::info!("loaded lens {}, new? {}", lens.name, is_new);
                 new_lenses.push(lens.clone());
             }
-            Ok(false) => log::info!("duplicate lens ({})", lens.name),
             Err(e) => log::error!("error loading lens {}", e),
         }
     }
@@ -98,10 +96,6 @@ pub async fn load_lenses(state: AppState) {
         for prefix in lens.urls.iter() {
             // Handle singular URL matches
             if prefix.ends_with('$') {
-                let overrides = crawl_queue::EnqueueSettings {
-                    crawl_type: crawl_queue::CrawlType::Bootstrap,
-                };
-
                 // Remove the '$' suffix and add to the crawl queue
                 let url = prefix.strip_suffix('$').unwrap();
                 if let Err(err) = crawl_queue::enqueue_all(
@@ -109,7 +103,7 @@ pub async fn load_lenses(state: AppState) {
                     &[url.to_owned()],
                     &Vec::new(),
                     &state.user_settings,
-                    &overrides,
+                    &Default::default(),
                 )
                 .await
                 {

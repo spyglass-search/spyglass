@@ -8,8 +8,19 @@ mod components;
 mod constants;
 mod events;
 mod pages;
+mod utils;
 
-use crate::pages::{LensManagerPage, SearchPage, StatsPage};
+use crate::pages::{LensManagerPage, PluginManagerPage, SearchPage, StatsPage};
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__"], catch)]
+    pub async fn invoke(fn_name: &str, val: JsValue) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "event"], catch)]
+    pub async fn listen(event_name: &str, cb: &Closure<dyn Fn()>) -> Result<JsValue, JsValue>;
+
+}
 
 #[wasm_bindgen(module = "/public/glue.js")]
 extern "C" {
@@ -17,13 +28,10 @@ extern "C" {
     pub async fn delete_doc(id: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
+    pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
     pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(js_name = "listInstalledLenses", catch)]
-    pub async fn list_installed_lenses() -> Result<JsValue, JsValue>;
-
-    #[wasm_bindgen(js_name = "listInstallableLenses", catch)]
-    pub async fn list_installable_lenses() -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
@@ -31,38 +39,20 @@ extern "C" {
     #[wasm_bindgen(js_name = "searchLenses", catch)]
     pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(js_name = "onClearSearch")]
-    pub async fn on_clear_search(callback: &Closure<dyn Fn()>);
-
-    #[wasm_bindgen(js_name = "onFocus")]
-    pub async fn on_focus(callback: &Closure<dyn Fn()>);
-
-    #[wasm_bindgen(js_name = "onRefreshResults")]
-    pub async fn on_refresh_results(callback: &Closure<dyn Fn()>);
-
-    #[wasm_bindgen]
-    pub async fn on_refresh_lens_manager(callback: &Closure<dyn Fn()>);
-
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(js_name = "openLensFolder", catch)]
-    pub async fn open_lens_folder() -> Result<(), JsValue>;
-
-    #[wasm_bindgen(js_name = "escape", catch)]
-    pub async fn escape() -> Result<(), JsValue>;
-
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(js_name = "crawlStats", catch)]
-    pub async fn crawl_stats() -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen]
     pub async fn network_change(is_offline: bool);
 
     #[wasm_bindgen(catch)]
     pub async fn recrawl_domain(domain: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    pub async fn toggle_plugin(name: &str) -> Result<(), JsValue>;
 }
 
 #[derive(Clone, Routable, PartialEq)]
@@ -73,6 +63,8 @@ enum Route {
     LensManager,
     #[at("/stats")]
     Status,
+    #[at("/settings/plugins")]
+    PluginManager,
 }
 
 fn main() {
@@ -116,6 +108,7 @@ pub fn app() -> Html {
 fn switch(routes: &Route) -> Html {
     match routes {
         Route::LensManager => html! { <LensManagerPage /> },
+        Route::PluginManager => html! { <PluginManagerPage /> },
         Route::Search => html! { <SearchPage /> },
         Route::Status => html! { <StatsPage /> },
     }

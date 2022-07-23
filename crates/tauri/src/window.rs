@@ -1,5 +1,7 @@
 use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
 
+use shared::event::ClientEvent;
+
 use crate::constants;
 
 pub fn center_window(window: &Window) {
@@ -20,7 +22,9 @@ pub fn center_window(window: &Window) {
 
 pub fn hide_window(window: &Window) {
     window.hide().unwrap();
-    window.emit("clear_search", true).unwrap();
+    window
+        .emit(ClientEvent::ClearSearch.as_ref(), true)
+        .unwrap();
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
@@ -33,7 +37,9 @@ pub async fn resize_window(window: &Window, height: f64) {
 }
 
 pub fn show_window(window: &Window) {
-    window.emit("focus_window", true).unwrap();
+    window
+        .emit(ClientEvent::FocusWindow.as_ref(), true)
+        .unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();
     window.set_always_on_top(true).unwrap();
@@ -70,6 +76,23 @@ pub fn show_lens_manager_window(app: &AppHandle) -> Window {
         WindowUrl::App("/settings/lens".into()),
     )
     .title("Lens Manager")
+    .build()
+    .unwrap()
+}
+
+pub fn show_plugin_manager(app: &AppHandle) -> Window {
+    if let Some(window) = app.get_window(constants::PLUGIN_MANAGER_WIN_NAME) {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return window;
+    }
+
+    WindowBuilder::new(
+        app,
+        constants::PLUGIN_MANAGER_WIN_NAME,
+        WindowUrl::App("/settings/plugins".into()),
+    )
+    .title("Plugins Manager")
     .build()
     .unwrap()
 }

@@ -39,16 +39,18 @@ pub async fn manager_task(
     log::info!("manager started");
 
     loop {
-        if state.app_state.get("paused").unwrap().to_string() == "true" {
-            // Run w/ a select on the shutdown signal otherwise we're stuck in an
-            // infinite loop
-            tokio::select! {
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
-                    continue
-                }
-                _ = shutdown_rx.recv() => {
-                    log::info!("🛑 Shutting down worker");
-                    return;
+        if let Some(is_paused) = state.app_state.get("paused") {
+            if (*is_paused) == "true" {
+                // Run w/ a select on the shutdown signal otherwise we're stuck in an
+                // infinite loop
+                tokio::select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
+                        continue
+                    }
+                    _ = shutdown_rx.recv() => {
+                        log::info!("🛑 Shutting down worker");
+                        return;
+                    }
                 }
             }
         }
@@ -148,64 +150,80 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 
             // Add / update search index w/ crawl result.
             if let Some(content) = crawl_result.content {
-                let url = Url::parse(&crawl_result.url).unwrap();
+                let url = Url::parse(&crawl_result.url).expect("Invalid crawl URL");
+                let url_host = url.host_str().expect("Invalid URL host");
 
                 let existing = indexed_document::Entity::find()
                     .filter(indexed_document::Column::Url.eq(url.as_str()))
                     .one(&state.db)
                     .await
-                    .unwrap();
+                    .unwrap_or_default();
 
                 // Delete old document, if any.
                 if let Some(doc) = &existing {
-                    let mut index_writer = state.index.writer.lock().unwrap();
-                    Searcher::delete(&mut index_writer, &doc.doc_id).unwrap();
+                    if let Ok(mut index_writer) = state.index.writer.lock() {
+                        let _ = Searcher::delete(&mut index_writer, &doc.doc_id);
+                    }
                 }
 
                 // Add document to index
-                let doc_id = {
-                    let mut index_writer = state.index.writer.lock().unwrap();
-                    Searcher::add_document(
-                        &mut index_writer,
-                        &crawl_result.title.unwrap_or_default(),
-                        &crawl_result.description.unwrap_or_default(),
-                        url.host_str().unwrap(),
-                        url.as_str(),
-                        &content,
-                        &crawl_result.raw.unwrap(),
-                    )
-                    .unwrap()
-                };
-
-                // Update/create index reference in our database
-                let indexed = if let Some(doc) = existing {
-                    let mut update: indexed_document::ActiveModel = doc.into();
-                    update.doc_id = Set(doc_id);
-                    update
-                } else {
-                    indexed_document::ActiveModel {
-                        domain: Set(url.host_str().unwrap().to_string()),
-                        url: Set(url.as_str().to_string()),
-                        doc_id: Set(doc_id),
-                        ..Default::default()
+                let doc_id: Option<String> = {
+                    if let Ok(mut index_writer) = state.index.writer.lock() {
+                        match Searcher::add_document(
+                            &mut index_writer,
+                            &crawl_result.title.unwrap_or_default(),
+                            &crawl_result.description.unwrap_or_default(),
+                            url_host,
+                            url.as_str(),
+                            &content,
+                            &crawl_result.raw.unwrap_or_default(),
+                        ) {
+                            Ok(new_doc_id) => Some(new_doc_id),
+                            _ => None,
+                        }
+                    } else {
+                        None
                     }
                 };
 
-                indexed.save(&state.db).await.unwrap();
+                if let Some(doc_id) = doc_id {
+                    // Update/create index reference in our database
+                    let indexed = if let Some(doc) = existing {
+                        let mut update: indexed_document::ActiveModel = doc.into();
+                        update.doc_id = Set(doc_id);
+                        update
+                    } else {
+                        indexed_document::ActiveModel {
+                            domain: Set(url_host.to_string()),
+                            url: Set(url.as_str().to_string()),
+                            doc_id: Set(doc_id),
+                            ..Default::default()
+                        }
+                    };
+
+                    if let Err(e) = indexed.save(&state.db).await {
+                        log::error!("Unable to save document: {}", e);
+                    }
+                }
             }
         }
         Ok(None) => {
             // Failed to grab robots.txt or crawling is not allowed
-            crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Completed)
-                .await
-                .unwrap();
+            if let Err(e) =
+                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Completed)
+                    .await
+            {
+                log::error!("Unable to mark task as finished: {}", e);
+            }
         }
         Err(err) => {
+            log::error!("Unable to crawl id: {} - {:?}", task.id, err);
             // mark crawl as failed
-            crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed)
-                .await
-                .unwrap();
-            log::error!("Unable to crawl id: {} - {:?}", task.id, err)
+            if let Err(e) =
+                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed).await
+            {
+                log::error!("Unable to mark task as failed: {}", e);
+            }
         }
     }
 }
@@ -220,16 +238,18 @@ pub async fn worker_task(
     let crawler = Crawler::new();
 
     loop {
-        if state.app_state.get("paused").unwrap().to_string() == "true" {
-            // Run w/ a select on the shutdown signal otherwise we're stuck in an
-            // infinite loop
-            tokio::select! {
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
-                    continue
-                }
-                _ = shutdown_rx.recv() => {
-                    log::info!("🛑 Shutting down worker");
-                    return;
+        if let Some(is_paused) = state.app_state.get("paused") {
+            if (*is_paused) == "true" {
+                // Run w/ a select on the shutdown signal otherwise we're stuck in an
+                // infinite loop
+                tokio::select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
+                        continue
+                    }
+                    _ = shutdown_rx.recv() => {
+                        log::info!("🛑 Shutting down worker");
+                        return;
+                    }
                 }
             }
         }
@@ -264,10 +284,10 @@ pub async fn lens_watcher(
 
     let mut watcher = RecommendedWatcher::new(move |res| {
         futures::executor::block_on(async {
-            tx.send(res).await.unwrap();
+            tx.send(res).await.expect("Unable to send FS event");
         })
     })
-    .unwrap();
+    .expect("Unable to watch lens directory");
 
     let _ = watcher.watch(&config.lenses_dir(), RecursiveMode::Recursive);
 

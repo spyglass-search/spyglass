@@ -438,19 +438,20 @@ pub async fn mark_done(
     id: i64,
     status: CrawlStatus,
 ) -> anyhow::Result<()> {
-    let crawl = Entity::find_by_id(id).one(db).await?.unwrap();
-    let mut updated: ActiveModel = crawl.clone().into();
+    if let Some(crawl) = Entity::find_by_id(id).one(db).await? {
+        let mut updated: ActiveModel = crawl.clone().into();
 
-    // Bump up number of retries if this failed
-    if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
-        updated.num_retries = Set(crawl.num_retries + 1);
-        // Queue again
-        updated.status = Set(CrawlStatus::Queued);
-    } else {
-        updated.status = Set(status);
+        // Bump up number of retries if this failed
+        if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
+            updated.num_retries = Set(crawl.num_retries + 1);
+            // Queue again
+            updated.status = Set(CrawlStatus::Queued);
+        } else {
+            updated.status = Set(status);
+        }
+
+        updated.update(db).await?;
     }
-
-    updated.update(db).await?;
 
     Ok(())
 }

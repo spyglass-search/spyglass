@@ -11,3 +11,4 @@ pub const LENS_DIRECTORY_INDEX_URL: &str =
 
 pub const STATS_WIN_NAME: &str = "crawl_stats";
 pub const LENS_MANAGER_WIN_NAME: &str = "lens_manager";
+pub const PLUGIN_MANAGER_WIN_NAME: &str = "plugin_manager";

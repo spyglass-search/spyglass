@@ -1,9 +1,11 @@
 use num_format::{Buffer, Locale};
+use shared::event::ClientInvoke;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::{btn, icons};
-use crate::crawl_stats;
+use crate::invoke;
 use shared::response::{CrawlStats, QueueStatus};
 
 fn fetch_crawl_stats(
@@ -11,7 +13,7 @@ fn fetch_crawl_stats(
     request_finished: UseStateHandle<bool>,
 ) {
     spawn_local(async move {
-        match crawl_stats().await {
+        match invoke(ClientInvoke::GetCrawlStats.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 let results: CrawlStats = results.into_serde().unwrap();
                 let mut sorted = results.by_domain;
@@ -120,9 +122,10 @@ pub fn stats_page() -> Html {
             let total = stats.total() as f64;
             html! {
                 <div class="p-4 px-8">
-                    <div class="text-xs pb-2 flex flex-row">
+                    <div class="text-xs pb-2 flex flex-row gap-2">
                         <div class="flex-grow">{domain}</div>
                         <btn::RecrawlButton onrecrawl={onclick.clone()} domain={domain.clone()} />
+                        <btn::DeleteDomainButton ondelete={onclick.clone()} domain={domain.clone()} />
                     </div>
                     <div class="relative flex flex-row items-center flex-growgroup w-full">
                         <StatsBar count={stats.num_queued} total={total} color={"bg-neutral-600"} is_start={true} />

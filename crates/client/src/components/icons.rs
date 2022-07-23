@@ -70,6 +70,24 @@ pub fn folder_open_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(LightningBoltIcon)]
+pub fn lightning_bolt_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+        </svg>
+    }
+}
+
+#[function_component(PencilIcon)]
+pub fn pencil_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+        </svg>
+    }
+}
+
 #[function_component(RefreshIcon)]
 pub fn refresh_icon(props: &IconProps) -> Html {
     html! {

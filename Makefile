@@ -1,4 +1,4 @@
-.PHONY: build-backend build-client build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
+.PHONY: build-backend build-client build-plugins build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
 
@@ -13,9 +13,25 @@ build-client:
 build-styles:
 	cd ./crates/client && npx tailwindcss -i ./public/input.css -o ./public/main.css
 
+build-plugins-dev:
+# Build chrome-importer plugin
+	cargo build -p chrome-importer --target wasm32-wasi
+	cp target/wasm32-wasi/debug/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
+
+	cargo build -p firefox-importer --target wasm32-wasi
+	cp target/wasm32-wasi/debug/firefox-importer.wasm assets/plugins/firefox-importer/main.wasm
+
+	cp -r assets/plugins ~/Library/Application\ Support/com.athlabs.spyglass-dev/
+
+build-plugins-release:
+	cargo build -p chrome-importer --target wasm32-wasi --release
+	cp target/wasm32-wasi/release/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
+
+	cargo build -p firefox-importer --target wasm32-wasi --release
+	cp target/wasm32-wasi/release/firefox-importer.wasm assets/plugins/firefox-importer/main.wasm
+
 build-release: build-backend build-styles
 	cargo tauri build
-# Run macOS binary signing utility
 
 check:
 	cargo check --all

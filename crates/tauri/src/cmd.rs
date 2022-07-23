@@ -7,6 +7,7 @@ use url::Url;
 use crate::{constants, open_folder, rpc, window};
 use shared::{
     config::Config,
+    event::ClientEvent,
     request,
     response::{self, InstallableLens},
 };
@@ -20,6 +21,15 @@ pub async fn escape(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 pub async fn open_lens_folder(_: tauri::Window, config: State<'_, Config>) -> Result<(), String> {
     open_folder(config.lenses_dir());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_plugins_folder(
+    _: tauri::Window,
+    config: State<'_, Config>,
+) -> Result<(), String> {
+    open_folder(config.plugins_dir());
     Ok(())
 }
 
@@ -144,7 +154,31 @@ pub async fn delete_doc<'r>(
         .await
     {
         Ok(_) => {
-            let _ = window.emit("refresh_results", true);
+            let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
+            Ok(())
+        }
+        Err(err) => {
+            log::error!("Error sending RPC: {}", err);
+            rpc.reconnect().await;
+            Ok(())
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn delete_domain<'r>(
+    window: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    domain: &str,
+) -> Result<(), String> {
+    let mut rpc = rpc.lock().await;
+    match rpc
+        .client
+        .call_method::<(String,), ()>("delete_domain", "", (domain.into(),))
+        .await
+    {
+        Ok(_) => {
+            let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
             Ok(())
         }
         Err(err) => {
@@ -189,7 +223,7 @@ pub async fn install_lens<'r>(
             } else {
                 // Sleep for a second to let the app reload the lenses and then let the client know we're done.
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                let _ = window.emit("refresh_lens_manager", true);
+                let _ = window.emit(ClientEvent::RefreshLensManager.as_ref(), true);
             }
         }
     }
@@ -256,4 +290,29 @@ pub async fn recrawl_domain(
             Ok(())
         }
     }
+}
+
+#[tauri::command]
+pub async fn list_plugins(
+    _: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+) -> Result<Vec<response::PluginResult>, String> {
+    let mut rpc = rpc.lock().await;
+    Ok(rpc
+        .call::<Value, Vec<response::PluginResult>>("list_plugins", Value::Null)
+        .await)
+}
+
+#[tauri::command]
+pub async fn toggle_plugin(
+    window: tauri::Window,
+    rpc: State<'_, rpc::RpcMutex>,
+    name: &str,
+) -> Result<(), String> {
+    let mut rpc = rpc.lock().await;
+    rpc.call::<(String,), ()>("toggle_plugin", (name.into(),))
+        .await;
+    let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
+
+    Ok(())
 }

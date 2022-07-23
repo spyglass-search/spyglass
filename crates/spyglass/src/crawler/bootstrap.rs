@@ -138,14 +138,32 @@ pub async fn bootstrap(
             count += urls.len();
 
             if resume.is_none() {
-                return Ok(count);
+                break;
             }
 
             resume_key = resume;
         } else {
-            return Ok(count);
+            break;
         }
     }
+
+    // If no URLs were found to be bootstrap, enqueue the seed url. This can happen
+    // if its a new site which the Internet Archive has yet to archive
+    if count == 0 {
+        log::warn!("No URLs found in CDX, adding <{}> as a normal crawl", url);
+        crawl_queue::enqueue_all(
+            db,
+            &[url.to_string()],
+            &Vec::new(),
+            settings,
+            // No overrides required
+            &Default::default(),
+        )
+        .await?;
+        count += 1;
+    }
+
+    Ok(count)
 }
 
 #[cfg(test)]

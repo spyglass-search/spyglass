@@ -33,8 +33,16 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::delete_doc(self.state.clone(), id))
     }
 
+    fn delete_domain(&self, domain: String) -> BoxFuture<Result<()>> {
+        Box::pin(route::delete_domain(self.state.clone(), domain))
+    }
+
     fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>> {
         Box::pin(route::list_installed_lenses(self.state.clone()))
+    }
+
+    fn list_plugins(&self) -> BoxFuture<Result<Vec<shared::response::PluginResult>>> {
+        Box::pin(route::list_plugins(self.state.clone()))
     }
 
     fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>> {
@@ -51,6 +59,10 @@ impl Rpc for SpyglassRPC {
 
     fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>> {
         Box::pin(route::toggle_pause(self.state.clone()))
+    }
+
+    fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>> {
+        Box::pin(route::toggle_plugin(self.state.clone(), name))
     }
 }
 

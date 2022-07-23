@@ -1,18 +1,26 @@
 use std::sync::Arc;
 
-use crate::search::{IndexPath, Searcher};
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
+
+use crate::{
+    plugin::PluginCommand,
+    search::{IndexPath, Searcher},
+};
 use shared::config::{Config, Lens, UserSettings};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, Lens>>,
     pub user_settings: UserSettings,
     pub index: Searcher,
+    // Plugin command/control
+    pub plugin_cmd_tx: Arc<Mutex<Option<Sender<PluginCommand>>>>,
 }
 
 impl AppState {
@@ -39,6 +47,7 @@ impl AppState {
             user_settings: config.user_settings.clone(),
             lenses: Arc::new(lenses),
             index,
+            plugin_cmd_tx: Arc::new(Mutex::new(None)),
         }
     }
 }

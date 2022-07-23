@@ -1,18 +1,20 @@
 use std::collections::HashMap;
 
 use entities::models::crawl_queue::CrawlStatus;
+use entities::models::lens::LensType;
 use jsonrpc_core::{Error, ErrorCode, Result};
 use tracing::instrument;
 use url::Url;
 
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, QueueStatus, SearchLensesResp, SearchMeta, SearchResult,
-    SearchResults,
+    AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
+    SearchResult, SearchResults,
 };
 
 use entities::models::{crawl_queue, indexed_document, lens};
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
+use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 
@@ -121,6 +123,37 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
     Ok(())
 }
 
+/// Remove a domain from crawl queue & index
+#[instrument(skip(state))]
+pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
+    // Remove items from crawl queue
+    let res = crawl_queue::Entity::delete_many()
+        .filter(crawl_queue::Column::Domain.eq(domain.clone()))
+        .exec(&state.db)
+        .await;
+
+    if let Ok(res) = res {
+        log::info!("removed {} items from crawl queue", res.rows_affected);
+    }
+
+    // Remove items from index
+    let indexed = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Domain.eq(domain))
+        .all(&state.db)
+        .await;
+
+    if let (Ok(indexed), Ok(mut writer)) = (indexed, state.index.writer.lock()) {
+        for result in indexed {
+            let _ = Searcher::delete(&mut writer, &result.doc_id);
+            let _ = result.delete(&state.db);
+        }
+
+        let _ = writer.commit();
+    }
+
+    Ok(())
+}
+
 /// List of installed lenses
 #[instrument(skip(state))]
 pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
@@ -138,6 +171,27 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
     lenses.sort_by(|x, y| x.title.cmp(&y.title));
 
     Ok(lenses)
+}
+
+pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>> {
+    let mut plugins = Vec::new();
+    let result = lens::Entity::find()
+        .filter(lens::Column::LensType.eq(LensType::Plugin))
+        .all(&state.db)
+        .await;
+
+    if let Ok(results) = result {
+        for plugin in results {
+            plugins.push(PluginResult {
+                author: plugin.author,
+                title: plugin.name,
+                description: plugin.description.clone().unwrap_or_default(),
+                is_enabled: plugin.is_enabled,
+            });
+        }
+    }
+
+    Ok(plugins)
 }
 
 /// Show the list of URLs in the queue and their status
@@ -277,4 +331,37 @@ pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     }
 
     _get_current_status(state.clone()).await
+}
+
+#[instrument(skip(state))]
+pub async fn toggle_plugin(state: AppState, name: String) -> jsonrpc_core::Result<()> {
+    // Find the plugin
+    let plugin = lens::Entity::find()
+        .filter(lens::Column::Name.eq(name))
+        .filter(lens::Column::LensType.eq(LensType::Plugin))
+        .one(&state.db)
+        .await;
+
+    if let Ok(Some(plugin)) = plugin {
+        let mut updated: lens::ActiveModel = plugin.clone().into();
+        let plugin_enabled = !plugin.is_enabled;
+        updated.is_enabled = Set(plugin_enabled);
+        let _ = updated.update(&state.db).await;
+
+        let mut cmd_tx = state.plugin_cmd_tx.lock().await;
+        match &mut *cmd_tx {
+            Some(cmd_tx) => {
+                let cmd = if plugin_enabled {
+                    PluginCommand::EnablePlugin(plugin.name)
+                } else {
+                    PluginCommand::DisablePlugin(plugin.name)
+                };
+
+                let _ = cmd_tx.send(cmd).await;
+            }
+            None => {}
+        }
+    }
+
+    Ok(())
 }

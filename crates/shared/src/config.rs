@@ -8,9 +8,11 @@ use serde::{Deserialize, Serialize};
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 
+pub type PluginSettings = HashMap<String, HashMap<String, String>>;
 #[derive(Clone, Debug)]
 pub struct Config {
     pub user_settings: UserSettings,
+    pub plugin_settings: PluginSettings,
     pub lenses: HashMap<String, Lens>,
 }
 
@@ -151,6 +153,31 @@ impl Default for UserSettings {
 }
 
 impl Config {
+    pub fn save_plugin_settings(&self, settings: &PluginSettings) -> anyhow::Result<()> {
+        let prefs_path = self.plugin_settings_file();
+        fs::write(
+            prefs_path,
+            ron::ser::to_string_pretty(settings, Default::default())?,
+        )
+        .expect("Unable to save plugin settings file.");
+
+        Ok(())
+    }
+
+    fn load_plugin_setings(&self) -> anyhow::Result<PluginSettings> {
+        let prefs_path = self.plugin_settings_file();
+        if prefs_path.exists() {
+            let settings: PluginSettings = ron::from_str(&fs::read_to_string(prefs_path)?)?;
+            return Ok(settings);
+        }
+
+        // Create default settings
+        let settings: PluginSettings = Default::default();
+        self.save_plugin_settings(&settings)?;
+
+        Ok(settings)
+    }
+
     fn load_user_settings() -> anyhow::Result<UserSettings> {
         let prefs_path = Self::prefs_file();
 
@@ -215,6 +242,14 @@ impl Config {
         Self::prefs_dir().join("settings.ron")
     }
 
+    pub fn plugins_dir(&self) -> PathBuf {
+        self.data_dir().join("plugins")
+    }
+
+    pub fn plugin_settings_file(&self) -> PathBuf {
+        self.plugins_dir().join("settings.ron")
+    }
+
     pub fn lenses_dir(&self) -> PathBuf {
         self.data_dir().join("lenses")
     }
@@ -229,9 +264,10 @@ impl Config {
             Default::default()
         });
 
-        let config = Config {
+        let mut config = Config {
             lenses: HashMap::new(),
             user_settings,
+            plugin_settings: Default::default(),
         };
 
         let data_dir = config.data_dir();
@@ -245,6 +281,16 @@ impl Config {
 
         let lenses_dir = config.lenses_dir();
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
+
+        let plugins_dir = config.plugins_dir();
+        fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
+
+        // Load plugin settings
+        let plugin_settings = config.load_plugin_setings().unwrap_or_else(|err| {
+            log::error!("Invalid plugin settings file!: Reason: {}", err);
+            Default::default()
+        });
+        config.plugin_settings = plugin_settings;
 
         config
     }
