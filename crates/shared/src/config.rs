@@ -153,6 +153,17 @@ impl Default for UserSettings {
 }
 
 impl Config {
+    pub fn save_plugin_settings(&self, settings: &PluginSettings) -> anyhow::Result<()> {
+        let prefs_path = self.plugin_settings_file();
+        fs::write(
+            prefs_path,
+            ron::ser::to_string_pretty(settings, Default::default())?,
+        )
+        .expect("Unable to save plugin settings file.");
+
+        Ok(())
+    }
+
     fn load_plugin_setings(&self) -> anyhow::Result<PluginSettings> {
         let prefs_path = self.plugin_settings_file();
         if prefs_path.exists() {
@@ -162,11 +173,7 @@ impl Config {
 
         // Create default settings
         let settings: PluginSettings = Default::default();
-        fs::write(
-            prefs_path,
-            ron::ser::to_string_pretty(&settings, Default::default())?,
-        )
-        .expect("Unable to save plugins settings file.");
+        self.save_plugin_settings(&settings)?;
 
         Ok(settings)
     }
