@@ -1,10 +1,11 @@
+use shared::event::ClientInvoke;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{Element, HtmlInputElement};
 use yew::prelude::*;
 
-use super::{escape, open};
+use super::{open, invoke};
 use crate::components::ResultListData;
 use crate::constants;
 use crate::pages::{clear_results, show_doc_results, show_lens_results};
@@ -55,7 +56,7 @@ pub fn handle_global_key_down(
         }
     } else if event.key() == "Escape" {
         spawn_local(async move {
-            escape().await.unwrap();
+            let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
         });
     } else if event.key() == "Backspace" {
         event.stop_propagation();

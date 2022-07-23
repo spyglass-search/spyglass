@@ -51,9 +51,6 @@ extern "C" {
     #[wasm_bindgen(js_name = "openLensFolder", catch)]
     pub async fn open_lens_folder() -> Result<(), JsValue>;
 
-    #[wasm_bindgen(js_name = "escape", catch)]
-    pub async fn escape() -> Result<(), JsValue>;
-
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;
 

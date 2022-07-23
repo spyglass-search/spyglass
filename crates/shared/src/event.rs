@@ -1,6 +1,6 @@
-use strum_macros::Display;
+use strum_macros::{AsRefStr, Display};
 
-#[derive(Display)]
+#[derive(AsRefStr, Display)]
 pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
@@ -9,8 +9,10 @@ pub enum ClientEvent {
     RefreshSearchResults,
 }
 
-#[derive(Display)]
+#[derive(AsRefStr, Display)]
 pub enum ClientInvoke {
+    #[strum(serialize = "escape")]
+    Escape,
     #[strum(serialize = "open_plugins_folder")]
     EditPluginSettings,
 }

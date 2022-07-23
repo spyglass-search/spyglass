@@ -23,7 +23,7 @@ pub fn center_window(window: &Window) {
 pub fn hide_window(window: &Window) {
     window.hide().unwrap();
     window
-        .emit(&ClientEvent::ClearSearch.to_string(), true)
+        .emit(ClientEvent::ClearSearch.as_ref(), true)
         .unwrap();
 }
 
@@ -38,7 +38,7 @@ pub async fn resize_window(window: &Window, height: f64) {
 
 pub fn show_window(window: &Window) {
     window
-        .emit(&ClientEvent::FocusWindow.to_string(), true)
+        .emit(ClientEvent::FocusWindow.as_ref(), true)
         .unwrap();
     window.show().unwrap();
     window.set_focus().unwrap();

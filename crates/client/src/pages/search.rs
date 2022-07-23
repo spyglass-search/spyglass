@@ -122,7 +122,7 @@ pub fn search_page() -> Html {
                 });
             }) as Box<dyn Fn()>);
 
-            let _ = listen(&ClientEvent::ClearSearch.to_string(), &cb).await;
+            let _ = listen(ClientEvent::ClearSearch.as_ref(), &cb).await;
             cb.forget();
         });
 
@@ -143,7 +143,7 @@ pub fn search_page() -> Html {
                     });
                 }
             }) as Box<dyn Fn()>);
-            let _ = listen(&ClientEvent::FocusWindow.to_string(), &cb).await;
+            let _ = listen(ClientEvent::FocusWindow.as_ref(), &cb).await;
             cb.forget();
         });
     }
@@ -160,7 +160,7 @@ pub fn search_page() -> Html {
                     query.set(el.value());
                 }
             }) as Box<dyn Fn()>);
-            let _ = listen(&ClientEvent::RefreshSearchResults.to_string(), &cb).await;
+            let _ = listen(ClientEvent::RefreshSearchResults.as_ref(), &cb).await;
             cb.forget();
         });
     }

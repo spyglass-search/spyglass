@@ -220,7 +220,7 @@ pub fn lens_manager_page() -> Html {
                 i_req_state.set(RequestState::NotStarted);
             }) as Box<dyn Fn()>);
 
-            let _ = listen(&ClientEvent::RefreshLensManager.to_string(), &cb).await;
+            let _ = listen(ClientEvent::RefreshLensManager.as_ref(), &cb).await;
             cb.forget();
         });
     }

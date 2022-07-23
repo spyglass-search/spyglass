@@ -150,7 +150,7 @@ pub fn plugin_manager_page() -> Html {
                 req_state.set(RequestState::NotStarted);
             }) as Box<dyn Fn()>);
 
-            let _ = listen(&ClientEvent::RefreshPluginManager.to_string(), &cb).await;
+            let _ = listen(ClientEvent::RefreshPluginManager.as_ref(), &cb).await;
             cb.forget();
         });
     }
