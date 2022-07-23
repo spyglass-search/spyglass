@@ -63,6 +63,28 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
         })
     };
 
+    let on_edit_settings = { Callback::from(move |_| {}) };
+
+    let toggle_button = html! {
+        <button
+            onclick={onclick}
+            class={vec!["flex", "flex-row", "text-sm", "cursor-pointer", "hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" }]}
+        >
+            <icons::LightningBoltIcon />
+            <div class="ml-2">{btn_label}</div>
+        </button>
+    };
+
+    let view_settings = html! {
+        <button
+            onclick={on_edit_settings}
+            class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white"
+        >
+            <icons::PencilIcon />
+            <div class="ml-2">{"Edit Settings"}</div>
+        </button>
+    };
+
     html! {
         <div class={component_styles}>
             <h2 class="text-xl truncate p-0">
@@ -76,12 +98,8 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
                 {plugin.description.clone()}
             </div>
             <div class="pt-2 flex flex-row gap-8">
-                <button
-                    onclick={onclick}
-                    class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white border-2 border-neutral-600 rounded"
-                >
-                    <div class="px-2">{btn_label}</div>
-                </button>
+                {toggle_button}
+                {view_settings}
             </div>
         </div>
     }
