@@ -25,6 +25,15 @@ pub async fn open_lens_folder(_: tauri::Window, config: State<'_, Config>) -> Re
 }
 
 #[tauri::command]
+pub async fn open_plugins_folder(
+    _: tauri::Window,
+    config: State<'_, Config>,
+) -> Result<(), String> {
+    open_folder(config.plugins_dir());
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     open::that(url).unwrap();
     Ok(())

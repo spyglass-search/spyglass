@@ -8,3 +8,9 @@ pub enum ClientEvent {
     RefreshPluginManager,
     RefreshSearchResults,
 }
+
+#[derive(Display)]
+pub enum ClientInvoke {
+    #[strum(serialize = "open_plugins_folder")]
+    EditPluginSettings,
+}
