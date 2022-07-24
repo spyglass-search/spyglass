@@ -12,7 +12,7 @@ use shared::response::{
     SearchResult, SearchResults,
 };
 
-use entities::models::{crawl_queue, indexed_document, lens};
+use entities::models::{crawl_queue, fetch_history, indexed_document, lens};
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
@@ -214,6 +214,11 @@ pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
 pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
     log::info!("handling recrawl domain: {}", domain);
     let db = &state.db;
+
+    let _ = fetch_history::Entity::delete_many()
+        .filter(fetch_history::Column::Domain.eq(domain.clone()))
+        .exec(db)
+        .await;
 
     let res = crawl_queue::Entity::update_many()
         .col_expr(
