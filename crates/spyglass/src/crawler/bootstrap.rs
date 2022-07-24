@@ -15,7 +15,7 @@ use url::Url;
 
 use entities::models::crawl_queue;
 use entities::sea_orm::DatabaseConnection;
-use shared::config::UserSettings;
+use shared::config::{Lens, UserSettings};
 
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
@@ -111,6 +111,7 @@ async fn fetch_cdx_page(
 /// from the Internet Archive. We then crawl their archived stuff as fast as possible
 /// locally to bring the index up to date.
 pub async fn bootstrap(
+    lens: &Lens,
     db: &DatabaseConnection,
     settings: &UserSettings,
     url: &str,
@@ -134,7 +135,7 @@ pub async fn bootstrap(
             // Add URLs to crawl queue
             log::info!("enqueing {} urls", urls.len());
             let urls: Vec<String> = urls.into_iter().collect();
-            crawl_queue::enqueue_all(db, &urls, &Vec::new(), settings, &overrides).await?;
+            crawl_queue::enqueue_all(db, &urls, &[lens.clone()], settings, &overrides).await?;
             count += urls.len();
 
             if resume.is_none() {
@@ -173,7 +174,6 @@ mod test {
     use entities::test::setup_test_db;
 
     use shared::config::{Limit, UserSettings};
-
     // These tests are ignored since they hit a 3rd party service and we don't
     // want them to be run everytime in CI
     #[tokio::test]
@@ -185,7 +185,8 @@ mod test {
             ..Default::default()
         };
 
-        let res = bootstrap(&db, &settings, "https://roll20.net/compendium/dnd5e").await;
+        let lens = Default::default();
+        let res = bootstrap(&lens, &db, &settings, "https://roll20.net/compendium/dnd5e").await;
         assert_eq!(res.unwrap(), 1934);
         let num_queue = crawl_queue::num_queued(&db, crawl_queue::CrawlStatus::Queued)
             .await

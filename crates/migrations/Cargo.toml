@@ -9,5 +9,5 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-sea-orm-migration = { version = "^0" }
+sea-orm-migration = { version = "^0.8" }
 entities = { path = "../entities" }

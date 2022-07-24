@@ -122,15 +122,27 @@ pub async fn check_resource_rules(
                         let body = res.text().await.unwrap();
 
                         let parsed_rules = parse(domain, &body);
-                        for rule in parsed_rules.iter() {
+                        // No rules? Treat as an allow all
+                        if parsed_rules.is_empty() {
                             let new_rule = resource_rule::ActiveModel {
-                                domain: Set(rule.domain.to_owned()),
-                                rule: Set(rule.regex.to_owned()),
+                                domain: Set(domain.to_owned()),
+                                rule: Set("/".to_owned()),
                                 no_index: Set(false),
-                                allow_crawl: Set(rule.allow_crawl),
+                                allow_crawl: Set(true),
                                 ..Default::default()
                             };
                             new_rule.insert(db).await?;
+                        } else {
+                            for rule in parsed_rules.iter() {
+                                let new_rule = resource_rule::ActiveModel {
+                                    domain: Set(rule.domain.to_owned()),
+                                    rule: Set(rule.regex.to_owned()),
+                                    no_index: Set(false),
+                                    allow_crawl: Set(rule.allow_crawl),
+                                    ..Default::default()
+                                };
+                                new_rule.insert(db).await?;
+                            }
                         }
                     }
                     // No robots.txt? Treat as an allow all

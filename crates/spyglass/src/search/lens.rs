@@ -11,6 +11,7 @@ use crate::state::AppState;
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
 async fn check_and_bootstrap(
+    lens: &Lens,
     db: &DatabaseConnection,
     user_settings: &UserSettings,
     seed_url: &str,
@@ -18,7 +19,7 @@ async fn check_and_bootstrap(
     if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
         log::info!("bootstrapping {}", seed_url);
 
-        match bootstrap::bootstrap(db, user_settings, seed_url).await {
+        match bootstrap::bootstrap(lens, db, user_settings, seed_url).await {
             Err(e) => {
                 log::error!("bootstrap {}", e);
                 return false;
@@ -90,7 +91,7 @@ pub async fn load_lenses(state: AppState) {
     for lens in new_lenses {
         for domain in lens.domains.iter() {
             let seed_url = format!("https://{}", domain);
-            check_and_bootstrap(&state.db, &state.user_settings, &seed_url).await;
+            check_and_bootstrap(&lens, &state.db, &state.user_settings, &seed_url).await;
         }
 
         for prefix in lens.urls.iter() {
@@ -110,7 +111,7 @@ pub async fn load_lenses(state: AppState) {
                     log::warn!("unable to enqueue <{}> due to {}", prefix, err)
                 }
             } else {
-                check_and_bootstrap(&state.db, &state.user_settings, prefix).await;
+                check_and_bootstrap(&lens, &state.db, &state.user_settings, prefix).await;
             }
         }
 
@@ -158,6 +159,6 @@ mod test {
         let test = "https://example.com";
 
         bootstrap_queue::enqueue(&db, test, 10).await.unwrap();
-        assert!(!check_and_bootstrap(&db, &settings, &test).await);
+        assert!(!check_and_bootstrap(&Default::default(), &db, &settings, &test).await);
     }
 }
