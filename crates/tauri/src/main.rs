@@ -37,7 +37,7 @@ use window::{show_crawl_stats_window, show_lens_manager_window, show_plugin_mana
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
 
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "client.log");
+    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let ctx = tauri::generate_context!();
-
+    let config_copy = config.clone();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
@@ -75,8 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::toggle_plugin,
         ])
         .menu(menu::get_app_menu(&ctx))
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config)))
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
+            let config = config_copy;
             // Copy default plugins to data directory to be picked up by the backend
             if let Err(e) = copy_plugins(&config, app.path_resolver()) {
                 log::error!("Unable to copy default plugins: {}", e);
@@ -158,7 +159,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         })
-        .on_system_tray_event(|app, event| {
+        .on_system_tray_event(move |app, event| {
+            let config = config.clone();
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").unwrap();
@@ -179,7 +181,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
-                        MenuID::OPEN_LOGS_FOLDER => open_folder(Config::logs_dir()),
+                        MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                         MenuID::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
                         MenuID::SHOW_CRAWL_STATUS => {
                             show_crawl_stats_window(app);
