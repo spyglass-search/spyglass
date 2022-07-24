@@ -214,11 +214,14 @@ impl Crawler {
             crawl.url.clone()
         };
 
-        let url = Url::parse(&fetch_url).unwrap();
+        let url = Url::parse(&fetch_url).expect("Invalid URL");
 
         // Break apart domain + path of the URL
-        let domain = url.host_str().unwrap();
-        let path = url.path();
+        let domain = url.host_str().expect("Invalid URL");
+        let mut path: String = url.path().to_string();
+        if let Some(query) = url.query() {
+            path = format!("{}?{}", path, query);
+        }
 
         // Have we crawled this recently?
         if let Some(history) = fetch_history::find_by_url(db, &url).await? {
@@ -275,7 +278,14 @@ impl Crawler {
         );
 
         // Update fetch history
-        fetch_history::upsert(db, domain, path, result.content_hash.clone(), result.status).await?;
+        fetch_history::upsert(
+            db,
+            domain,
+            &path,
+            result.content_hash.clone(),
+            result.status,
+        )
+        .await?;
 
         Ok(Some(result))
     }

@@ -28,7 +28,7 @@ serde_json = "1.0"
 shared = { path = "../shared" }
 strum = "0.24"
 strum_macros = "0.24"
-tauri = { version = "1.0.2", features = ["api-all", "devtools", "process-command-api", "notification", "system-tray", "updater"] }
+tauri = { version = "1.0.2", features = ["api-all", "devtools", "notification", "process-command-api", "system-tray", "updater"] }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"
