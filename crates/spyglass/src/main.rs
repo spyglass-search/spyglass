@@ -54,10 +54,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match rt.block_on(Migrator::up(&state.db, None)) {
         Ok(_) => {}
         Err(e) => {
-            // Ruh-oh something went wrong
-            log::error!("Unable to migrate database - {:?}", e);
-            // Exit from app
-            return Ok(());
+            let msg = e.to_string();
+            // This is ok, just the migrator being funky
+            if !msg.contains("been applied but its file is missing") {
+                // Ruh-oh something went wrong
+                log::error!("Unable to migrate database - {}", e.to_string());
+                // Exit from app
+                return Ok(());
+            }
         }
     }
 
