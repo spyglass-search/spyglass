@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-sea-orm = { version = "^0", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
+sea-orm = { version = "^0.8", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls"], default-features = false }
 entities = { path = "../entities" }
 shared = { path = "../shared" }
 spyglass = { path = "../spyglass" }
