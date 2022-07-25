@@ -19,7 +19,8 @@ mod api;
 use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file_appender = tracing_appender::rolling::daily(Config::logs_dir(), "server.log");
+    let config = Config::new();
+    let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
@@ -53,10 +54,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match rt.block_on(Migrator::up(&state.db, None)) {
         Ok(_) => {}
         Err(e) => {
-            // Ruh-oh something went wrong
-            log::error!("Unable to migrate database - {:?}", e);
-            // Exit from app
-            return Ok(());
+            let msg = e.to_string();
+            // This is ok, just the migrator being funky
+            if !msg.contains("been applied but its file is missing") {
+                // Ruh-oh something went wrong
+                log::error!("Unable to migrate database - {}", e.to_string());
+                // Exit from app
+                return Ok(());
+            }
         }
     }
 
@@ -173,5 +178,5 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         }
     }
 
-    let _ = tokio::join!(manager_handle, worker_handle);
+    let _ = tokio::join!(manager_handle, worker_handle, pm_handle);
 }
