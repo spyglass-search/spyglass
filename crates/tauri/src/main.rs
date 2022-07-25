@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     } else {
         Some(sentry::init((
-            "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
+            "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
             sentry::ClientOptions {
                 release: Some(Cow::from(ctx.package_info().version.to_string())),
                 ..Default::default()
