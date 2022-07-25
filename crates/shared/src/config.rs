@@ -102,6 +102,9 @@ pub struct UserSettings {
     /// Should we crawl links that don't match our lens rules?
     #[serde(default)]
     pub crawl_external_links: bool,
+    /// Should we disable telemetry
+    #[serde(default)]
+    pub disable_telementry: bool,
 }
 
 impl UserSettings {
@@ -148,6 +151,7 @@ impl Default for UserSettings {
             // Where to store the metadata & index
             data_directory: UserSettings::default_data_dir(),
             crawl_external_links: false,
+            disable_telementry: false,
         }
     }
 }

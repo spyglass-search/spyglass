@@ -20,6 +20,19 @@ use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
+
+    let _guard = if config.user_settings.disable_telementry {
+        None
+    } else {
+        Some(sentry::init((
+            "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                ..Default::default()
+            },
+        )))
+    };
+
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 

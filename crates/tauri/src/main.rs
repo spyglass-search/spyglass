@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -35,7 +36,20 @@ mod window;
 use window::{show_crawl_stats_window, show_lens_manager_window, show_plugin_manager};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let ctx = tauri::generate_context!();
     let config = Config::new();
+
+    let _guard = if config.user_settings.disable_telementry {
+        None
+    } else {
+        Some(sentry::init((
+            "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
+            sentry::ClientOptions {
+                release: Some(Cow::from(ctx.package_info().version.to_string())),
+                ..Default::default()
+            },
+        )))
+    };
 
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -52,7 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
-    let ctx = tauri::generate_context!();
     let config_copy = config.clone();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
