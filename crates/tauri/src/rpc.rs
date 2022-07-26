@@ -25,8 +25,18 @@ pub fn check_and_start_backend() {
 
         while let Some(event) = rx.recv().await {
             match event {
-                CommandEvent::Error(line) => log::error!("sidecar error: {}", line),
+                CommandEvent::Error(message) => {
+                    sentry::capture_error(&std::io::Error::new(
+                        std::io::ErrorKind::BrokenPipe,
+                        message.clone(),
+                    ));
+                    log::error!("sidecar error: {}", message);
+                }
                 CommandEvent::Terminated(payload) => {
+                    sentry::capture_error(&std::io::Error::new(
+                        std::io::ErrorKind::BrokenPipe,
+                        format!("sidecar terminated: {:?}", payload.clone()),
+                    ));
                     log::error!("sidecar terminated: {:?}", payload)
                 }
                 _ => {}
