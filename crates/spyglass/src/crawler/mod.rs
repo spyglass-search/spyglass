@@ -151,11 +151,14 @@ impl Crawler {
             };
         }
 
-        let res = res.unwrap();
+        let res = res.expect("Expected valid response");
         let status = res.status().as_u16();
         if status == StatusCode::OK {
+            // Pull URL from request, this handles cases where we are 301 redirected
+            // to a different URL.
+            let end_url = res.url().to_owned();
             if let Ok(raw_body) = res.text().await {
-                let mut scrape_result = self.scrape_page(&url, &raw_body).await;
+                let mut scrape_result = self.scrape_page(&end_url, &raw_body).await;
                 scrape_result.status = status;
                 return scrape_result;
             }
@@ -341,6 +344,28 @@ mod test {
 
     #[tokio::test]
     #[ignore]
+    async fn test_fetch_redirect() {
+        let crawler = Crawler::new();
+
+        let db = setup_test_db().await;
+        let url = Url::parse("https://xkcd.com/1375").unwrap();
+        let query = crawl_queue::ActiveModel {
+            domain: Set(url.host_str().unwrap().to_owned()),
+            url: Set(url.to_string()),
+            ..Default::default()
+        };
+        let model = query.insert(&db).await.unwrap();
+
+        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        assert!(crawl_result.is_some());
+
+        let result = crawl_result.unwrap();
+        assert_eq!(result.title, Some("xkcd: Astronaut Vandalism".to_string()));
+        assert_eq!(result.url, "https://xkcd.com/1375/".to_string());
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn test_fetch_bootstrap() {
         let crawler = Crawler::new();
 
@@ -405,7 +430,7 @@ mod test {
     }
 
     #[test]
-    fn testnormalize_href() {
+    fn test_normalize_href() {
         let url = "https://example.com";
 
         assert_eq!(

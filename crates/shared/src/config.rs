@@ -102,6 +102,9 @@ pub struct UserSettings {
     /// Should we crawl links that don't match our lens rules?
     #[serde(default)]
     pub crawl_external_links: bool,
+    /// Should we disable telemetry
+    #[serde(default)]
+    pub disable_telementry: bool,
 }
 
 impl UserSettings {
@@ -148,6 +151,7 @@ impl Default for UserSettings {
             // Where to store the metadata & index
             data_directory: UserSettings::default_data_dir(),
             crawl_external_links: false,
+            disable_telementry: false,
         }
     }
 }
@@ -227,8 +231,8 @@ impl Config {
         self.data_dir().join("index")
     }
 
-    pub fn logs_dir() -> PathBuf {
-        Self::default_data_dir().join("logs")
+    pub fn logs_dir(&self) -> PathBuf {
+        self.data_dir().join("logs")
     }
 
     pub fn prefs_dir() -> PathBuf {
@@ -276,7 +280,7 @@ impl Config {
         let index_dir = config.index_dir();
         fs::create_dir_all(&index_dir).expect("Unable to create index folder");
 
-        let logs_dir = Config::logs_dir();
+        let logs_dir = config.logs_dir();
         fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
 
         let lenses_dir = config.lenses_dir();

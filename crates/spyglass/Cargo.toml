@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "0.1.0"
+version = "22.7.4"
 edition = "2021"
 
 [dependencies]
@@ -26,6 +26,7 @@ regex = "1"
 reqwest = "0.11"
 ron = "0.7"
 rusqlite = { version = "*", features = ["bundled"] }
+sentry = "0.27.0"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 shared = { path = "../shared" }

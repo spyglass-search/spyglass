@@ -134,7 +134,7 @@ pub async fn plugin_manager(
             res = cmd_queue.recv() => res,
             _ = interval.tick() => Some(PluginCommand::CheckForUpdate),
             _ = shutdown_rx.recv() => {
-                log::info!("🛑 Shutting down worker");
+                log::info!("🛑 Shutting down plugin manager");
                 return;
             }
         };
