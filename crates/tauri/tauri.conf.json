@@ -1,7 +1,7 @@
 {
   "package": {
     "productName": "Spyglass",
-    "version": "22.7.3"
+    "version": "22.7.4"
   },
   "build": {
     "distDir": "../client/dist",
