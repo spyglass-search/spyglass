@@ -102,14 +102,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(not(debug_assertions))]
             rpc::check_and_start_backend();
 
-            let window = app.get_window("main").unwrap();
+            let window = app.get_window("main").expect("Main window not found");
             let _ = window.set_skip_taskbar(true);
 
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
             {
                 unsafe {
-                    let ns_window = window.ns_window().unwrap() as cocoa::base::id;
+                    let ns_window = window.ns_window().expect("Unable to get ns_window") as cocoa::base::id;
                     ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
                 }
             }
@@ -154,8 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .on_system_tray_event(move |app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
-                let window = app.get_window("main").unwrap();
-
+                let window = app.get_window("main").expect("Main window not initialized");
 
                 if let Ok(menu_id) = MenuID::from_str(&id) {
                     match menu_id {
@@ -168,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "⏸ Pause indexing"
                             };
 
-                            item_handle.set_title(new_label).unwrap();
+                            let _ = item_handle.set_title(new_label);
                         }
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
@@ -178,13 +177,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             show_crawl_stats_window(app);
                         }
                         MenuID::SHOW_SEARCHBAR => {
-                            if !window.is_visible().unwrap() {
-                                window::show_window(&window);
-                            }
+                            let _ = window.is_visible()
+                                .map(|is_visible| {
+                                    if !is_visible {
+                                        window::show_window(&window);
+                                    }
+                                });
                         }
                         MenuID::QUIT => app.exit(0),
                         MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
-                        MenuID::JOIN_DISCORD => open::that(constants::DISCORD_JOIN_URL).unwrap(),
+                        MenuID::JOIN_DISCORD => {
+                            let _ = open::that(constants::DISCORD_JOIN_URL);
+                        },
                         _ => {}
                     }
                 }
@@ -203,11 +207,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if let Err(e) = shortcuts
                             .register(&config.user_settings.shortcut, move || {
                                 let window = window_clone.clone();
-                                if window.is_visible().unwrap() {
-                                    window::hide_window(&window);
-                                } else {
-                                    window::show_window(&window);
-                                }
+                                let _ = window.is_visible()
+                                    .map(|is_visible| {
+                                        if is_visible {
+                                            window::hide_window(&window);
+                                        } else {
+                                            window::show_window(&window);
+                                        }
+                                    });
                             }) {
                             window::alert(&window, "Error registering global shortcut", &format!("{}", e));
                         }
@@ -259,19 +266,19 @@ fn open_folder(folder: PathBuf) {
     std::process::Command::new("xdg-open")
         .arg(folder)
         .spawn()
-        .unwrap();
+        .expect("xdg-open cmd not available");
 
     #[cfg(target_os = "macos")]
     std::process::Command::new("open")
         .arg(folder)
         .spawn()
-        .unwrap();
+        .expect("open cmd not available");
 
     #[cfg(target_os = "windows")]
     std::process::Command::new("explorer")
         .arg(folder)
         .spawn()
-        .unwrap();
+        .expect("explorer cmd not available");
 }
 
 async fn update_tray_menu(app: &AppHandle) {
@@ -280,22 +287,20 @@ async fn update_tray_menu(app: &AppHandle) {
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {
-        handle
+        let _ = handle
             .get_item(&MenuID::CRAWL_STATUS.to_string())
             .set_title(if app_status.is_paused {
                 "▶️ Resume indexing"
             } else {
                 "⏸ Pause indexing"
-            })
-            .unwrap();
+            });
 
-        handle
+        let _ = handle
             .get_item(&MenuID::NUM_DOCS.to_string())
             .set_title(format!(
                 "{} documents indexed",
                 app_status.num_docs.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
+            ));
     }
 }
 
