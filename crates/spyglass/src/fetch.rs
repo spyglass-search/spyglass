@@ -1,6 +1,5 @@
-use anyhow::Result;
 use http::StatusCode;
-use reqwest::{Client, Error, Response};
+use reqwest::{Client, Response};
 use url::Url;
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
@@ -30,8 +29,11 @@ impl HTTPClient {
         HTTPClient { client }
     }
 
-    pub async fn head(&self, url: &Url) -> Result<Response, Error> {
+    pub async fn head(&self, url: &Url) -> anyhow::Result<Response> {
         let mut url = url.clone();
+        if url.scheme() != "http" && url.scheme() != "https" {
+            return Err(anyhow::Error::msg(format!("Invalid HTTP url: {}", url)));
+        }
 
         url.set_scheme("https")
             .expect("Unable to set scheme to HTTPS");
@@ -44,11 +46,17 @@ impl HTTPClient {
             }
         }
 
-        res
+        match res {
+            Ok(e) => Ok(e),
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
     }
 
-    pub async fn get(&self, url: &Url) -> Result<Response, Error> {
+    pub async fn get(&self, url: &Url) -> anyhow::Result<Response> {
         let mut url = url.clone();
+        if url.scheme() != "http" && url.scheme() != "https" {
+            return Err(anyhow::Error::msg(format!("Invalid HTTP url: {}", url)));
+        }
 
         // Attempt HTTPS first, if that fails switch to HTTP
         url.set_scheme("https")
@@ -73,7 +81,10 @@ impl HTTPClient {
             }
         }
 
-        res
+        match res {
+            Ok(e) => Ok(e),
+            Err(e) => Err(anyhow::Error::from(e)),
+        }
     }
 }
 
