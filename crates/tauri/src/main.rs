@@ -2,7 +2,6 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-
 use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
@@ -66,7 +65,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
-    let config_copy = config.clone();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
@@ -90,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
-            let config = config_copy;
+            let config = Config::new();
             // Copy default plugins to data directory to be picked up by the backend
             if let Err(e) = copy_plugins(&config, app.path_resolver()) {
                 log::error!("Unable to copy default plugins: {}", e);
@@ -125,26 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             app.manage(Arc::new(Mutex::new(rpc)));
 
             // Load user settings
-            app.manage(config.clone());
-
-            // Register global shortcut
-            let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts
-                .is_registered(&config.user_settings.shortcut)
-                .unwrap()
-            {
-                log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
-                let window = window.clone();
-                shortcuts
-                    .register(&config.user_settings.shortcut, move || {
-                        if window.is_visible().unwrap() {
-                            window::hide_window(&window);
-                        } else {
-                            window::show_window(&window);
-                        }
-                    })
-                    .unwrap();
-            }
+            app.manage(config);
 
             // Center window horizontally in the current screen
             window::center_window(&window);
@@ -173,7 +152,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .on_system_tray_event(move |app, event| {
-            let config = config.clone();
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").unwrap();
@@ -210,6 +188,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         _ => {}
                     }
                 }
+            }
+        })
+        .on_page_load(move |window, _| {
+            let config = window.state::<Config>();
+            let window_clone = window.clone();
+            // Register global shortcut
+            let mut shortcuts = window.app_handle().global_shortcut_manager();
+            match shortcuts.is_registered(&config.user_settings.shortcut) {
+                Ok(is_registered) => {
+                    if !is_registered
+                    {
+                        log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
+                        if let Err(e) = shortcuts
+                            .register(&config.user_settings.shortcut, move || {
+                                let window = window_clone.clone();
+                                if window.is_visible().unwrap() {
+                                    window::hide_window(&window);
+                                } else {
+                                    window::show_window(&window);
+                                }
+                            }) {
+                            window::alert(&window, "Error registering global shortcut", &format!("{}", e));
+                        }
+                    }
+                }
+                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
         })
         .run(ctx)
