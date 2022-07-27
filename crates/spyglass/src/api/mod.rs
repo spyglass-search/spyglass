@@ -78,7 +78,7 @@ pub fn start_api_ipc(state: &AppState) -> anyhow::Result<Server, ()> {
     let server = ServerBuilder::new(io)
         .start(&endpoint)
         .map_err(|_| log::warn!("Couldn't open socket"))
-        .unwrap();
+        .expect("Unable to open ipc socket");
 
     log::info!("Started IPC server at {}", endpoint);
     Ok(server)
