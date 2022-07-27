@@ -41,7 +41,7 @@ pub fn filter_set(rules: &[ParsedRule], allow: bool) -> RegexSet {
         .map(|x| x.regex.clone())
         .collect();
 
-    RegexSet::new(&rules).unwrap()
+    RegexSet::new(&rules).expect("Invalid regex rules")
 }
 
 /// Parse a robots.txt file and return a vector of parsed rules
@@ -81,7 +81,8 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
                         } else if regex.is_none() && prefix.starts_with("disallow") {
                             rules.push(ParsedRule {
                                 domain: domain.to_string(),
-                                regex: regex_for_robots("/", WildcardType::Regex).unwrap(),
+                                regex: regex_for_robots("/", WildcardType::Regex)
+                                    .expect("Invalid robots regex"),
                                 allow_crawl: true,
                             });
                         }
@@ -100,7 +101,7 @@ pub async fn check_resource_rules(
     client: &HTTPClient,
     url: &Url,
 ) -> anyhow::Result<bool> {
-    let domain = url.host_str().unwrap();
+    let domain = url.host_str().unwrap_or_default();
     let path = url[url::Position::BeforePath..].to_string();
 
     let rules = resource_rule::Entity::find()
@@ -119,29 +120,29 @@ pub async fn check_resource_rules(
             Ok(res) => {
                 match res.status() {
                     StatusCode::OK => {
-                        let body = res.text().await.unwrap();
-
-                        let parsed_rules = parse(domain, &body);
-                        // No rules? Treat as an allow all
-                        if parsed_rules.is_empty() {
-                            let new_rule = resource_rule::ActiveModel {
-                                domain: Set(domain.to_owned()),
-                                rule: Set("/".to_owned()),
-                                no_index: Set(false),
-                                allow_crawl: Set(true),
-                                ..Default::default()
-                            };
-                            new_rule.insert(db).await?;
-                        } else {
-                            for rule in parsed_rules.iter() {
+                        if let Ok(body) = res.text().await {
+                            let parsed_rules = parse(domain, &body);
+                            // No rules? Treat as an allow all
+                            if parsed_rules.is_empty() {
                                 let new_rule = resource_rule::ActiveModel {
-                                    domain: Set(rule.domain.to_owned()),
-                                    rule: Set(rule.regex.to_owned()),
+                                    domain: Set(domain.to_owned()),
+                                    rule: Set("/".to_owned()),
                                     no_index: Set(false),
-                                    allow_crawl: Set(rule.allow_crawl),
+                                    allow_crawl: Set(true),
                                     ..Default::default()
                                 };
                                 new_rule.insert(db).await?;
+                            } else {
+                                for rule in parsed_rules.iter() {
+                                    let new_rule = resource_rule::ActiveModel {
+                                        domain: Set(rule.domain.to_owned()),
+                                        rule: Set(rule.regex.to_owned()),
+                                        no_index: Set(false),
+                                        allow_crawl: Set(rule.allow_crawl),
+                                        ..Default::default()
+                                    };
+                                    new_rule.insert(db).await?;
+                                }
                             }
                         }
                     }
@@ -185,11 +186,15 @@ pub async fn check_resource_rules(
             if !headers.contains_key(http::header::CONTENT_TYPE) {
                 return Ok(false);
             } else {
-                let value = headers.get(http::header::CONTENT_TYPE).unwrap();
-                let value = value.to_str().unwrap();
-                if !value.to_string().contains(&"text/html") {
-                    log::info!("Unable to crawl: content-type =/= text/html");
-                    return Ok(false);
+                let value = headers
+                    .get(http::header::CONTENT_TYPE)
+                    .and_then(|header| header.to_str().ok());
+
+                if let Some(value) = value {
+                    if !value.to_string().contains(&"text/html") {
+                        log::info!("Unable to crawl: content-type =/= text/html");
+                        return Ok(false);
+                    }
                 }
             }
         }
