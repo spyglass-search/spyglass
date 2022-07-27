@@ -1,6 +1,6 @@
-use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
-
 use shared::event::ClientEvent;
+use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
+use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
 
 use crate::constants;
 
@@ -95,4 +95,12 @@ pub fn show_plugin_manager(app: &AppHandle) -> Window {
     .title("Plugins Manager")
     .build()
     .unwrap()
+}
+
+pub fn alert(window: &Window, title: &str, message: &str) {
+    MessageDialogBuilder::new(title, message)
+        .parent(window)
+        .buttons(MessageDialogButtons::Ok)
+        .kind(MessageDialogKind::Error)
+        .show(|_| {});
 }
