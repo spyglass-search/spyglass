@@ -98,7 +98,7 @@ pub async fn load_lenses(state: AppState) {
             // Handle singular URL matches
             if prefix.ends_with('$') {
                 // Remove the '$' suffix and add to the crawl queue
-                let url = prefix.strip_suffix('$').unwrap();
+                let url = prefix.strip_suffix('$').expect("No $ at end of prefix");
                 if let Err(err) = crawl_queue::enqueue_all(
                     &state.db,
                     &[url.to_owned()],

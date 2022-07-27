@@ -25,28 +25,33 @@ use super::response;
 pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> Result<String> {
     let db = &state.db;
 
-    let parsed = Url::parse(&queue_item.url).unwrap();
-    let new_task = crawl_queue::ActiveModel {
-        domain: Set(parsed.host_str().unwrap().to_string()),
-        url: Set(queue_item.url.to_owned()),
-        crawl_type: Set(crawl_queue::CrawlType::Normal),
-        ..Default::default()
-    };
+    if let Ok(parsed) = Url::parse(&queue_item.url) {
+        let new_task = crawl_queue::ActiveModel {
+            domain: Set(parsed.host_str().expect("Invalid host str").to_string()),
+            url: Set(queue_item.url.to_owned()),
+            crawl_type: Set(crawl_queue::CrawlType::Normal),
+            ..Default::default()
+        };
 
-    match new_task.insert(db).await {
-        Ok(_) => Ok("ok".to_string()),
-        Err(err) => Err(Error {
-            code: ErrorCode::InternalError,
-            message: err.to_string(),
-            data: None,
-        }),
+        return match new_task.insert(db).await {
+            Ok(_) => Ok("ok".to_string()),
+            Err(err) => Err(Error {
+                code: ErrorCode::InternalError,
+                message: err.to_string(),
+                data: None,
+            }),
+        };
     }
+
+    Ok("ok".to_string())
 }
 
 async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     // Grab crawler status
     let app_state = &state.app_state;
-    let paused_status = app_state.get("paused").unwrap();
+    let paused_status = app_state
+        .entry("paused".to_string())
+        .or_insert("false".to_string());
     let is_paused = *paused_status == *"true";
 
     // Grab details about index
@@ -80,7 +85,7 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
     }
 
     let mut by_domain = HashMap::new();
-    let queue_stats = queue_stats.unwrap();
+    let queue_stats = queue_stats.expect("Invalid queue_stats");
     for stat in queue_stats {
         let entry = by_domain
             .entry(stat.domain)
@@ -93,7 +98,7 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
         }
     }
 
-    let indexed_stats = indexed_stats.unwrap();
+    let indexed_stats = indexed_stats.expect("Invalid indexed_stats");
     for stat in indexed_stats {
         let entry = by_domain
             .entry(stat.domain)
@@ -262,24 +267,34 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {
-        let retrieved = searcher.doc(doc_addr).unwrap();
+        if let Ok(retrieved) = searcher.doc(doc_addr) {
+            let doc_id = retrieved
+                .get_first(fields.id)
+                .expect("Missing doc_id in schema");
+            let domain = retrieved
+                .get_first(fields.domain)
+                .expect("Missing domain in schema");
+            let title = retrieved
+                .get_first(fields.title)
+                .expect("Missing title in schema");
+            let description = retrieved
+                .get_first(fields.description)
+                .expect("Missing description in schema");
+            let url = retrieved
+                .get_first(fields.url)
+                .expect("Missing url in schema");
 
-        let doc_id = retrieved.get_first(fields.id).unwrap();
-        let domain = retrieved.get_first(fields.domain).unwrap();
-        let title = retrieved.get_first(fields.title).unwrap();
-        let description = retrieved.get_first(fields.description).unwrap();
-        let url = retrieved.get_first(fields.url).unwrap();
+            let result = SearchResult {
+                doc_id: doc_id.as_text().unwrap_or_default().to_string(),
+                domain: domain.as_text().unwrap_or_default().to_string(),
+                title: title.as_text().unwrap_or_default().to_string(),
+                description: description.as_text().unwrap_or_default().to_string(),
+                url: url.as_text().unwrap_or_default().to_string(),
+                score,
+            };
 
-        let result = SearchResult {
-            doc_id: doc_id.as_text().unwrap().to_string(),
-            domain: domain.as_text().unwrap().to_string(),
-            title: title.as_text().unwrap().to_string(),
-            description: description.as_text().unwrap().to_string(),
-            url: url.as_text().unwrap().to_string(),
-            score,
-        };
-
-        results.push(result);
+            results.push(result);
+        }
     }
 
     let meta = SearchMeta {
@@ -305,22 +320,24 @@ pub async fn search_lenses(
         .all(&state.db)
         .await;
 
-    if let Err(err) = query_results {
-        log::error!("Unable to search lenses: {:?}", err);
-        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
-    }
+    match query_results {
+        Ok(query_results) => {
+            for lens in query_results {
+                results.push(LensResult {
+                    author: lens.author,
+                    title: lens.name,
+                    description: lens.description.unwrap_or_else(|| "".to_string()),
+                    ..Default::default()
+                });
+            }
 
-    let query_results = query_results.unwrap();
-    for lens in query_results {
-        results.push(LensResult {
-            author: lens.author,
-            title: lens.name,
-            description: lens.description.unwrap_or_else(|| "".to_string()),
-            ..Default::default()
-        });
+            Ok(SearchLensesResp { results })
+        }
+        Err(err) => {
+            log::error!("Unable to search lenses: {:?}", err);
+            Err(jsonrpc_core::Error::new(ErrorCode::InternalError))
+        }
     }
-
-    Ok(SearchLensesResp { results })
 }
 
 #[instrument(skip(state))]
@@ -328,7 +345,7 @@ pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
     // Scope so that the app_state mutex is correctly released.
     {
         let app_state = &state.app_state;
-        let mut paused_status = app_state.get_mut("paused").unwrap();
+        let mut paused_status = app_state.entry("paused".into()).or_insert("false".into());
 
         let current_status = paused_status.to_string() == "true";
         let updated_status = !current_status;

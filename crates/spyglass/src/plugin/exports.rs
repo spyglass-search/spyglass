@@ -85,11 +85,18 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
                 if let Ok(conn) = Connection::open(path) {
                     let stmt = conn.prepare(&query);
                     if let Ok(mut stmt) = stmt {
-                        let results =
-                            stmt.query_map([], |row| Ok(row.get::<usize, String>(0).unwrap()));
+                        let results = stmt.query_map([], |row| {
+                            Ok(row.get::<usize, String>(0).unwrap_or_default())
+                        });
 
                         if let Ok(results) = results {
-                            let collected = results.map(|x| x.unwrap()).collect::<Vec<String>>();
+                            let collected: Vec<String> = results
+                                .map(|x| x.unwrap_or_default())
+                                .collect::<Vec<String>>()
+                                .into_iter()
+                                .filter(|x| !x.is_empty())
+                                .collect();
+
                             if let Err(e) = wasi_write(&env.wasi_env, &collected) {
                                 log::error!("{}", e);
                             }
