@@ -6,7 +6,7 @@ use serde::Serialize;
 use shared::rpc::gen_ipc_path;
 use tauri::api::process::{Command, CommandEvent};
 use tokio::sync::Mutex;
-use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio_retry::strategy::ExponentialBackoff;
 use tokio_retry::Retry;
 
 pub type RpcMutex = Arc<Mutex<RpcClient>>;
@@ -56,8 +56,7 @@ async fn connect(endpoint: &str) -> Result<TypedClient, ()> {
 }
 
 async fn try_connect(endpoint: &str) -> Result<TypedClient, ()> {
-    let retry_strategy = ExponentialBackoff::from_millis(10)
-        .take(10);
+    let retry_strategy = ExponentialBackoff::from_millis(10).take(10);
 
     Retry::spawn(retry_strategy, || connect(endpoint)).await
 }
