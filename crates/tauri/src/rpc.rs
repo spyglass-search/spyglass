@@ -84,6 +84,7 @@ impl RpcClient {
         match self.client.call_method::<T, R>(method, "", args).await {
             Ok(resp) => resp,
             Err(err) => {
+                sentry::capture_error(&err);
                 log::error!("Error sending RPC: {}", err);
                 self.reconnect().await;
                 R::default()
