@@ -46,16 +46,17 @@ pub fn check_and_start_backend() {
 }
 
 async fn connect(endpoint: &str) -> Result<TypedClient, ()> {
-    if let Ok(client) = ipc::connect(endpoint).await {
-        return Ok(client);
+    match ipc::connect(endpoint).await {
+        Ok(client) => Ok(client),
+        Err(e) => {
+            sentry::capture_error(&e);
+            Err(())
+        }
     }
-
-    Err(())
 }
 
 async fn try_connect(endpoint: &str) -> Result<TypedClient, ()> {
     let retry_strategy = ExponentialBackoff::from_millis(10)
-        .map(jitter) // add jitter to delays
         .take(10);
 
     Retry::spawn(retry_strategy, || connect(endpoint)).await
