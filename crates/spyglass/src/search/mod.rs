@@ -91,13 +91,15 @@ impl Searcher {
         let schema = Searcher::schema();
 
         DocFields {
-            id: schema.get_field("id").unwrap(),
-            domain: schema.get_field("domain").unwrap(),
-            content: schema.get_field("content").unwrap(),
-            description: schema.get_field("description").unwrap(),
-            title: schema.get_field("title").unwrap(),
-            url: schema.get_field("url").unwrap(),
-            raw: schema.get_field("raw").unwrap(),
+            id: schema.get_field("id").expect("No id in schema"),
+            domain: schema.get_field("domain").expect("No domain in schema"),
+            content: schema.get_field("content").expect("No content in schema"),
+            description: schema
+                .get_field("description")
+                .expect("No description in schema"),
+            title: schema.get_field("title").expect("No title in schema"),
+            url: schema.get_field("url").expect("No url in schema"),
+            raw: schema.get_field("raw").expect("No raw in schema"),
         }
     }
 
@@ -118,16 +120,19 @@ impl Searcher {
             return None;
         }
 
-        let (_, doc_address) = res.first().unwrap();
-        Some(searcher.doc(*doc_address).unwrap())
+        let (_, doc_address) = res.first().expect("No results in search");
+        if let Ok(doc) = searcher.doc(*doc_address) {
+            return Some(doc);
+        }
+        None
     }
 
     pub fn with_index(index_path: &IndexPath) -> Self {
         let schema = Searcher::schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
-                let dir = MmapDirectory::open(path).unwrap();
-                Index::open_or_create(dir, schema).unwrap()
+                let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
+                Index::open_or_create(dir, schema).expect("Unable to open search index")
             }
             IndexPath::Memory => Index::create_in_ram(schema),
         };
