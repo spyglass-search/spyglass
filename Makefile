@@ -30,7 +30,7 @@ build-plugins-release:
 	cargo build -p firefox-importer --target wasm32-wasi --release
 	cp target/wasm32-wasi/release/firefox-importer.wasm assets/plugins/firefox-importer/main.wasm
 
-build-release: build-backend build-styles
+build-release: build-backend build-styles build-plugins-release
 	cargo tauri build
 
 check:
