@@ -9,19 +9,38 @@ pub struct IconProps {
     pub height: String,
     #[prop_or("w-5".into())]
     pub width: String,
+    #[prop_or_default]
+    pub classes: Classes,
 }
 
 impl IconProps {
-    pub fn class(&self) -> Vec<Option<String>> {
-        let animated = if self.animate_spin {
-            Some("animate-spin".to_string())
-        } else {
-            None
-        };
-
-        vec![animated, Some(format!("{} {}", self.height, self.width))]
+    pub fn class(&self) -> Classes {
+        classes!(
+            self.classes.clone(),
+            self.animate_spin.then(|| Some("animate-spin")),
+            Some(format!("{} {}", self.height, self.width))
+        )
     }
 }
+
+#[function_component(AdjustmentsIcon)]
+pub fn adjustments_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
+          <path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" />
+        </svg>
+    }
+}
+
+#[function_component(ChipIcon)]
+pub fn chip_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+        </svg>
+    }
+}
+
 
 #[function_component(BadgeCheckIcon)]
 pub fn badge_check_icon(props: &IconProps) -> Html {
@@ -56,6 +75,15 @@ pub fn eye_icon(props: &IconProps) -> Html {
         <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
             <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
             <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+        </svg>
+    }
+}
+
+#[function_component(FilterIcon)]
+pub fn filter_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
         </svg>
     }
 }
