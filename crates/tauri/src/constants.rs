@@ -9,6 +9,4 @@ pub const DISCORD_JOIN_URL: &str = "https://discord.gg/663wPVBSTB";
 pub const LENS_DIRECTORY_INDEX_URL: &str =
     "https://raw.githubusercontent.com/spyglass-search/lens-box/main/index.ron";
 
-pub const STATS_WIN_NAME: &str = "crawl_stats";
-pub const LENS_MANAGER_WIN_NAME: &str = "lens_manager";
-pub const PLUGIN_MANAGER_WIN_NAME: &str = "plugin_manager";
+pub const SETTINGS_WIN_NAME: &str = "settings_window";
