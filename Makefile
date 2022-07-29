@@ -66,3 +66,6 @@ setup-dev-linux:
 
 run-client-dev:
 	cargo tauri dev
+
+run-client-headless:
+	cd ./crates/client && HEADLESS_CLIENT=true trunk serve

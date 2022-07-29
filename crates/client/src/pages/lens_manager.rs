@@ -116,7 +116,8 @@ pub fn lens_component(props: &LensProps) -> Html {
     let component_styles: Vec<String> = vec![
         "border-t".into(),
         "border-neutral-600".into(),
-        "p-4".into(),
+        "px-8".into(),
+        "py-4".into(),
         "pr-0".into(),
         "text-white".into(),
         "bg-netural-800".into(),
@@ -253,7 +254,7 @@ pub fn lens_manager_page() -> Html {
 
     html! {
         <div class="text-white">
-            <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-400 h-20">
+            <div class="pt-4 px-8 top-0 sticky bg-stone-800 z-400 h-20 border-b-2 border-stone-900">
                 <div class="flex flex-row items-center gap-4">
                     <h1 class="text-2xl grow">{"Lens Manager"}</h1>
                     <button
@@ -269,9 +270,7 @@ pub fn lens_manager_page() -> Html {
                     </button>
                 </div>
             </div>
-            <div class="px-8">
-                {contents}
-            </div>
+            <div>{contents}</div>
         </div>
     }
 }
