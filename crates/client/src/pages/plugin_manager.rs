@@ -7,7 +7,7 @@ use yew::prelude::*;
 use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
-use crate::components::icons;
+use crate::components::{icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen, toggle_plugin};
 
@@ -157,7 +157,8 @@ pub fn plugin_manager_page() -> Html {
 
     html! {
         <div class="text-white">
-            {contents}
+            <Header label="Plugins" />
+            <div>{contents}</div>
         </div>
     }
 }

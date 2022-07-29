@@ -50,7 +50,6 @@ pub fn chip_icon(props: &IconProps) -> Html {
     }
 }
 
-
 #[function_component(BadgeCheckIcon)]
 pub fn badge_check_icon(props: &IconProps) -> Html {
     html! {

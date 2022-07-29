@@ -1,3 +1,6 @@
+mod admin;
+pub use admin::*;
+
 mod lens_manager;
 pub use lens_manager::*;
 
@@ -7,8 +10,8 @@ pub use plugin_manager::*;
 mod search;
 pub use search::*;
 
-mod admin;
-pub use admin::*;
+mod settings;
+pub use settings::*;
 
 mod stats;
 pub use stats::*;

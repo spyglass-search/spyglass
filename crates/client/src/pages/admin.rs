@@ -2,8 +2,8 @@ use strum_macros::{Display, EnumString};
 use yew::{classes, prelude::*, Children};
 use yew_router::components::Link;
 
-use crate::{pages, Route};
 use crate::components::icons;
+use crate::{pages, Route};
 
 #[derive(Clone, EnumString, Display, PartialEq)]
 pub enum Tab {
@@ -114,7 +114,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
                     Tab::PluginsManager => html! { <pages::PluginManagerPage /> },
                     Tab::Stats => html!{ <pages::StatsPage /> },
-                    Tab::UserSettings => html! { <div>{"User Settings"}</div> },
+                    Tab::UserSettings => html! { <pages::UserSettingsPage /> },
                 }
             }
             </div>

@@ -6,7 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use crate::components::icons;
+use crate::components::{btn::Btn, icons, Header};
 use crate::listen;
 use crate::utils::RequestState;
 use crate::{install_lens, invoke};
@@ -185,21 +185,19 @@ pub fn lens_manager_page() -> Html {
         fetch_installable_lenses(installable.clone(), i_req_state.clone());
     }
 
-    let on_open_folder = {
-        move |_| {
-            spawn_local(async {
-                let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
-            });
-        }
-    };
+    let on_open_folder = Callback::from(move |_| {
+        spawn_local(async {
+            let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
+        });
+    });
 
     let on_refresh = {
         let ui_req_state = ui_req_state.clone();
         let i_req_state = i_req_state.clone();
-        move |_| {
+        Callback::from(move |_| {
             ui_req_state.set(RequestState::NotStarted);
             i_req_state.set(RequestState::NotStarted);
-        }
+        })
     };
 
     let already_installed: HashSet<String> =
@@ -254,22 +252,15 @@ pub fn lens_manager_page() -> Html {
 
     html! {
         <div class="text-white">
-            <div class="pt-4 px-8 top-0 sticky bg-stone-800 z-400 h-20 border-b-2 border-stone-900">
-                <div class="flex flex-row items-center gap-4">
-                    <h1 class="text-2xl grow">{"Lens Manager"}</h1>
-                    <button
-                        onclick={on_open_folder}
-                        class="flex flex-row border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600 text-sm">
-                        <icons::FolderOpenIcon />
-                        <div class="ml-2">{"Lens folder"}</div>
-                    </button>
-                    <button
-                        onclick={on_refresh}
-                        class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
-                        <icons::RefreshIcon />
-                    </button>
-                </div>
-            </div>
+            <Header label="Lens Manager">
+                <Btn onclick={on_open_folder}>
+                    <icons::FolderOpenIcon />
+                    <div class="ml-2">{"Lens folder"}</div>
+                </Btn>
+                <Btn onclick={on_refresh}>
+                    <icons::RefreshIcon />
+                </Btn>
+            </Header>
             <div>{contents}</div>
         </div>
     }
