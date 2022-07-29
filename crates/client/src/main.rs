@@ -10,7 +10,7 @@ mod events;
 mod pages;
 mod utils;
 
-use crate::pages::{LensManagerPage, PluginManagerPage, SearchPage, SettingsPage, StatsPage};
+use crate::pages::{SearchPage, SettingsPage, StatsPage};
 
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
@@ -98,17 +98,13 @@ extern "C" {
 }
 
 #[derive(Clone, Routable, PartialEq)]
-enum Route {
+pub enum Route {
     #[at("/")]
     Search,
-    #[at("/settings")]
-    SettingsPage,
-    #[at("/settings/lens")]
-    LensManager,
+    #[at("/settings/:tab")]
+    SettingsPage { tab: pages::Tab },
     #[at("/stats")]
     Status,
-    #[at("/settings/plugins")]
-    PluginManager,
 }
 
 fn main() {
@@ -151,10 +147,8 @@ pub fn app() -> Html {
 
 fn switch(routes: &Route) -> Html {
     match routes {
-        Route::LensManager => html! { <LensManagerPage /> },
-        Route::PluginManager => html! { <PluginManagerPage /> },
         Route::Search => html! { <SearchPage /> },
-        Route::SettingsPage => html! { <SettingsPage /> },
+        Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
         Route::Status => html! { <StatsPage /> },
     }
 }

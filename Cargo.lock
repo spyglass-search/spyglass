@@ -5043,6 +5043,8 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "strum 0.24.1",
+ "strum_macros 0.24.2",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-logger",
