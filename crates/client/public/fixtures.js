@@ -89,6 +89,13 @@ export let invoke = async (func_name, params) => {
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             is_enabled: true,
         }];
+    } else if (func_name == "crawl_stats") {
+        return {
+            by_domain: [
+                ['oldschool.runescape.wiki', { num_queued: 0, num_processing: 0, num_completed: 31413, num_indexed: 35453 }],
+                ['en.wikipedia.org', { num_queued: 0, num_processing: 0, num_completed: 31413, num_indexed: 35453 }]
+            ]
+        };
     }
 
     return [];

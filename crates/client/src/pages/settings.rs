@@ -7,12 +7,14 @@ use crate::components::icons;
 
 #[derive(Clone, EnumString, Display, PartialEq)]
 pub enum Tab {
-    #[strum(serialize = "user")]
-    UserSettings,
     #[strum(serialize = "lenses")]
     LensManager,
     #[strum(serialize = "plugins")]
     PluginsManager,
+    #[strum(serialize = "stats")]
+    Stats,
+    #[strum(serialize = "user")]
+    UserSettings,
 }
 
 #[derive(PartialEq, Properties)]
@@ -61,6 +63,20 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
             <div class="flex-col h-screen w-64 bg-stone-900 p-4 top-0 left-0 z-40 sticky">
                 <div class="mb-10">
                     <div class="uppercase mb-4 text-sm text-gray-500 font-bold">
+                        {"Spyglass"}
+                    </div>
+                    <ul>
+                        <li class="mb-2">
+                            <NavLink tab={Tab::Stats} current={props.tab.clone()}>
+                                <icons::ChartBarIcon classes="mr-2" height="h-4" width="h-4" />
+                                {"Crawl Status"}
+                            </NavLink>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="mb-10">
+                    <div class="uppercase mb-4 text-sm text-gray-500 font-bold">
                         {"Configuration"}
                     </div>
                     <ul>
@@ -95,9 +111,10 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
             <div class="flex-col flex-1">
             {
                 match props.tab {
-                    Tab::UserSettings => html! { <div>{"User Settings"}</div> },
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
                     Tab::PluginsManager => html! { <pages::PluginManagerPage /> },
+                    Tab::Stats => html!{ <pages::StatsPage /> },
+                    Tab::UserSettings => html! { <div>{"User Settings"}</div> },
                 }
             }
             </div>
