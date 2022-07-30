@@ -157,11 +157,9 @@ pub fn stats_page() -> Html {
                     <h1 class="text-2xl grow p-0">
                         {"Crawl Status"}
                     </h1>
-                    <button
-                        {onclick}
-                        class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
+                    <btn::Btn onclick={onclick}>
                         <icons::RefreshIcon height={"h-4"} width={"w-4"} />
-                    </button>
+                    </btn::Btn>
                 </div>
                 <div class="py-2">
                     <div class="flex flex-row">

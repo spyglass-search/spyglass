@@ -37,14 +37,14 @@ pub struct PluginProps {
 #[function_component(Plugin)]
 pub fn plugin_comp(props: &PluginProps) -> Html {
     let plugin = &props.plugin;
-    let component_styles: Vec<String> = vec![
-        "border-t".into(),
-        "border-neutral-600".into(),
-        "p-4".into(),
-        "pr-0".into(),
-        "text-white".into(),
-        "bg-netural-800".into(),
-    ];
+    let component_styles: Classes = classes!(
+        "border-t",
+        "border-neutral-600",
+        "py-4",
+        "px-8",
+        "text-white",
+        "bg-netural-800",
+    );
 
     let btn_label = if plugin.is_enabled {
         "Disable"
