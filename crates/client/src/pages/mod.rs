@@ -13,5 +13,5 @@ pub use search::*;
 mod settings;
 pub use settings::*;
 
-mod stats;
-pub use stats::*;
+mod crawl_stats;
+pub use crawl_stats::*;

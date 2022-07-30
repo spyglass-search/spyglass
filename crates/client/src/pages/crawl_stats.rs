@@ -69,7 +69,7 @@ struct StatsBarProps {
 
 #[function_component(StatsBar)]
 fn stats_bar(props: &StatsBarProps) -> Html {
-    let percent = props.count as f64 / props.total * 100.0;
+    let percent = (props.count as f64 / props.total * 100.0).max(5.0);
     let mut buf = Buffer::default();
     buf.write_formatted(&props.count, &Locale::en);
 
@@ -152,7 +152,7 @@ pub fn stats_page() -> Html {
 
     html! {
         <div class="text-white">
-            <div class="pt-4 px-8 top-0 sticky bg-stone-800 z-40 h-24 border-b-2 border-stone-900">
+            <div class="py-4 px-8 top-0 sticky bg-stone-800 z-40 border-b-2 border-stone-900">
                 <div class="flex flex-row items-center">
                     <h1 class="text-2xl grow p-0">
                         {"Crawl Status"}

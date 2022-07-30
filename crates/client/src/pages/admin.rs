@@ -60,7 +60,7 @@ pub struct SettingsPageProps {
 pub fn settings_page(props: &SettingsPageProps) -> Html {
     html! {
         <div class="text-white flex">
-            <div class="flex-col h-screen w-64 bg-stone-900 p-4 top-0 left-0 z-40 sticky">
+            <div class="flex-col h-screen w-48 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky">
                 <div class="mb-10">
                     <div class="uppercase mb-4 text-sm text-gray-500 font-bold">
                         {"Spyglass"}
