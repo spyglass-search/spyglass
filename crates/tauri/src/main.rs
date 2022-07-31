@@ -32,7 +32,9 @@ mod menu;
 use menu::MenuID;
 mod rpc;
 mod window;
-use window::{show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings};
+use window::{
+    show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
