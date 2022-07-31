@@ -81,6 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::open_result,
             cmd::recrawl_domain,
             cmd::resize_window,
+            cmd::save_settings,
             cmd::search_docs,
             cmd::search_lenses,
             cmd::toggle_plugin,

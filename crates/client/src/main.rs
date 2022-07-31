@@ -1,8 +1,8 @@
 use gloo::events::EventListener;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use yew::prelude::*;
+use wasm_bindgen::prelude::*;
 use yew_router::prelude::*;
+use yew::prelude::*;
 
 mod components;
 mod constants;
@@ -29,6 +29,9 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    pub async fn save_settings(settings: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;
@@ -74,6 +77,9 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    pub async fn save_settings(settings: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "searchDocs", catch)]
     pub async fn search_docs(lenses: JsValue, query: String) -> Result<JsValue, JsValue>;

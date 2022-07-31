@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 
 use jsonrpc_core::Value;
@@ -314,5 +315,14 @@ pub async fn toggle_plugin(
         .await;
     let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
 
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_settings(
+    _: tauri::Window,
+    settings: HashMap<String, String>
+) -> Result<(), String> {
+    dbg!(settings);
     Ok(())
 }

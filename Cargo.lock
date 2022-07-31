@@ -1851,9 +1851,9 @@ dependencies = [
 
 [[package]]
 name = "gloo"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03e691526c3972d1fda35453f6df29925edea014dc75a2dede7661527e9439f0"
+checksum = "3a4bef6b277b3ab073253d4bca60761240cf8d6998f4bd142211957b69a61b20"
 dependencies = [
  "gloo-console",
  "gloo-dialogs",
@@ -1999,9 +1999,9 @@ dependencies = [
 
 [[package]]
 name = "gloo-worker"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09110b5555bcafe508cee0fb94308af9aac7a85f980d3c88b270d117c6c6911d"
+checksum = "9caac1b89bbe1e1454bb23e4d046a3fc92438ae2e95fb429c41685789e1fcbaa"
 dependencies = [
  "anymap2",
  "bincode",
@@ -2009,8 +2009,8 @@ dependencies = [
  "gloo-utils",
  "js-sys",
  "serde",
- "slab",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -5036,7 +5036,7 @@ dependencies = [
 name = "spyglass-client"
 version = "0.1.0"
 dependencies = [
- "gloo 0.7.0",
+ "gloo 0.8.0",
  "js-sys",
  "log",
  "num-format",

@@ -125,6 +125,10 @@ export async function recrawl_domain(domain) {
     return await invoke('recrawl_domain', { domain });
 }
 
+export async function save_settings(settings) {
+    return await invoke('save_settings', { settings });
+}
+
 export async function searchDocs(lenses, query) {
     return await invoke('search_docs', { lenses, query });
 }
