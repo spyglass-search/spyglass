@@ -71,3 +71,19 @@ pub async fn enqueue(
     new_row.insert(db).await?;
     Ok(())
 }
+
+pub async fn dequeue(
+    db: &DatabaseConnection,
+    seed_url: &str,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let res = Entity::find()
+        .filter(Column::SeedUrl.eq(seed_url))
+        .one(db)
+        .await?;
+
+    if let Some(res) = res {
+        res.delete(db).await?;
+    }
+
+    Ok(())
+}

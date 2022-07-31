@@ -30,6 +30,11 @@ async fn check_and_bootstrap(
                 return true;
             }
         }
+    } else {
+        log::info!(
+            "bootstrap queue already contains seed url: {}, skipping",
+            seed_url
+        );
     }
 
     false
