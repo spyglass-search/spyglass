@@ -224,14 +224,6 @@ impl Crawler {
         };
 
         let url = Url::parse(&fetch_url).expect("Invalid fetch URL");
-
-        // Break apart domain + path of the URL
-        let domain = url.host_str().expect("Invalid URL");
-        let mut path: String = url.path().to_string();
-        if let Some(query) = url.query() {
-            path = format!("{}?{}", path, query);
-        }
-
         // Have we crawled this recently?
         if let Some(history) = fetch_history::find_by_url(db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
@@ -287,6 +279,14 @@ impl Crawler {
         );
 
         // Update fetch history
+        // Break apart domain + path of the URL
+        let url = Url::parse(&result.url).expect("Invalid result URL");
+        let domain = url.host_str().expect("Invalid URL");
+        let mut path: String = url.path().to_string();
+        if let Some(query) = url.query() {
+            path = format!("{}?{}", path, query);
+        }
+
         fetch_history::upsert(
             db,
             domain,
