@@ -11,7 +11,7 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
+use shared::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 use shared::config::{Lens, LensRule, Limit, UserSettings};
 
 const MAX_RETRIES: u8 = 5;
@@ -477,9 +477,9 @@ mod test {
     use url::Url;
 
     use shared::config::{Lens, LensRule, Limit, UserSettings};
+    use shared::regex::{regex_for_robots, WildcardType};
 
     use crate::models::{crawl_queue, indexed_document};
-    use crate::regex::{regex_for_robots, WildcardType};
     use crate::test::setup_test_db;
 
     use super::{gen_priority_sql, gen_priority_values, EnqueueSettings};

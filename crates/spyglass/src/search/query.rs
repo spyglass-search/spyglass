@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use entities::regex::regex_for_prefix;
 use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, RegexQuery, TermQuery};
 use tantivy::schema::*;
 use tantivy::Score;
 
 use super::DocFields;
 use shared::config::Lens;
+use shared::regex::regex_for_prefix;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
 

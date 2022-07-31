@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+use crate::regex::{regex_for_robots, WildcardType};
+
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 

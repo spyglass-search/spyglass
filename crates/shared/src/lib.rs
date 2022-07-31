@@ -5,6 +5,7 @@ pub mod config;
 pub mod event;
 pub mod request;
 pub mod response;
+pub mod regex;
 pub mod rpc;
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize)]
