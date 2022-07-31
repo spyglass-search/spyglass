@@ -4,42 +4,52 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-use crate::{components::{btn, Header}, save_settings};
-
-#[derive(PartialEq)]
-pub enum FormType {
-    Text,
-}
+use crate::{
+    components::{btn, Header},
+    invoke, save_user_settings,
+    utils::RequestState,
+};
+use shared::event::ClientInvoke;
+use shared::SettingOpts;
 
 #[derive(Properties, PartialEq)]
 pub struct SettingFormProps {
     #[prop_or_default]
-    onchange: Callback<KeyboardEvent>,
-    form_type: FormType,
-    help_text: Option<String>,
-    label: String,
-    value: String,
+    onchange: Callback<SettingChangeEvent>,
+    setting_ref: String,
+    opts: SettingOpts,
+}
+
+pub struct SettingChangeEvent {
+    setting_ref: String,
+    new_value: String,
 }
 
 #[function_component(SettingForm)]
 pub fn setting_form(props: &SettingFormProps) -> Html {
+    let value = use_state(|| props.opts.value.clone());
+
     let onkeyup = {
-        let cur_value = props.value.clone();
         let onchange = props.onchange.clone();
+        let setting_ref = props.setting_ref.clone();
+        let value = value.clone();
         Callback::from(move |e: KeyboardEvent| {
             let input: HtmlInputElement = e.target_unchecked_into();
-            let value = input.value();
-            if value != cur_value {
-                onchange.emit(e);
-            }
+            let input_value = input.value();
+            onchange.emit(SettingChangeEvent {
+                setting_ref: setting_ref.clone(),
+                new_value: input_value.clone(),
+            });
+            value.set(input_value);
         })
     };
+
     html! {
         <div class="p-8">
             <div class="mb-2">
-                <label class="text-yellow-500">{props.label.clone()}</label>
+                <label class="text-yellow-500">{props.opts.label.clone()}</label>
                 {
-                    if let Some(help_text) = props.help_text.clone() {
+                    if let Some(help_text) = props.opts.help_text.clone() {
                         html! {
                             <div>
                                 <small class="text-gray-500">
@@ -57,7 +67,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                     onkeyup={onkeyup}
                     type="text"
                     class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
-                    value={props.value.clone()}
+                    value={(*value).clone()}
                 />
             </div>
         </div>
@@ -66,27 +76,64 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
 
 #[function_component(UserSettingsPage)]
 pub fn user_settings_page() -> Html {
+    let current_settings: UseStateHandle<HashMap<String, SettingOpts>> = use_state_eq(HashMap::new);
+    let changes: UseStateHandle<HashMap<String, String>> = use_state_eq(HashMap::new);
+
+    let req_state = use_state_eq(|| RequestState::NotStarted);
+    if *req_state == RequestState::NotStarted {
+        req_state.set(RequestState::InProgress);
+        let current_settings = current_settings.clone();
+        spawn_local(async move {
+            if let Ok(res) = invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
+                if let Ok(deser) = JsValue::into_serde::<HashMap<String, SettingOpts>>(&res) {
+                    current_settings.set(deser);
+                } else {
+                    log::error!("unable to deserialize");
+                }
+            } else {
+                log::error!("unable to invoke");
+            }
+        })
+    }
+
     // Detect changes in setting values & enable the save changes button
     let has_changes = use_state_eq(|| false);
     let onchange = {
         let has_changes = has_changes.clone();
-        Callback::from(move |_| {
+        let changes = changes.clone();
+        Callback::from(move |evt: SettingChangeEvent| {
             has_changes.set(true);
+            let mut updated = (*changes).clone();
+            updated.insert(evt.setting_ref, evt.new_value);
+            changes.set(updated);
         })
     };
 
     let handle_save_changes = {
         let has_changes = has_changes.clone();
         Callback::from(move |_| {
-            let mut example: HashMap<String, String> = HashMap::new();
-            example.insert("test".into(), "/user/a5huynh/documents".into());
+            let changes_ref = changes.clone();
+            let updated = (*changes).clone();
             spawn_local(async move {
-                let _ = save_settings(JsValue::from_serde(&example).expect("cant serialize")).await;
+                let _ = save_user_settings(
+                    JsValue::from_serde(&updated.clone()).expect("cant serialize"),
+                )
+                .await;
             });
 
+            changes_ref.set(HashMap::new());
             has_changes.set(false);
         })
     };
+
+    let contents = current_settings
+        .iter()
+        .map(|(setting_ref, setting)| {
+            html! {
+                <SettingForm onchange={onchange.clone()} setting_ref={setting_ref.clone()} opts={setting.clone()} />
+            }
+        })
+        .collect::<Html>();
 
     html! {
         <div class="text-white">
@@ -95,15 +142,7 @@ pub fn user_settings_page() -> Html {
                     {"Save Changes"}
                 </btn::Btn>
             </Header>
-            <div>
-                <SettingForm
-                    onchange={onchange}
-                    label="Data directory"
-                    value={"/Users/a5huynh/Library/Application Support/com.athlabs.spyglass-dev"}
-                    form_type={FormType::Text}
-                    help_text={"The data directory is where your index, lenses, plugins, and logs are stored."}
-                />
-            </div>
+            <div>{contents}</div>
         </div>
     }
 }

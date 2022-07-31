@@ -41,7 +41,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
             classes={
                 classes!(
                     (props.current == props.tab).then(|| Some("bg-stone-700")),
-                    link_styles.clone()
+                    link_styles
                 )
             }
             to={Route::SettingsPage { tab: props.tab.clone() }}

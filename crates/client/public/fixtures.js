@@ -96,6 +96,15 @@ export let invoke = async (func_name, params) => {
                 ['en.wikipedia.org', { num_queued: 0, num_processing: 0, num_completed: 31413, num_indexed: 35453 }]
             ]
         };
+    } else if (func_name == "load_user_settings") {
+        return {
+            "user.data_directory": {
+                label: "Data Directory",
+                value: "/Users/a5huynh/Library/Application Support/com.athlabs.spyglass-dev",
+                form_type: "Text",
+                help_text: "The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.",
+            }
+        };
     }
 
     return [];
@@ -125,8 +134,8 @@ export async function recrawl_domain(domain) {
     return await invoke('recrawl_domain', { domain });
 }
 
-export async function save_settings(settings) {
-    return await invoke('save_settings', { settings });
+export async function save_user_settings(settings) {
+    return await invoke('save_user_settings', { settings });
 }
 
 export async function searchDocs(lenses, query) {

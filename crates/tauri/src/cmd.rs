@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 
 use jsonrpc_core::Value;
 use tauri::State;
@@ -11,6 +12,7 @@ use shared::{
     event::ClientEvent,
     request,
     response::{self, InstallableLens},
+    FormType, SettingOpts,
 };
 
 #[tauri::command]
@@ -319,10 +321,38 @@ pub async fn toggle_plugin(
 }
 
 #[tauri::command]
-pub async fn save_settings(
+pub async fn save_user_settings(
     _: tauri::Window,
-    settings: HashMap<String, String>
+    config: State<'_, Config>,
+    settings: HashMap<String, String>,
 ) -> Result<(), String> {
-    dbg!(settings);
+    let mut user_settings = config.user_settings.clone();
+    // Update the user settings
+    for (key, value) in settings.iter() {
+        if key == "user.data_directory" {
+            user_settings.data_directory = PathBuf::from(value);
+        }
+    }
+
+    dbg!(&user_settings);
+    let _ = config.save_user_settings(&user_settings);
+
     Ok(())
+}
+
+#[tauri::command]
+pub async fn load_user_settings(
+    _: tauri::Window,
+    config: State<'_, Config>,
+) -> Result<HashMap<String, SettingOpts>, String> {
+    let serialized: HashMap<String, String> = config.user_settings.clone().into();
+    let mut map = HashMap::new();
+    map.insert("user.data_directory".into(), SettingOpts {
+        label: "Data Directory".into(),
+        value: serialized.get("user.data_directory").unwrap_or(&"".to_string()).to_string(),
+        form_type: FormType::Text,
+        help_text: Some("The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.".into())
+    });
+
+    Ok(map)
 }
