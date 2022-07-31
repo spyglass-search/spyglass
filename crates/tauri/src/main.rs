@@ -32,7 +32,9 @@ mod menu;
 use menu::MenuID;
 mod rpc;
 mod window;
-use window::{show_crawl_stats_window, show_lens_manager_window, show_plugin_manager};
+use window::{
+    show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
@@ -75,12 +77,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::list_installable_lenses,
             cmd::list_installed_lenses,
             cmd::list_plugins,
+            cmd::load_user_settings,
             cmd::network_change,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,
+            cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
+            cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,
             cmd::toggle_plugin,
@@ -172,7 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                         MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
-                        MenuID::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
+                        MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
                         MenuID::SHOW_CRAWL_STATUS => {
                             show_crawl_stats_window(app);
                         }

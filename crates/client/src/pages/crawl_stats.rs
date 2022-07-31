@@ -69,26 +69,20 @@ struct StatsBarProps {
 
 #[function_component(StatsBar)]
 fn stats_bar(props: &StatsBarProps) -> Html {
-    let percent = props.count as f64 / props.total * 100.0;
+    let percent = (props.count as f64 / props.total * 100.0).max(5.0);
     let mut buf = Buffer::default();
     buf.write_formatted(&props.count, &Locale::en);
 
-    let mut bar_style: Vec<String> = vec![
-        "relative".into(),
-        "flex".into(),
-        "justify-center".into(),
-        "h-8".into(),
-        "p-2".into(),
-    ];
-    bar_style.push(props.color.clone());
-
-    if props.is_start {
-        bar_style.push("rounded-l-lg".into());
-    }
-
-    if props.is_end {
-        bar_style.push("rounded-r-lg".into());
-    }
+    let bar_style = classes!(
+        "relative",
+        "flex",
+        "justify-center",
+        "h-8",
+        "p-2",
+        props.color.clone(),
+        props.is_start.then(|| Some("rounded-l-lg")),
+        props.is_end.then(|| Some("rounded-r-lg")),
+    );
 
     html! {
         <div class={bar_style} style={format!("width: {}%", percent)}>
@@ -158,16 +152,14 @@ pub fn stats_page() -> Html {
 
     html! {
         <div class="text-white">
-            <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-40 h-24">
+            <div class="py-4 px-8 top-0 sticky bg-stone-800 z-40 border-b-2 border-stone-900">
                 <div class="flex flex-row items-center">
                     <h1 class="text-2xl grow p-0">
                         {"Crawl Status"}
                     </h1>
-                    <button
-                        {onclick}
-                        class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
+                    <btn::Btn onclick={onclick}>
                         <icons::RefreshIcon height={"h-4"} width={"w-4"} />
-                    </button>
+                    </btn::Btn>
                 </div>
                 <div class="py-2">
                     <div class="flex flex-row">

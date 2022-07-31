@@ -134,6 +134,22 @@ impl UserSettings {
     }
 }
 
+impl From<UserSettings> for HashMap<String, String> {
+    fn from(settings: UserSettings) -> Self {
+        let mut map: HashMap<String, String> = HashMap::new();
+        map.insert(
+            "user.data_directory".to_string(),
+            settings
+                .data_directory
+                .to_str()
+                .expect("Unable to convert to string")
+                .to_string(),
+        );
+
+        map
+    }
+}
+
 impl Default for UserSettings {
     fn default() -> Self {
         UserSettings {
@@ -164,6 +180,15 @@ impl Config {
             ron::ser::to_string_pretty(settings, Default::default())?,
         )
         .expect("Unable to save plugin settings file.");
+
+        Ok(())
+    }
+
+    pub fn save_user_settings(&self, user_settings: &UserSettings) -> anyhow::Result<()> {
+        let prefs_path = Self::prefs_file();
+        let serialized = ron::ser::to_string_pretty(user_settings, Default::default())
+            .expect("Unable to serialize user settings");
+        fs::write(prefs_path, serialized).expect("Unable to save user preferences file");
 
         Ok(())
     }

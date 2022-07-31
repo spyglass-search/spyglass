@@ -15,7 +15,7 @@ pub enum MenuID {
     OPEN_LENS_MANAGER,
     OPEN_LOGS_FOLDER,
     OPEN_PLUGIN_MANAGER,
-    OPEN_SETTINGS_FOLDER,
+    OPEN_SETTINGS_MANAGER,
     QUIT,
     SHOW_CRAWL_STATUS,
     SHOW_SEARCHBAR,
@@ -28,11 +28,6 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
 
     let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "");
     let quit = CustomMenuItem::new(MenuID::QUIT.to_string(), "Quit");
-
-    let open_settings_folder = CustomMenuItem::new(
-        MenuID::OPEN_SETTINGS_FOLDER.to_string(),
-        "Open settings folder",
-    );
 
     let open_logs_folder =
         CustomMenuItem::new(MenuID::OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
@@ -50,18 +45,21 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         )
         .add_item(CustomMenuItem::new(
             MenuID::SHOW_CRAWL_STATUS.to_string(),
-            "Show crawl status",
+            "Crawl status",
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_LENS_MANAGER.to_string(),
-            "Manage/install lenses",
+            "Manage lenses",
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_PLUGIN_MANAGER.to_string(),
             "Manage plugins",
         ))
+        .add_item(CustomMenuItem::new(
+            MenuID::OPEN_SETTINGS_MANAGER.to_string(),
+            "Preferences",
+        ))
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(open_settings_folder)
         .add_item(open_logs_folder);
 
     // Add dev utils

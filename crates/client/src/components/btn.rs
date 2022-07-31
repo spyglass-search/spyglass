@@ -132,3 +132,36 @@ pub fn delete_button(props: &DeleteDomainButtonProps) -> Html {
         </button>
     }
 }
+
+#[derive(Properties, PartialEq)]
+pub struct DefaultBtnProps {
+    pub onclick: Callback<MouseEvent>,
+    #[prop_or_default]
+    pub disabled: bool,
+    #[prop_or_default]
+    pub children: Children,
+}
+
+#[function_component(Btn)]
+pub fn default_button(props: &DefaultBtnProps) -> Html {
+    let styles = classes!(
+        "border-neutral-600",
+        "border",
+        "flex-row",
+        "flex",
+        "p-2",
+        "rounded-lg",
+        "text-sm",
+        if props.disabled {
+            classes!("text-stone-700")
+        } else {
+            classes!("hover:bg-neutral-600", "active:bg-neutral-700")
+        },
+    );
+
+    html! {
+        <button onclick={props.onclick.clone()} class={styles} disabled={props.disabled}>
+            {props.children.clone()}
+        </button>
+    }
+}

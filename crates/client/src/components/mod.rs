@@ -164,3 +164,22 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         }
     }
 }
+
+#[derive(PartialEq, Properties)]
+pub struct HeaderProps {
+    pub label: String,
+    #[prop_or_default]
+    pub children: Children,
+}
+
+#[function_component(Header)]
+pub fn header(props: &HeaderProps) -> Html {
+    html! {
+        <div class="py-4 px-8 top-0 sticky bg-stone-800 z-400 border-b-2 border-stone-900">
+            <div class="flex flex-row items-center gap-4">
+                <h1 class="text-2xl grow">{props.label.clone()}</h1>
+                {props.children.clone()}
+            </div>
+        </div>
+    }
+}
