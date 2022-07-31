@@ -131,13 +131,6 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                                 {"Plugins"}
                             </NavLink>
                         </li>
-                    </ul>
-                </div>
-                <div class="mb-6">
-                    <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
-                        {"Settings"}
-                    </div>
-                    <ul>
                         <li class="mb-2">
                             <NavLink tab={Tab::UserSettings} current={props.tab.clone()}>
                                 <icons::AdjustmentsIcon classes="mr-2" height="h-4" width="h-4" />
