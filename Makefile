@@ -46,6 +46,7 @@ test:
 	cargo test --all
 
 setup-dev:
+	rustup target add warm32-unknown-unknown
 # Required for plugin development
 	rustup target add wasm32-wasi
 # Install tauri-cli & trunk for client development
