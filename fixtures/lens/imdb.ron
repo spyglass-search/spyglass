@@ -1,0 +1,16 @@
+(
+    version: "1",
+    name: "imdb",
+    author: "@test",
+    description: Some("test description"),
+    is_enabled: true,
+    domains: [],
+    urls: [
+        "https://www.imbdb.com/title"
+    ],
+    rules: [
+        // Limit to only the movie detail pages
+        // e.g only matches: https://www.imdb.com/title/tt0094625/
+        LimitURLDepth("https://www.imdb.com", 2),
+    ]
+)

@@ -11,8 +11,8 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use shared::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 use shared::config::{Lens, LensRule, Limit, UserSettings};
+use shared::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 10000;
@@ -243,6 +243,15 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
                 if let Some(regex) = regex_for_robots(rule_str, WildcardType::Regex) {
                     skip_list.push(regex);
                 }
+            }
+            LensRule::LimitURLDepth(rule_str, max_depth) => {
+                let mut regex = format!("^{}", rule_str);
+                for _ in 0..*max_depth {
+                    regex.push_str("/[^/]+");
+                }
+                // Optional ending slash
+                regex.push_str("/?$");
+                allow_list.push(regex);
             }
         }
     }
@@ -681,5 +690,29 @@ mod test {
         assert!(allow_list.is_match(invalid));
         // but should now be denied
         assert!(block_list.is_match(invalid));
+    }
+
+    #[tokio::test]
+    async fn test_create_ruleset_with_limits() {
+        let lens =
+            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/imdb.ron")).unwrap();
+
+        let rules = super::create_ruleset_from_lens(&lens);
+        let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
+        let block_list = regex::RegexSet::new(rules.skip_list).unwrap();
+
+        let valid = "https://www.imdb.com/title/tt0094625/";
+        let invalid = vec![
+            // Bare domain should not match
+            "https://www.imdb.com",
+            // Pages past the detail page should not match.
+            "https://www.imdb.com/title/tt0094625/reviews?ref_=tt_ov_rt",
+        ];
+
+        assert!(allow_list.is_match(valid));
+        assert!(!block_list.is_match(valid));
+        for url in invalid {
+            assert!(!allow_list.is_match(url));
+        }
     }
 }

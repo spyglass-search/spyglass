@@ -211,8 +211,8 @@ mod test {
     use entities::models::resource_rule;
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
-    use shared::regex::{regex_for_robots, WildcardType};
     use regex::Regex;
+    use shared::regex::{regex_for_robots, WildcardType};
 
     #[test]
     fn test_parse() {

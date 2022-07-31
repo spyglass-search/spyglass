@@ -27,9 +27,33 @@ impl Default for Config {
 /// Different rules that filter out the URLs that would be crawled for a lens
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum LensRule {
-    /// Robots.txt regex to skip certain URLs
+    /// Limits the depth of a URL to a certain depth.
+    /// For example:
+    ///  - LimitURLDepth("https://example.com/", 1) will limit it to https://example.com/<path 1>
+    ///  - LimitURLDepth("https://example.com/", 2) will limit it to https://example.com/<path 1>/<path 2>
+    ///  - etc.
+    LimitURLDepth(String, u8),
     /// Skips are applied when bootstrapping & crawling
     SkipURL(String),
+}
+
+impl LensRule {
+    pub fn to_regex(&self) -> String {
+        match &self {
+            LensRule::LimitURLDepth(rule, max_depth) => {
+                let mut regex = format!("^{}", rule);
+                for _ in 0..*max_depth {
+                    regex.push_str("/[^/]+");
+                }
+                // Optional ending slash
+                regex.push_str("/?$");
+                regex
+            }
+            LensRule::SkipURL(rule_str) => {
+                regex_for_robots(rule_str, WildcardType::Regex).expect("Invalid SkipURL regex")
+            }
+        }
+    }
 }
 
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
