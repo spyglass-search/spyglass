@@ -5,7 +5,7 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 use crate::{
-    components::{btn, Header},
+    components::{btn, icons, Header},
     invoke, save_user_settings,
     utils::RequestState,
 };
@@ -109,16 +109,24 @@ pub fn user_settings_page() -> Html {
         })
     };
 
+    let handle_show_folder = Callback::from(|_| {
+        spawn_local(async move {
+            let _ = invoke(ClientInvoke::OpenSettingsFolder.as_ref(), JsValue::NULL).await;
+        });
+    });
+
     let handle_save_changes = {
         let has_changes = has_changes.clone();
         Callback::from(move |_| {
             let changes_ref = changes.clone();
             let updated = (*changes).clone();
             spawn_local(async move {
-                let _ = save_user_settings(
-                    JsValue::from_serde(&updated.clone()).expect("cant serialize"),
-                )
-                .await;
+                // Send changes to backend to be validated & saved.
+                if let Ok(ser) = JsValue::from_serde(&updated.clone()) {
+                    // TODO: Handle any validation errors from backend and show
+                    // them to user.
+                    let _ = save_user_settings(ser).await;
+                }
             });
 
             changes_ref.set(HashMap::new());
@@ -138,6 +146,10 @@ pub fn user_settings_page() -> Html {
     html! {
         <div class="text-white">
             <Header label="User Settings">
+                <btn::Btn onclick={handle_show_folder}>
+                    <icons::FolderOpenIcon classes={classes!("mr-2")}/>
+                    {"Settings folder"}
+                </btn::Btn>
                 <btn::Btn onclick={handle_save_changes} disabled={!*has_changes}>
                     {"Save Changes"}
                 </btn::Btn>

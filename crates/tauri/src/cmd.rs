@@ -37,6 +37,12 @@ pub async fn open_plugins_folder(
 }
 
 #[tauri::command]
+pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
+    open_folder(Config::prefs_dir());
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     open::that(url).unwrap();
     Ok(())

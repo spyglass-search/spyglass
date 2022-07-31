@@ -75,6 +75,10 @@ pub fn show_plugin_manager(app: &AppHandle) {
     _show_tab(app, "/settings/plugins");
 }
 
+pub fn show_user_settings(app: &AppHandle) {
+    _show_tab(app, "/settings/user");
+}
+
 pub fn alert(window: &Window, title: &str, message: &str) {
     MessageDialogBuilder::new(title, message)
         .parent(window)

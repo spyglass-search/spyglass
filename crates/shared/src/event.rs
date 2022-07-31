@@ -26,4 +26,6 @@ pub enum ClientInvoke {
     LoadUserSettings,
     #[strum(serialize = "open_lens_folder")]
     OpenLensFolder,
+    #[strum(serialize = "open_settings_folder")]
+    OpenSettingsFolder,
 }
