@@ -145,10 +145,10 @@ pub fn plugin_manager_page() -> Html {
     // Listen for updates from plugins
     {
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 log::info!("refresh!");
                 req_state.set(RequestState::NotStarted);
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
 
             let _ = listen(ClientEvent::RefreshPluginManager.as_ref(), &cb).await;
             cb.forget();

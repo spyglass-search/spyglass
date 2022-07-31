@@ -4,6 +4,7 @@ use strum_macros::{AsRefStr, Display};
 pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
+    Navigate,
     RefreshLensManager,
     RefreshPluginManager,
     RefreshSearchResults,

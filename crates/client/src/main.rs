@@ -19,7 +19,10 @@ extern "C" {
     pub async fn invoke(fn_name: &str, val: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(catch)]
-    pub async fn listen(event_name: &str, cb: &Closure<dyn Fn()>) -> Result<JsValue, JsValue>;
+    pub async fn listen(
+        event_name: &str,
+        cb: &Closure<dyn Fn(JsValue)>,
+    ) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "deleteDoc", catch)]
     pub async fn delete_doc(id: String) -> Result<(), JsValue>;
@@ -62,7 +65,10 @@ extern "C" {
     pub async fn invoke(fn_name: &str, val: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "event"], catch)]
-    pub async fn listen(event_name: &str, cb: &Closure<dyn Fn()>) -> Result<JsValue, JsValue>;
+    pub async fn listen(
+        event_name: &str,
+        cb: &Closure<dyn Fn(JsValue)>,
+    ) -> Result<JsValue, JsValue>;
 
 }
 

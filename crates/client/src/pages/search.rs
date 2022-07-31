@@ -107,7 +107,7 @@ pub fn search_page() -> Html {
         // Reset query string, results list, etc when we receive a "clear_search"
         // event from tauri
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 query.set("".to_string());
                 results.set(Vec::new());
                 selected_idx.set(0);
@@ -120,7 +120,7 @@ pub fn search_page() -> Html {
                 spawn_local(async move {
                     resize_window(node.client_height() as f64).await.unwrap();
                 });
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
 
             let _ = listen(ClientEvent::ClearSearch.as_ref(), &cb).await;
             cb.forget();
@@ -130,7 +130,7 @@ pub fn search_page() -> Html {
         // Focus on the search box when we receive an "focus_window" event from
         // tauri
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 let document = gloo::utils::document();
                 if let Some(el) = document.get_element_by_id("searchbox") {
                     let el: HtmlElement = el.unchecked_into();
@@ -142,7 +142,7 @@ pub fn search_page() -> Html {
                         resize_window(node.client_height() as f64).await.unwrap();
                     });
                 }
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
             let _ = listen(ClientEvent::FocusWindow.as_ref(), &cb).await;
             cb.forget();
         });
@@ -152,14 +152,14 @@ pub fn search_page() -> Html {
         // Refresh search results
         let query = query.clone();
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 let document = gloo::utils::document();
                 if let Some(el) = document.get_element_by_id("searchbox") {
                     let el: HtmlInputElement = el.unchecked_into();
                     query.set("".into());
                     query.set(el.value());
                 }
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
             let _ = listen(ClientEvent::RefreshSearchResults.as_ref(), &cb).await;
             cb.forget();
         });

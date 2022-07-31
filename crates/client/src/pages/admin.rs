@@ -1,9 +1,20 @@
+use serde::Deserialize;
 use strum_macros::{Display, EnumString};
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use yew::{classes, prelude::*, Children};
 use yew_router::components::Link;
+use yew_router::history::History;
+use yew_router::hooks::use_history;
 
 use crate::components::icons;
-use crate::{pages, Route};
+use crate::{listen, pages, Route};
+use shared::event::ClientEvent;
+
+#[derive(Debug, Deserialize)]
+struct ListenPayload {
+    payload: String,
+}
 
 #[derive(Clone, EnumString, Display, PartialEq)]
 pub enum Tab {
@@ -58,6 +69,34 @@ pub struct SettingsPageProps {
 
 #[function_component(SettingsPage)]
 pub fn settings_page(props: &SettingsPageProps) -> Html {
+    let history = use_history().unwrap();
+
+    spawn_local(async move {
+        let cb = Closure::wrap(Box::new(move |payload: JsValue| {
+            if let Ok(payload) = payload.into_serde::<ListenPayload>() {
+                match payload.payload.as_str() {
+                    "/settings/lenses" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::LensManager,
+                    }),
+                    "/settings/plugins" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::PluginsManager,
+                    }),
+                    "/settings/stats" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::Stats,
+                    }),
+                    "/settings/user" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::UserSettings,
+                    }),
+                    _ => history.push(Route::SettingsPage {
+                        tab: pages::Tab::Stats,
+                    }),
+                }
+            }
+        }) as Box<dyn Fn(JsValue)>);
+        let _ = listen(ClientEvent::Navigate.as_ref(), &cb).await;
+        cb.forget();
+    });
+
     html! {
         <div class="text-white flex">
             <div class="flex-col h-screen w-48 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky">

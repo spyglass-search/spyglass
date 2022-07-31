@@ -46,31 +46,33 @@ pub fn show_window(window: &Window) {
     center_window(window);
 }
 
-fn _show_tab(app: &AppHandle, tab_url: &str) -> Window {
-    if let Some(window) = app.get_window(constants::SETTINGS_WIN_NAME) {
-        let _ = window.close();
-    }
+fn _show_tab(app: &AppHandle, tab_url: &str) {
+    let window = if let Some(window) = app.get_window(constants::SETTINGS_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::SETTINGS_WIN_NAME,
+            WindowUrl::App(tab_url.into()),
+        )
+        .title("Spyglass - Personal Search Engine")
+        .build()
+        .unwrap()
+    };
 
-    WindowBuilder::new(
-        app,
-        constants::SETTINGS_WIN_NAME,
-        WindowUrl::App(tab_url.into()),
-    )
-    .title("Spyglass - Personal Search Engine")
-    .build()
-    .unwrap()
+    let _ = window.emit(ClientEvent::Navigate.as_ref(), tab_url);
 }
 
-pub fn show_crawl_stats_window(app: &AppHandle) -> Window {
-    _show_tab(app, "/settings/stats")
+pub fn show_crawl_stats_window(app: &AppHandle) {
+    _show_tab(app, "/settings/stats");
 }
 
-pub fn show_lens_manager_window(app: &AppHandle) -> Window {
-    _show_tab(app, "/settings/lenses")
+pub fn show_lens_manager_window(app: &AppHandle) {
+    _show_tab(app, "/settings/lenses");
 }
 
-pub fn show_plugin_manager(app: &AppHandle) -> Window {
-    _show_tab(app, "/settings/plugins")
+pub fn show_plugin_manager(app: &AppHandle) {
+    _show_tab(app, "/settings/plugins");
 }
 
 pub fn alert(window: &Window, title: &str, message: &str) {

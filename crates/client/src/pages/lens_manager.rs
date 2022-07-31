@@ -215,10 +215,10 @@ pub fn lens_manager_page() -> Html {
         let ui_req_state = ui_req_state.clone();
         let i_req_state = i_req_state.clone();
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 ui_req_state.set(RequestState::NotStarted);
                 i_req_state.set(RequestState::NotStarted);
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
 
             let _ = listen(ClientEvent::RefreshLensManager.as_ref(), &cb).await;
             cb.forget();
