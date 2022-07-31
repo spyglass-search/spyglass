@@ -61,6 +61,9 @@ fn _show_tab(app: &AppHandle, tab_url: &str) {
     };
 
     let _ = window.emit(ClientEvent::Navigate.as_ref(), tab_url);
+    // A little hack to bring window to the front if its hiding behind something.
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_always_on_top(false);
 }
 
 pub fn show_crawl_stats_window(app: &AppHandle) {
