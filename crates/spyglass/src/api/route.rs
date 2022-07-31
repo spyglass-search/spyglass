@@ -226,6 +226,12 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
         .exec(db)
         .await;
 
+    // Handle cases where we incorrectly stored the web.archive.org URL in the fetch_history
+    let _ = fetch_history::Entity::delete_many()
+        .filter(fetch_history::Column::Path.contains(&domain))
+        .exec(db)
+        .await;
+
     let res = crawl_queue::Entity::update_many()
         .col_expr(
             crawl_queue::Column::Status,
