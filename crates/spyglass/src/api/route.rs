@@ -147,13 +147,14 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
         .all(&state.db)
         .await;
 
-    if let (Ok(indexed), Ok(mut writer)) = (indexed, state.index.writer.lock()) {
+    if let Ok(indexed) = indexed {
         for result in indexed {
-            let _ = Searcher::delete(&mut writer, &result.doc_id);
-            let _ = result.delete(&state.db);
+            if let Ok(mut writer) = state.index.writer.lock() {
+                let _ = Searcher::delete(&mut writer, &result.doc_id);
+                let _ = writer.commit();
+            }
+            let _ = result.delete(&state.db).await;
         }
-
-        let _ = writer.commit();
     }
 
     Ok(())
