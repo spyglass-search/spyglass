@@ -113,10 +113,13 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 pub(crate) fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     log::info!("<{}> requesting access to folder: {}", env.name, src);
 
-    let dst = Path::new(&dst);
+    let dst = Path::new(&dst)
+        .strip_prefix("/data")
+        .unwrap_or_else(|_| Path::new(""));
+
     let src = Path::new(&src);
     if let Some(file_name) = src.file_name() {
-        let dst = dst.join(file_name);
+        let dst = env.data_dir.join(dst).join(file_name);
         // Attempt to mount directory
         if let Err(e) = std::fs::copy(src, &dst) {
             log::error!("Unable to copy into plugin data dir: {}", e);
