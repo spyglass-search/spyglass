@@ -44,14 +44,23 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
     if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
         match cmd {
             PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, &urls),
-            PluginCommandRequest::ListDir(path) => {
-                let entries = if let Ok(entries) = std::fs::read_dir(path) {
-                    entries
-                        .flatten()
-                        .map(|entry| entry.path().display().to_string())
-                        .collect::<Vec<String>>()
+            PluginCommandRequest::ListDir { path, recurse } => {
+                let entries = if recurse {
+                    let mut entries = Vec::new();
+                    if let Ok(_) = walk_dir(&Path::new(&path), &mut entries) {
+                        entries
+                    } else {
+                        Vec::new()
+                    }
                 } else {
-                    Vec::new()
+                    if let Ok(entries) = std::fs::read_dir(path) {
+                        entries
+                            .flatten()
+                            .map(|entry| entry.path().display().to_string())
+                            .collect::<Vec<String>>()
+                    } else {
+                        Vec::new()
+                    }
                 };
 
                 if let Err(e) = wasi_write(&env.wasi_env, &entries) {
@@ -108,9 +117,25 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
     }
 }
 
+fn walk_dir(dir: &Path, entries: &mut Vec<String>) -> std::io::Result<()> {
+    if dir.is_dir() {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                walk_dir(&path, entries)?;
+            } else {
+                entries.push(entry.path().display().to_string());
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Adds a file into the plugin data directory. Use this to copy files from elsewhere
 /// in the filesystem so that it can be processed by the plugin.
-pub(crate) fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
+fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     log::info!("<{}> requesting access to folder: {}", env.name, src);
 
     let dst = Path::new(&dst)

@@ -21,8 +21,13 @@ pub fn enqueue_all(urls: &[String]) {
 }
 
 /// List dir
-pub fn list_dir(path: &str) -> Result<Vec<String>, ron::Error> {
-    if object_to_stdout(&PluginCommandRequest::ListDir(path.to_string())).is_ok() {
+pub fn list_dir(path: &str, recurse: bool) -> Result<Vec<String>, ron::Error> {
+    if object_to_stdout(&PluginCommandRequest::ListDir {
+        path: path.to_string(),
+        recurse,
+    })
+    .is_ok()
+    {
         unsafe {
             plugin_cmd();
         }

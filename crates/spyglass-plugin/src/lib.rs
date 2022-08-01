@@ -43,7 +43,7 @@ pub enum PluginCommandRequest {
     // Enqueue a list of URLs into the crawl queue
     Enqueue { urls: Vec<String> },
     // List the contents of a directory
-    ListDir(String),
+    ListDir { path: String, recurse: bool },
     // Subscribe to PluginEvents
     Subscribe(PluginEvent),
     // Run a sqlite query on a db file. NOTE: This is a workaround due to the fact
