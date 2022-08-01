@@ -146,6 +146,9 @@ pub async fn bootstrap(
         } else {
             break;
         }
+
+        // Add a little delay so our UI thread is able to get a word in.
+        let _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 
     // If no URLs were found to be bootstrap, enqueue the seed url. This can happen
