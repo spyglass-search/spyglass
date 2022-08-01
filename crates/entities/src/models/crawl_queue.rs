@@ -249,13 +249,10 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
                     skip_list.push(regex);
                 }
             }
-            LensRule::LimitURLDepth(rule_str, max_depth) => {
-                let mut regex = format!("^{}", rule_str);
-                for _ in 0..*max_depth {
-                    regex.push_str("/[^/]+");
-                }
-                // Optional ending slash
-                regex.push_str("/?$");
+            LensRule::LimitURLDepth(prefix, max_depth) => {
+                // Trim any extra slashes at the end of the prefix.
+                let prefix = prefix.trim_end_matches('/');
+                let regex = format!("^{}/?(/[^/]+/?){{0, {}}}$", prefix, max_depth);
                 restrict_list.push(regex);
             }
         }
@@ -718,6 +715,8 @@ mod test {
         let valid = vec![
             "https://www.imdb.com/title/tt0094625",
             "https://www.imdb.com/title/tt0094625/",
+            "https://www.imdb.com/title",
+            "https://www.imdb.com/title/",
         ];
 
         let invalid = vec![
