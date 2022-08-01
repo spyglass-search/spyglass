@@ -6,7 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use crate::components::{btn::Btn, icons, Header, Tabs, TabEvent};
+use crate::components::{btn::Btn, icons, Header, TabEvent, Tabs};
 use crate::listen;
 use crate::utils::RequestState;
 use crate::{install_lens, invoke};
