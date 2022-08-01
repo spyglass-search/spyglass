@@ -217,14 +217,19 @@ fn gen_priority_sql(p_domains: &str, p_prefixes: &str, user_settings: UserSettin
     )
 }
 struct LensRuleSets {
+    // Allow if any URLs match
     allow_list: Vec<String>,
+    // Skip if any URLs match
     skip_list: Vec<String>,
+    // Skip if any URLs do not match
+    restrict_list: Vec<String>,
 }
 
 /// Create a set of allow/skip rules from a Lens
 fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
     let mut allow_list = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
+    let mut restrict_list: Vec<String> = Vec::new();
 
     // Build regex from domain
     for domain in lens.domains.iter() {
@@ -251,7 +256,7 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
                 }
                 // Optional ending slash
                 regex.push_str("/?$");
-                allow_list.push(regex);
+                restrict_list.push(regex);
             }
         }
     }
@@ -259,6 +264,7 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
     LensRuleSets {
         allow_list,
         skip_list,
+        restrict_list,
     }
 }
 
@@ -332,6 +338,7 @@ pub async fn enqueue_all(
 ) -> anyhow::Result<(), sea_orm::DbErr> {
     let mut allow_list: Vec<String> = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
+    let mut restrict_list: Vec<String> = Vec::new();
 
     for domain in settings.block_list.iter() {
         skip_list.push(regex_for_domain(domain));
@@ -341,10 +348,12 @@ pub async fn enqueue_all(
         let ruleset = create_ruleset_from_lens(lens);
         allow_list.extend(ruleset.allow_list);
         skip_list.extend(ruleset.skip_list);
+        restrict_list.extend(ruleset.restrict_list);
     }
 
     let allow_list = RegexSet::new(allow_list).expect("Unable to create allow list");
     let skip_list = RegexSet::new(skip_list).expect("Unable to create skip list");
+    let restrict_list = RegexSet::new(restrict_list).expect("Unable to create restrict list");
 
     // Ignore invalid URLs
     let urls: Vec<String> = urls
@@ -359,7 +368,11 @@ pub async fn enqueue_all(
                 let normalized = parsed.to_string();
 
                 // Ignore domains on blacklist
-                if skip_list.is_match(&normalized) {
+                if skip_list.is_match(&normalized)
+                    // Skip if any URLs do not match this restriction
+                    || (!restrict_list.is_empty()
+                        && !restrict_list.is_match(&normalized))
+                {
                     return None;
                 }
 
@@ -700,19 +713,39 @@ mod test {
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
         let block_list = regex::RegexSet::new(rules.skip_list).unwrap();
+        let restrict_list = regex::RegexSet::new(rules.restrict_list).unwrap();
 
-        let valid = "https://www.imdb.com/title/tt0094625/";
+        let valid = vec![
+            "https://www.imdb.com/title/tt0094625",
+            "https://www.imdb.com/title/tt0094625/",
+        ];
+
         let invalid = vec![
             // Bare domain should not match
             "https://www.imdb.com",
+            // Matches the URL depth but does not match the URL prefix.
+            "https://www.imdb.com/blah/blah",
             // Pages past the detail page should not match.
-            "https://www.imdb.com/title/tt0094625/reviews?ref_=tt_ov_rt",
+            "https://www.imdb.com/title/tt0094625/reviews",
+            // Should block URLs that are skipped but match restrictions
+            "https://www.imdb.com/title/fake_title",
         ];
 
-        assert!(allow_list.is_match(valid));
-        assert!(!block_list.is_match(valid));
+        for url in valid {
+            assert!(allow_list.is_match(url));
+            // All valid URLs should match the restriction as well.
+            assert!(restrict_list.is_match(url));
+            assert!(!block_list.is_match(url));
+        }
+
         for url in invalid {
-            assert!(!allow_list.is_match(url));
+            // Allowed, but then restricted by rules.
+            if allow_list.is_match(url) {
+                assert!(!restrict_list.is_match(url) || block_list.is_match(url));
+            } else {
+                // Other not allowed at all
+                assert!(!allow_list.is_match(url));
+            }
         }
     }
 }
