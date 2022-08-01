@@ -40,6 +40,7 @@ pub enum PluginEvent {
 
 #[derive(Deserialize, Serialize)]
 pub enum PluginCommandRequest {
+    Enqueue { urls: Vec<String> },
     ListDir(String),
     Subscribe(PluginEvent),
     SqliteQuery { path: String, query: String },
@@ -49,9 +50,4 @@ pub enum PluginCommandRequest {
 pub struct PluginMountRequest {
     pub dst: String,
     pub src: String,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct PluginEnqueueRequest {
-    pub urls: Vec<String>,
 }

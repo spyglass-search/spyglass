@@ -9,7 +9,7 @@ use super::{
 };
 use crate::state::AppState;
 use entities::models::crawl_queue::enqueue_all;
-use spyglass_plugin::{PluginCommandRequest, PluginEnqueueRequest, PluginMountRequest};
+use spyglass_plugin::{PluginCommandRequest, PluginMountRequest};
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -34,10 +34,6 @@ pub fn register_exports(
         Function::new_native_with_env(store, env.clone(), plugin_cmd),
     );
     exports.insert(
-        "plugin_enqueue",
-        Function::new_native_with_env(store, env.clone(), plugin_enqueue),
-    );
-    exports.insert(
         "plugin_log",
         Function::new_native_with_env(store, env.clone(), plugin_log),
     );
@@ -51,6 +47,7 @@ pub fn register_exports(
 pub(crate) fn plugin_cmd(env: &PluginEnv) {
     if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
         match cmd {
+            PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, &urls),
             PluginCommandRequest::ListDir(path) => {
                 let entries = if let Ok(entries) = std::fs::read_dir(path) {
                     entries
@@ -137,25 +134,24 @@ pub(crate) fn plugin_sync_file(env: &PluginEnv) {
     }
 }
 
-pub(crate) fn plugin_enqueue(env: &PluginEnv) {
-    if let Ok(request) = wasi_read::<PluginEnqueueRequest>(&env.wasi_env) {
-        log::info!("{} enqueuing {} urls", env.name, request.urls.len());
-        let state = env.app_state.clone();
-        // Grab a handle to the plugin manager runtime
-        let rt = tokio::runtime::Handle::current();
-        rt.spawn(async move {
-            let state = state.clone();
-            if let Err(e) = enqueue_all(
-                &state.db.clone(),
-                &request.urls,
-                &[],
-                &state.user_settings,
-                &Default::default(),
-            )
-            .await
-            {
-                log::error!("error adding to queue: {}", e);
-            }
-        });
-    }
+fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
+    log::info!("{} enqueuing {} urls", env.name, urls.len());
+    let state = env.app_state.clone();
+    // Grab a handle to the plugin manager runtime
+    let rt = tokio::runtime::Handle::current();
+    let urls = urls.clone();
+    rt.spawn(async move {
+        let state = state.clone();
+        if let Err(e) = enqueue_all(
+            &state.db.clone(),
+            &urls,
+            &[],
+            &state.user_settings,
+            &Default::default(),
+        )
+        .await
+        {
+            log::error!("error adding to queue: {}", e);
+        }
+    });
 }

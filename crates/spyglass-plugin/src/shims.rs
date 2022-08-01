@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
 
-use crate::{PluginCommandRequest, PluginEnqueueRequest, PluginEvent, PluginMountRequest};
+use crate::{PluginCommandRequest, PluginEvent, PluginMountRequest};
 
 pub fn subscribe(event: PluginEvent) {
     if object_to_stdout(&PluginCommandRequest::Subscribe(event)).is_ok() {
@@ -13,10 +13,7 @@ pub fn subscribe(event: PluginEvent) {
 
 /// Add an item to the Spyglass crawl queue
 pub fn enqueue_all(urls: &[String]) {
-    if object_to_stdout(&PluginEnqueueRequest {
-        urls: urls.to_owned(),
-    })
-    .is_ok()
+    if object_to_stdout(&PluginCommandRequest::Enqueue { urls: urls.into() }).is_ok()
     {
         unsafe {
             plugin_enqueue();
