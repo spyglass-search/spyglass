@@ -12,7 +12,7 @@ use shared::response::{
     SearchResult, SearchResults,
 };
 
-use entities::models::{crawl_queue, fetch_history, indexed_document, lens};
+use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
@@ -131,6 +131,13 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
 /// Remove a domain from crawl queue & index
 #[instrument(skip(state))]
 pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
+    // Remove domain from bootstrap queue
+    if let Err(err) =
+        bootstrap_queue::dequeue(&state.db, format!("https://{}", domain).as_str()).await
+    {
+        log::error!("Error deleting seed_url {} from DB: {}", &domain, &err);
+    }
+
     // Remove items from crawl queue
     let res = crawl_queue::Entity::delete_many()
         .filter(crawl_queue::Column::Domain.eq(domain.clone()))
