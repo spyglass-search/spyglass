@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
 
-use crate::{PluginCommandRequest, PluginEvent, PluginMountRequest};
+use crate::{PluginCommandRequest, PluginEvent};
 
 pub fn subscribe(event: PluginEvent) {
     if object_to_stdout(&PluginCommandRequest::Subscribe(event)).is_ok() {
@@ -13,10 +13,9 @@ pub fn subscribe(event: PluginEvent) {
 
 /// Add an item to the Spyglass crawl queue
 pub fn enqueue_all(urls: &[String]) {
-    if object_to_stdout(&PluginCommandRequest::Enqueue { urls: urls.into() }).is_ok()
-    {
+    if object_to_stdout(&PluginCommandRequest::Enqueue { urls: urls.into() }).is_ok() {
         unsafe {
-            plugin_enqueue();
+            plugin_cmd();
         }
     }
 }
@@ -59,9 +58,9 @@ pub fn sqlite3_query(path: &str, query: &str) -> Result<Vec<String>, ron::Error>
 
 /// Adds / updates a file in the plugin VFS from the host.
 pub fn sync_file(dst: String, src: String) {
-    if object_to_stdout(&PluginMountRequest { dst, src }).is_ok() {
+    if object_to_stdout(&PluginCommandRequest::SyncFile { dst, src }).is_ok() {
         unsafe {
-            plugin_sync_file();
+            plugin_cmd();
         }
     }
 }
@@ -69,9 +68,7 @@ pub fn sync_file(dst: String, src: String) {
 #[link(wasm_import_module = "spyglass")]
 extern "C" {
     fn plugin_cmd();
-    fn plugin_enqueue();
     fn plugin_log();
-    fn plugin_sync_file();
 }
 
 #[doc(hidden)]

@@ -9,7 +9,7 @@ use super::{
 };
 use crate::state::AppState;
 use entities::models::crawl_queue::enqueue_all;
-use spyglass_plugin::{PluginCommandRequest, PluginMountRequest};
+use spyglass_plugin::PluginCommandRequest;
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -35,11 +35,7 @@ pub fn register_exports(
     );
     exports.insert(
         "plugin_log",
-        Function::new_native_with_env(store, env.clone(), plugin_log),
-    );
-    exports.insert(
-        "plugin_sync_file",
-        Function::new_native_with_env(store, env, plugin_sync_file),
+        Function::new_native_with_env(store, env, plugin_log),
     );
     exports
 }
@@ -101,6 +97,7 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
                     }
                 }
             }
+            PluginCommandRequest::SyncFile { dst, src } => handle_sync_file(env, &dst, &src),
         }
     }
 }
@@ -113,24 +110,19 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 
 /// Adds a file into the plugin data directory. Use this to copy files from elsewhere
 /// in the filesystem so that it can be processed by the plugin.
-pub(crate) fn plugin_sync_file(env: &PluginEnv) {
-    if let Ok(mount_request) = wasi_read::<PluginMountRequest>(&env.wasi_env) {
-        log::info!(
-            "<{}> requesting access to folder: {}",
-            env.name,
-            mount_request.src
-        );
+pub(crate) fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
+    log::info!("<{}> requesting access to folder: {}", env.name, src);
 
-        let src = Path::new(&mount_request.src);
-        if let Some(file_name) = src.file_name() {
-            let dst = &env.data_dir.join(file_name);
-            // Attempt to mount directory
-            if let Err(e) = std::fs::copy(mount_request.src, &dst) {
-                log::error!("Unable to copy into plugin data dir: {}", e);
-            }
-        } else {
-            log::error!("Source must be a file: {}", src.display());
+    let dst = Path::new(&dst);
+    let src = Path::new(&src);
+    if let Some(file_name) = src.file_name() {
+        let dst = dst.join(file_name);
+        // Attempt to mount directory
+        if let Err(e) = std::fs::copy(src, &dst) {
+            log::error!("Unable to copy into plugin data dir: {}", e);
         }
+    } else {
+        log::error!("Source must be a file: {}", src.display());
     }
 }
 
