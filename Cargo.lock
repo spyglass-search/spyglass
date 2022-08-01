@@ -4856,6 +4856,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-derive",
  "log",
+ "regex",
  "ron",
  "serde",
  "serde_json",

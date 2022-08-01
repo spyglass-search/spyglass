@@ -8,9 +8,9 @@ use std::convert::From;
 use url::Url;
 
 use entities::models::resource_rule;
-use entities::regex::{regex_for_robots, WildcardType};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{DatabaseConnection, Set};
+use shared::regex::{regex_for_robots, WildcardType};
 
 use crate::fetch::HTTPClient;
 
@@ -209,10 +209,10 @@ mod test {
     use crate::crawler::Crawler;
 
     use entities::models::resource_rule;
-    use entities::regex::{regex_for_robots, WildcardType};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
     use regex::Regex;
+    use shared::regex::{regex_for_robots, WildcardType};
 
     #[test]
     fn test_parse() {
