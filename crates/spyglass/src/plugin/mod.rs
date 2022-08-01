@@ -14,6 +14,7 @@ use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 use entities::models::lens;
 use shared::config::Config;
+use shared::SettingOpts;
 use spyglass_plugin::{consts::env, PluginEvent};
 
 use crate::state::AppState;
@@ -39,7 +40,7 @@ pub struct PluginConfig {
     #[serde(default)]
     pub path: Option<PathBuf>,
     pub plugin_type: PluginType,
-    pub user_settings: HashMap<String, String>,
+    pub user_settings: HashMap<String, SettingOpts>,
     #[serde(default)]
     pub is_enabled: bool,
 }
@@ -253,8 +254,8 @@ pub async fn plugin_load(
                         for (key, value) in plug.user_settings.iter_mut() {
                             let user_override = user_settings
                                 .entry(key.to_string())
-                                .or_insert_with(|| value.to_string());
-                            *value = user_override.to_string();
+                                .or_insert_with(|| value.value.to_string());
+                            (*value).value = user_override.to_string();
                         }
                         // Update the user settings file in case any new setting entries
                         // were added.
@@ -353,7 +354,11 @@ pub async fn plugin_init(
         .env(env::HOST_HOME_DIR, home_dir)
         .env(env::HOST_OS, std::env::consts::OS)
         // Load user settings as environment variables
-        .envs(user_settings.iter())
+        .envs(
+            user_settings
+                .iter()
+                .map(|(name, opts)| (name, opts.value.clone())),
+        )
         // Override stdin/out with pipes for comms
         .stdin(Box::new(input))
         .stdout(Box::new(output))

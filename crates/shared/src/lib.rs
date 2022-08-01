@@ -10,6 +10,7 @@ pub mod rpc;
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize)]
 pub enum FormType {
+    List,
     Text,
 }
 
