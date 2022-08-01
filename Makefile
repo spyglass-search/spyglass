@@ -1,6 +1,7 @@
-.PHONY: build-backend build-client build-plugins build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
+.PHONY: build-backend build-client build-plugins-dev build-plugins-release build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
+PLUGINS := chrome-importer firefox-importer local-file-indexer
 
 build-backend:
 	cargo build -p spyglass
@@ -14,21 +15,21 @@ build-styles:
 	cd ./crates/client && npx tailwindcss -i ./public/input.css -o ./public/main.css
 
 build-plugins-dev:
-# Build chrome-importer plugin
-	cargo build -p chrome-importer --target wasm32-wasi
-	cp target/wasm32-wasi/debug/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
-
-	cargo build -p firefox-importer --target wasm32-wasi
-	cp target/wasm32-wasi/debug/firefox-importer.wasm assets/plugins/firefox-importer/main.wasm
-
+	@for plugin in $(PLUGINS); do \
+		echo "-> building $${plugin}"; \
+		mkdir -p "assets/plugins/$${plugin}"; \
+		cargo build -p $$plugin --target wasm32-wasi; \
+		cp target/wasm32-wasi/debug/$$plugin.wasm assets/plugins/$$plugin/main.wasm; \
+	done
 	cp -r assets/plugins ~/Library/Application\ Support/com.athlabs.spyglass-dev/
 
 build-plugins-release:
-	cargo build -p chrome-importer --target wasm32-wasi --release
-	cp target/wasm32-wasi/release/chrome-importer.wasm assets/plugins/chrome-importer/main.wasm
-
-	cargo build -p firefox-importer --target wasm32-wasi --release
-	cp target/wasm32-wasi/release/firefox-importer.wasm assets/plugins/firefox-importer/main.wasm
+	@for plugin in $(PLUGINS); do \
+		echo "-> building $${plugin}"; \
+		mkdir -p "assets/plugins/$${plugin}"; \
+		cargo build -p $$plugin --target wasm32-wasi --release; \
+		cp target/wasm32-wasi/release/$$plugin.wasm assets/plugins/$$plugin/main.wasm; \
+	done
 
 build-release: build-backend build-styles build-plugins-release
 	cargo tauri build
