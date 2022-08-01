@@ -6,7 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use crate::components::{btn::Btn, icons, Header};
+use crate::components::{btn::Btn, icons, Header, Tabs, TabEvent};
 use crate::listen;
 use crate::utils::RequestState;
 use crate::{install_lens, invoke};
@@ -170,6 +170,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
 #[function_component(LensManagerPage)]
 pub fn lens_manager_page() -> Html {
+    let active_tab = use_state_eq(|| 0);
     let user_installed: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
     let installable: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
 
@@ -226,19 +227,26 @@ pub fn lens_manager_page() -> Html {
     }
 
     let contents = if ui_req_state.is_done() && i_req_state.is_done() {
-        html! {
-            <>
-            {
-                user_installed.iter().map(|data| {
-                    html! {<Lens result={data.clone()} is_installed={true} /> }
-                }).collect::<Html>()
+        if *active_tab == 0 {
+            html! {
+                <>
+                {
+                    user_installed.iter().map(|data| {
+                        html! {<Lens result={data.clone()} is_installed={true} /> }
+                    }).collect::<Html>()
+                }
+                </>
             }
-            {
-                installable.iter().map(|data| {
-                    html! {<Lens result={data.clone()} is_installed={false} /> }
-                }).collect::<Html>()
-            }
+        } else {
+            html! {
+                <>
+                {
+                    installable.iter().map(|data| {
+                        html! {<Lens result={data.clone()} is_installed={false} /> }
+                    }).collect::<Html>()
+                }
             </>
+            }
         }
     } else {
         html! {
@@ -250,9 +258,17 @@ pub fn lens_manager_page() -> Html {
         }
     };
 
+    let handle_tab_change = Callback::from(move |evnt: TabEvent| {
+        active_tab.set(evnt.tab_idx);
+    });
+
+    let tabs = html! {
+        <Tabs onchange={handle_tab_change} tabs={vec!["Installed".to_string(), "Uninstalled".to_string()]} />
+    };
+
     html! {
-        <div class="text-white">
-            <Header label="Lens Manager">
+        <div class="text-white relative">
+            <Header label="Lens Manager" tabs={tabs}>
                 <Btn onclick={on_open_folder}>
                     <icons::FolderOpenIcon />
                     <div class="ml-2">{"Lens folder"}</div>
