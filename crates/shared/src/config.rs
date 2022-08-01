@@ -40,13 +40,9 @@ pub enum LensRule {
 impl LensRule {
     pub fn to_regex(&self) -> String {
         match &self {
-            LensRule::LimitURLDepth(rule, max_depth) => {
-                let mut regex = format!("^{}", rule);
-                for _ in 0..*max_depth {
-                    regex.push_str("/[^/]+");
-                }
-                // Optional ending slash
-                regex.push_str("/?$");
+            LensRule::LimitURLDepth(prefix, max_depth) => {
+                let prefix = prefix.trim_end_matches('/');
+                let regex = format!("^{}/?(/[^/]+/?){{0, {}}}$", prefix, max_depth);
                 regex
             }
             LensRule::SkipURL(rule_str) => {

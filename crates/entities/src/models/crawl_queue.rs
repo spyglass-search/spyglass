@@ -12,7 +12,7 @@ use url::Url;
 
 use super::indexed_document;
 use shared::config::{Lens, LensRule, Limit, UserSettings};
-use shared::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
+use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 10000;
@@ -244,16 +244,11 @@ fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
     // Build regex from rules
     for rule in lens.rules.iter() {
         match rule {
-            LensRule::SkipURL(rule_str) => {
-                if let Some(regex) = regex_for_robots(rule_str, WildcardType::Regex) {
-                    skip_list.push(regex);
-                }
+            LensRule::SkipURL(_) => {
+                skip_list.push(rule.to_regex());
             }
-            LensRule::LimitURLDepth(prefix, max_depth) => {
-                // Trim any extra slashes at the end of the prefix.
-                let prefix = prefix.trim_end_matches('/');
-                let regex = format!("^{}/?(/[^/]+/?){{0, {}}}$", prefix, max_depth);
-                restrict_list.push(regex);
+            LensRule::LimitURLDepth(_, _) => {
+                restrict_list.push(rule.to_regex());
             }
         }
     }
