@@ -52,16 +52,17 @@ impl Html {
     }
 
     fn head(&self) -> Option<NodeRef<Node>> {
-        let root = self.html().unwrap();
-        for child in root.children() {
-            let node = child.value();
-            if !node.is_element() {
-                continue;
-            }
+        if let Some(root) = self.html() {
+            for child in root.children() {
+                let node = child.value();
+                if !node.is_element() {
+                    continue;
+                }
 
-            if let Some(element) = node.as_element() {
-                if element.name() == "head" {
-                    return Some(child);
+                if let Some(element) = node.as_element() {
+                    if element.name() == "head" {
+                        return Some(child);
+                    }
                 }
             }
         }
@@ -76,9 +77,9 @@ impl Html {
                 if let Some(element) = node.as_element() {
                     if element.name() == "title" {
                         let title = child.children().into_iter().next();
-                        if let Some(title) = title {
-                            return Some(title.value().as_text().unwrap().trim().to_string());
-                        }
+                        return title
+                            .and_then(|val| val.value().as_text())
+                            .map(|text| text.trim().to_string());
                     }
                 }
             }
@@ -110,22 +111,24 @@ impl Html {
         let href_key = QualName::new(None, ns!(), local_name!("href"));
 
         // Loop through elements in the header and find the matching meta tags
-        let root = self.head().unwrap();
-        for child in root.children() {
-            let node = child.value();
-            if !node.is_element() {
-                continue;
-            }
+        if let Some(root) = self.head() {
+            for child in root.children() {
+                let node = child.value();
+                if !node.is_element() {
+                    continue;
+                }
 
-            if let Some(element) = node.as_element() {
-                if element.name() == "link"
-                    && element.attrs.contains_key(&rel_key)
-                    && element.attrs.contains_key(&href_key)
-                {
-                    let key = element.attrs.get(&rel_key).unwrap().to_string();
-                    let value = element.attrs.get(&href_key).unwrap().to_string();
-
-                    map.insert(key, value);
+                if let Some(element) = node.as_element() {
+                    if element.name() == "link"
+                        && element.attrs.contains_key(&rel_key)
+                        && element.attrs.contains_key(&href_key)
+                    {
+                        let key = element.attrs.get(&rel_key);
+                        let value = element.attrs.get(&href_key);
+                        if let (Some(key), Some(value)) = (key, value) {
+                            map.insert(key.to_string(), value.to_string());
+                        }
+                    }
                 }
             }
         }
@@ -138,30 +141,34 @@ impl Html {
         let content_key = QualName::new(None, ns!(), local_name!("content"));
 
         // Loop through elements in the header and find the matching meta tags
-        let root = self.head().unwrap();
-        for child in root.children() {
-            let node = child.value();
-            if !node.is_element() {
-                continue;
-            }
+        if let Some(root) = self.head() {
+            for child in root.children() {
+                let node = child.value();
+                if !node.is_element() {
+                    continue;
+                }
 
-            if let Some(element) = node.as_element() {
-                if element.name() == "meta" {
-                    if element.attrs.contains_key(&name_key) {
-                        let key = element.attrs.get(&name_key).unwrap().to_string();
-                        let value = if let Some(value) = element.attrs.get(&content_key) {
-                            value.to_string()
-                        } else {
-                            "".to_string()
-                        };
+                if let Some(element) = node.as_element() {
+                    if element.name() == "meta" {
+                        if element.attrs.contains_key(&name_key) {
+                            if let Some(key) = element.attrs.get(&name_key) {
+                                let value = element
+                                    .attrs
+                                    .get(&content_key)
+                                    .map(|text| text.to_string())
+                                    .unwrap_or_default();
+                                map.insert(key.to_string(), value);
+                            }
+                        } else if element.attrs.contains_key(&property_key) {
+                            if let Some(key) = element.attrs.get(&property_key) {
+                                let value = element
+                                    .attrs
+                                    .get(&content_key)
+                                    .map(|text| text.to_string())
+                                    .unwrap_or_default();
 
-                        map.insert(key, value);
-                    } else if element.attrs.contains_key(&property_key) {
-                        let key = element.attrs.get(&property_key).unwrap().to_string();
-                        if let Some(value) = element.attrs.get(&content_key) {
-                            map.insert(key, value.to_string());
-                        } else {
-                            map.insert(key, "".to_string());
+                                map.insert(key.to_string(), value);
+                            }
                         }
                     }
                 }
@@ -208,10 +215,10 @@ impl TreeSink for Html {
     fn elem_name(&self, target: &Self::Handle) -> ExpandedName {
         self.tree
             .get(*target)
-            .unwrap()
+            .expect("No target in tree")
             .value()
             .as_element()
-            .unwrap()
+            .expect("Unable to convert to element")
             .name
             .expanded()
     }
@@ -264,33 +271,33 @@ impl TreeSink for Html {
     //
     // The child node will not already have a parent.
     fn append(&mut self, parent: &Self::Handle, child: NodeOrText<Self::Handle>) {
-        let mut parent = self.tree.get_mut(*parent).unwrap();
-
-        match child {
-            NodeOrText::AppendNode(id) => {
-                parent.append_id(id);
-            }
-
-            NodeOrText::AppendText(text) => {
-                let mut text = text;
-                // Convert new lines, etc into a single space.
-                if text.trim().is_empty() {
-                    text.clear();
-                    text.push_char(' ');
+        if let Some(mut parent) = self.tree.get_mut(*parent) {
+            match child {
+                NodeOrText::AppendNode(id) => {
+                    parent.append_id(id);
                 }
 
-                let can_concat = parent
-                    .last_child()
-                    .map_or(false, |mut n| n.value().is_text());
-
-                if can_concat {
-                    let mut last_child = parent.last_child().unwrap();
-                    match *last_child.value() {
-                        Node::Text(ref mut t) => t.text.push_tendril(&text),
-                        _ => unreachable!(),
+                NodeOrText::AppendText(text) => {
+                    let mut text = text;
+                    // Convert new lines, etc into a single space.
+                    if text.trim().is_empty() {
+                        text.clear();
+                        text.push_char(' ');
                     }
-                } else {
-                    parent.append(Node::Text(Text { text }));
+
+                    let can_concat = parent
+                        .last_child()
+                        .map_or(false, |mut n| n.value().is_text());
+
+                    if can_concat {
+                        let mut last_child = parent.last_child().expect("Should have last_child");
+                        match *last_child.value() {
+                            Node::Text(ref mut t) => t.text.push_tendril(&text),
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        parent.append(Node::Text(Text { text }));
+                    }
                 }
             }
         }
@@ -310,10 +317,16 @@ impl TreeSink for Html {
         new_node: NodeOrText<Self::Handle>,
     ) {
         if let NodeOrText::AppendNode(id) = new_node {
-            self.tree.get_mut(id).unwrap().detach();
+            self.tree
+                .get_mut(id)
+                .expect("Unable to get node from tree")
+                .detach();
         }
 
-        let mut sibling = self.tree.get_mut(*sibling).unwrap();
+        let mut sibling = self
+            .tree
+            .get_mut(*sibling)
+            .expect("Unable to get sibling from tree");
         if sibling.parent().is_some() {
             match new_node {
                 NodeOrText::AppendNode(id) => {
@@ -326,7 +339,8 @@ impl TreeSink for Html {
                         .map_or(false, |mut n| n.value().is_text());
 
                     if can_concat {
-                        let mut prev_sibling = sibling.prev_sibling().unwrap();
+                        let mut prev_sibling =
+                            sibling.prev_sibling().expect("Unable to get prev_sibling");
                         match *prev_sibling.value() {
                             Node::Text(ref mut t) => t.text.push_tendril(&text),
                             _ => unreachable!(),
@@ -341,28 +355,30 @@ impl TreeSink for Html {
 
     // Detach the given node from its parent.
     fn remove_from_parent(&mut self, target: &Self::Handle) {
-        self.tree.get_mut(*target).unwrap().detach();
+        if let Some(mut target) = self.tree.get_mut(*target) {
+            target.detach();
+        }
     }
 
     // Remove all the children from node and append them to new_parent.
     fn reparent_children(&mut self, node: &Self::Handle, new_parent: &Self::Handle) {
-        self.tree
-            .get_mut(*new_parent)
-            .unwrap()
-            .reparent_from_id_append(*node);
+        if let Some(mut parent) = self.tree.get_mut(*new_parent) {
+            parent.reparent_from_id_append(*node);
+        }
     }
 
     // Add each attribute to the given element, if no attribute with that name already exists. The
     // tree builder promises this will never be called with something else than an element.
     fn add_attrs_if_missing(&mut self, target: &Self::Handle, attrs: Vec<Attribute>) {
-        let mut node = self.tree.get_mut(*target).unwrap();
-        let element = match *node.value() {
-            Node::Element(ref mut e) => e,
-            _ => unreachable!(),
-        };
+        if let Some(mut node) = self.tree.get_mut(*target) {
+            let element = match *node.value() {
+                Node::Element(ref mut e) => e,
+                _ => unreachable!(),
+            };
 
-        for attr in attrs {
-            element.attrs.entry(attr.name).or_insert(attr.value);
+            for attr in attrs {
+                element.attrs.entry(attr.name).or_insert(attr.value);
+            }
         }
     }
 
@@ -371,7 +387,12 @@ impl TreeSink for Html {
     // The tree builder promises this will never be called with something else than a template
     // element.
     fn get_template_contents(&mut self, target: &Self::Handle) -> Self::Handle {
-        self.tree.get(*target).unwrap().first_child().unwrap().id()
+        self.tree
+            .get(*target)
+            .expect("Unable to find target in tree")
+            .first_child()
+            .expect("Unable to find first_child")
+            .id()
     }
 
     // Mark a HTML <script> element as "already started".
@@ -393,10 +414,13 @@ impl TreeSink for Html {
         prev_element: &Self::Handle,
         child: NodeOrText<Self::Handle>,
     ) {
-        if self.tree.get(*element).unwrap().parent().is_some() {
-            self.append_before_sibling(element, child)
-        } else {
-            self.append(prev_element, child)
+        if let Some(el) = self.tree.get(*element) {
+            if el.parent().is_some() {
+                self.append_before_sibling(element, child);
+                return;
+            }
         }
+
+        self.append(prev_element, child)
     }
 }

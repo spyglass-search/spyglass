@@ -4,6 +4,7 @@ use strum_macros::{AsRefStr, Display};
 pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
+    Navigate,
     RefreshLensManager,
     RefreshPluginManager,
     RefreshSearchResults,
@@ -21,6 +22,10 @@ pub enum ClientInvoke {
     ListInstalledLenses,
     #[strum(serialize = "list_installable_lenses")]
     ListInstallableLenses,
+    #[strum(serialize = "load_user_settings")]
+    LoadUserSettings,
     #[strum(serialize = "open_lens_folder")]
     OpenLensFolder,
+    #[strum(serialize = "open_settings_folder")]
+    OpenSettingsFolder,
 }

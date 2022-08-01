@@ -30,7 +30,7 @@ build-plugins-release:
 	cargo build -p firefox-importer --target wasm32-wasi --release
 	cp target/wasm32-wasi/release/firefox-importer.wasm assets/plugins/firefox-importer/main.wasm
 
-build-release: build-backend build-styles
+build-release: build-backend build-styles build-plugins-release
 	cargo tauri build
 
 check:
@@ -46,8 +46,11 @@ test:
 	cargo test --all
 
 setup-dev:
+	rustup target add wasm32-unknown-unknown
+# Required for plugin development
+	rustup target add wasm32-wasi
 # Install tauri-cli & trunk for client development
-	cargo install tauri-cli --locked --version ^1.0.0
+	cargo install tauri-cli --locked --version ^1.0.5
 	cargo install --locked trunk
 # Install tailwind
 	cd ./crates/client && npm install
@@ -64,3 +67,6 @@ setup-dev-linux:
 
 run-client-dev:
 	cargo tauri dev
+
+run-client-headless:
+	cd ./crates/client && HEADLESS_CLIENT=true trunk serve

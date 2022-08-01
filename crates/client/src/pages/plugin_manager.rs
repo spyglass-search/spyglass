@@ -7,7 +7,7 @@ use yew::prelude::*;
 use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
-use crate::components::icons;
+use crate::components::{icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen, toggle_plugin};
 
@@ -37,14 +37,14 @@ pub struct PluginProps {
 #[function_component(Plugin)]
 pub fn plugin_comp(props: &PluginProps) -> Html {
     let plugin = &props.plugin;
-    let component_styles: Vec<String> = vec![
-        "border-t".into(),
-        "border-neutral-600".into(),
-        "p-4".into(),
-        "pr-0".into(),
-        "text-white".into(),
-        "bg-netural-800".into(),
-    ];
+    let component_styles: Classes = classes!(
+        "border-t",
+        "border-neutral-600",
+        "py-4",
+        "px-8",
+        "text-white",
+        "bg-netural-800",
+    );
 
     let btn_label = if plugin.is_enabled {
         "Disable"
@@ -145,10 +145,10 @@ pub fn plugin_manager_page() -> Html {
     // Listen for updates from plugins
     {
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 log::info!("refresh!");
                 req_state.set(RequestState::NotStarted);
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
 
             let _ = listen(ClientEvent::RefreshPluginManager.as_ref(), &cb).await;
             cb.forget();
@@ -157,7 +157,8 @@ pub fn plugin_manager_page() -> Html {
 
     html! {
         <div class="text-white">
-            {contents}
+            <Header label="Plugins" />
+            <div>{contents}</div>
         </div>
     }
 }

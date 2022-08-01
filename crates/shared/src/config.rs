@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+use crate::regex::{regex_for_robots, WildcardType};
+
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 
@@ -25,9 +27,29 @@ impl Default for Config {
 /// Different rules that filter out the URLs that would be crawled for a lens
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum LensRule {
-    /// Robots.txt regex to skip certain URLs
+    /// Limits the depth of a URL to a certain depth.
+    /// For example:
+    ///  - LimitURLDepth("https://example.com/", 1) will limit it to https://example.com/<path 1>
+    ///  - LimitURLDepth("https://example.com/", 2) will limit it to https://example.com/<path 1>/<path 2>
+    ///  - etc.
+    LimitURLDepth(String, u8),
     /// Skips are applied when bootstrapping & crawling
     SkipURL(String),
+}
+
+impl LensRule {
+    pub fn to_regex(&self) -> String {
+        match &self {
+            LensRule::LimitURLDepth(prefix, max_depth) => {
+                let prefix = prefix.trim_end_matches('/');
+                let regex = format!("^{}/?(/[^/]+/?){{0, {}}}$", prefix, max_depth);
+                regex
+            }
+            LensRule::SkipURL(rule_str) => {
+                regex_for_robots(rule_str, WildcardType::Regex).expect("Invalid SkipURL regex")
+            }
+        }
+    }
 }
 
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
@@ -134,6 +156,22 @@ impl UserSettings {
     }
 }
 
+impl From<UserSettings> for HashMap<String, String> {
+    fn from(settings: UserSettings) -> Self {
+        let mut map: HashMap<String, String> = HashMap::new();
+        map.insert(
+            "user.data_directory".to_string(),
+            settings
+                .data_directory
+                .to_str()
+                .expect("Unable to convert to string")
+                .to_string(),
+        );
+
+        map
+    }
+}
+
 impl Default for UserSettings {
     fn default() -> Self {
         UserSettings {
@@ -164,6 +202,15 @@ impl Config {
             ron::ser::to_string_pretty(settings, Default::default())?,
         )
         .expect("Unable to save plugin settings file.");
+
+        Ok(())
+    }
+
+    pub fn save_user_settings(&self, user_settings: &UserSettings) -> anyhow::Result<()> {
+        let prefs_path = Self::prefs_file();
+        let serialized = ron::ser::to_string_pretty(user_settings, Default::default())
+            .expect("Unable to serialize user settings");
+        fs::write(prefs_path, serialized).expect("Unable to save user preferences file");
 
         Ok(())
     }

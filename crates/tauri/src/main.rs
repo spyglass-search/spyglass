@@ -2,7 +2,6 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-
 use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
@@ -33,7 +32,9 @@ mod menu;
 use menu::MenuID;
 mod rpc;
 mod window;
-use window::{show_crawl_stats_window, show_lens_manager_window, show_plugin_manager};
+use window::{
+    show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
@@ -66,7 +67,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
-    let config_copy = config.clone();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
@@ -77,12 +77,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::list_installable_lenses,
             cmd::list_installed_lenses,
             cmd::list_plugins,
+            cmd::load_user_settings,
             cmd::network_change,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,
+            cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
+            cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,
             cmd::toggle_plugin,
@@ -90,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
-            let config = config_copy;
+            let config = Config::new();
             // Copy default plugins to data directory to be picked up by the backend
             if let Err(e) = copy_plugins(&config, app.path_resolver()) {
                 log::error!("Unable to copy default plugins: {}", e);
@@ -104,14 +107,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(not(debug_assertions))]
             rpc::check_and_start_backend();
 
-            let window = app.get_window("main").unwrap();
+            let window = app.get_window("main").expect("Main window not found");
             let _ = window.set_skip_taskbar(true);
 
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
             {
                 unsafe {
-                    let ns_window = window.ns_window().unwrap() as cocoa::base::id;
+                    let ns_window = window.ns_window().expect("Unable to get ns_window") as cocoa::base::id;
                     ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
                 }
             }
@@ -125,26 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             app.manage(Arc::new(Mutex::new(rpc)));
 
             // Load user settings
-            app.manage(config.clone());
-
-            // Register global shortcut
-            let mut shortcuts = app.global_shortcut_manager();
-            if !shortcuts
-                .is_registered(&config.user_settings.shortcut)
-                .unwrap()
-            {
-                log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
-                let window = window.clone();
-                shortcuts
-                    .register(&config.user_settings.shortcut, move || {
-                        if window.is_visible().unwrap() {
-                            window::hide_window(&window);
-                        } else {
-                            window::show_window(&window);
-                        }
-                    })
-                    .unwrap();
-            }
+            app.manage(config);
 
             // Center window horizontally in the current screen
             window::center_window(&window);
@@ -173,11 +157,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .on_system_tray_event(move |app, event| {
-            let config = config.clone();
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
                 let item_handle = app.tray_handle().get_item(&id);
-                let window = app.get_window("main").unwrap();
-
+                let window = app.get_window("main").expect("Main window not initialized");
 
                 if let Ok(menu_id) = MenuID::from_str(&id) {
                     match menu_id {
@@ -190,26 +172,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "⏸ Pause indexing"
                             };
 
-                            item_handle.set_title(new_label).unwrap();
+                            let _ = item_handle.set_title(new_label);
                         }
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                         MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
-                        MenuID::OPEN_SETTINGS_FOLDER => open_folder(Config::prefs_dir()),
+                        MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
                         MenuID::SHOW_CRAWL_STATUS => {
                             show_crawl_stats_window(app);
                         }
                         MenuID::SHOW_SEARCHBAR => {
-                            if !window.is_visible().unwrap() {
-                                window::show_window(&window);
-                            }
+                            let _ = window.is_visible()
+                                .map(|is_visible| {
+                                    if !is_visible {
+                                        window::show_window(&window);
+                                    }
+                                });
                         }
                         MenuID::QUIT => app.exit(0),
                         MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
-                        MenuID::JOIN_DISCORD => open::that(constants::DISCORD_JOIN_URL).unwrap(),
+                        MenuID::JOIN_DISCORD => {
+                            let _ = open::that(constants::DISCORD_JOIN_URL);
+                        },
                         _ => {}
                     }
                 }
+            }
+        })
+        .on_page_load(move |window, _| {
+            let config = window.state::<Config>();
+            let window_clone = window.clone();
+            // Register global shortcut
+            let mut shortcuts = window.app_handle().global_shortcut_manager();
+            match shortcuts.is_registered(&config.user_settings.shortcut) {
+                Ok(is_registered) => {
+                    if !is_registered
+                    {
+                        log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
+                        if let Err(e) = shortcuts
+                            .register(&config.user_settings.shortcut, move || {
+                                let window = window_clone.clone();
+                                let _ = window.is_visible()
+                                    .map(|is_visible| {
+                                        if is_visible {
+                                            window::hide_window(&window);
+                                        } else {
+                                            window::show_window(&window);
+                                        }
+                                    });
+                            }) {
+                            window::alert(&window, "Error registering global shortcut", &format!("{}", e));
+                        }
+                    }
+                }
+                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
         })
         .run(ctx)
@@ -255,19 +271,19 @@ fn open_folder(folder: PathBuf) {
     std::process::Command::new("xdg-open")
         .arg(folder)
         .spawn()
-        .unwrap();
+        .expect("xdg-open cmd not available");
 
     #[cfg(target_os = "macos")]
     std::process::Command::new("open")
         .arg(folder)
         .spawn()
-        .unwrap();
+        .expect("open cmd not available");
 
     #[cfg(target_os = "windows")]
     std::process::Command::new("explorer")
         .arg(folder)
         .spawn()
-        .unwrap();
+        .expect("explorer cmd not available");
 }
 
 async fn update_tray_menu(app: &AppHandle) {
@@ -276,22 +292,20 @@ async fn update_tray_menu(app: &AppHandle) {
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {
-        handle
+        let _ = handle
             .get_item(&MenuID::CRAWL_STATUS.to_string())
             .set_title(if app_status.is_paused {
                 "▶️ Resume indexing"
             } else {
                 "⏸ Pause indexing"
-            })
-            .unwrap();
+            });
 
-        handle
+        let _ = handle
             .get_item(&MenuID::NUM_DOCS.to_string())
             .set_title(format!(
                 "{} documents indexed",
                 app_status.num_docs.to_formatted_string(&Locale::en)
-            ))
-            .unwrap();
+            ));
     }
 }
 

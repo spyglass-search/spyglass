@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use entities::regex::regex_for_prefix;
 use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, RegexQuery, TermQuery};
 use tantivy::schema::*;
 use tantivy::Score;
 
 use super::DocFields;
 use shared::config::Lens;
+use shared::regex::regex_for_prefix;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
 
@@ -40,28 +40,32 @@ pub fn build_query(
     let mut lense_queries: QueryVec = Vec::new();
     for lens in applied_lens {
         if lenses.contains_key(lens) {
-            let lens = lenses.get(lens).unwrap();
-            for domain in &lens.domains {
-                lense_queries.push((
-                    Occur::Should,
-                    Box::new(TermQuery::new(
-                        Term::from_field_text(fields.domain, domain),
-                        IndexRecordOption::Basic,
-                    )),
-                ));
-            }
-
-            for prefix in &lens.urls {
-                let mut regex = regex_for_prefix(prefix);
-                // By default, a RegexQuery is assumed to be exact match.
-                if regex.ends_with('$') {
-                    regex = regex.strip_suffix('$').unwrap().to_string();
+            if let Some(lens) = lenses.get(lens) {
+                for domain in &lens.domains {
+                    lense_queries.push((
+                        Occur::Should,
+                        Box::new(TermQuery::new(
+                            Term::from_field_text(fields.domain, domain),
+                            IndexRecordOption::Basic,
+                        )),
+                    ));
                 }
 
-                lense_queries.push((
-                    Occur::Should,
-                    Box::new(RegexQuery::from_pattern(&regex, fields.url).unwrap()),
-                ))
+                for prefix in &lens.urls {
+                    let mut regex = regex_for_prefix(prefix);
+                    // By default, a RegexQuery is assumed to be exact match.
+                    if regex.ends_with('$') {
+                        regex = regex.strip_suffix('$').expect("No $ in prefix").to_string();
+                    }
+
+                    lense_queries.push((
+                        Occur::Should,
+                        Box::new(
+                            RegexQuery::from_pattern(&regex, fields.url)
+                                .expect("Invalid regex pattern"),
+                        ),
+                    ))
+                }
             }
         }
     }

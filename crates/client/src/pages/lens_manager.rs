@@ -6,7 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use crate::components::icons;
+use crate::components::{btn::Btn, icons, Header, TabEvent, Tabs};
 use crate::listen;
 use crate::utils::RequestState;
 use crate::{install_lens, invoke};
@@ -116,7 +116,8 @@ pub fn lens_component(props: &LensProps) -> Html {
     let component_styles: Vec<String> = vec![
         "border-t".into(),
         "border-neutral-600".into(),
-        "p-4".into(),
+        "px-8".into(),
+        "py-4".into(),
         "pr-0".into(),
         "text-white".into(),
         "bg-netural-800".into(),
@@ -169,6 +170,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
 #[function_component(LensManagerPage)]
 pub fn lens_manager_page() -> Html {
+    let active_tab = use_state_eq(|| 0);
     let user_installed: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
     let installable: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
 
@@ -184,21 +186,19 @@ pub fn lens_manager_page() -> Html {
         fetch_installable_lenses(installable.clone(), i_req_state.clone());
     }
 
-    let on_open_folder = {
-        move |_| {
-            spawn_local(async {
-                let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
-            });
-        }
-    };
+    let on_open_folder = Callback::from(move |_| {
+        spawn_local(async {
+            let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
+        });
+    });
 
     let on_refresh = {
         let ui_req_state = ui_req_state.clone();
         let i_req_state = i_req_state.clone();
-        move |_| {
+        Callback::from(move |_| {
             ui_req_state.set(RequestState::NotStarted);
             i_req_state.set(RequestState::NotStarted);
-        }
+        })
     };
 
     let already_installed: HashSet<String> =
@@ -216,10 +216,10 @@ pub fn lens_manager_page() -> Html {
         let ui_req_state = ui_req_state.clone();
         let i_req_state = i_req_state.clone();
         spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move || {
+            let cb = Closure::wrap(Box::new(move |_| {
                 ui_req_state.set(RequestState::NotStarted);
                 i_req_state.set(RequestState::NotStarted);
-            }) as Box<dyn Fn()>);
+            }) as Box<dyn Fn(JsValue)>);
 
             let _ = listen(ClientEvent::RefreshLensManager.as_ref(), &cb).await;
             cb.forget();
@@ -227,19 +227,26 @@ pub fn lens_manager_page() -> Html {
     }
 
     let contents = if ui_req_state.is_done() && i_req_state.is_done() {
-        html! {
-            <>
-            {
-                user_installed.iter().map(|data| {
-                    html! {<Lens result={data.clone()} is_installed={true} /> }
-                }).collect::<Html>()
+        if *active_tab == 0 {
+            html! {
+                <>
+                {
+                    user_installed.iter().map(|data| {
+                        html! {<Lens result={data.clone()} is_installed={true} /> }
+                    }).collect::<Html>()
+                }
+                </>
             }
-            {
-                installable.iter().map(|data| {
-                    html! {<Lens result={data.clone()} is_installed={false} /> }
-                }).collect::<Html>()
-            }
+        } else {
+            html! {
+                <>
+                {
+                    installable.iter().map(|data| {
+                        html! {<Lens result={data.clone()} is_installed={false} /> }
+                    }).collect::<Html>()
+                }
             </>
+            }
         }
     } else {
         html! {
@@ -251,27 +258,26 @@ pub fn lens_manager_page() -> Html {
         }
     };
 
+    let handle_tab_change = Callback::from(move |evnt: TabEvent| {
+        active_tab.set(evnt.tab_idx);
+    });
+
+    let tabs = html! {
+        <Tabs onchange={handle_tab_change} tabs={vec!["Installed".to_string(), "Uninstalled".to_string()]} />
+    };
+
     html! {
-        <div class="text-white">
-            <div class="pt-4 px-8 top-0 sticky bg-stone-900 z-400 h-20">
-                <div class="flex flex-row items-center gap-4">
-                    <h1 class="text-2xl grow">{"Lens Manager"}</h1>
-                    <button
-                        onclick={on_open_folder}
-                        class="flex flex-row border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600 text-sm">
-                        <icons::FolderOpenIcon />
-                        <div class="ml-2">{"Lens folder"}</div>
-                    </button>
-                    <button
-                        onclick={on_refresh}
-                        class="border border-neutral-600 rounded-lg p-2 active:bg-neutral-700 hover:bg-neutral-600">
-                        <icons::RefreshIcon />
-                    </button>
-                </div>
-            </div>
-            <div class="px-8">
-                {contents}
-            </div>
+        <div class="text-white relative">
+            <Header label="Lens Manager" tabs={tabs}>
+                <Btn onclick={on_open_folder}>
+                    <icons::FolderOpenIcon />
+                    <div class="ml-2">{"Lens folder"}</div>
+                </Btn>
+                <Btn onclick={on_refresh}>
+                    <icons::RefreshIcon />
+                </Btn>
+            </Header>
+            <div>{contents}</div>
         </div>
     }
 }

@@ -63,7 +63,9 @@ fn normalize_href(url: &str, href: &str) -> Option<String> {
             // Force HTTPS, crawler will fallback to HTTP if necessary.
             if let Ok(url) = Url::parse(href) {
                 let mut url = url;
-                url.set_scheme("https").unwrap();
+                if url.scheme() == "http" {
+                    url.set_scheme("https").expect("Unable to set HTTPS scheme");
+                }
                 return Some(url.to_string());
             }
         } else {
@@ -106,24 +108,24 @@ fn determine_canonical(original: &Url, extracted: &Url) -> String {
     }
 
     // Only allow overrides on the same root domain.
-    let origin_dn = parse_domain_name(origin_dn.unwrap());
-    let extracted_dn = parse_domain_name(extracted_dn.unwrap());
+    let origin_dn = parse_domain_name(origin_dn.expect("origin_dn should not be None"));
+    let extracted_dn = parse_domain_name(extracted_dn.expect("extracted_dn should not be None"));
 
     if origin_dn.is_err() || extracted_dn.is_err() {
         return original.to_string();
     }
 
-    let origin_dn = origin_dn.unwrap();
+    let origin_dn = origin_dn.expect("origin_dn invalid");
+    let extracted_dn = extracted_dn.expect("extracted_dn invalid");
+
     // Special case for bootstrapper.
-    if origin_dn.root().is_some() && origin_dn.root().unwrap() == "archive.org" {
-        return extracted.to_string();
+    if let Some(root) = origin_dn.root() {
+        if root == "archive.org" || Some(root) == extracted_dn.root() {
+            return extracted.to_string();
+        }
     }
 
-    if origin_dn.root() == extracted_dn.unwrap().root() {
-        extracted.to_string()
-    } else {
-        original.to_string()
-    }
+    original.to_string()
 }
 
 impl Crawler {
@@ -208,8 +210,12 @@ impl Crawler {
         db: &DatabaseConnection,
         id: i64,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?.unwrap();
+        let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?;
+        if crawl.is_none() {
+            return Ok(None);
+        }
 
+        let crawl = crawl.expect("Invalid crawl model");
         // Modify bootstrapped URLs to pull from the Internet Archive
         let fetch_url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
             create_archive_url(&crawl.url)
@@ -217,15 +223,7 @@ impl Crawler {
             crawl.url.clone()
         };
 
-        let url = Url::parse(&fetch_url).expect("Invalid URL");
-
-        // Break apart domain + path of the URL
-        let domain = url.host_str().expect("Invalid URL");
-        let mut path: String = url.path().to_string();
-        if let Some(query) = url.query() {
-            path = format!("{}?{}", path, query);
-        }
-
+        let url = Url::parse(&fetch_url).expect("Invalid fetch URL");
         // Have we crawled this recently?
         if let Some(history) = fetch_history::find_by_url(db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
@@ -238,7 +236,7 @@ impl Crawler {
         // Check for robots.txt of this domain
         // When looking at bootstrapped tasks, check the original URL
         if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
-            let og_url = Url::parse(&crawl.url).unwrap();
+            let og_url = Url::parse(&crawl.url).expect("Invalid crawl URL");
             if !check_resource_rules(db, &self.client, &og_url).await? {
                 return Ok(None);
             }
@@ -257,8 +255,8 @@ impl Crawler {
         // Check to see if a canonical URL was found, if not use the original
         // bootstrapped URL
         if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
-            let parsed = Url::parse(&result.url).unwrap();
-            let domain = parsed.host_str().unwrap();
+            let parsed = Url::parse(&result.url).expect("Invalid result URL");
+            let domain = parsed.host_str().expect("Invalid result URL host");
             if domain == "web.archive.org" {
                 result.url = crawl.url.clone();
             }
@@ -281,6 +279,14 @@ impl Crawler {
         );
 
         // Update fetch history
+        // Break apart domain + path of the URL
+        let url = Url::parse(&result.url).expect("Invalid result URL");
+        let domain = url.host_str().expect("Invalid URL");
+        let mut path: String = url.path().to_string();
+        if let Some(query) = url.query() {
+            path = format!("{}?{}", path, query);
+        }
+
         fetch_history::upsert(
             db,
             domain,

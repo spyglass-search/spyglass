@@ -1,6 +1,6 @@
-use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
-
 use shared::event::ClientEvent;
+use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
+use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
 
 use crate::constants;
 
@@ -46,53 +46,46 @@ pub fn show_window(window: &Window) {
     center_window(window);
 }
 
-pub fn show_crawl_stats_window(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window(constants::STATS_WIN_NAME) {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return window;
-    }
+fn _show_tab(app: &AppHandle, tab_url: &str) {
+    let window = if let Some(window) = app.get_window(constants::SETTINGS_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::SETTINGS_WIN_NAME,
+            WindowUrl::App(tab_url.into()),
+        )
+        .title("Spyglass - Personal Search Engine")
+        .build()
+        .unwrap()
+    };
 
-    WindowBuilder::new(
-        app,
-        constants::STATS_WIN_NAME,
-        WindowUrl::App("/stats".into()),
-    )
-    .title("Status")
-    .build()
-    .unwrap()
+    let _ = window.emit(ClientEvent::Navigate.as_ref(), tab_url);
+    // A little hack to bring window to the front if its hiding behind something.
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_always_on_top(false);
 }
 
-pub fn show_lens_manager_window(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window(constants::LENS_MANAGER_WIN_NAME) {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return window;
-    }
-
-    WindowBuilder::new(
-        app,
-        constants::LENS_MANAGER_WIN_NAME,
-        WindowUrl::App("/settings/lens".into()),
-    )
-    .title("Lens Manager")
-    .build()
-    .unwrap()
+pub fn show_crawl_stats_window(app: &AppHandle) {
+    _show_tab(app, "/settings/stats");
 }
 
-pub fn show_plugin_manager(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window(constants::PLUGIN_MANAGER_WIN_NAME) {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return window;
-    }
+pub fn show_lens_manager_window(app: &AppHandle) {
+    _show_tab(app, "/settings/lenses");
+}
 
-    WindowBuilder::new(
-        app,
-        constants::PLUGIN_MANAGER_WIN_NAME,
-        WindowUrl::App("/settings/plugins".into()),
-    )
-    .title("Plugins Manager")
-    .build()
-    .unwrap()
+pub fn show_plugin_manager(app: &AppHandle) {
+    _show_tab(app, "/settings/plugins");
+}
+
+pub fn show_user_settings(app: &AppHandle) {
+    _show_tab(app, "/settings/user");
+}
+
+pub fn alert(window: &Window, title: &str, message: &str) {
+    MessageDialogBuilder::new(title, message)
+        .parent(window)
+        .buttons(MessageDialogButtons::Ok)
+        .kind(MessageDialogKind::Error)
+        .show(|_| {});
 }

@@ -1,0 +1,11 @@
+[package]
+name = "local-file-indexer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "local-file-indexer"
+path = "src/main.rs"
+
+[dependencies]
+spyglass-plugin = { path = "../../crates/spyglass-plugin" }
