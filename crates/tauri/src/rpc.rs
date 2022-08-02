@@ -15,7 +15,7 @@ pub type RpcMutex = Arc<Mutex<RpcClient>>;
 pub struct RpcClient {
     pub client: TypedClient,
     pub endpoint: String,
-    pub sidecar_handle: Option<JoinHandle<()>>
+    pub sidecar_handle: Option<JoinHandle<()>>,
 }
 
 async fn connect(endpoint: &str) -> Result<TypedClient, ()> {
@@ -52,7 +52,7 @@ impl RpcClient {
         RpcClient {
             client,
             endpoint: endpoint.clone(),
-            sidecar_handle
+            sidecar_handle,
         }
     }
 
@@ -110,7 +110,7 @@ impl RpcClient {
                     CommandEvent::Terminated(payload) => {
                         sentry::capture_error(&std::io::Error::new(
                             std::io::ErrorKind::BrokenPipe,
-                            format!("sidecar terminated: {:?}", payload.clone()),
+                            format!("sidecar terminated: {:?}", payload),
                         ));
                         log::error!("sidecar terminated: {:?}", payload);
                         return;
