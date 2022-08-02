@@ -47,13 +47,17 @@ pub fn regex_for_robots(rule: &str, wildcard_type: WildcardType) -> Option<Strin
                     has_end = true;
                 }
             }
-            _ => {
-                if wildcard_type == WildcardType::Regex {
-                    regex.push_str(&regex::escape(&ch.to_string()));
-                } else {
-                    regex.push(ch);
+            other_ch => match wildcard_type {
+                WildcardType::Database => match other_ch {
+                    // % and _ characters are treated as wildcards in SQLite
+                    '%' => regex.push_str("\\%"),
+                    '_' => regex.push_str("\\_"),
+                    _ => regex.push(other_ch),
+                },
+                WildcardType::Regex => {
+                    regex.push_str(&regex::escape(&other_ch.to_string()));
                 }
-            }
+            },
         }
     }
 
