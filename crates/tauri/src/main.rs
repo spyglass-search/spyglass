@@ -103,10 +103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // Start up backend (only in release mode)
-            #[cfg(not(debug_assertions))]
-            rpc::check_and_start_backend();
-
             let window = app.get_window("main").expect("Main window not found");
             let _ = window.set_skip_taskbar(true);
 
