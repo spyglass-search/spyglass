@@ -361,6 +361,16 @@ pub async fn enqueue_all(
         .iter()
         .filter_map(|url| {
             if let Ok(mut parsed) = Url::parse(url) {
+                dbg!(&url);
+
+                // Check that we can handle this scheme
+                if parsed.scheme() != "http"
+                    && parsed.scheme() != "https"
+                    && parsed.scheme() != "file"
+                {
+                    return None;
+                }
+
                 // Always ignore fragments, otherwise crawling
                 // https://wikipedia.org/Rust#Blah would be considered different than
                 // https://wikipedia.org/Rust
