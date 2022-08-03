@@ -21,7 +21,7 @@ register_plugin!(Plugin);
 impl SpyglassPlugin for Plugin {
     fn load(&self) {
         // Let the host know we want to check for updates on a regular interval.
-        subscribe(PluginEvent::CheckUpdateInterval);
+        subscribe(PluginSubscription::CheckUpdateInterval);
 
         let mut profile_path = None;
         if let Ok(folder) = std::env::var("FIREFOX_DATA_FOLDER") {
@@ -41,7 +41,7 @@ impl SpyglassPlugin for Plugin {
         }
     }
 
-    fn update(&self) {
+    fn update(&self, _: PluginEvent) {
         let path = Path::new(DATA_DIR).join(DB_FILE);
         if path.exists() {
             enqueue_all(&self.read_bookmarks());

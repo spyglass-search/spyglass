@@ -1,9 +1,9 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
 
-use crate::{PluginCommandRequest, PluginEvent};
+use crate::{PluginCommandRequest, PluginSubscription};
 
-pub fn subscribe(event: PluginEvent) {
+pub fn subscribe(event: PluginSubscription) {
     if object_to_stdout(&PluginCommandRequest::Subscribe(event)).is_ok() {
         unsafe {
             plugin_cmd();

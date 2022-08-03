@@ -47,20 +47,18 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
             PluginCommandRequest::ListDir { path, recurse } => {
                 let entries = if recurse {
                     let mut entries = Vec::new();
-                    if let Ok(_) = walk_dir(&Path::new(&path), &mut entries) {
+                    if walk_dir(Path::new(&path), &mut entries).is_ok() {
                         entries
                     } else {
                         Vec::new()
                     }
+                } else if let Ok(entries) = std::fs::read_dir(path) {
+                    entries
+                        .flatten()
+                        .map(|entry| entry.path().display().to_string())
+                        .collect::<Vec<String>>()
                 } else {
-                    if let Ok(entries) = std::fs::read_dir(path) {
-                        entries
-                            .flatten()
-                            .map(|entry| entry.path().display().to_string())
-                            .collect::<Vec<String>>()
-                    } else {
-                        Vec::new()
-                    }
+                    Vec::new()
                 };
 
                 if let Err(e) = wasi_write(&env.wasi_env, &entries) {

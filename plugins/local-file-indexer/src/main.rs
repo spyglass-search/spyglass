@@ -7,11 +7,14 @@ register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
     fn load(&self) {
-        if let Ok(entries) = list_dir("/Users/a5huynh/Documents/projects/blog/blog-src", true) {
-            for path in entries {
-                log(path);
-            }
-        }
+        // on load subscribe to file notif events for folders
+        subscribe(PluginSubscription::WatchDirectory {
+            path: "/Users/a5huynh/Documents/projects/blog/blog-src".to_string(),
+            recurse: false,
+        });
     }
-    fn update(&self) {}
+
+    fn update(&self, event: PluginEvent) {
+        log(format!("received event: {:?}", event));
+    }
 }

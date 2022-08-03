@@ -19,7 +19,10 @@ macro_rules! register_plugin {
         #[no_mangle]
         pub fn update() {
             STATE.with(|state| {
-                state.borrow_mut().update();
+                let event = $crate::object_from_stdin::<PluginEvent>();
+                if let Ok(event) = event {
+                    state.borrow_mut().update(event);
+                }
             })
         }
     };
@@ -29,13 +32,26 @@ pub trait SpyglassPlugin {
     /// subscribe to specific events.
     fn load(&self);
     /// Request plugin for updates
-    fn update(&self);
+    fn update(&self, event: PluginEvent);
 }
 
 #[derive(Deserialize, Serialize)]
-pub enum PluginEvent {
+pub enum PluginSubscription {
     /// Check for updates at a fixed interval
     CheckUpdateInterval,
+    WatchDirectory {
+        path: String,
+        recurse: bool,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum PluginEvent {
+    IntervalUpdate,
+    // File watcher updates
+    FileCreated(String),
+    FileUpdated(String),
+    FileDeleted(String),
 }
 
 #[derive(Deserialize, Serialize)]
@@ -45,7 +61,7 @@ pub enum PluginCommandRequest {
     // List the contents of a directory
     ListDir { path: String, recurse: bool },
     // Subscribe to PluginEvents
-    Subscribe(PluginEvent),
+    Subscribe(PluginSubscription),
     // Run a sqlite query on a db file. NOTE: This is a workaround due to the fact
     // that sqlite can not be easily compiled to wasm... yet!
     SqliteQuery { path: String, query: String },

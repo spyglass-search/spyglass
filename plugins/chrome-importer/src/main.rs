@@ -13,7 +13,7 @@ register_plugin!(Plugin);
 impl SpyglassPlugin for Plugin {
     fn load(&self) {
         // Let the host know we want to check for updates on a regular interval.
-        subscribe(PluginEvent::CheckUpdateInterval);
+        subscribe(PluginSubscription::CheckUpdateInterval);
 
         let mut path = None;
 
@@ -65,7 +65,7 @@ impl SpyglassPlugin for Plugin {
         }
     }
 
-    fn update(&self) {
+    fn update(&self, _: PluginEvent) {
         let path = Path::new(DATA_DIR).join(BOOKMARK_FILE);
         // Nothing to do if theres no file.
         if !path.exists() {
