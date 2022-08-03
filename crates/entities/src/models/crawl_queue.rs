@@ -305,7 +305,16 @@ pub async fn dequeue(
         user_settings,
     ));
 
-    return entity.one(db).await;
+    // Grab new entity and immediately mark in-progress
+    if let Ok(Some(model)) = entity.one(db).await {
+        let mut update: ActiveModel = model.into();
+        update.status = Set(CrawlStatus::Processing);
+        let model: Model = update.update(db).await.expect("Unable to save");
+
+        return Ok(Some(model));
+    }
+
+    Ok(None)
 }
 
 /// Add url to the crawl queue
