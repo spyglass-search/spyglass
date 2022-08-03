@@ -56,6 +56,7 @@ fn _show_tab(app: &AppHandle, tab_url: &str) {
             WindowUrl::App(tab_url.into()),
         )
         .title("Spyglass - Personal Search Engine")
+        .min_inner_size(constants::MIN_WINDOW_WIDTH, constants::MIN_WINDOW_HEIGHT)
         .build()
         .unwrap()
     };
