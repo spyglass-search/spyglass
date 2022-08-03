@@ -1,7 +1,7 @@
 use spyglass_plugin::*;
 use std::path::{Path, PathBuf};
 
-const DATA_DIR: &str = "/data";
+const DATA_DIR: &str = "/";
 const DB_FILE: &str = "places.sqlite";
 const BOOKMARK_QUERY: &str = "
     SELECT

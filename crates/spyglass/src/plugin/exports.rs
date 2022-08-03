@@ -62,21 +62,24 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
                 };
 
                 if let Err(e) = wasi_write(&env.wasi_env, &entries) {
-                    log::error!("<{}> unable to list dir: {}", env.id, e);
+                    log::error!("<{}> unable to list dir: {}", env.name, e);
                 }
             }
             PluginCommandRequest::Subscribe(event) => {
                 let writer = env.cmd_writer.clone();
                 let plugin_id = env.id;
+                let plugin_name = env.name.clone();
 
                 let rt = tokio::runtime::Handle::current();
                 rt.spawn(async move {
                     let writer = writer.clone();
                     if let Err(e) = writer
-                        .send(PluginCommand::Subscribe(plugin_id, event))
+                        .send(PluginCommand::Subscribe(plugin_id, event.clone()))
                         .await
                     {
                         log::error!("Unable to subscribe plugin <{}> to event: {}", plugin_id, e);
+                    } else {
+                        log::info!("<{}> subscribed to {}", plugin_name, event);
                     }
                 });
             }
@@ -136,11 +139,9 @@ fn walk_dir(dir: &Path, entries: &mut Vec<String>) -> std::io::Result<()> {
 fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     log::info!("<{}> requesting access to folder: {}", env.name, src);
 
-    let dst = Path::new(&dst)
-        .strip_prefix("/data")
-        .unwrap_or_else(|_| Path::new(""));
-
+    let dst = Path::new(&dst);
     let src = Path::new(&src);
+
     if let Some(file_name) = src.file_name() {
         let dst = env.data_dir.join(dst).join(file_name);
         // Attempt to mount directory

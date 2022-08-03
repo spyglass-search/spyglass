@@ -2,7 +2,7 @@ use serde_json::Value;
 use spyglass_plugin::*;
 use std::{fs, path::Path};
 
-const DATA_DIR: &str = "/data";
+const DATA_DIR: &str = "/";
 const BOOKMARK_FILE: &str = "Bookmarks";
 
 #[derive(Default)]

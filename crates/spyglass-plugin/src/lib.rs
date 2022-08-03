@@ -1,5 +1,7 @@
 pub mod consts;
 mod shims;
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 pub use shims::*;
 
@@ -35,7 +37,7 @@ pub trait SpyglassPlugin {
     fn update(&self, event: PluginEvent);
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub enum PluginSubscription {
     /// Check for updates at a fixed interval
     CheckUpdateInterval,
@@ -43,6 +45,26 @@ pub enum PluginSubscription {
         path: String,
         recurse: bool,
     },
+}
+
+impl fmt::Display for PluginSubscription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PluginSubscription::CheckUpdateInterval => {
+                write!(f, "<CheckUpdateInterval>")
+            }
+            PluginSubscription::WatchDirectory { path, recurse } => write!(
+                f,
+                "<WatchDirectory {} - {}>",
+                path,
+                if *recurse {
+                    "recursive"
+                } else {
+                    "non-recursive"
+                }
+            ),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

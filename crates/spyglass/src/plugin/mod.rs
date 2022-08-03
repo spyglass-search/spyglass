@@ -463,8 +463,9 @@ pub async fn plugin_init(
         .map_or_else(|| "".to_string(), |dir| dir);
 
     let mut wasi_env = WasiState::new(&plugin.name)
-        // Attach the plugin data directory
-        .map_dir("/data", plugin.data_folder())
+        // Attach the plugin data directory. Anything created by the plugin will live
+        // there.
+        .map_dir("/", plugin.data_folder())
         .expect("Unable to mount plugin data folder")
         .env(env::BASE_CONFIG_DIR, base_config_dir)
         .env(env::BASE_DATA_DIR, base_data_dir)
