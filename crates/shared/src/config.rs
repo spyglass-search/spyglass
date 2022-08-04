@@ -295,7 +295,6 @@ impl Config {
 
     pub fn prefs_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
-        log::info!("Using {:?}", proj_dirs.preference_dir().to_path_buf());
         proj_dirs.preference_dir().to_path_buf()
     }
 

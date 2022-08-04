@@ -94,6 +94,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
             let config = Config::new();
+            log::info!("Loading prefs from: {:?}", Config::prefs_dir());
+
             // Copy default plugins to data directory to be picked up by the backend
             if let Err(e) = copy_plugins(&config, app.path_resolver()) {
                 log::error!("Unable to copy default plugins: {}", e);
@@ -312,6 +314,7 @@ async fn check_version_interval(window: Window) {
         interval.tick().await;
         log::info!("checking for update...");
         window.trigger_global("tauri://update", None);
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 }
 
