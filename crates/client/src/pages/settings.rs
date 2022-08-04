@@ -27,24 +27,39 @@ pub struct SettingChangeEvent {
 
 #[function_component(SettingForm)]
 pub fn setting_form(props: &SettingFormProps) -> Html {
-    let value = use_state(|| props.opts.value.clone());
+    let input_ref = use_node_ref();
+
+    {
+        let input_ref = input_ref.clone();
+        let value = props.opts.value.clone();
+        use_effect(move || {
+            if let Some(el) = input_ref.cast::<HtmlInputElement>() {
+                // Only set the input once on render
+                if el.value().is_empty() && !value.is_empty() {
+                    el.set_value(&value);
+                }
+            }
+
+            || {}
+        });
+    }
+
     let (parent, _) = props
         .setting_ref
         .split_once('.')
         .unwrap_or((&props.setting_ref, ""));
 
-    let onkeyup = {
+    let oninput = {
         let onchange = props.onchange.clone();
         let setting_ref = props.setting_ref.clone();
-        let value = value.clone();
-        Callback::from(move |e: KeyboardEvent| {
+        Callback::from(move |e: InputEvent| {
+            e.stop_immediate_propagation();
             let input: HtmlInputElement = e.target_unchecked_into();
             let input_value = input.value();
             onchange.emit(SettingChangeEvent {
                 setting_ref: setting_ref.clone(),
-                new_value: input_value.clone(),
+                new_value: input_value,
             });
-            value.set(input_value);
         })
     };
 
@@ -84,22 +99,24 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                         FormType::List => {
                             html! {
                                 <textarea
-                                    onkeyup={onkeyup}
+                                    ref={input_ref.clone()}
+                                    spellcheck="false"
+                                    oninput={oninput}
                                     class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
                                     rows="5"
                                     placeholder={"[\"/Users/example/Documents\", \"/Users/example/Desktop/Notes\"]"}
                                 >
-                                    {(*value).clone()}
                                 </textarea>
                             }
                         }
                         FormType::Text => {
                             html! {
                                 <input
-                                    onkeyup={onkeyup}
+                                    ref={input_ref.clone()}
+                                    spellcheck="false"
+                                    oninput={oninput}
                                     type="text"
                                     class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
-                                    value={(*value).clone()}
                                 />
                             }
                         }
@@ -187,7 +204,7 @@ pub fn user_settings_page() -> Html {
                     {"Settings folder"}
                 </btn::Btn>
                 <btn::Btn onclick={handle_save_changes} disabled={!*has_changes}>
-                    {"Save Changes"}
+                    {"Save & Restart"}
                 </btn::Btn>
             </Header>
             <div class="pt-8">

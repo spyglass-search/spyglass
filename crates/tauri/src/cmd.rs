@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use jsonrpc_core::Value;
+use tauri::Manager;
 use tauri::State;
 use url::Url;
 
@@ -335,7 +336,7 @@ pub async fn toggle_plugin(
 
 #[tauri::command]
 pub async fn save_user_settings(
-    _: tauri::Window,
+    window: tauri::Window,
     config: State<'_, Config>,
     settings: HashMap<String, String>,
 ) -> Result<(), String> {
@@ -346,6 +347,7 @@ pub async fn save_user_settings(
     for (key, value) in settings.iter() {
         if let Some((parent, field)) = key.split_once('.') {
             match parent {
+                // Hacky way to update user settings directly.
                 "_" => {
                     if field == "data_directory" {
                         user_settings.data_directory = PathBuf::from(value);
@@ -362,10 +364,14 @@ pub async fn save_user_settings(
                                 FormType::Text => Some(value.into()),
                                 FormType::List => {
                                     // Validate the value by attempting to deserialize
-                                    if let Ok(parsed) = serde_json::from_str::<Vec<String>>(value) {
-                                        serde_json::to_string::<Vec<String>>(&parsed).ok()
-                                    } else {
-                                        None
+                                    match serde_json::from_str::<Vec<String>>(value) {
+                                        Ok(parsed) => {
+                                            serde_json::to_string::<Vec<String>>(&parsed).ok()
+                                        }
+                                        Err(e) => {
+                                            log::info!("unable to save setting: {}", e);
+                                            None
+                                        }
                                     }
                                 }
                             };
@@ -382,6 +388,9 @@ pub async fn save_user_settings(
 
     let _ = config.save_user_settings(&user_settings);
 
+    let app = window.app_handle();
+    app.restart();
+
     Ok(())
 }
 
@@ -390,25 +399,36 @@ pub async fn load_user_settings(
     _: tauri::Window,
     config: State<'_, Config>,
 ) -> Result<Vec<(String, SettingOpts)>, String> {
-    let serialized: HashMap<String, String> = config.user_settings.clone().into();
-    let mut user_settings = Vec::new();
+    let current_settings = Config::load_user_settings().expect("Unable to read user settings");
 
+    let serialized: HashMap<String, String> = current_settings.clone().into();
     let plugin_configs = config.load_plugin_config();
 
-    user_settings.push(("_.data_directory".into(), SettingOpts {
+    let mut list = vec![("_.data_directory".into(), SettingOpts {
         label: "Data Directory".into(),
-        value: serialized.get("user.data_directory").unwrap_or(&"".to_string()).to_string(),
+        value: serialized.get("_.data_directory").unwrap_or(&"".to_string()).to_string(),
         form_type: FormType::Text,
         help_text: Some("The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.".into())
-    }));
+    })];
 
+    let current_plug_settings = current_settings.plugin_settings;
     for (pname, pconfig) in plugin_configs {
         for (setting_name, setting_opts) in pconfig.user_settings {
-            user_settings.push((format!("{}.{}", pname, setting_name), setting_opts));
+            let mut opts = setting_opts.clone();
+
+            let value = current_plug_settings
+                .get(&pname)
+                .and_then(|settings| settings.get(&setting_name))
+                .map(|value| value.to_string());
+
+            if let Some(value) = value {
+                opts.value = value.to_string();
+            }
+
+            list.push((format!("{}.{}", pname, setting_name), opts));
         }
     }
 
-    user_settings.sort_by(|a, b| a.0.cmp(&b.0));
-
-    Ok(user_settings)
+    list.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(list)
 }

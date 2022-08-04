@@ -163,7 +163,7 @@ impl From<UserSettings> for HashMap<String, String> {
     fn from(settings: UserSettings) -> Self {
         let mut map: HashMap<String, String> = HashMap::new();
         map.insert(
-            "user.data_directory".to_string(),
+            "_.data_directory".to_string(),
             settings
                 .data_directory
                 .to_str()
@@ -208,7 +208,7 @@ impl Config {
         Ok(())
     }
 
-    fn load_user_settings() -> anyhow::Result<UserSettings> {
+    pub fn load_user_settings() -> anyhow::Result<UserSettings> {
         let prefs_path = Self::prefs_file();
 
         match prefs_path.exists() {
