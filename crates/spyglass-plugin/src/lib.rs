@@ -82,7 +82,7 @@ pub enum PluginCommandRequest {
     // Enqueue a list of URLs into the crawl queue
     Enqueue { urls: Vec<String> },
     // List the contents of a directory
-    ListDir { path: String, recurse: bool },
+    ListDir { path: String },
     // Subscribe to PluginEvents
     Subscribe(PluginSubscription),
     // Run a sqlite query on a db file. NOTE: This is a workaround due to the fact
@@ -90,4 +90,11 @@ pub enum PluginCommandRequest {
     SqliteQuery { path: String, query: String },
     // Request mounting a file & its contents to the plugin VFS
     SyncFile { dst: String, src: String },
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct ListDirEntry {
+    pub path: String,
+    pub is_file: bool,
+    pub is_dir: bool,
 }

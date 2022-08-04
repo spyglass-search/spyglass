@@ -75,10 +75,13 @@ impl Plugin {
         // Loop through profiles in the profile directory & find the default one.
         // A little hacky since Firefox prepends a random string to the profile name.
         if let Some(profiles_dir) = profiles_dir {
-            if let Ok(entries) = list_dir(&profiles_dir.display().to_string(), false) {
-                for path in entries {
-                    if path.ends_with(".default") || path.ends_with(".default-release") {
-                        return Some(Path::new(&path).join(DB_FILE));
+            if let Ok(entries) = list_dir(&profiles_dir.display().to_string()) {
+                for entry in entries {
+                    if entry.is_dir
+                        && (entry.path.ends_with(".default")
+                            || entry.path.ends_with(".default-release"))
+                    {
+                        return Some(Path::new(&entry.path).join(DB_FILE));
                     }
                 }
             }

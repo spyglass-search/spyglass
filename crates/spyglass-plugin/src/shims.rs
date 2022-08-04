@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
 
-use crate::{PluginCommandRequest, PluginSubscription};
+use crate::{ListDirEntry, PluginCommandRequest, PluginSubscription};
 
 pub fn delete_doc(url: &str) {
     if object_to_stdout(&PluginCommandRequest::DeleteDoc {
@@ -33,17 +33,16 @@ pub fn enqueue_all(urls: &[String]) {
 }
 
 /// List dir
-pub fn list_dir(path: &str, recurse: bool) -> Result<Vec<String>, ron::Error> {
+pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::Error> {
     if object_to_stdout(&PluginCommandRequest::ListDir {
         path: path.to_string(),
-        recurse,
     })
     .is_ok()
     {
         unsafe {
             plugin_cmd();
         }
-        return object_from_stdin::<Vec<String>>();
+        return object_from_stdin::<Vec<ListDirEntry>>();
     }
 
     Ok(Vec::new())

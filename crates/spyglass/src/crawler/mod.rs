@@ -17,7 +17,7 @@ pub mod robots;
 
 use crate::crawler::bootstrap::create_archive_url;
 use crate::fetch::HTTPClient;
-use crate::scraper::html_to_text;
+use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
@@ -266,11 +266,24 @@ impl Crawler {
         hasher.update(&contents.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
 
+        // TODO: Better description building for text files?
+        let description = if !contents.is_empty() {
+            let desc = contents
+                .split(' ')
+                .into_iter()
+                .take(DEFAULT_DESC_LENGTH)
+                .collect::<Vec<&str>>()
+                .join(" ");
+            Some(desc)
+        } else {
+            None
+        };
+
         Ok(Some(CrawlResult {
             content_hash,
             content: Some(contents.clone()),
             // Does a file have a description? Pull the first part of the file
-            description: Some(contents[0..256.min(contents.len())].to_string()),
+            description,
             status: 200,
             title: Some(file_name),
             url: url.to_string(),

@@ -16,7 +16,7 @@ use entities::{
     models::{crawl_queue::enqueue_all, indexed_document},
     sea_orm::ModelTrait,
 };
-use spyglass_plugin::PluginCommandRequest;
+use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -79,19 +79,19 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
                 });
             }
             PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, &urls),
-            PluginCommandRequest::ListDir { path, recurse } => {
-                let entries = if recurse {
-                    let mut entries = Vec::new();
-                    if walk_dir(Path::new(&path), &mut entries).is_ok() {
-                        entries
-                    } else {
-                        Vec::new()
-                    }
-                } else if let Ok(entries) = std::fs::read_dir(path) {
+            PluginCommandRequest::ListDir { path } => {
+                let entries = if let Ok(entries) = std::fs::read_dir(path) {
                     entries
                         .flatten()
-                        .map(|entry| entry.path().display().to_string())
-                        .collect::<Vec<String>>()
+                        .map(|entry| {
+                            let path = entry.path();
+                            ListDirEntry {
+                                path: path.display().to_string(),
+                                is_file: path.is_file(),
+                                is_dir: path.is_dir(),
+                            }
+                        })
+                        .collect::<Vec<ListDirEntry>>()
                 } else {
                     Vec::new()
                 };
@@ -151,22 +151,6 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
     if let Ok(msg) = wasi_read_string(&env.wasi_env) {
         log::info!("{}: {}", env.name, msg);
     }
-}
-
-fn walk_dir(dir: &Path, entries: &mut Vec<String>) -> std::io::Result<()> {
-    if dir.is_dir() {
-        for entry in std::fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                walk_dir(&path, entries)?;
-            } else {
-                entries.push(entry.path().display().to_string());
-            }
-        }
-    }
-
-    Ok(())
 }
 
 /// Adds a file into the plugin data directory. Use this to copy files from elsewhere
