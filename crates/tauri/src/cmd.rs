@@ -342,8 +342,19 @@ pub async fn save_user_settings(
     let mut user_settings = config.user_settings.clone();
     // Update the user settings
     for (key, value) in settings.iter() {
-        if key == "user.data_directory" {
-            user_settings.data_directory = PathBuf::from(value);
+        if let Some((parent, field)) = key.split_once('.') {
+            match parent {
+                "_" => {
+                    if field == "data_directory" {
+                        user_settings.data_directory = PathBuf::from(value);
+                    }
+                }
+                plugin_name => {
+                    if let Some(to_update) = user_settings.plugin_settings.get_mut(plugin_name) {
+                        to_update.insert(field.into(), value.into());
+                    }
+                }
+            }
         }
     }
 
@@ -362,7 +373,7 @@ pub async fn load_user_settings(
 
     let plugin_configs = config.load_plugin_config();
 
-    user_settings.push(("user.data_directory".into(), SettingOpts {
+    user_settings.push(("_.data_directory".into(), SettingOpts {
         label: "Data Directory".into(),
         value: serialized.get("user.data_directory").unwrap_or(&"".to_string()).to_string(),
         form_type: FormType::Text,
@@ -374,6 +385,8 @@ pub async fn load_user_settings(
             user_settings.push((format!("{}.{}", pname, setting_name), setting_opts));
         }
     }
+
+    user_settings.sort_by(|a, b| a.0.cmp(&b.0));
 
     Ok(user_settings)
 }

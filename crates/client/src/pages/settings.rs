@@ -48,7 +48,8 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
         })
     };
 
-    let label = if parent != "user" {
+    // System settings have "_" as the parent.
+    let label = if parent != "_" {
         html! {
             <>
                 <span class="text-white">{format!("{}: ", parent)}</span>
@@ -60,7 +61,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
     };
 
     html! {
-        <div class="p-8">
+        <div class="px-8 mb-8">
             <div class="mb-2">
                 <label class="text-yellow-500">{label}</label>
                 {
@@ -86,6 +87,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                                     onkeyup={onkeyup}
                                     class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
                                     rows="5"
+                                    placeholder={"[\"/Users/example/Documents\", \"/Users/example/Desktop/Notes\"]"}
                                 >
                                     {(*value).clone()}
                                 </textarea>
@@ -188,7 +190,9 @@ pub fn user_settings_page() -> Html {
                     {"Save Changes"}
                 </btn::Btn>
             </Header>
-            <div>{contents}</div>
+            <div class="pt-8">
+                {contents}
+            </div>
         </div>
     }
 }
