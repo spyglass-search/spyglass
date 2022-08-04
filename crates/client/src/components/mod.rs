@@ -135,7 +135,13 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                         <div class="text-xs truncate">
                             <a href={url.clone().to_string()} target="_blank">
                                 {uri_icon}
-                                <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span>
+                                {
+                                    if url.scheme() == "file" {
+                                        html!{}
+                                    } else {
+                                        html!{ <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span> }
+                                    }
+                                }
                                 <span class="align-middle">{format!(" → {}", path)}</span>
                             </a>
                         </div>

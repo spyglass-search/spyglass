@@ -15,7 +15,9 @@ register_plugin!(Plugin);
 
 // Create a file URI
 fn to_uri(path: &str) -> String {
-    let host = "Lord-of-Data.local";
+    // TODO: Pull hostname? When we need to sync indexes across devices
+    // this will need to be something that is unique
+    let host = "localhost";
     format!("file://{}/{}", host, path)
 }
 
