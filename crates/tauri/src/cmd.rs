@@ -340,6 +340,8 @@ pub async fn save_user_settings(
     settings: HashMap<String, String>,
 ) -> Result<(), String> {
     let mut user_settings = config.user_settings.clone();
+    let plugin_configs = config.load_plugin_config();
+
     // Update the user settings
     for (key, value) in settings.iter() {
         if let Some((parent, field)) = key.split_once('.') {
@@ -350,8 +352,28 @@ pub async fn save_user_settings(
                     }
                 }
                 plugin_name => {
+                    let plugin_config = plugin_configs
+                        .get(plugin_name)
+                        .expect("Unable to find plugin");
+
                     if let Some(to_update) = user_settings.plugin_settings.get_mut(plugin_name) {
-                        to_update.insert(field.into(), value.into());
+                        if let Some(field_opts) = plugin_config.user_settings.get(field) {
+                            let value = match field_opts.form_type {
+                                FormType::Text => Some(value.into()),
+                                FormType::List => {
+                                    // Validate the value by attempting to deserialize
+                                    if let Ok(parsed) = serde_json::from_str::<Vec<String>>(value) {
+                                        serde_json::to_string::<Vec<String>>(&parsed).ok()
+                                    } else {
+                                        None
+                                    }
+                                }
+                            };
+
+                            if let Some(value) = value {
+                                to_update.insert(field.into(), value);
+                            }
+                        }
                     }
                 }
             }
