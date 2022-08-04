@@ -3,6 +3,7 @@ use strum_macros::{Display, EnumString};
 
 pub mod config;
 pub mod event;
+pub mod plugin;
 pub mod regex;
 pub mod request;
 pub mod response;

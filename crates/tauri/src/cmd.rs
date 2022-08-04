@@ -356,15 +356,24 @@ pub async fn save_user_settings(
 pub async fn load_user_settings(
     _: tauri::Window,
     config: State<'_, Config>,
-) -> Result<HashMap<String, SettingOpts>, String> {
+) -> Result<Vec<(String, SettingOpts)>, String> {
     let serialized: HashMap<String, String> = config.user_settings.clone().into();
-    let mut map = HashMap::new();
-    map.insert("user.data_directory".into(), SettingOpts {
+    let mut user_settings = Vec::new();
+
+    let plugin_configs = config.load_plugin_config();
+
+    user_settings.push(("user.data_directory".into(), SettingOpts {
         label: "Data Directory".into(),
         value: serialized.get("user.data_directory").unwrap_or(&"".to_string()).to_string(),
         form_type: FormType::Text,
         help_text: Some("The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.".into())
-    });
+    }));
 
-    Ok(map)
+    for (pname, pconfig) in plugin_configs {
+        for (setting_name, setting_opts) in pconfig.user_settings {
+            user_settings.push((format!("{}.{}", pname, setting_name), setting_opts));
+        }
+    }
+
+    Ok(user_settings)
 }

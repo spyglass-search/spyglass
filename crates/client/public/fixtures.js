@@ -103,6 +103,18 @@ export let invoke = async (func_name, params) => {
                 value: "/Users/a5huynh/Library/Application Support/com.athlabs.spyglass-dev",
                 form_type: "Text",
                 help_text: "The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.",
+            },
+            "chrome-importer.CHROME_DATA_FOLDER": {
+                label: "Chrome Data Folder",
+                value: "",
+                form_type: "Text",
+                help_text: "",
+            },
+            "local-file-indexer.FOLDERS_LIST": {
+                label: "Folders List",
+                value: "",
+                form_type: "List",
+                help_text: "List of folders.",
             }
         };
     }

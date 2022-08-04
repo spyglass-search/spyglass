@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
@@ -9,7 +8,7 @@ use dashmap::DashMap;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{broadcast, mpsc};
 use wasmer::{Instance, Module, Store, WasmerEnv};
@@ -17,47 +16,13 @@ use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 use entities::models::lens;
 use shared::config::Config;
-use shared::SettingOpts;
+use shared::plugin::{PluginConfig, PluginType};
 use spyglass_plugin::{consts::env, PluginEvent, PluginSubscription};
 
 use crate::state::AppState;
 use crate::task::AppShutdown;
 
 mod exports;
-
-#[derive(Clone, Deserialize, Serialize, PartialEq)]
-pub enum PluginType {
-    /// A more complex lens than a simple list of URLs
-    /// - Registers itself as a lens, under some "trigger" label.
-    /// - Enqueues URLs to the crawl queue.
-    /// - Can register to handle specific protocols if not HTTP
-    Lens,
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-pub struct PluginConfig {
-    pub name: String,
-    pub author: String,
-    pub description: String,
-    pub version: String,
-    #[serde(default)]
-    pub path: Option<PathBuf>,
-    pub plugin_type: PluginType,
-    pub user_settings: HashMap<String, SettingOpts>,
-    #[serde(default)]
-    pub is_enabled: bool,
-}
-
-impl PluginConfig {
-    pub fn data_folder(&self) -> PathBuf {
-        self.path
-            .as_ref()
-            .expect("Unable to find plugin path")
-            .parent()
-            .expect("Unable to find parent plugin directory")
-            .join("data")
-    }
-}
 
 type PluginId = usize;
 pub enum PluginCommand {
@@ -345,86 +310,67 @@ pub async fn plugin_load(
     cmds: &mpsc::Sender<PluginCommand>,
 ) {
     log::info!("🔌 loading plugins");
+    let mut user_plugin_settings = config.user_settings.plugin_settings.clone();
+    let plugin_user_settings = config.load_plugin_config();
 
-    let plugins_dir = config.plugins_dir();
-    let plugin_files = fs::read_dir(plugins_dir).expect("Invalid plugin directory");
+    for (_, plugin_config) in plugin_user_settings {
+        let mut plug = plugin_config.clone();
 
-    for entry in plugin_files.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            // Load plugin settings
-            let plugin_config = path.join("manifest.ron");
-            if !plugin_config.exists() || !plugin_config.is_file() {
-                log::warn!("Invalid plugin manifest: {}", path.as_path().display());
-                continue;
+        // If any user settings are found, override default ones
+        // from plugin config file.
+        let user_settings = user_plugin_settings
+            .entry(plug.name.clone())
+            .or_insert_with(HashMap::new);
+
+        // Loop through plugin settings and use any user overrides found.
+        for (key, value) in plug.user_settings.iter_mut() {
+            let user_override = user_settings
+                .entry(key.to_string())
+                .or_insert_with(|| value.value.to_string());
+            (*value).value = user_override.to_string();
+        }
+
+        // Update the user settings file in case any new setting entries
+        // were added.
+        config.user_settings.plugin_settings = user_plugin_settings.clone();
+        let _ = config.save_user_settings(&config.user_settings);
+
+        // Enable plugins that are lenses, this is the only type right so technically they
+        // all will be enabled as a lens.
+        if plug.plugin_type == PluginType::Lens {
+            match lens::add_or_enable(
+                &state.db,
+                &plug.name,
+                &plug.author,
+                Some(&plug.description),
+                &plug.version,
+                lens::LensType::Plugin,
+            )
+            .await
+            {
+                Ok(is_new) => {
+                    log::info!("loaded lens {}, new? {}", plug.name, is_new)
+                }
+                Err(e) => log::error!("Unable to add lens: {}", e),
             }
+        }
 
-            match fs::read_to_string(plugin_config) {
-                Ok(file_contents) => match ron::from_str::<PluginConfig>(&file_contents) {
-                    // Successfully loaded plugin manifest
-                    Ok(plug) => {
-                        let mut plug = plug.clone();
-                        plug.path = Some(path.join("main.wasm"));
-                        // If any user settings are found, override default ones
-                        // from plugin config file.
-                        let user_settings = config
-                            .plugin_settings
-                            .entry(plug.name.clone())
-                            .or_insert_with(HashMap::new);
+        // Is this plugin enabled?
+        let lens_config = lens::Entity::find()
+            .filter(lens::Column::Name.eq(plug.name.clone()))
+            .one(&state.db)
+            .await;
 
-                        // Loop through plugin settings and use any user overrides found.
-                        for (key, value) in plug.user_settings.iter_mut() {
-                            let user_override = user_settings
-                                .entry(key.to_string())
-                                .or_insert_with(|| value.value.to_string());
-                            (*value).value = user_override.to_string();
-                        }
-                        // Update the user settings file in case any new setting entries
-                        // were added.
-                        let _ = config.save_plugin_settings(&config.plugin_settings);
+        if let Ok(Some(lens_config)) = lens_config {
+            plug.is_enabled = lens_config.is_enabled;
+        }
 
-                        // Enable plugins that are lenses, this is the only type right so technically they
-                        // all will be enabled as a lens.
-                        if plug.plugin_type == PluginType::Lens {
-                            match lens::add_or_enable(
-                                &state.db,
-                                &plug.name,
-                                &plug.author,
-                                Some(&plug.description),
-                                &plug.version,
-                                lens::LensType::Plugin,
-                            )
-                            .await
-                            {
-                                Ok(is_new) => {
-                                    log::info!("loaded lens {}, new? {}", plug.name, is_new)
-                                }
-                                Err(e) => log::error!("Unable to add lens: {}", e),
-                            }
-                        }
-
-                        // Is this plugin enabled?
-                        let lens_config = lens::Entity::find()
-                            .filter(lens::Column::Name.eq(plug.name.clone()))
-                            .one(&state.db)
-                            .await;
-
-                        if let Ok(Some(lens_config)) = lens_config {
-                            plug.is_enabled = lens_config.is_enabled;
-                        }
-
-                        if cmds
-                            .send(PluginCommand::Initialize(plug.clone()))
-                            .await
-                            .is_ok()
-                        {
-                            log::info!("<{}> plugin found", &plug.name);
-                        }
-                    }
-                    Err(e) => log::error!("Couldn't parse plugin config: {}", e),
-                },
-                Err(e) => log::error!("Couldn't read plugin config: {}", e),
-            }
+        if cmds
+            .send(PluginCommand::Initialize(plug.clone()))
+            .await
+            .is_ok()
+        {
+            log::info!("<{}> plugin found", &plug.name);
         }
     }
 }

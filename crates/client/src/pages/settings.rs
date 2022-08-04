@@ -10,7 +10,7 @@ use crate::{
     utils::RequestState,
 };
 use shared::event::ClientInvoke;
-use shared::SettingOpts;
+use shared::{FormType, SettingOpts};
 
 #[derive(Properties, PartialEq)]
 pub struct SettingFormProps {
@@ -28,6 +28,10 @@ pub struct SettingChangeEvent {
 #[function_component(SettingForm)]
 pub fn setting_form(props: &SettingFormProps) -> Html {
     let value = use_state(|| props.opts.value.clone());
+    let (parent, _) = props
+        .setting_ref
+        .split_once('.')
+        .unwrap_or((&props.setting_ref, ""));
 
     let onkeyup = {
         let onchange = props.onchange.clone();
@@ -44,10 +48,21 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
         })
     };
 
+    let label = if parent != "user" {
+        html! {
+            <>
+                <span class="text-white">{format!("{}: ", parent)}</span>
+                {props.opts.label.clone()}
+            </>
+        }
+    } else {
+        html! { props.opts.label.clone() }
+    };
+
     html! {
         <div class="p-8">
             <div class="mb-2">
-                <label class="text-yellow-500">{props.opts.label.clone()}</label>
+                <label class="text-yellow-500">{label}</label>
                 {
                     if let Some(help_text) = props.opts.help_text.clone() {
                         html! {
@@ -63,12 +78,31 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                 }
             </div>
             <div>
-                <input
-                    onkeyup={onkeyup}
-                    type="text"
-                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
-                    value={(*value).clone()}
-                />
+                {
+                    match &props.opts.form_type {
+                        FormType::List => {
+                            html! {
+                                <textarea
+                                    onkeyup={onkeyup}
+                                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
+                                    rows="5"
+                                >
+                                    {(*value).clone()}
+                                </textarea>
+                            }
+                        }
+                        FormType::Text => {
+                            html! {
+                                <input
+                                    onkeyup={onkeyup}
+                                    type="text"
+                                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
+                                    value={(*value).clone()}
+                                />
+                            }
+                        }
+                    }
+                }
             </div>
         </div>
     }
@@ -76,7 +110,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
 
 #[function_component(UserSettingsPage)]
 pub fn user_settings_page() -> Html {
-    let current_settings: UseStateHandle<HashMap<String, SettingOpts>> = use_state_eq(HashMap::new);
+    let current_settings: UseStateHandle<Vec<(String, SettingOpts)>> = use_state_eq(Vec::new);
     let changes: UseStateHandle<HashMap<String, String>> = use_state_eq(HashMap::new);
 
     let req_state = use_state_eq(|| RequestState::NotStarted);
@@ -85,7 +119,7 @@ pub fn user_settings_page() -> Html {
         let current_settings = current_settings.clone();
         spawn_local(async move {
             if let Ok(res) = invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
-                if let Ok(deser) = JsValue::into_serde::<HashMap<String, SettingOpts>>(&res) {
+                if let Ok(deser) = JsValue::into_serde::<Vec<(String, SettingOpts)>>(&res) {
                     current_settings.set(deser);
                 } else {
                     log::error!("unable to deserialize");
