@@ -10,7 +10,7 @@
             label: "Firefox Data Folder",
             value: "",
             form_type: Text,
-            help_text: None
+            help_text: Some("Leave blank for auto-detection. Otherwise, point this to where the Firefox's `places.sqlite` file is found.")
         )
     }
 )
