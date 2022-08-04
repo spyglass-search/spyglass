@@ -1,3 +1,4 @@
+use std::process::Command;
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
@@ -89,4 +90,31 @@ pub fn alert(window: &Window, title: &str, message: &str) {
         .buttons(MessageDialogButtons::Ok)
         .kind(MessageDialogKind::Error)
         .show(|_| {});
+}
+
+pub fn notify(title: &str, body: &str) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let title = title.to_string().clone();
+        let body = body.to_string().clone();
+        tauri::async_runtime::spawn(async move {
+            // osascript -e 'display notification "hello world!" with title "test"'
+            Command::new("osascript")
+                .arg("-e")
+                .arg(format!("display notification \"{}\" with title \"{}\"", body, title))
+                .spawn()
+                .expect("Failed to send message");
+        });
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        use notify_rust::Notification;
+        Notification::new()
+            .summary(title)
+            .body(body)
+            .show()?;
+    }
+
+    Ok(())
 }
