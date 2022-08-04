@@ -1,5 +1,6 @@
-use rusqlite::Connection;
 use std::path::Path;
+
+use rusqlite::Connection;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
@@ -7,8 +8,14 @@ use wasmer_wasi::WasiEnv;
 use super::{
     wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
 };
+
+use crate::search::Searcher;
 use crate::state::AppState;
-use entities::models::crawl_queue::enqueue_all;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use entities::{
+    models::{crawl_queue::enqueue_all, indexed_document},
+    sea_orm::ModelTrait,
+};
 use spyglass_plugin::PluginCommandRequest;
 
 pub fn register_exports(
@@ -43,6 +50,34 @@ pub fn register_exports(
 pub(crate) fn plugin_cmd(env: &PluginEnv) {
     if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
         match cmd {
+            PluginCommandRequest::DeleteDoc { url } => {
+                let rt = tokio::runtime::Handle::current();
+                let db = env.app_state.db.clone();
+                let writer = env.app_state.index.writer.clone();
+                rt.spawn(async move {
+                    let doc = indexed_document::Entity::find()
+                        .filter(indexed_document::Column::Url.eq(url))
+                        .one(&db)
+                        .await;
+
+                    if let Ok(Some(doc)) = doc {
+                        let doc_id = doc.doc_id.clone();
+                        // Remove from index_doc table
+                        let _ = doc.delete(&db).await;
+                        // Remove from search index
+                        if let Ok(mut writer) = writer.lock() {
+                            match Searcher::delete(&mut writer, &doc_id) {
+                                Ok(_) => {
+                                    let _ = writer.commit();
+                                }
+                                Err(e) => {
+                                    log::error!("Unable to delete doc {} - {}", doc_id, e);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
             PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, &urls),
             PluginCommandRequest::ListDir { path, recurse } => {
                 let entries = if recurse {

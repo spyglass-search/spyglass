@@ -347,7 +347,6 @@ pub async fn save_user_settings(
         }
     }
 
-    dbg!(&user_settings);
     let _ = config.save_user_settings(&user_settings);
 
     Ok(())

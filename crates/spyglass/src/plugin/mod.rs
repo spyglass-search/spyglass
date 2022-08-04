@@ -102,7 +102,7 @@ struct PluginInstance {
 }
 
 impl PluginInstance {
-    pub fn update(&self, event: PluginEvent) {
+    pub fn update(&mut self, event: PluginEvent) {
         if !self.config.is_enabled {
             return;
         }
@@ -226,7 +226,7 @@ pub async fn plugin_manager(
                 }
             }
             Some(PluginCommand::HandleUpdate { plugin_id, event }) => {
-                if let Some(plugin) = manager.plugins.get(&plugin_id) {
+                if let Some(mut plugin) = manager.plugins.get_mut(&plugin_id) {
                     plugin.update(event);
                 } else {
                     log::error!("Unable to find plugin id: {}", plugin_id);

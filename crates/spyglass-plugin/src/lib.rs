@@ -32,9 +32,9 @@ macro_rules! register_plugin {
 pub trait SpyglassPlugin {
     /// Initial plugin load, setup any configuration you need here as well as
     /// subscribe to specific events.
-    fn load(&self);
+    fn load(&mut self);
     /// Request plugin for updates
-    fn update(&self, event: PluginEvent);
+    fn update(&mut self, event: PluginEvent);
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -78,6 +78,7 @@ pub enum PluginEvent {
 
 #[derive(Deserialize, Serialize)]
 pub enum PluginCommandRequest {
+    DeleteDoc { url: String },
     // Enqueue a list of URLs into the crawl queue
     Enqueue { urls: Vec<String> },
     // List the contents of a directory

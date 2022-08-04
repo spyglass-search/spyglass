@@ -3,6 +3,18 @@ use std::io;
 
 use crate::{PluginCommandRequest, PluginSubscription};
 
+pub fn delete_doc(url: &str) {
+    if object_to_stdout(&PluginCommandRequest::DeleteDoc {
+        url: url.to_string(),
+    })
+    .is_ok()
+    {
+        unsafe {
+            plugin_cmd();
+        }
+    }
+}
+
 pub fn subscribe(event: PluginSubscription) {
     if object_to_stdout(&PluginCommandRequest::Subscribe(event)).is_ok() {
         unsafe {

@@ -361,8 +361,6 @@ pub async fn enqueue_all(
         .iter()
         .filter_map(|url| {
             if let Ok(mut parsed) = Url::parse(url) {
-                dbg!(&url);
-
                 // Check that we can handle this scheme
                 if parsed.scheme() != "http"
                     && parsed.scheme() != "https"

@@ -19,7 +19,7 @@ struct Plugin;
 register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
-    fn load(&self) {
+    fn load(&mut self) {
         // Let the host know we want to check for updates on a regular interval.
         subscribe(PluginSubscription::CheckUpdateInterval);
 
@@ -41,7 +41,7 @@ impl SpyglassPlugin for Plugin {
         }
     }
 
-    fn update(&self, _: PluginEvent) {
+    fn update(&mut self, _: PluginEvent) {
         let path = Path::new(DATA_DIR).join(DB_FILE);
         if path.exists() {
             enqueue_all(&self.read_bookmarks());

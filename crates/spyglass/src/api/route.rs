@@ -125,6 +125,15 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
         }
     }
 
+    // Remove from indexed_doc table
+    if let Ok(Some(model)) = indexed_document::Entity::find()
+        .filter(indexed_document::Column::DocId.eq(id))
+        .one(&state.db)
+        .await
+    {
+        let _ = model.delete(&state.db).await;
+    }
+
     Ok(())
 }
 
