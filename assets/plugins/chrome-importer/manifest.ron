@@ -10,7 +10,7 @@
             label: "Chrome Data Folder",
             value: "",
             form_type: Text,
-            help_text: None
+            help_text: Some("Leave blank for auto-detection. Otherwise, point this to the folder where the `Bookmarks` file is found.")
         )
     }
 )

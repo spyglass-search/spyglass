@@ -37,14 +37,15 @@ async fn try_connect(endpoint: &str) -> Result<TypedClient, ()> {
 impl RpcClient {
     pub async fn new() -> Self {
         let endpoint = gen_ipc_path();
-
-        let client = try_connect(&endpoint)
-            .await
-            .expect("Unable to connect to spyglass backend!");
+        log::info!("Starting backend");
 
         // Only startup & manage sidecar in release mode.
         #[cfg(not(debug_assertions))]
         let sidecar_handle = Some(RpcClient::check_and_start_backend());
+
+        let client = try_connect(&endpoint)
+            .await
+            .expect("Unable to connect to spyglass backend!");
 
         #[cfg(debug_assertions)]
         let sidecar_handle = None;
