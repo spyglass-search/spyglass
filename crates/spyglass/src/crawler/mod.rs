@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::path::Path;
 
 use addr::parse_domain_name;
 use chrono::prelude::*;
@@ -216,14 +217,8 @@ impl Crawler {
         }
 
         let crawl = crawl.expect("Invalid crawl model");
-        // Modify bootstrapped URLs to pull from the Internet Archive
-        let fetch_url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
-            create_archive_url(&crawl.url)
-        } else {
-            crawl.url.clone()
-        };
+        let url = Url::parse(&crawl.url).expect("Invalid fetch URL");
 
-        let url = Url::parse(&fetch_url).expect("Invalid fetch URL");
         // Have we crawled this recently?
         if let Some(history) = fetch_history::find_by_url(db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
@@ -232,6 +227,71 @@ impl Crawler {
                 return Ok(None);
             }
         }
+
+        // Route URL to the correct fetcher
+        // TODO: Have plugins register for a specific scheme and have the plugin
+        // handle any fetching/parsing.
+        match url.scheme() {
+            "file" => self.handle_file_fetch(&crawl, &url).await,
+            "http" | "https" => self.handle_http_fetch(db, &crawl, &url).await,
+            _ => {
+                // unknown scheme, ignore
+                log::warn!("Ignoring unhandled scheme: {}", &url);
+                Ok(None)
+            }
+        }
+    }
+
+    async fn handle_file_fetch(
+        &self,
+        _: &crawl_queue::Model,
+        url: &Url,
+    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        let path = Path::new(url.path());
+        // Is this a file and does this exist?
+        if !path.exists() || !path.is_file() {
+            return Ok(None);
+        }
+
+        let file_name = path
+            .file_name()
+            .and_then(|x| x.to_str())
+            .map(|x| x.to_string())
+            .expect("Unable to convert path file name to string");
+
+        // Attempt to read file
+        let contents = std::fs::read_to_string(&path)?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(&contents.as_bytes());
+        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+
+        Ok(Some(CrawlResult {
+            content_hash,
+            content: Some(contents.clone()),
+            // Does a file have a description? Pull the first part of the file
+            description: Some(contents[0..256.min(contents.len())].to_string()),
+            status: 200,
+            title: Some(file_name),
+            url: url.to_string(),
+            links: Default::default(),
+            raw: None,
+        }))
+    }
+
+    /// Handle HTTP related requests
+    async fn handle_http_fetch(
+        &self,
+        db: &DatabaseConnection,
+        crawl: &crawl_queue::Model,
+        url: &Url,
+    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        // Modify bootstrapped URLs to pull from the Internet Archive
+        let url: Url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+            Url::parse(&create_archive_url(url.as_ref())).expect("Unable to create archive URL")
+        } else {
+            url.clone()
+        };
 
         // Check for robots.txt of this domain
         // When looking at bootstrapped tasks, check the original URL

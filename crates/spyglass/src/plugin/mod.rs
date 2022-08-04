@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
@@ -286,7 +286,6 @@ pub async fn plugin_manager(
             }
             // Notify subscribers of a new file event
             Some(PluginCommand::QueueFileNotify(file_event)) => {
-                dbg!(&file_event);
                 if !matches!(
                     file_event.kind,
                     EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
@@ -297,13 +296,19 @@ pub async fn plugin_manager(
                 for updated_path in file_event.paths {
                     let updated_path = updated_path.display().to_string();
 
-                    let event = match file_event.kind {
+                    let event = match &file_event.kind {
                         EventKind::Create(_) => {
                             Some(PluginEvent::FileCreated(updated_path.clone()))
                         }
-                        EventKind::Modify(_) => {
-                            Some(PluginEvent::FileUpdated(updated_path.clone()))
-                        }
+                        EventKind::Modify(modify_kind) => match modify_kind {
+                            ModifyKind::Any
+                            | ModifyKind::Data(_)
+                            | ModifyKind::Name(_)
+                            | ModifyKind::Other => {
+                                Some(PluginEvent::FileUpdated(updated_path.clone()))
+                            }
+                            ModifyKind::Metadata(_) => None,
+                        },
                         EventKind::Remove(_) => {
                             Some(PluginEvent::FileDeleted(updated_path.clone()))
                         }
