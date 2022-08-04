@@ -6,6 +6,7 @@ use yew::prelude::*;
 
 use btn::DeleteButton;
 use shared::response::{LensResult, SearchResult};
+use url::Url;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {
@@ -107,29 +108,46 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
 
     match result.result_type {
         ResultListType::DocSearch => {
-            let url_link = if result.url.is_some() {
-                let domain = result
-                    .domain
-                    .clone()
-                    .unwrap_or_else(|| "example.com".to_string());
-                let url = result.url.clone().unwrap();
+            let url_link = if let Some(url) = &result.url {
+                if let Ok(url) = Url::parse(url) {
+                    let domain = result
+                        .domain
+                        .clone()
+                        .unwrap_or_else(|| "example.com".to_string());
 
-                let path = url
-                    .trim_start_matches("http://")
-                    .trim_start_matches("https://")
-                    .trim_start_matches(&domain);
+                    let path = url.path();
 
-                html! {
-                    <div class="text-xs truncate">
-                        <a href={url.clone()} target="_blank">
-                            <img
-                                class="w-3 inline align-middle"
+                    let uri_icon = if url.scheme() == "file" {
+                        html! {
+                            <icons::DesktopComputerIcon
+                                classes={classes!("inline", "align-middle")}
+                            />
+                        }
+                    } else {
+                        html! {
+                            <img class="w-3 inline align-middle"
                                 src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
                             />
-                            <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span>
-                            <span class="align-middle">{format!(" → {}", path)}</span>
-                        </a>
-                    </div>
+                        }
+                    };
+
+                    html! {
+                        <div class="text-xs truncate">
+                            <a href={url.clone().to_string()} target="_blank">
+                                {uri_icon}
+                                {
+                                    if url.scheme() == "file" {
+                                        html!{}
+                                    } else {
+                                        html!{ <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span> }
+                                    }
+                                }
+                                <span class="align-middle">{format!(" → {}", path)}</span>
+                            </a>
+                        </div>
+                    }
+                } else {
+                    html! { <span></span> }
                 }
             } else {
                 html! { <span></span> }

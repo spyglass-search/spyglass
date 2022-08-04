@@ -1,7 +1,7 @@
 use spyglass_plugin::*;
 use std::path::{Path, PathBuf};
 
-const DATA_DIR: &str = "/data";
+const DATA_DIR: &str = "/";
 const DB_FILE: &str = "places.sqlite";
 const BOOKMARK_QUERY: &str = "
     SELECT
@@ -19,9 +19,9 @@ struct Plugin;
 register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
-    fn load(&self) {
+    fn load(&mut self) {
         // Let the host know we want to check for updates on a regular interval.
-        subscribe(PluginEvent::CheckUpdateInterval);
+        subscribe(PluginSubscription::CheckUpdateInterval);
 
         let mut profile_path = None;
         if let Ok(folder) = std::env::var("FIREFOX_DATA_FOLDER") {
@@ -41,7 +41,7 @@ impl SpyglassPlugin for Plugin {
         }
     }
 
-    fn update(&self) {
+    fn update(&mut self, _: PluginEvent) {
         let path = Path::new(DATA_DIR).join(DB_FILE);
         if path.exists() {
             enqueue_all(&self.read_bookmarks());
@@ -76,9 +76,12 @@ impl Plugin {
         // A little hacky since Firefox prepends a random string to the profile name.
         if let Some(profiles_dir) = profiles_dir {
             if let Ok(entries) = list_dir(&profiles_dir.display().to_string()) {
-                for path in entries {
-                    if path.ends_with(".default") || path.ends_with(".default-release") {
-                        return Some(Path::new(&path).join(DB_FILE));
+                for entry in entries {
+                    if entry.is_dir
+                        && (entry.path.ends_with(".default")
+                            || entry.path.ends_with(".default-release"))
+                    {
+                        return Some(Path::new(&entry.path).join(DB_FILE));
                     }
                 }
             }

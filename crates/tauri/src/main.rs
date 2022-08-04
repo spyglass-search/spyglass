@@ -327,7 +327,7 @@ fn copy_plugins(config: &Config, resolver: PathResolver) -> anyhow::Result<()> {
                 let plugin_name = path.file_name().expect("Unable to parse folder");
                 let plugin_dir = base_plugin_dir.join(plugin_name);
                 // Create folder for plugin
-                std::fs::create_dir_all(plugin_dir.join(plugin_name))?;
+                std::fs::create_dir_all(plugin_dir.clone())?;
                 // Copy plugin contents to folder
                 for file in std::fs::read_dir(path)? {
                     let file = file?;
