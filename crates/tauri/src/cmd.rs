@@ -44,7 +44,14 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
-    open::that(url).unwrap();
+    if let Ok(mut url) = url::Url::parse(url) {
+        // treat open files as a local action.
+        if url.scheme() == "file" {
+            let _ = url.set_host(Some("localhost"));
+        }
+
+        open::that(url.to_string()).unwrap();
+    }
     Ok(())
 }
 

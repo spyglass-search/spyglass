@@ -5046,6 +5046,7 @@ dependencies = [
  "shared",
  "strum 0.24.1",
  "strum_macros 0.24.2",
+ "url 2.2.2",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-logger",
