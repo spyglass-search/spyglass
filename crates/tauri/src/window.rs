@@ -1,8 +1,7 @@
-use shared::event::ClientEvent;
-use std::process::Command;
-use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
-use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use crate::constants;
+use shared::event::ClientEvent;
+use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
+use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
 
 pub fn center_window(window: &Window) {
     if let Some(monitor) = window.primary_monitor().unwrap() {
@@ -117,6 +116,7 @@ pub fn alert(window: &Window, title: &str, message: &str) {
 pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     {
+        use std::process::Command;
         let title = title.to_string();
         let body = body.to_string();
         tauri::async_runtime::spawn(async move {
