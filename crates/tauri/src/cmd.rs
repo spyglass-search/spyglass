@@ -432,3 +432,18 @@ pub async fn load_user_settings(
     list.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(list)
 }
+
+#[tauri::command]
+pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
+    let app_handle = window.app_handle();
+    if let Ok(updater) = app_handle.updater().check().await {
+        log::info!("downloading new update...");
+        if let Err(e) = updater.download_and_install().await {
+            window::alert(&window, "Unable to update", &e.to_string());
+        } else {
+            log::info!("completed update, restarting!");
+            app_handle.restart();
+        }
+    }
+    Ok(())
+}

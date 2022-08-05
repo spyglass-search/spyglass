@@ -28,4 +28,6 @@ pub enum ClientInvoke {
     OpenLensFolder,
     #[strum(serialize = "open_settings_folder")]
     OpenSettingsFolder,
+    #[strum(serialize = "update_and_restart")]
+    UpdateAndRestart,
 }

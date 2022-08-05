@@ -1,17 +1,15 @@
 mod admin;
-pub use admin::*;
-
-mod lens_manager;
-pub use lens_manager::*;
-
-mod plugin_manager;
-pub use plugin_manager::*;
-
-mod search;
-pub use search::*;
-
-mod settings;
-pub use settings::*;
-
 mod crawl_stats;
+mod lens_manager;
+mod plugin_manager;
+mod search;
+mod settings;
+mod updater;
+
+pub use admin::*;
 pub use crawl_stats::*;
+pub use lens_manager::*;
+pub use plugin_manager::*;
+pub use search::*;
+pub use settings::*;
+pub use updater::*;

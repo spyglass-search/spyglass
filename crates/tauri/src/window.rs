@@ -1,8 +1,7 @@
+use crate::constants;
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
-
-use crate::constants;
 
 pub fn center_window(window: &Window) {
     if let Some(monitor) = window.primary_monitor().unwrap() {
@@ -83,10 +82,64 @@ pub fn show_user_settings(app: &AppHandle) {
     _show_tab(app, "/settings/user");
 }
 
+pub fn show_update_window(app: &AppHandle) {
+    let window = if let Some(window) = app.get_window(constants::UPDATE_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::UPDATE_WIN_NAME,
+            WindowUrl::App("/updater".into()),
+        )
+        .title("Spyglass - Update Available!")
+        .min_inner_size(450.0, 375.0)
+        .max_inner_size(450.0, 375.0)
+        .build()
+        .unwrap()
+    };
+
+    // A little hack to bring window to the front if its hiding behind something.
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_always_on_top(false);
+    let _ = window.center();
+}
+
 pub fn alert(window: &Window, title: &str, message: &str) {
     MessageDialogBuilder::new(title, message)
         .parent(window)
         .buttons(MessageDialogButtons::Ok)
         .kind(MessageDialogKind::Error)
         .show(|_| {});
+}
+
+#[allow(dead_code)]
+pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let title = title.to_string();
+        let body = body.to_string();
+        tauri::async_runtime::spawn(async move {
+            // osascript -e 'display notification "hello world!" with title "test"'
+            Command::new("osascript")
+                .arg("-e")
+                .arg(format!(
+                    "display notification \"{}\" with title \"{}\"",
+                    body, title
+                ))
+                .spawn()
+                .expect("Failed to send message");
+        });
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        use tauri::api::notification::Notification;
+        let _ = Notification::new(&_app.config().tauri.bundle.identifier)
+            .title(title)
+            .body(body)
+            .show();
+    }
+
+    Ok(())
 }

@@ -135,11 +135,14 @@ pub fn delete_button(props: &DeleteDomainButtonProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct DefaultBtnProps {
+    #[prop_or_default]
     pub onclick: Callback<MouseEvent>,
     #[prop_or_default]
     pub disabled: bool,
     #[prop_or_default]
     pub children: Children,
+    #[prop_or_default]
+    pub href: String,
 }
 
 #[function_component(Btn)]
@@ -159,9 +162,17 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         },
     );
 
-    html! {
-        <button onclick={props.onclick.clone()} class={styles} disabled={props.disabled}>
-            {props.children.clone()}
-        </button>
+    if props.href.is_empty() {
+        html! {
+            <button onclick={props.onclick.clone()} class={styles} disabled={props.disabled}>
+                {props.children.clone()}
+            </button>
+        }
+    } else {
+        html! {
+            <a onclick={props.onclick.clone()} href={props.href.clone()} class={styles} target="_blank">
+                {props.children.clone()}
+            </a>
+        }
     }
 }
