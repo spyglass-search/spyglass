@@ -1,5 +1,5 @@
-use std::process::Command;
 use shared::event::ClientEvent;
+use std::process::Command;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
 
@@ -94,7 +94,8 @@ pub fn show_update_window(app: &AppHandle) {
             WindowUrl::App("/updater".into()),
         )
         .title("Spyglass - Update Available!")
-        .min_inner_size(450.0, 350.0)
+        .min_inner_size(450.0, 375.0)
+        .max_inner_size(450.0, 375.0)
         .build()
         .unwrap()
     };
@@ -112,16 +113,20 @@ pub fn alert(window: &Window, title: &str, message: &str) {
         .show(|_| {});
 }
 
+#[allow(dead_code)]
 pub fn notify(title: &str, body: &str) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     {
-        let title = title.to_string().clone();
-        let body = body.to_string().clone();
+        let title = title.to_string();
+        let body = body.to_string();
         tauri::async_runtime::spawn(async move {
             // osascript -e 'display notification "hello world!" with title "test"'
             Command::new("osascript")
                 .arg("-e")
-                .arg(format!("display notification \"{}\" with title \"{}\"", body, title))
+                .arg(format!(
+                    "display notification \"{}\" with title \"{}\"",
+                    body, title
+                ))
                 .spawn()
                 .expect("Failed to send message");
         });
@@ -130,10 +135,7 @@ pub fn notify(title: &str, body: &str) -> anyhow::Result<()> {
     #[cfg(not(target_os = "macos"))]
     {
         use notify_rust::Notification;
-        Notification::new()
-            .summary(title)
-            .body(body)
-            .show()?;
+        Notification::new().summary(title).body(body).show()?;
     }
 
     Ok(())
