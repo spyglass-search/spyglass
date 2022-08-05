@@ -53,7 +53,7 @@ pub async fn resize_window(window: &Window, height: f64) {
         }
     };
 
-    let max_height = if let Some(window_height) = window_height {
+    let height = if let Some(window_height) = window_height {
         window_height.min(height)
     } else {
         height
@@ -61,7 +61,7 @@ pub async fn resize_window(window: &Window, height: f64) {
 
     let _ = window.set_size(Size::Logical(LogicalSize {
         width: constants::INPUT_WIDTH,
-        height: max_height
+        height
     }));
 }
 

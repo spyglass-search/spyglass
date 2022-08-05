@@ -26,13 +26,13 @@ pub fn search_page() -> Html {
     let lens = use_state_eq(Vec::new);
     // Current query string
     let query = use_state_eq(|| "".to_string());
-    let query_ref = use_state_eq(NodeRef::default);
+    let query_ref = use_node_ref();
 
     // Search results + selected index
     let search_results = use_state_eq(Vec::new);
     let selected_idx = use_state_eq(|| 0);
 
-    let node_ref = use_state_eq(NodeRef::default);
+    let node_ref = use_node_ref();
     let query_debounce: UseStateHandle<Option<TimeoutId>> = use_state(|| None);
 
     // Handle key events
@@ -169,8 +169,9 @@ pub fn search_page() -> Html {
         .iter()
         .enumerate()
         .map(|(idx, res)| {
+            let is_selected = idx == *selected_idx;
             html! {
-                <SearchResultItem result={res.clone()} is_selected={idx == *selected_idx} />
+                <SearchResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
             }
         })
         .collect::<Html>();
@@ -197,11 +198,11 @@ pub fn search_page() -> Html {
     };
 
     html! {
-        <div ref={(*node_ref).clone()}>
+        <div ref={node_ref} class="relative ">
             <div class="flex flex-nowrap w-full">
                 <SelectedLens lens={(*lens).clone()} />
                 <input
-                    ref={(*query_ref).clone()}
+                    ref={query_ref}
                     id="searchbox"
                     type="text"
                     class="bg-neutral-800 text-white text-5xl p-4 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
@@ -212,7 +213,7 @@ pub fn search_page() -> Html {
                     tabindex="-1"
                 />
             </div>
-            <div>{ results }</div>
+            <div class="overflow-scroll h-full">{ results }</div>
         </div>
     }
 }
