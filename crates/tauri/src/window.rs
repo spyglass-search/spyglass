@@ -1,10 +1,26 @@
 use crate::constants;
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
-use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
+use tauri::{AppHandle, LogicalSize, Manager, Monitor, Size, Window, WindowBuilder, WindowUrl};
+
+pub fn _find_monitor(window: &Window) -> Option<Monitor> {
+    if let Ok(Some(mon)) = window.primary_monitor() {
+        Some(mon)
+    } else if let Ok(Some(mon)) = window.current_monitor() {
+        Some(mon)
+    } else if let Ok(mut monitors) = window.available_monitors() {
+        if monitors.is_empty() {
+            None
+        } else {
+            monitors.pop()
+        }
+    } else {
+        None
+    }
+}
 
 pub fn center_window(window: &Window) {
-    if let Some(monitor) = window.primary_monitor().unwrap() {
+    if let Some(monitor) = _find_monitor(window) {
         let size = monitor.size();
         let scale = monitor.scale_factor();
 
@@ -16,14 +32,14 @@ pub fn center_window(window: &Window) {
                 y: constants::INPUT_Y,
             }))
             .unwrap();
+    } else {
+        log::error!("Unable to detect any monitors...");
     }
 }
 
 pub fn hide_window(window: &Window) {
-    window.hide().unwrap();
-    window
-        .emit(ClientEvent::ClearSearch.as_ref(), true)
-        .unwrap();
+    let _ = window
+        .emit(ClientEvent::ClearSearch.as_ref(), true);
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
