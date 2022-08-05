@@ -84,6 +84,26 @@ pub fn show_user_settings(app: &AppHandle) {
     _show_tab(app, "/settings/user");
 }
 
+pub fn show_update_window(app: &AppHandle) {
+    let window = if let Some(window) = app.get_window(constants::UPDATE_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::UPDATE_WIN_NAME,
+            WindowUrl::App("/updater".into()),
+        )
+        .title("Spyglass - Update Available!")
+        .min_inner_size(450.0, 350.0)
+        .build()
+        .unwrap()
+    };
+
+    // A little hack to bring window to the front if its hiding behind something.
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_always_on_top(false);
+}
+
 pub fn alert(window: &Window, title: &str, message: &str) {
     MessageDialogBuilder::new(title, message)
         .parent(window)

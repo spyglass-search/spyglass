@@ -189,13 +189,15 @@ pub struct HeaderProps {
     #[prop_or_default]
     pub children: Children,
     #[prop_or_default]
+    pub classes: Classes,
+    #[prop_or_default]
     pub tabs: Html,
 }
 
 #[function_component(Header)]
 pub fn header(props: &HeaderProps) -> Html {
     html! {
-        <div class={classes!("pt-4", "px-8", "top-0", "sticky", "bg-stone-800", "z-400", "border-b-2", "border-stone-900")}>
+        <div class={classes!(props.classes.clone(), "pt-4", "px-8", "top-0", "sticky", "bg-stone-800", "z-400", "border-b-2", "border-stone-900")}>
             <div class="flex flex-row items-center gap-4 pb-4">
                 <h1 class="text-2xl grow">{props.label.clone()}</h1>
                 {props.children.clone()}

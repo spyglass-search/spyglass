@@ -14,3 +14,4 @@ pub const LENS_DIRECTORY_INDEX_URL: &str =
     "https://raw.githubusercontent.com/spyglass-search/lens-box/main/index.ron";
 
 pub const SETTINGS_WIN_NAME: &str = "settings_window";
+pub const UPDATE_WIN_NAME: &str = "update_window";

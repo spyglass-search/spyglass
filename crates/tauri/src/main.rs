@@ -36,6 +36,8 @@ use window::{
     show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings,
 };
 
+use crate::window::show_update_window;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
     let config = Config::new();
@@ -89,6 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::search_docs,
             cmd::search_lenses,
             cmd::toggle_plugin,
+            cmd::update_and_restart,
         ])
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
@@ -310,10 +313,19 @@ async fn update_tray_menu(app: &AppHandle) {
 async fn check_version_interval(window: Window) {
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
+
+    let app_handle = window.app_handle();
+
     loop {
         interval.tick().await;
         log::info!("checking for update...");
-        window.trigger_global("tauri://update", None);
+        if let Ok(response) = app_handle.updater().check().await {
+            if response.is_update_available() {
+                // show update dialog
+                show_update_window(&app_handle);
+            }
+        }
+
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 }
