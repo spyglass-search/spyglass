@@ -19,7 +19,6 @@ anyhow = "1.0"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ipc"] }
 log = "0.4"
-notify-rust = { version = "4", features = ["d"]}
 num-format = "0.4"
 open = "2"
 reqwest = { version = "0.11", features = ["json"] }

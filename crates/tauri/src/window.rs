@@ -1,8 +1,7 @@
 use shared::event::ClientEvent;
 use std::process::Command;
-use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{AppHandle, LogicalSize, Manager, Size, Window, WindowBuilder, WindowUrl};
-
+use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use crate::constants;
 
 pub fn center_window(window: &Window) {
@@ -115,7 +114,7 @@ pub fn alert(window: &Window, title: &str, message: &str) {
 }
 
 #[allow(dead_code)]
-pub fn notify(title: &str, body: &str) -> anyhow::Result<()> {
+pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     {
         let title = title.to_string();
@@ -135,8 +134,11 @@ pub fn notify(title: &str, body: &str) -> anyhow::Result<()> {
 
     #[cfg(not(target_os = "macos"))]
     {
-        use notify_rust::Notification;
-        Notification::new().summary(title).body(body).show()?;
+        use tauri::api::notification::Notification;
+        let _ = Notification::new(&_app.config().tauri.bundle.identifier)
+            .title(title)
+            .body(body)
+            .show();
     }
 
     Ok(())
