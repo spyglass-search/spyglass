@@ -103,6 +103,7 @@ pub fn show_update_window(app: &AppHandle) {
     // A little hack to bring window to the front if its hiding behind something.
     let _ = window.set_always_on_top(true);
     let _ = window.set_always_on_top(false);
+    let _ = window.center();
 }
 
 pub fn alert(window: &Window, title: &str, message: &str) {
