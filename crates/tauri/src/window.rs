@@ -61,7 +61,7 @@ pub async fn resize_window(window: &Window, height: f64) {
 
     let _ = window.set_size(Size::Logical(LogicalSize {
         width: constants::INPUT_WIDTH,
-        height
+        height,
     }));
 }
 
