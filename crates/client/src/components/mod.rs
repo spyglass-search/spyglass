@@ -82,6 +82,7 @@ pub fn selected_lens_list(props: &SelectLensProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
+    pub id: String,
     pub result: ResultListData,
     pub is_selected: bool,
 }
@@ -92,19 +93,18 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     let is_selected = props.is_selected;
     let result = &props.result;
 
-    let mut selected: String = "bg-neutral-800".into();
-    if is_selected {
-        selected = "bg-cyan-900".into();
-    }
-
-    let component_styles = vec![
-        "border-t".into(),
-        "border-neutral-600".into(),
-        "p-4".into(),
-        "pr-0".into(),
-        "text-white".into(),
-        selected,
-    ];
+    let component_styles = classes!(
+        "border-t",
+        "border-neutral-600",
+        "p-4",
+        "pr-0",
+        "text-white",
+        if is_selected {
+            "bg-cyan-900"
+        } else {
+            "bg-neutral-800"
+        }
+    );
 
     match result.result_type {
         ResultListType::DocSearch => {
@@ -154,7 +154,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             };
 
             html! {
-                <div class={component_styles}>
+                <div id={props.id.clone()} class={component_styles}>
                     <div class="float-right pl-4 mr-2 h-28">
                         <DeleteButton doc_id={result.id.clone()} />
                     </div>
@@ -170,7 +170,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         }
         ResultListType::LensSearch => {
             html! {
-                <div class={component_styles}>
+                <div id={props.id.clone()} class={component_styles}>
                     <h2 class="text-2xl truncate py-1">
                         {result.title.clone()}
                     </h2>

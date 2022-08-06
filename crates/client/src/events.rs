@@ -1,21 +1,29 @@
-use shared::event::ClientInvoke;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Element, HtmlInputElement};
+use web_sys::{Element, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 use super::{invoke, open};
 use crate::components::ResultListData;
 use crate::constants;
 use crate::pages::{clear_results, show_doc_results, show_lens_results};
+use shared::event::ClientInvoke;
+
+fn scroll_to_result(idx: usize) {
+    let document = gloo::utils::document();
+    if let Some(el) = document.get_element_by_id(&format!("result-{}", idx)) {
+        let el: HtmlElement = el.unchecked_into();
+        el.scroll_into_view();
+    }
+}
 
 pub fn handle_global_key_down(
     event: &Event,
-    node_ref: UseStateHandle<NodeRef>,
+    node_ref: NodeRef,
     lens: UseStateHandle<Vec<String>>,
     query: UseStateHandle<String>,
-    query_ref: UseStateHandle<NodeRef>,
+    query_ref: NodeRef,
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
@@ -29,10 +37,12 @@ pub fn handle_global_key_down(
             search_results.len() - 1
         };
         selected_idx.set((*selected_idx + 1).min(max_len));
+        scroll_to_result(*selected_idx);
     } else if event.key() == "ArrowUp" {
         event.stop_propagation();
         let new_idx = (*selected_idx).max(1) - 1;
         selected_idx.set(new_idx);
+        scroll_to_result(new_idx);
     } else if event.key() == "Enter" {
         let selected: &ResultListData = (*search_results).get(*selected_idx).unwrap();
         if let Some(url) = selected.url.clone() {
@@ -76,7 +86,7 @@ pub fn handle_global_key_down(
 
 pub fn handle_query_change(
     query: &str,
-    node_ref: UseStateHandle<NodeRef>,
+    node_ref: NodeRef,
     lens: UseStateHandle<Vec<String>>,
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,

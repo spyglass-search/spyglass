@@ -2,6 +2,8 @@
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
 PLUGINS := chrome-importer firefox-importer local-file-indexer
+# Set this up if you're working on the plugins
+PLUGINS_DEV_FOLDER := ~/spyglass-plugins
 
 build-backend:
 	cargo build -p spyglass
@@ -21,7 +23,8 @@ build-plugins-dev:
 		cargo build -p $$plugin --target wasm32-wasi; \
 		cp target/wasm32-wasi/debug/$$plugin.wasm assets/plugins/$$plugin/main.wasm; \
 	done
-	cp -r assets/plugins ~/Library/Application\ Support/com.athlabs.spyglass-dev/
+	mkdir -p $(PLUGINS_DEV_FOLDER);
+	cp -r assets/plugins $(PLUGINS_DEV_FOLDER);
 
 build-plugins-release:
 	@for plugin in $(PLUGINS); do \
