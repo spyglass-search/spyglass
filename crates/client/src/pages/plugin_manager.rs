@@ -4,7 +4,6 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
 use crate::components::{icons, Header};
@@ -64,14 +63,6 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
         })
     };
 
-    let on_edit_settings = {
-        Callback::from(move |_| {
-            spawn_local(async move {
-                let _ = invoke(&ClientInvoke::EditPluginSettings.to_string(), JsValue::NULL).await;
-            });
-        })
-    };
-
     let toggle_button = html! {
         <button
             onclick={onclick}
@@ -79,16 +70,6 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
         >
             <icons::LightningBoltIcon />
             <div class="ml-2">{btn_label}</div>
-        </button>
-    };
-
-    let view_settings = html! {
-        <button
-            onclick={on_edit_settings}
-            class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white"
-        >
-            <icons::PencilIcon />
-            <div class="ml-2">{"Edit/View Settings"}</div>
         </button>
     };
 
@@ -106,7 +87,6 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
             </div>
             <div class="pt-2 flex flex-row gap-8">
                 {toggle_button}
-                {view_settings}
             </div>
         </div>
     }
