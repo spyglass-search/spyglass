@@ -82,7 +82,7 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
                 {"Crafted By:"}
                 <span class="ml-2 text-cyan-400">{plugin.author.clone()}</span>
             </h2>
-            <div class="leading-relaxed text-neutral-400 h-6 overflow-hidden text-ellipsis">
+            <div class="leading-relaxed text-neutral-400">
                 {plugin.description.clone()}
             </div>
             <div class="pt-2 flex flex-row gap-8">

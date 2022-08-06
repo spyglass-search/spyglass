@@ -1,7 +1,7 @@
 (
     name: "local-file-importer",
     author: "a5huynh",
-    description: "Crawl & index local files",
+    description: "Crawl & index local files. Currently only supports `.md` and `.txt` extensions. Add folders in your user settings to get started!",
     version: "1",
     plugin_type: Lens,
     // User settings w/ the default value, this will be added the plugin environment
