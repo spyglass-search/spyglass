@@ -11,7 +11,7 @@ use url::Url;
 use crate::scraper::element::Node;
 use crate::scraper::html::Html;
 
-const DEFAULT_DESC_LENGTH: usize = 256;
+pub const DEFAULT_DESC_LENGTH: usize = 256;
 
 #[derive(Debug)]
 pub struct ScrapeResult {

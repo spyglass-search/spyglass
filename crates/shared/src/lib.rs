@@ -3,6 +3,7 @@ use strum_macros::{Display, EnumString};
 
 pub mod config;
 pub mod event;
+pub mod plugin;
 pub mod regex;
 pub mod request;
 pub mod response;
@@ -10,6 +11,7 @@ pub mod rpc;
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize)]
 pub enum FormType {
+    List,
     Text,
 }
 

@@ -82,14 +82,8 @@ pub async fn manager_task(
         match next_url {
             Err(err) => log::error!("Unable to dequeue: {}", err),
             Ok(Some(task)) => {
-                // Mark in progress
-                let task_id = task.id;
-                let mut update: crawl_queue::ActiveModel = task.into();
-                update.status = Set(crawl_queue::CrawlStatus::Processing);
-                let _ = update.update(&state.db).await;
-
                 // Send to worker
-                let cmd = Command::Fetch(CrawlTask { id: task_id });
+                let cmd = Command::Fetch(CrawlTask { id: task.id });
                 if queue.send(cmd).await.is_err() {
                     eprintln!("unable to send command to worker");
                     return;

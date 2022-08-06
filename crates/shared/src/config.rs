@@ -5,17 +5,16 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+use crate::plugin::PluginConfig;
 use crate::regex::{regex_for_robots, WildcardType};
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 
-pub type PluginSettings = HashMap<String, HashMap<String, String>>;
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub user_settings: UserSettings,
-    pub plugin_settings: PluginSettings,
     pub lenses: HashMap<String, Lens>,
+    pub user_settings: UserSettings,
 }
 
 impl Default for Config {
@@ -100,6 +99,7 @@ impl Limit {
     }
 }
 
+pub type PluginSettings = HashMap<String, HashMap<String, String>>;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UserSettings {
     /// Number of pages allowed per domain. Sub-domains are treated as
@@ -127,6 +127,9 @@ pub struct UserSettings {
     /// Should we disable telemetry
     #[serde(default)]
     pub disable_telementry: bool,
+    /// Plugin settings
+    #[serde(default)]
+    pub plugin_settings: PluginSettings,
 }
 
 impl UserSettings {
@@ -160,7 +163,7 @@ impl From<UserSettings> for HashMap<String, String> {
     fn from(settings: UserSettings) -> Self {
         let mut map: HashMap<String, String> = HashMap::new();
         map.insert(
-            "user.data_directory".to_string(),
+            "_.data_directory".to_string(),
             settings
                 .data_directory
                 .to_str()
@@ -190,22 +193,12 @@ impl Default for UserSettings {
             data_directory: UserSettings::default_data_dir(),
             crawl_external_links: false,
             disable_telementry: false,
+            plugin_settings: Default::default(),
         }
     }
 }
 
 impl Config {
-    pub fn save_plugin_settings(&self, settings: &PluginSettings) -> anyhow::Result<()> {
-        let prefs_path = self.plugin_settings_file();
-        fs::write(
-            prefs_path,
-            ron::ser::to_string_pretty(settings, Default::default())?,
-        )
-        .expect("Unable to save plugin settings file.");
-
-        Ok(())
-    }
-
     pub fn save_user_settings(&self, user_settings: &UserSettings) -> anyhow::Result<()> {
         let prefs_path = Self::prefs_file();
         let serialized = ron::ser::to_string_pretty(user_settings, Default::default())
@@ -215,21 +208,7 @@ impl Config {
         Ok(())
     }
 
-    fn load_plugin_setings(&self) -> anyhow::Result<PluginSettings> {
-        let prefs_path = self.plugin_settings_file();
-        if prefs_path.exists() {
-            let settings: PluginSettings = ron::from_str(&fs::read_to_string(prefs_path)?)?;
-            return Ok(settings);
-        }
-
-        // Create default settings
-        let settings: PluginSettings = Default::default();
-        self.save_plugin_settings(&settings)?;
-
-        Ok(settings)
-    }
-
-    fn load_user_settings() -> anyhow::Result<UserSettings> {
+    pub fn load_user_settings() -> anyhow::Result<UserSettings> {
         let prefs_path = Self::prefs_file();
 
         match prefs_path.exists() {
@@ -251,6 +230,38 @@ impl Config {
                 Ok(settings)
             }
         }
+    }
+
+    /// Load & read plugin manifests to get plugin settings that are available.
+    pub fn load_plugin_config(&self) -> HashMap<String, PluginConfig> {
+        let plugins_dir = self.plugins_dir();
+        let plugin_files = fs::read_dir(plugins_dir).expect("Invalid plugin directory");
+        let mut settings: HashMap<String, PluginConfig> = Default::default();
+
+        for entry in plugin_files.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+
+            // Load plugin settings
+            let plugin_config = path.join("manifest.ron");
+            if !plugin_config.exists() || !plugin_config.is_file() {
+                log::warn!("Invalid plugin manifest: {}", path.as_path().display());
+                continue;
+            }
+
+            if let Ok(file_contents) = std::fs::read_to_string(plugin_config) {
+                if let Ok(plugin_config) = ron::from_str::<PluginConfig>(&file_contents) {
+                    let mut config = plugin_config.clone();
+                    config.path = Some(path.join("main.wasm"));
+
+                    settings.insert(plugin_config.name.clone(), config.clone());
+                }
+            }
+        }
+
+        settings
     }
 
     pub fn app_identifier() -> String {
@@ -284,7 +295,6 @@ impl Config {
 
     pub fn prefs_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
-        log::info!("Using {:?}", proj_dirs.preference_dir().to_path_buf());
         proj_dirs.preference_dir().to_path_buf()
     }
 
@@ -295,10 +305,6 @@ impl Config {
 
     pub fn plugins_dir(&self) -> PathBuf {
         self.data_dir().join("plugins")
-    }
-
-    pub fn plugin_settings_file(&self) -> PathBuf {
-        self.plugins_dir().join("settings.ron")
     }
 
     pub fn lenses_dir(&self) -> PathBuf {
@@ -315,10 +321,9 @@ impl Config {
             Default::default()
         });
 
-        let mut config = Config {
+        let config = Config {
             lenses: HashMap::new(),
             user_settings,
-            plugin_settings: Default::default(),
         };
 
         let data_dir = config.data_dir();
@@ -335,13 +340,6 @@ impl Config {
 
         let plugins_dir = config.plugins_dir();
         fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
-
-        // Load plugin settings
-        let plugin_settings = config.load_plugin_setings().unwrap_or_else(|err| {
-            log::error!("Invalid plugin settings file!: Reason: {}", err);
-            Default::default()
-        });
-        config.plugin_settings = plugin_settings;
 
         config
     }

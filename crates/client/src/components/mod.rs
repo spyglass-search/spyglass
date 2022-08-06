@@ -6,6 +6,7 @@ use yew::prelude::*;
 
 use btn::DeleteButton;
 use shared::response::{LensResult, SearchResult};
+use url::Url;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResultListType {
@@ -81,6 +82,7 @@ pub fn selected_lens_list(props: &SelectLensProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
+    pub id: String,
     pub result: ResultListData,
     pub is_selected: bool,
 }
@@ -91,52 +93,68 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     let is_selected = props.is_selected;
     let result = &props.result;
 
-    let mut selected: String = "bg-neutral-800".into();
-    if is_selected {
-        selected = "bg-cyan-900".into();
-    }
-
-    let component_styles = vec![
-        "border-t".into(),
-        "border-neutral-600".into(),
-        "p-4".into(),
-        "pr-0".into(),
-        "text-white".into(),
-        selected,
-    ];
+    let component_styles = classes!(
+        "border-t",
+        "border-neutral-600",
+        "p-4",
+        "pr-0",
+        "text-white",
+        if is_selected {
+            "bg-cyan-900"
+        } else {
+            "bg-neutral-800"
+        }
+    );
 
     match result.result_type {
         ResultListType::DocSearch => {
-            let url_link = if result.url.is_some() {
-                let domain = result
-                    .domain
-                    .clone()
-                    .unwrap_or_else(|| "example.com".to_string());
-                let url = result.url.clone().unwrap();
+            let url_link = if let Some(url) = &result.url {
+                if let Ok(url) = Url::parse(url) {
+                    let domain = result
+                        .domain
+                        .clone()
+                        .unwrap_or_else(|| "example.com".to_string());
 
-                let path = url
-                    .trim_start_matches("http://")
-                    .trim_start_matches("https://")
-                    .trim_start_matches(&domain);
+                    let path = url.path();
 
-                html! {
-                    <div class="text-xs truncate">
-                        <a href={url.clone()} target="_blank">
-                            <img
-                                class="w-3 inline align-middle"
+                    let uri_icon = if url.scheme() == "file" {
+                        html! {
+                            <icons::DesktopComputerIcon
+                                classes={classes!("inline", "align-middle")}
+                            />
+                        }
+                    } else {
+                        html! {
+                            <img class="w-3 inline align-middle"
                                 src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
                             />
-                            <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span>
-                            <span class="align-middle">{format!(" → {}", path)}</span>
-                        </a>
-                    </div>
+                        }
+                    };
+
+                    html! {
+                        <div class="text-xs truncate">
+                            <a href={url.clone().to_string()} target="_blank">
+                                {uri_icon}
+                                {
+                                    if url.scheme() == "file" {
+                                        html!{}
+                                    } else {
+                                        html!{ <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span> }
+                                    }
+                                }
+                                <span class="align-middle">{format!(" → {}", path)}</span>
+                            </a>
+                        </div>
+                    }
+                } else {
+                    html! { <span></span> }
                 }
             } else {
                 html! { <span></span> }
             };
 
             html! {
-                <div class={component_styles}>
+                <div id={props.id.clone()} class={component_styles}>
                     <div class="float-right pl-4 mr-2 h-28">
                         <DeleteButton doc_id={result.id.clone()} />
                     </div>
@@ -152,7 +170,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         }
         ResultListType::LensSearch => {
             html! {
-                <div class={component_styles}>
+                <div id={props.id.clone()} class={component_styles}>
                     <h2 class="text-2xl truncate py-1">
                         {result.title.clone()}
                     </h2>
@@ -171,13 +189,15 @@ pub struct HeaderProps {
     #[prop_or_default]
     pub children: Children,
     #[prop_or_default]
+    pub classes: Classes,
+    #[prop_or_default]
     pub tabs: Html,
 }
 
 #[function_component(Header)]
 pub fn header(props: &HeaderProps) -> Html {
     html! {
-        <div class={classes!("pt-4", "px-8", "top-0", "sticky", "bg-stone-800", "z-400", "border-b-2", "border-stone-900")}>
+        <div class={classes!(props.classes.clone(), "pt-4", "px-8", "top-0", "sticky", "bg-stone-800", "z-400", "border-b-2", "border-stone-900")}>
             <div class="flex flex-row items-center gap-4 pb-4">
                 <h1 class="text-2xl grow">{props.label.clone()}</h1>
                 {props.children.clone()}

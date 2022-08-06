@@ -59,11 +59,29 @@ pub fn badge_check_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(DesktopComputerIcon)]
+pub fn desktop_computer_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd" />
+        </svg>
+    }
+}
+
 #[function_component(DocumentDownloadIcon)]
 pub fn document_download_icon(props: &IconProps) -> Html {
     html! {
         <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd" />
+        </svg>
+    }
+}
+
+#[function_component(EmojiHappyIcon)]
+pub fn emoji_happy_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
     }
 }

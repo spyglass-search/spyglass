@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
-    let config = Config::new();
+    log::info!("Loading prefs from: {:?}", Config::prefs_dir());
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-backend")

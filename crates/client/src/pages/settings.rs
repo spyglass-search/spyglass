@@ -10,7 +10,7 @@ use crate::{
     utils::RequestState,
 };
 use shared::event::ClientInvoke;
-use shared::SettingOpts;
+use shared::{FormType, SettingOpts};
 
 #[derive(Properties, PartialEq)]
 pub struct SettingFormProps {
@@ -27,27 +27,58 @@ pub struct SettingChangeEvent {
 
 #[function_component(SettingForm)]
 pub fn setting_form(props: &SettingFormProps) -> Html {
-    let value = use_state(|| props.opts.value.clone());
+    let input_ref = use_node_ref();
 
-    let onkeyup = {
+    {
+        let input_ref = input_ref.clone();
+        let value = props.opts.value.clone();
+        use_effect(move || {
+            if let Some(el) = input_ref.cast::<HtmlInputElement>() {
+                // Only set the input once on render
+                if el.value().is_empty() && !value.is_empty() {
+                    el.set_value(&value);
+                }
+            }
+
+            || {}
+        });
+    }
+
+    let (parent, _) = props
+        .setting_ref
+        .split_once('.')
+        .unwrap_or((&props.setting_ref, ""));
+
+    let oninput = {
         let onchange = props.onchange.clone();
         let setting_ref = props.setting_ref.clone();
-        let value = value.clone();
-        Callback::from(move |e: KeyboardEvent| {
+        Callback::from(move |e: InputEvent| {
+            e.stop_immediate_propagation();
             let input: HtmlInputElement = e.target_unchecked_into();
             let input_value = input.value();
             onchange.emit(SettingChangeEvent {
                 setting_ref: setting_ref.clone(),
-                new_value: input_value.clone(),
+                new_value: input_value,
             });
-            value.set(input_value);
         })
     };
 
+    // System settings have "_" as the parent.
+    let label = if parent != "_" {
+        html! {
+            <>
+                <span class="text-white">{format!("{}: ", parent)}</span>
+                {props.opts.label.clone()}
+            </>
+        }
+    } else {
+        html! { props.opts.label.clone() }
+    };
+
     html! {
-        <div class="p-8">
+        <div class="px-8 mb-8">
             <div class="mb-2">
-                <label class="text-yellow-500">{props.opts.label.clone()}</label>
+                <label class="text-yellow-500">{label}</label>
                 {
                     if let Some(help_text) = props.opts.help_text.clone() {
                         html! {
@@ -63,12 +94,34 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                 }
             </div>
             <div>
-                <input
-                    onkeyup={onkeyup}
-                    type="text"
-                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
-                    value={(*value).clone()}
-                />
+                {
+                    match &props.opts.form_type {
+                        FormType::List => {
+                            html! {
+                                <textarea
+                                    ref={input_ref.clone()}
+                                    spellcheck="false"
+                                    oninput={oninput}
+                                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
+                                    rows="5"
+                                    placeholder={"[\"/Users/example/Documents\", \"/Users/example/Desktop/Notes\"]"}
+                                >
+                                </textarea>
+                            }
+                        }
+                        FormType::Text => {
+                            html! {
+                                <input
+                                    ref={input_ref.clone()}
+                                    spellcheck="false"
+                                    oninput={oninput}
+                                    type="text"
+                                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
+                                />
+                            }
+                        }
+                    }
+                }
             </div>
         </div>
     }
@@ -76,7 +129,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
 
 #[function_component(UserSettingsPage)]
 pub fn user_settings_page() -> Html {
-    let current_settings: UseStateHandle<HashMap<String, SettingOpts>> = use_state_eq(HashMap::new);
+    let current_settings: UseStateHandle<Vec<(String, SettingOpts)>> = use_state_eq(Vec::new);
     let changes: UseStateHandle<HashMap<String, String>> = use_state_eq(HashMap::new);
 
     let req_state = use_state_eq(|| RequestState::NotStarted);
@@ -85,7 +138,7 @@ pub fn user_settings_page() -> Html {
         let current_settings = current_settings.clone();
         spawn_local(async move {
             if let Ok(res) = invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
-                if let Ok(deser) = JsValue::into_serde::<HashMap<String, SettingOpts>>(&res) {
+                if let Ok(deser) = JsValue::into_serde::<Vec<(String, SettingOpts)>>(&res) {
                     current_settings.set(deser);
                 } else {
                     log::error!("unable to deserialize");
@@ -151,10 +204,12 @@ pub fn user_settings_page() -> Html {
                     {"Settings folder"}
                 </btn::Btn>
                 <btn::Btn onclick={handle_save_changes} disabled={!*has_changes}>
-                    {"Save Changes"}
+                    {"Save & Restart"}
                 </btn::Btn>
             </Header>
-            <div>{contents}</div>
+            <div class="pt-8">
+                {contents}
+            </div>
         </div>
     }
 }

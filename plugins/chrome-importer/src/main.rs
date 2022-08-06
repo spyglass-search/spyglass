@@ -2,7 +2,7 @@ use serde_json::Value;
 use spyglass_plugin::*;
 use std::{fs, path::Path};
 
-const DATA_DIR: &str = "/data";
+const DATA_DIR: &str = "/";
 const BOOKMARK_FILE: &str = "Bookmarks";
 
 #[derive(Default)]
@@ -11,9 +11,9 @@ struct Plugin;
 register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
-    fn load(&self) {
+    fn load(&mut self) {
         // Let the host know we want to check for updates on a regular interval.
-        subscribe(PluginEvent::CheckUpdateInterval);
+        subscribe(PluginSubscription::CheckUpdateInterval);
 
         let mut path = None;
 
@@ -65,7 +65,7 @@ impl SpyglassPlugin for Plugin {
         }
     }
 
-    fn update(&self) {
+    fn update(&mut self, _: PluginEvent) {
         let path = Path::new(DATA_DIR).join(BOOKMARK_FILE);
         // Nothing to do if theres no file.
         if !path.exists() {
