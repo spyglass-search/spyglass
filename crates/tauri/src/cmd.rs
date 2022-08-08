@@ -365,14 +365,18 @@ pub async fn save_user_settings(
                                 FormType::Text => Some(value.into()),
                                 FormType::List => {
                                     // Escape backslashes
-                                    let value = value.replace("\\", "\\\\");
+                                    let value = value.replace('\\', "\\\\");
                                     // Validate the value by attempting to deserialize
                                     match serde_json::from_str::<Vec<String>>(&value) {
                                         Ok(parsed) => {
                                             serde_json::to_string::<Vec<String>>(&parsed).ok()
                                         }
                                         Err(e) => {
-                                            window::alert(&window, "Unable to save settings", &format!("Reason: {}", e));
+                                            window::alert(
+                                                &window,
+                                                "Unable to save settings",
+                                                &format!("Reason: {}", e),
+                                            );
                                             received_error = true;
                                             log::error!("unable to save setting: {}", e);
                                             None
