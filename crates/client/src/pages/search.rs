@@ -198,7 +198,7 @@ pub fn search_page() -> Html {
     };
 
     html! {
-        <div ref={node_ref} class="relative ">
+        <div ref={node_ref} class="relative overflow-hidden">
             <div class="flex flex-nowrap w-full">
                 <SelectedLens lens={(*lens).clone()} />
                 <input
@@ -213,7 +213,7 @@ pub fn search_page() -> Html {
                     tabindex="-1"
                 />
             </div>
-            <div class="overflow-scroll h-full">{ results }</div>
+            <div class="overflow-y-auto overflow-x-hidden h-full">{ results }</div>
         </div>
     }
 }

@@ -315,9 +315,6 @@ pub async fn plugin_load(
 
     for (_, plugin_config) in plugin_user_settings {
         let mut plug = plugin_config.clone();
-
-        // If any user settings are found, override default ones
-        // from plugin config file.
         let user_settings = user_plugin_settings
             .entry(plug.name.clone())
             .or_insert_with(HashMap::new);
