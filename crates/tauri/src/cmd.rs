@@ -342,6 +342,7 @@ pub async fn save_user_settings(
 ) -> Result<(), String> {
     let mut user_settings = config.user_settings.clone();
     let plugin_configs = config.load_plugin_config();
+    let mut received_error = false;
 
     // Update the user settings
     for (key, value) in settings.iter() {
@@ -369,6 +370,8 @@ pub async fn save_user_settings(
                                             serde_json::to_string::<Vec<String>>(&parsed).ok()
                                         }
                                         Err(e) => {
+                                            window::alert(&window, "Unable to save settings", &format!("Reason: {}", e));
+                                            received_error = true;
                                             log::info!("unable to save setting: {}", e);
                                             None
                                         }
@@ -386,10 +389,12 @@ pub async fn save_user_settings(
         }
     }
 
-    let _ = config.save_user_settings(&user_settings);
-
-    let app = window.app_handle();
-    app.restart();
+    // Only save settings if everything is valid.
+    if !received_error {
+        let _ = config.save_user_settings(&user_settings);
+        let app = window.app_handle();
+        app.restart();
+    }
 
     Ok(())
 }
