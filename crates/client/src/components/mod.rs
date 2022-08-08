@@ -1,6 +1,5 @@
 pub mod btn;
 pub mod icons;
-pub mod lens;
 
 use yew::prelude::*;
 
