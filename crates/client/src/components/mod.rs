@@ -125,7 +125,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     } else {
                         html! {
                             <img class="w-3 inline align-middle"
-                                src={format!("https://icons.duckduckgo.com/ip3/{}.ico", domain.clone())}
+                                src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())}
                             />
                         }
                     };
