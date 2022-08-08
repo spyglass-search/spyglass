@@ -4,6 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
+use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
 use crate::components::{btn, icons, Header};
@@ -15,7 +16,7 @@ fn fetch_installed_plugins(
     req_state: UseStateHandle<RequestState>,
 ) {
     spawn_local(async move {
-        match invoke("list_plugins", JsValue::NULL).await {
+        match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 plugins_handle.set(results.into_serde().unwrap());
                 req_state.set(RequestState::Finished);
