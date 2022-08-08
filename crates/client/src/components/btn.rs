@@ -143,11 +143,15 @@ pub struct DefaultBtnProps {
     pub children: Children,
     #[prop_or_default]
     pub href: String,
+    #[prop_or_default]
+    pub classes: Classes,
 }
 
 #[function_component(Btn)]
 pub fn default_button(props: &DefaultBtnProps) -> Html {
     let styles = classes!(
+        props.classes.clone(),
+        "cursor-pointer",
         "border-neutral-600",
         "border",
         "flex-row",

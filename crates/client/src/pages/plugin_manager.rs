@@ -6,7 +6,7 @@ use yew::prelude::*;
 
 use shared::response::PluginResult;
 
-use crate::components::{icons, Header};
+use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen, toggle_plugin};
 
@@ -64,13 +64,13 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
     };
 
     let toggle_button = html! {
-        <button
+        <btn::Btn
             onclick={onclick}
-            class={vec!["flex", "flex-row", "text-sm", "cursor-pointer", "hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" }]}
+            classes={classes!("hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" })}
         >
             <icons::LightningBoltIcon />
             <div class="ml-2">{btn_label}</div>
-        </button>
+        </btn::Btn>
     };
 
     html! {
