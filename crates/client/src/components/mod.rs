@@ -4,8 +4,8 @@ pub mod icons;
 use yew::prelude::*;
 
 use btn::DeleteButton;
-use shared::url_path_windows;
 use shared::response::{LensResult, SearchResult};
+use shared::url_to_file_path;
 use url::Url;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -115,8 +115,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                         .clone()
                         .unwrap_or_else(|| "example.com".to_string());
 
-                    let path = url_path_windows(&url.path());
-
+                    let path = url_to_file_path(&url.path(), false);
                     let uri_icon = if url.scheme() == "file" {
                         html! {
                             <icons::DesktopComputerIcon
