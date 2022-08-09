@@ -21,6 +21,7 @@ use crate::api::start_api_ipc;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
 
+    #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telementry {
         None
     } else {

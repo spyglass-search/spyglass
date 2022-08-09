@@ -1,6 +1,7 @@
 use spyglass_plugin::*;
 use std::collections::HashSet;
 use std::path::Path;
+use url::Url;
 
 #[derive(Default)]
 struct Plugin {
@@ -21,7 +22,11 @@ fn to_uri(path: &str) -> String {
         "home.local".into()
     };
 
-    format!("file://{}/{}", host, path)
+    let mut new_url = Url::parse("file://").expect("Base URI");
+    let _ = new_url.set_host(Some(&host));
+    // Fixes issues handling windows drive letters
+    new_url.set_path(&path.replace(':', "%3A"));
+    new_url.to_string()
 }
 
 impl Plugin {

@@ -48,7 +48,15 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     if let Ok(mut url) = url::Url::parse(url) {
         // treat open files as a local action.
         if url.scheme() == "file" {
-            let _ = url.set_host(Some("localhost"));
+            let _ = url.set_host(None);
+
+            #[cfg(target_os = "windows")]
+            {
+                use shared::url_to_file_path;
+                let path = url_to_file_path(url.path(), true);
+                open::that(format!("file://{}", path)).unwrap();
+                return Ok(());
+            }
         }
 
         open::that(url.to_string()).unwrap();
