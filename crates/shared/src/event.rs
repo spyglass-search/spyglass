@@ -22,6 +22,8 @@ pub enum ClientInvoke {
     ListInstalledLenses,
     #[strum(serialize = "list_installable_lenses")]
     ListInstallableLenses,
+    #[strum(serialize = "list_plugins")]
+    ListPlugins,
     #[strum(serialize = "load_user_settings")]
     LoadUserSettings,
     #[strum(serialize = "open_lens_folder")]

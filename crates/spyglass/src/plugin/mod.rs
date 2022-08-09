@@ -143,8 +143,8 @@ pub async fn plugin_manager(
     // Initial load, send some basic configuration to the plugins
     plugin_load(&state, &mut config, &cmd_writer).await;
 
-    // Subscribe plugins check for updates every hour
-    let mut interval = tokio::time::interval(Duration::from_secs(60 * 60));
+    // Subscribe plugins check for updates every 10 minutes
+    let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
 
     loop {
         // Wait for next command / handle shutdown responses
@@ -217,6 +217,12 @@ pub async fn plugin_manager(
             Some(PluginCommand::Subscribe(plugin_id, event)) => match event {
                 PluginSubscription::CheckUpdateInterval => {
                     manager.check_update_subs.insert(plugin_id);
+                    let _ = cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id,
+                            event: PluginEvent::IntervalUpdate,
+                        })
+                        .await;
                 }
                 PluginSubscription::WatchDirectory { path, recurse } => {
                     let dir_path = Path::new(&path);
@@ -315,9 +321,6 @@ pub async fn plugin_load(
 
     for (_, plugin_config) in plugin_user_settings {
         let mut plug = plugin_config.clone();
-
-        // If any user settings are found, override default ones
-        // from plugin config file.
         let user_settings = user_plugin_settings
             .entry(plug.name.clone())
             .or_insert_with(HashMap::new);
@@ -413,6 +416,16 @@ pub async fn plugin_init(
         .map(|base| base.home_dir().display().to_string())
         .map_or_else(|| "".to_string(), |dir| dir);
 
+    let host_name: String = if let Ok(hname) = hostname::get() {
+        if let Some(hname) = hname.to_str() {
+            hname.to_string()
+        } else {
+            "home.local".to_string()
+        }
+    } else {
+        "home.local".to_string()
+    };
+
     let mut wasi_env = WasiState::new(&plugin.name)
         // Attach the plugin data directory. Anything created by the plugin will live
         // there.
@@ -420,6 +433,7 @@ pub async fn plugin_init(
         .expect("Unable to mount plugin data folder")
         .env(env::BASE_CONFIG_DIR, base_config_dir)
         .env(env::BASE_DATA_DIR, base_data_dir)
+        .env(env::HOST_NAME, host_name)
         .env(env::HOST_HOME_DIR, home_dir)
         .env(env::HOST_OS, std::env::consts::OS)
         // Load user settings as environment variables

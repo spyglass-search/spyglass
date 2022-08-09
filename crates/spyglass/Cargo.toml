@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "22.8.3"
+version = "22.8.4"
 edition = "2021"
 
 [dependencies]
@@ -15,6 +15,7 @@ ego-tree = "0.6.2"
 entities = { path = "../entities" }
 futures = "0.3"
 hex = "0.4"
+hostname = "^0.3"
 html5ever = "0.25"
 http = "0.2"
 jsonrpc-core = "18.0.0"

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use entities::models::crawl_queue::EnqueueSettings;
 use rusqlite::Connection;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
@@ -157,13 +158,12 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 /// in the filesystem so that it can be processed by the plugin.
 fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     log::info!("<{}> requesting access to folder: {}", env.name, src);
-
-    let dst = Path::new(&dst);
+    let dst = Path::new(dst.trim_start_matches('/'));
     let src = Path::new(&src);
 
     if let Some(file_name) = src.file_name() {
         let dst = env.data_dir.join(dst).join(file_name);
-        // Attempt to mount directory
+        // Attempt to copy file into plugin data directory
         if let Err(e) = std::fs::copy(src, &dst) {
             log::error!("Unable to copy into plugin data dir: {}", e);
         }
@@ -185,7 +185,10 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             &urls,
             &[],
             &state.user_settings,
-            &Default::default(),
+            &EnqueueSettings {
+                force_allow: true,
+                ..Default::default()
+            },
         )
         .await
         {

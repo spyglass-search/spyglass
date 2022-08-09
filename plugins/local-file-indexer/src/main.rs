@@ -15,9 +15,12 @@ register_plugin!(Plugin);
 
 // Create a file URI
 fn to_uri(path: &str) -> String {
-    // TODO: Pull hostname? When we need to sync indexes across devices
-    // this will need to be something that is unique
-    let host = "localhost";
+    let host = if let Ok(hname) = std::env::var("HOST_NAME") {
+        hname
+    } else {
+        "home.local".into()
+    };
+
     format!("file://{}/{}", host, path)
 }
 

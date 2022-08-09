@@ -4963,7 +4963,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass"
-version = "22.8.3"
+version = "22.8.4"
 dependencies = [
  "addr",
  "anyhow",
@@ -4976,6 +4976,7 @@ dependencies = [
  "entities",
  "futures 0.3.21",
  "hex",
+ "hostname",
  "html5ever",
  "http",
  "jsonrpc-core",

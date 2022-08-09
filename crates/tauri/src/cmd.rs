@@ -342,6 +342,7 @@ pub async fn save_user_settings(
 ) -> Result<(), String> {
     let mut user_settings = config.user_settings.clone();
     let plugin_configs = config.load_plugin_config();
+    let mut received_error = false;
 
     // Update the user settings
     for (key, value) in settings.iter() {
@@ -363,13 +364,21 @@ pub async fn save_user_settings(
                             let value = match field_opts.form_type {
                                 FormType::Text => Some(value.into()),
                                 FormType::List => {
+                                    // Escape backslashes
+                                    let value = value.replace('\\', "\\\\");
                                     // Validate the value by attempting to deserialize
-                                    match serde_json::from_str::<Vec<String>>(value) {
+                                    match serde_json::from_str::<Vec<String>>(&value) {
                                         Ok(parsed) => {
                                             serde_json::to_string::<Vec<String>>(&parsed).ok()
                                         }
                                         Err(e) => {
-                                            log::info!("unable to save setting: {}", e);
+                                            window::alert(
+                                                &window,
+                                                "Unable to save settings",
+                                                &format!("Reason: {}", e),
+                                            );
+                                            received_error = true;
+                                            log::error!("unable to save setting: {}", e);
                                             None
                                         }
                                     }
@@ -386,10 +395,12 @@ pub async fn save_user_settings(
         }
     }
 
-    let _ = config.save_user_settings(&user_settings);
-
-    let app = window.app_handle();
-    app.restart();
+    // Only save settings if everything is valid.
+    if !received_error {
+        let _ = config.save_user_settings(&user_settings);
+        let app = window.app_handle();
+        app.restart();
+    }
 
     Ok(())
 }
@@ -419,7 +430,8 @@ pub async fn load_user_settings(
             let value = current_plug_settings
                 .get(&pname)
                 .and_then(|settings| settings.get(&setting_name))
-                .map(|value| value.to_string());
+                // Reverse backslash escaping
+                .map(|value| value.to_string().replace("\\\\", "\\"));
 
             if let Some(value) = value {
                 opts.value = value.to_string();

@@ -7,7 +7,7 @@ use yew::prelude::*;
 use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
-use crate::components::{icons, Header};
+use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen, toggle_plugin};
 
@@ -16,7 +16,7 @@ fn fetch_installed_plugins(
     req_state: UseStateHandle<RequestState>,
 ) {
     spawn_local(async move {
-        match invoke("list_plugins", JsValue::NULL).await {
+        match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 plugins_handle.set(results.into_serde().unwrap());
                 req_state.set(RequestState::Finished);
@@ -64,32 +64,14 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
         })
     };
 
-    let on_edit_settings = {
-        Callback::from(move |_| {
-            spawn_local(async move {
-                let _ = invoke(&ClientInvoke::EditPluginSettings.to_string(), JsValue::NULL).await;
-            });
-        })
-    };
-
     let toggle_button = html! {
-        <button
+        <btn::Btn
             onclick={onclick}
-            class={vec!["flex", "flex-row", "text-sm", "cursor-pointer", "hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" }]}
+            classes={classes!("hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" })}
         >
             <icons::LightningBoltIcon />
             <div class="ml-2">{btn_label}</div>
-        </button>
-    };
-
-    let view_settings = html! {
-        <button
-            onclick={on_edit_settings}
-            class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white"
-        >
-            <icons::PencilIcon />
-            <div class="ml-2">{"Edit/View Settings"}</div>
-        </button>
+        </btn::Btn>
     };
 
     html! {
@@ -101,12 +83,11 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
                 {"Crafted By:"}
                 <span class="ml-2 text-cyan-400">{plugin.author.clone()}</span>
             </h2>
-            <div class="leading-relaxed text-neutral-400 h-6 overflow-hidden text-ellipsis">
+            <div class="leading-relaxed text-neutral-400">
                 {plugin.description.clone()}
             </div>
             <div class="pt-2 flex flex-row gap-8">
                 {toggle_button}
-                {view_settings}
             </div>
         </div>
     }

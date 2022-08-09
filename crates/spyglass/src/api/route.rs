@@ -213,6 +213,7 @@ pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>> {
         }
     }
 
+    plugins.sort_by(|a, b| a.title.cmp(&b.title));
     Ok(plugins)
 }
 
