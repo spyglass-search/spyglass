@@ -12,12 +12,14 @@ use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::DatabaseConnection;
 
-pub mod bootstrap;
-pub mod robots;
+use shared::url_path_windows;
 
 use crate::crawler::bootstrap::create_archive_url;
 use crate::fetch::HTTPClient;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
+
+pub mod bootstrap;
+pub mod robots;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
@@ -247,7 +249,15 @@ impl Crawler {
         _: &crawl_queue::Model,
         url: &Url,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let path = Path::new(url.path());
+        let mut url_path = url.path().to_string();
+
+        // Fixes issues handling Windows drive paths
+        #[cfg(target_os = "windows")]
+        {
+            url_path = url_path_windows(&url_path);
+        }
+
+        let path = Path::new(&url_path);
         // Is this a file and does this exist?
         if !path.exists() || !path.is_file() {
             return Ok(None);

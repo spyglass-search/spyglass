@@ -14,6 +14,7 @@ use shared::{
     request,
     response::{self, InstallableLens},
     FormType, SettingOpts,
+    url_path_windows,
 };
 
 #[tauri::command]
@@ -48,7 +49,13 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     if let Ok(mut url) = url::Url::parse(url) {
         // treat open files as a local action.
         if url.scheme() == "file" {
-            let _ = url.set_host(Some("localhost"));
+            let _ = url.set_host(None);
+            #[cfg(target_os = "windows")]
+            {
+                let path = url_path_windows(url.path());
+                open::that(format!("file://{}", path)).unwrap();
+                return Ok(());
+            }
         }
 
         open::that(url.to_string()).unwrap();

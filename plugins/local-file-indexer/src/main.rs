@@ -24,8 +24,10 @@ fn to_uri(path: &str) -> String {
 
     let mut new_url = Url::parse("file://").expect("Base URI");
     let _ = new_url.set_host(Some(&host));
-    new_url.set_path(path);
+    // Fixes issues handling windows drive letters
+    new_url.set_path(&path.replace(':', "%3A"));
 
+    log(new_url.to_string());
     new_url.to_string()
 }
 
