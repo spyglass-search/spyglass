@@ -13,7 +13,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 use tokio_retry::Retry;
 use url::Url;
 
-use entities::models::crawl_queue;
+use entities::models::crawl_queue::{self, EnqueueSettings};
 use entities::sea_orm::DatabaseConnection;
 use shared::config::{Lens, UserSettings};
 
@@ -126,6 +126,7 @@ pub async fn bootstrap(
     let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
         crawl_type: crawl_queue::CrawlType::Bootstrap,
+        ..Default::default()
     };
 
     // Stream pages of URLs from the CDX server & add them to our crawl queue.
@@ -161,7 +162,10 @@ pub async fn bootstrap(
             &[],
             settings,
             // No overrides required
-            &Default::default(),
+            &EnqueueSettings {
+                force_allow: true,
+                ..Default::default()
+            },
         )
         .await?;
         count += 1;
@@ -190,10 +194,10 @@ mod test {
 
         let lens = Default::default();
         let res = bootstrap(&lens, &db, &settings, "https://roll20.net/compendium/dnd5e").await;
-        assert_eq!(res.unwrap(), 1934);
+        assert!(res.unwrap() > 2000);
         let num_queue = crawl_queue::num_queued(&db, crawl_queue::CrawlStatus::Queued)
             .await
             .unwrap();
-        assert_eq!(num_queue, 1934);
+        assert!(num_queue > 2000);
     }
 }

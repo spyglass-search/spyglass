@@ -1,5 +1,6 @@
 use std::fs;
 
+use entities::models::crawl_queue::EnqueueSettings;
 use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens};
 use entities::sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter};
 use migration::sea_orm::DatabaseConnection;
@@ -112,7 +113,10 @@ pub async fn load_lenses(state: AppState) {
                     &[url.to_owned()],
                     &[],
                     &state.user_settings,
-                    &Default::default(),
+                    &EnqueueSettings {
+                        force_allow: true,
+                        ..Default::default()
+                    },
                 )
                 .await
                 {
