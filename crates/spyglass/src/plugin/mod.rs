@@ -416,6 +416,16 @@ pub async fn plugin_init(
         .map(|base| base.home_dir().display().to_string())
         .map_or_else(|| "".to_string(), |dir| dir);
 
+    let host_name: String = if let Ok(hname) = hostname::get() {
+        if let Some(hname) = hname.to_str() {
+            hname.to_string()
+        } else {
+            "home.local".to_string()
+        }
+    } else {
+        "home.local".to_string()
+    };
+
     let mut wasi_env = WasiState::new(&plugin.name)
         // Attach the plugin data directory. Anything created by the plugin will live
         // there.
@@ -423,6 +433,7 @@ pub async fn plugin_init(
         .expect("Unable to mount plugin data folder")
         .env(env::BASE_CONFIG_DIR, base_config_dir)
         .env(env::BASE_DATA_DIR, base_data_dir)
+        .env(env::HOST_NAME, host_name)
         .env(env::HOST_HOME_DIR, home_dir)
         .env(env::HOST_OS, std::env::consts::OS)
         // Load user settings as environment variables

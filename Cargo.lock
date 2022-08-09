@@ -4976,6 +4976,7 @@ dependencies = [
  "entities",
  "futures 0.3.21",
  "hex",
+ "hostname",
  "html5ever",
  "http",
  "jsonrpc-core",
