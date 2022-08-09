@@ -430,7 +430,8 @@ pub async fn load_user_settings(
             let value = current_plug_settings
                 .get(&pname)
                 .and_then(|settings| settings.get(&setting_name))
-                .map(|value| value.to_string());
+                // Reverse backslash escaping
+                .map(|value| value.to_string().replace("\\\\", "\\"));
 
             if let Some(value) = value {
                 opts.value = value.to_string();
