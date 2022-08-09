@@ -2758,6 +2758,7 @@ dependencies = [
  "serde",
  "serde_json",
  "spyglass-plugin",
+ "url 2.2.2",
 ]
 
 [[package]]
