@@ -115,7 +115,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                         .clone()
                         .unwrap_or_else(|| "example.com".to_string());
 
-                    let path = url_to_file_path(&url.path(), false);
+                    let path = url_to_file_path(url.path(), false);
                     let uri_icon = if url.scheme() == "file" {
                         html! {
                             <icons::DesktopComputerIcon
