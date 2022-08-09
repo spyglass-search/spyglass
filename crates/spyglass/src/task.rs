@@ -86,14 +86,14 @@ pub async fn manager_task(
                 let cmd = Command::Fetch(CrawlTask { id: task.id });
                 if queue.send(cmd).await.is_err() {
                     eprintln!("unable to send command to worker");
-                    return;
                 }
             }
             // ignore everything else
-            _ => {
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            }
+            _ => {}
         }
+
+        // Wait a little before we dequeue another URL
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 }
 

@@ -2,6 +2,7 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+#[allow(unused_imports)]
 use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
@@ -42,6 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
     let config = Config::new();
 
+    #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telementry {
         None
     } else {
