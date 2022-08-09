@@ -13,7 +13,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 use tokio_retry::Retry;
 use url::Url;
 
-use entities::models::crawl_queue;
+use entities::models::crawl_queue::{self, EnqueueSettings};
 use entities::sea_orm::DatabaseConnection;
 use shared::config::{Lens, UserSettings};
 
@@ -126,6 +126,7 @@ pub async fn bootstrap(
     let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
         crawl_type: crawl_queue::CrawlType::Bootstrap,
+        ..Default::default()
     };
 
     // Stream pages of URLs from the CDX server & add them to our crawl queue.
@@ -161,7 +162,10 @@ pub async fn bootstrap(
             &[],
             settings,
             // No overrides required
-            &Default::default(),
+            &EnqueueSettings {
+                force_allow: true,
+                ..Default::default()
+            },
         )
         .await?;
         count += 1;

@@ -328,6 +328,7 @@ pub enum SkipReason {
 #[derive(Default)]
 pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
+    pub force_allow: bool,
 }
 
 pub async fn enqueue_all(
@@ -392,7 +393,8 @@ pub async fn enqueue_all(
 
                 // If external links are not allowed, only allow crawls specified
                 // in our lenses
-                if lenses.is_empty() || (!allow_list.is_empty() && allow_list.is_match(&normalized))
+                if overrides.force_allow
+                    || (!allow_list.is_empty() && allow_list.is_match(&normalized))
                 {
                     return Some(normalized);
                 }

@@ -143,8 +143,8 @@ pub async fn plugin_manager(
     // Initial load, send some basic configuration to the plugins
     plugin_load(&state, &mut config, &cmd_writer).await;
 
-    // Subscribe plugins check for updates every hour
-    let mut interval = tokio::time::interval(Duration::from_secs(60 * 60));
+    // Subscribe plugins check for updates every 10 minutes
+    let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
 
     loop {
         // Wait for next command / handle shutdown responses
@@ -217,6 +217,12 @@ pub async fn plugin_manager(
             Some(PluginCommand::Subscribe(plugin_id, event)) => match event {
                 PluginSubscription::CheckUpdateInterval => {
                     manager.check_update_subs.insert(plugin_id);
+                    let _ = cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id,
+                            event: PluginEvent::IntervalUpdate,
+                        })
+                        .await;
                 }
                 PluginSubscription::WatchDirectory { path, recurse } => {
                     let dir_path = Path::new(&path);

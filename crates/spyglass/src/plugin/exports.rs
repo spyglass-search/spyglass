@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use entities::models::crawl_queue::EnqueueSettings;
 use rusqlite::Connection;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
@@ -184,7 +185,10 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             &urls,
             &[],
             &state.user_settings,
-            &Default::default(),
+            &EnqueueSettings {
+                force_allow: true,
+                ..Default::default()
+            },
         )
         .await
         {
