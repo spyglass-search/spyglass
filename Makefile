@@ -1,9 +1,11 @@
-.PHONY: build-backend build-client build-plugins-dev build-plugins-release build-styles build-release check clippy fmt test setup-dev setup-dev-linux run-client-dev
+.PHONY: build-backend build-client build-plugins-dev build-plugins-release \
+	build-styles build-release check clippy fmt test test-with-ignored \
+	setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
 PLUGINS := chrome-importer firefox-importer local-file-indexer
 # Set this up if you're working on the plugins
-PLUGINS_DEV_FOLDER := ~/spyglass-plugins
+PLUGINS_DEV_FOLDER := ~/Library/Application\ Support/com.athlabs.spyglass-dev/
 
 build-backend:
 	cargo build -p spyglass
@@ -48,6 +50,9 @@ fmt:
 
 test:
 	cargo test --all
+
+test-with-ignored:
+	cargo test --all -- --ignored
 
 setup-dev:
 	rustup target add wasm32-unknown-unknown

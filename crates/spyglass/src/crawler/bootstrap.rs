@@ -190,10 +190,10 @@ mod test {
 
         let lens = Default::default();
         let res = bootstrap(&lens, &db, &settings, "https://roll20.net/compendium/dnd5e").await;
-        assert_eq!(res.unwrap(), 1934);
+        assert!(res.unwrap() > 2000);
         let num_queue = crawl_queue::num_queued(&db, crawl_queue::CrawlStatus::Queued)
             .await
             .unwrap();
-        assert_eq!(num_queue, 1934);
+        assert!(num_queue > 2000);
     }
 }
