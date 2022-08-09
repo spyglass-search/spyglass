@@ -266,7 +266,6 @@ impl Crawler {
             url_path = url_to_file_path(&url.path(), true);
         }
 
-        dbg!(&url_path);
         let path = Path::new(&url_path);
         // Is this a file and does this exist?
         if !path.exists() || !path.is_file() {
