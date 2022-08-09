@@ -392,7 +392,8 @@ pub async fn enqueue_all(
 
                 // If external links are not allowed, only allow crawls specified
                 // in our lenses
-                if allow_list.is_empty() || allow_list.is_match(&normalized) {
+                if lenses.is_empty() || (!allow_list.is_empty() && allow_list.is_match(&normalized))
+                {
                     return Some(normalized);
                 }
             }

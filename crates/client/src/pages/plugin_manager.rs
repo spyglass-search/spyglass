@@ -4,9 +4,10 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
+use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
-use crate::components::{icons, Header};
+use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen, toggle_plugin};
 
@@ -15,7 +16,7 @@ fn fetch_installed_plugins(
     req_state: UseStateHandle<RequestState>,
 ) {
     spawn_local(async move {
-        match invoke("list_plugins", JsValue::NULL).await {
+        match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
             Ok(results) => {
                 plugins_handle.set(results.into_serde().unwrap());
                 req_state.set(RequestState::Finished);
@@ -64,13 +65,13 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
     };
 
     let toggle_button = html! {
-        <button
+        <btn::Btn
             onclick={onclick}
-            class={vec!["flex", "flex-row", "text-sm", "cursor-pointer", "hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" }]}
+            classes={classes!("hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" })}
         >
             <icons::LightningBoltIcon />
             <div class="ml-2">{btn_label}</div>
-        </button>
+        </btn::Btn>
     };
 
     html! {

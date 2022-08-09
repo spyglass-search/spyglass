@@ -110,7 +110,7 @@ pub async fn load_lenses(state: AppState) {
                 if let Err(err) = crawl_queue::enqueue_all(
                     &state.db,
                     &[url.to_owned()],
-                    &Vec::new(),
+                    &[],
                     &state.user_settings,
                     &Default::default(),
                 )

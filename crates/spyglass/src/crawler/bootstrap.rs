@@ -158,7 +158,7 @@ pub async fn bootstrap(
         crawl_queue::enqueue_all(
             db,
             &[url.to_string()],
-            &Vec::new(),
+            &[],
             settings,
             // No overrides required
             &Default::default(),
