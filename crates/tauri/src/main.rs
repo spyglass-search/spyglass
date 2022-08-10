@@ -266,7 +266,7 @@ async fn pause_crawler(app: AppHandle, menu_id: String) {
             let item_handle = app.tray_handle().get_item(&menu_id);
             let _ = item_handle.set_title(new_label);
             let _ = item_handle.set_enabled(true);
-        },
+        }
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
             rpc.reconnect().await;
