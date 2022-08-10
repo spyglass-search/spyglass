@@ -49,7 +49,7 @@ pub trait Rpc {
     fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>>;
 
     #[rpc(name = "toggle_pause")]
-    fn toggle_pause(&self) -> BoxFuture<Result<AppStatus>>;
+    fn toggle_pause(&self) -> BoxFuture<Result<bool>>;
 
     #[rpc(name = "toggle_plugin")]
     fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>>;

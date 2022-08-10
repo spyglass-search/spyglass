@@ -365,18 +365,16 @@ pub async fn search_lenses(
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<bool> {
     // Scope so that the app_state mutex is correctly released.
-    {
-        let app_state = &state.app_state;
-        let mut paused_status = app_state.entry("paused".into()).or_insert("false".into());
+    let app_state = &state.app_state;
+    let mut paused_status = app_state.entry("paused".into()).or_insert("false".into());
 
-        let current_status = paused_status.to_string() == "true";
-        let updated_status = !current_status;
-        *paused_status = updated_status.to_string();
-    }
+    let current_status = paused_status.to_string() == "true";
+    let updated_status = !current_status;
+    *paused_status = updated_status.to_string();
 
-    _get_current_status(state.clone()).await
+    Ok(updated_status)
 }
 
 #[instrument(skip(state))]
