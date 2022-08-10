@@ -281,7 +281,7 @@ pub async fn network_change(
             if should_toggle {
                 let _ = rpc
                     .client
-                    .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
+                    .call_method::<Value, bool>("toggle_pause", "", Value::Null)
                     .await;
             }
         }

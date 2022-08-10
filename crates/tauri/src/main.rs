@@ -161,21 +161,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .on_system_tray_event(move |app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
-                let item_handle = app.tray_handle().get_item(&id);
                 let window = app.get_window("main").expect("Main window not initialized");
 
                 if let Ok(menu_id) = MenuID::from_str(&id) {
                     match menu_id {
                         MenuID::CRAWL_STATUS => {
-                            let rpc = app.state::<RpcMutex>().inner();
-                            let is_paused = tauri::async_runtime::block_on(pause_crawler(rpc));
-                            let new_label = if is_paused {
-                                "▶️ Resume indexing"
-                            } else {
-                                "⏸ Pause indexing"
-                            };
-
-                            let _ = item_handle.set_title(new_label);
+                            // Don't block main thread when pausing the crawler.
+                            let item_handle = app.tray_handle().get_item(&id);
+                            let _ = item_handle.set_title("Handling request...");
+                            let _ = item_handle.set_enabled(false);
+                            tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                         }
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
@@ -253,18 +248,28 @@ async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
     }
 }
 
-async fn pause_crawler(rpc: &rpc::RpcMutex) -> bool {
+async fn pause_crawler(app: AppHandle, menu_id: String) {
+    let rpc = app.state::<RpcMutex>().inner();
     let mut rpc = rpc.lock().await;
     match rpc
         .client
-        .call_method::<Value, response::AppStatus>("toggle_pause", "", Value::Null)
+        .call_method::<Value, bool>("toggle_pause", "", Value::Null)
         .await
     {
-        Ok(resp) => resp.is_paused,
+        Ok(resp) => {
+            let new_label = if resp {
+                "▶️ Resume indexing"
+            } else {
+                "⏸ Pause indexing"
+            };
+
+            let item_handle = app.tray_handle().get_item(&menu_id);
+            let _ = item_handle.set_title(new_label);
+            let _ = item_handle.set_enabled(true);
+        },
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
             rpc.reconnect().await;
-            false
         }
     }
 }
