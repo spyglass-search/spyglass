@@ -290,7 +290,10 @@ pub async fn dequeue(
         .await?;
 
     if let Some(task) = entity {
-        return Ok(Some(task));
+        let mut update: ActiveModel = task.into();
+        update.status = Set(CrawlStatus::Processing);
+        let model: Model = update.update(db).await.expect("Unable to save");
+        return Ok(Some(model));
     }
 
     // List of domains to prioritize when dequeuing tasks
@@ -310,7 +313,6 @@ pub async fn dequeue(
         let mut update: ActiveModel = model.into();
         update.status = Set(CrawlStatus::Processing);
         let model: Model = update.update(db).await.expect("Unable to save");
-
         return Ok(Some(model));
     }
 
