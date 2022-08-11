@@ -26,7 +26,7 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
     let show = CustomMenuItem::new(MenuID::SHOW_SEARCHBAR.to_string(), "Show search")
         .accelerator(config.user_settings.shortcut.clone());
 
-    let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "");
+    let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "⏸ Pause indexing");
     let quit = CustomMenuItem::new(MenuID::QUIT.to_string(), "Quit");
 
     let open_logs_folder =

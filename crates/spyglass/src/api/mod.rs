@@ -57,8 +57,8 @@ impl Rpc for SpyglassRPC {
         Box::pin(route::search_lenses(self.state.clone(), query))
     }
 
-    fn toggle_pause(&self) -> BoxFuture<Result<bool>> {
-        Box::pin(route::toggle_pause(self.state.clone()))
+    fn toggle_pause(&self, is_paused: bool) -> BoxFuture<Result<()>> {
+        Box::pin(route::toggle_pause(self.state.clone(), is_paused))
     }
 
     fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>> {
