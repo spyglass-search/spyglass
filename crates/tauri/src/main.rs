@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use jsonrpc_core::Value;
@@ -38,6 +39,8 @@ use window::{
 };
 
 use crate::window::show_update_window;
+
+type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
@@ -129,9 +132,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Wait for the server to boot up
             let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
             app.manage(Arc::new(Mutex::new(rpc)));
-
             // Load user settings
             app.manage(config);
+            app.manage(Arc::new(PauseState::new(false)));
 
             // Center window horizontally in the current screen
             window::center_window(&window);
@@ -250,14 +253,21 @@ async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
 
 async fn pause_crawler(app: AppHandle, menu_id: String) {
     let rpc = app.state::<RpcMutex>().inner();
+    let pause_state = app.state::<Arc<PauseState>>().inner();
+
     let mut rpc = rpc.lock().await;
+    let is_paused = pause_state.clone();
+
     match rpc
         .client
-        .call_method::<Value, bool>("toggle_pause", "", Value::Null)
+        .call_method::<(bool,), ()>("toggle_pause", "", (!is_paused.load(Ordering::Relaxed),))
         .await
     {
-        Ok(resp) => {
-            let new_label = if resp {
+        Ok(_) => {
+            let is_paused = !pause_state.load(Ordering::Relaxed);
+            pause_state.store(is_paused, Ordering::Relaxed);
+
+            let new_label = if is_paused {
                 "▶️ Resume indexing"
             } else {
                 "⏸ Pause indexing"
@@ -300,14 +310,6 @@ async fn update_tray_menu(app: &AppHandle) {
     let handle = app.tray_handle();
 
     if let Some(app_status) = app_status {
-        let _ = handle
-            .get_item(&MenuID::CRAWL_STATUS.to_string())
-            .set_title(if app_status.is_paused {
-                "▶️ Resume indexing"
-            } else {
-                "⏸ Pause indexing"
-            });
-
         let _ = handle
             .get_item(&MenuID::NUM_DOCS.to_string())
             .set_title(format!(

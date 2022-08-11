@@ -267,28 +267,12 @@ pub async fn network_change(
         if is_offline { "offline" } else { "online" }
     );
 
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
-        .await
-    {
-        Ok(status) => {
-            // Pause the crawler if we're offline and we're currently crawling.
-            let should_toggle =
-                (!status.is_paused && is_offline) || (status.is_paused && !is_offline);
-
-            if should_toggle {
-                let _ = rpc
-                    .client
-                    .call_method::<Value, bool>("toggle_pause", "", Value::Null)
-                    .await;
-            }
-        }
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-        }
+    if is_offline {
+        let rpc = rpc.lock().await;
+        let _ = rpc
+            .client
+            .call_method::<(bool,), ()>("toggle_pause", "", (true,))
+            .await;
     }
 
     Ok(())

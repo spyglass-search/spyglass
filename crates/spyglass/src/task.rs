@@ -19,9 +19,11 @@ pub struct CrawlTask {
     pub id: i64,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Command {
     Fetch(CrawlTask),
+    PauseCrawler,
+    RunCrawler,
 }
 
 #[derive(Clone, Debug)]
@@ -34,25 +36,30 @@ pub enum AppShutdown {
 pub async fn manager_task(
     state: AppState,
     queue: mpsc::Sender<Command>,
+    mut crawler_cmd: broadcast::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
+    let mut is_paused = false;
 
     loop {
-        if let Some(is_paused) = state.app_state.get("paused") {
-            if (*is_paused) == "true" {
-                // Run w/ a select on the shutdown signal otherwise we're stuck in an
-                // infinite loop
-                tokio::select! {
-                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
-                        continue
-                    }
-                    _ = shutdown_rx.recv() => {
-                        log::info!("🛑 Shutting down worker");
-                        return;
+        if is_paused {
+            tokio::select! {
+                res = crawler_cmd.recv() => {
+                    match res {
+                        Ok(Command::PauseCrawler) => is_paused = true,
+                        Ok(Command::RunCrawler) => is_paused = false,
+                        _ => {}
                     }
                 }
+                _ = shutdown_rx.recv() => {
+                    log::info!("🛑 Shutting down manager");
+                    return;
+                }
             }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
         }
 
         let mut prioritized_domains: Vec<String> = Vec::new();
@@ -76,6 +83,15 @@ pub async fn manager_task(
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 return;
+            }
+            res = crawler_cmd.recv() => {
+                match res {
+                    Ok(Command::PauseCrawler) => is_paused = true,
+                    Ok(Command::RunCrawler) => is_paused = false,
+                    _ => {}
+                }
+
+                Ok(None)
             }
         };
 
@@ -226,30 +242,38 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
 pub async fn worker_task(
     state: AppState,
     mut queue: mpsc::Receiver<Command>,
+    mut crawler_cmd: broadcast::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("worker started");
     let crawler = Crawler::new();
+    let mut is_paused = false;
 
     loop {
-        if let Some(is_paused) = state.app_state.get("paused") {
-            if (*is_paused) == "true" {
-                // Run w/ a select on the shutdown signal otherwise we're stuck in an
-                // infinite loop
-                tokio::select! {
-                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
-                        continue
+        // Run w/ a select on the shutdown signal otherwise we're stuck in an
+        // infinite loop
+        if is_paused {
+            tokio::select! {
+                res = crawler_cmd.recv() => {
+                    match res {
+                        Ok(Command::PauseCrawler) => is_paused = true,
+                        Ok(Command::RunCrawler) => is_paused = false,
+                        _ => {}
                     }
-                    _ = shutdown_rx.recv() => {
-                        log::info!("🛑 Shutting down worker");
-                        return;
-                    }
+                },
+                _ = shutdown_rx.recv() => {
+                    log::info!("🛑 Shutting down worker");
+                    return;
                 }
-            }
+            };
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
         }
 
         let next_cmd = tokio::select! {
             res = queue.recv() => res,
+            res = crawler_cmd.recv() => res.ok(),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down worker");
                 return;
@@ -258,6 +282,8 @@ pub async fn worker_task(
 
         if let Some(cmd) = next_cmd {
             match cmd {
+                Command::PauseCrawler => is_paused = true,
+                Command::RunCrawler => is_paused = false,
                 Command::Fetch(task) => {
                     tokio::spawn(_handle_fetch(state.clone(), crawler.clone(), task.clone()));
                 }

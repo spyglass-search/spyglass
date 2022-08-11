@@ -17,7 +17,6 @@ impl QueueStatus {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
-    pub is_paused: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
