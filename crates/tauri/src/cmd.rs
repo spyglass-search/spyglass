@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::{atomic::Ordering, Arc};
 
 use jsonrpc_core::Value;
 use tauri::Manager;
