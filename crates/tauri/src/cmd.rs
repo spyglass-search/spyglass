@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, atomic::Ordering};
 
 use jsonrpc_core::Value;
 use tauri::Manager;
 use tauri::State;
 use url::Url;
 
+use crate::PauseState;
 use crate::{constants, open_folder, rpc, window};
 use shared::{
     config::Config,
@@ -260,6 +262,7 @@ pub async fn install_lens<'r>(
 pub async fn network_change(
     _: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
+    paused: State<'_, Arc<PauseState>>,
     is_offline: bool,
 ) -> Result<(), String> {
     log::info!(
@@ -269,6 +272,8 @@ pub async fn network_change(
 
     if is_offline {
         let rpc = rpc.lock().await;
+        paused.store(true, Ordering::Relaxed);
+
         let _ = rpc
             .client
             .call_method::<(bool,), ()>("toggle_pause", "", (true,))
