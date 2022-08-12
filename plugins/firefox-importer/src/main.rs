@@ -37,6 +37,7 @@ impl SpyglassPlugin for Plugin {
         // Grab a copy of the firefox data into our plugin data folder.
         // This is required because Firefox locks the file when running.
         if let Some(profile_path) = profile_path {
+            log(format!("Using profile: {}", profile_path.display()));
             sync_file(DATA_DIR.to_string(), profile_path.display().to_string());
         }
     }
@@ -45,6 +46,8 @@ impl SpyglassPlugin for Plugin {
         let path = Path::new(DATA_DIR).join(DB_FILE);
         if path.exists() {
             enqueue_all(&self.read_bookmarks());
+        } else {
+            log("Unable to find places.sqlite file".to_string());
         }
     }
 }

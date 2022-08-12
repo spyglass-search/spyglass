@@ -8,14 +8,15 @@ use tauri::Manager;
 use tauri::State;
 use url::Url;
 
+use crate::window::alert;
 use crate::PauseState;
 use crate::{constants, open_folder, rpc, window};
 use shared::{
     config::Config,
     event::ClientEvent,
+    form::{FormType, SettingOpts},
     request,
     response::{self, InstallableLens},
-    FormType, SettingOpts,
 };
 
 #[tauri::command]
@@ -358,32 +359,23 @@ pub async fn save_user_settings(
 
                     if let Some(to_update) = user_settings.plugin_settings.get_mut(plugin_name) {
                         if let Some(field_opts) = plugin_config.user_settings.get(field) {
-                            let value = match field_opts.form_type {
-                                FormType::Text => Some(value.into()),
-                                FormType::List => {
-                                    // Escape backslashes
-                                    let value = value.replace('\\', "\\\\");
-                                    // Validate the value by attempting to deserialize
-                                    match serde_json::from_str::<Vec<String>>(&value) {
-                                        Ok(parsed) => {
-                                            serde_json::to_string::<Vec<String>>(&parsed).ok()
-                                        }
-                                        Err(e) => {
-                                            window::alert(
-                                                &window,
-                                                "Unable to save settings",
-                                                &format!("Reason: {}", e),
-                                            );
-                                            received_error = true;
-                                            log::error!("unable to save setting: {}", e);
-                                            None
-                                        }
-                                    }
+                            // Validate & serialize value into something we can save.
+                            match field_opts.form_type.validate(value) {
+                                Ok(val) => {
+                                    to_update.insert(field.into(), val);
                                 }
-                            };
-
-                            if let Some(value) = value {
-                                to_update.insert(field.into(), value);
+                                Err(error) => {
+                                    // Show an alert
+                                    received_error = true;
+                                    alert(
+                                        &window,
+                                        "Error",
+                                        &format!(
+                                            "Unable to save {} due to: {}",
+                                            field_opts.label, error
+                                        ),
+                                    );
+                                }
                             }
                         }
                     }

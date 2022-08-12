@@ -10,7 +10,7 @@ use crate::{
     utils::RequestState,
 };
 use shared::event::ClientInvoke;
-use shared::{FormType, SettingOpts};
+use shared::form::{FormType, SettingOpts};
 
 #[derive(Properties, PartialEq)]
 pub struct SettingFormProps {
@@ -96,7 +96,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
             <div>
                 {
                     match &props.opts.form_type {
-                        FormType::List => {
+                        FormType::PathList => {
                             html! {
                                 <textarea
                                     ref={input_ref.clone()}
@@ -109,7 +109,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                                 </textarea>
                             }
                         }
-                        FormType::Text => {
+                        FormType::Text | FormType::Path => {
                             html! {
                                 <input
                                     ref={input_ref.clone()}

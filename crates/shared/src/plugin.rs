@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::SettingOpts;
+use crate::form::SettingOpts;
 
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub enum PluginType {
