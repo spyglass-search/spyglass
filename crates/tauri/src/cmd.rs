@@ -344,17 +344,34 @@ pub async fn save_user_settings(
     let mut received_error = false;
     let mut fields_updated: usize = 0;
 
-    // Update the user settings
+    // Loop through each updated settings value sent from the front-end and
+    // validate the values.
     for (key, value) in settings.iter() {
+        // Update spyglass or plugin settings?
         if let Some((parent, field)) = key.split_once('.') {
             match parent {
                 // Hacky way to update user settings directly.
                 "_" => {
                     if field == "data_directory" {
-                        user_settings.data_directory = PathBuf::from(value);
+                        match FormType::Path.validate(value) {
+                            Ok(val) => {
+                                fields_updated += 1;
+                                user_settings.data_directory = PathBuf::from(val);
+                            }
+                            Err(error) => {
+                                // Show an alert
+                                received_error = true;
+                                alert(
+                                    &window,
+                                    "Error",
+                                    &format!("Unable to save data directory due to: {}", error),
+                                );
+                            }
+                        }
                     }
                 }
                 plugin_name => {
+                    // Load plugin settings configurations
                     let plugin_config = plugin_configs
                         .get(plugin_name)
                         .expect("Unable to find plugin");

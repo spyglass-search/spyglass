@@ -20,7 +20,10 @@ impl FormType {
                 if existence_check.exists() {
                     Ok(value)
                 } else {
-                    Err(format!("Path \"{}\" is not accessible/does not exist", value))
+                    Err(format!(
+                        "Path \"{}\" is not accessible/does not exist",
+                        value
+                    ))
                 }
             }
             FormType::PathList => {
@@ -32,7 +35,10 @@ impl FormType {
                         for path in parsed.iter() {
                             let check = Path::new(&path);
                             if !check.exists() {
-                                return Err(format!("Path \"{}\" is not accessible/does not exist", path));
+                                return Err(format!(
+                                    "Path \"{}\" is not accessible/does not exist",
+                                    path
+                                ));
                             }
                         }
 
