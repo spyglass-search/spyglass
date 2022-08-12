@@ -29,7 +29,7 @@ fn fetch_installed_plugins(
     });
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct PluginProps {
     pub plugin: PluginResult,
 }

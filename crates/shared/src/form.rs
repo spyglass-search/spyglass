@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 
-#[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum FormType {
     Path,
     PathList,
@@ -39,7 +39,7 @@ impl FormType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SettingOpts {
     pub label: String,
     pub value: String,

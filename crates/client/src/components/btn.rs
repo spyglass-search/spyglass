@@ -3,7 +3,7 @@ use yew::prelude::*;
 
 use crate::components::icons;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct TooltipProps {
     pub label: String,
 }
@@ -34,7 +34,7 @@ pub fn tooltip(props: &TooltipProps) -> Html {
     }
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct DeleteButtonProps {
     pub doc_id: String,
 }

@@ -1,7 +1,7 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, Eq, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "resource_rules")]
 pub struct Model {
     #[sea_orm(primary_key)]

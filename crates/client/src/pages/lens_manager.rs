@@ -13,7 +13,7 @@ use crate::{install_lens, invoke};
 use shared::event::ClientEvent;
 use shared::response::InstallableLens;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct LensProps {
     pub result: LensResult,
     #[prop_or_default]
@@ -68,7 +68,7 @@ fn fetch_installable_lenses(
     });
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct InstallBtnProps {
     pub download_url: String,
 }

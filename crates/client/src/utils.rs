@@ -1,4 +1,4 @@
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum RequestState {
     NotStarted,
     InProgress,

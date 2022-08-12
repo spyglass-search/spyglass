@@ -8,7 +8,7 @@ use shared::response::{LensResult, SearchResult};
 use shared::url_to_file_path;
 use url::Url;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResultListType {
     DocSearch,
     LensSearch,
@@ -53,7 +53,7 @@ impl From<&SearchResult> for ResultListData {
     }
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct SelectLensProps {
     pub lens: Vec<String>,
 }

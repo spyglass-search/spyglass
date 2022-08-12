@@ -17,7 +17,7 @@ use shared::regex::{regex_for_domain, regex_for_prefix};
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 10000;
 
-#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum CrawlStatus {
     #[sea_orm(string_value = "Queued")]
@@ -41,7 +41,7 @@ impl fmt::Display for CrawlStatus {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum CrawlType {
     #[sea_orm(string_value = "API")]
@@ -68,7 +68,7 @@ impl fmt::Display for CrawlType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "crawl_queue")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -320,7 +320,7 @@ pub async fn dequeue(
 }
 
 /// Add url to the crawl queue
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum SkipReason {
     Invalid,
     Blocked,
