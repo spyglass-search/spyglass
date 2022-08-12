@@ -9,7 +9,7 @@
         "FOLDERS_LIST": (
             label: "Folders List",
             value: "",
-            form_type: List,
+            form_type: PathList,
             help_text: Some("List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specify the parent folder.")
         )
     }

@@ -109,7 +109,7 @@ extern "C" {
     pub async fn toggle_plugin(name: &str) -> Result<(), JsValue>;
 }
 
-#[derive(Clone, Routable, PartialEq)]
+#[derive(Clone, Routable, PartialEq, Eq)]
 pub enum Route {
     #[at("/")]
     Search,

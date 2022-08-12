@@ -29,7 +29,7 @@ fn fetch_crawl_stats(
     });
 }
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct LegendIconProps {
     pub color: String,
     pub label: String,

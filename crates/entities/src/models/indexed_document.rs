@@ -1,7 +1,7 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{FromQueryResult, QuerySelect, Set};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "indexed_document")]
 pub struct Model {
     #[sea_orm(primary_key)]

@@ -4,7 +4,7 @@ use sea_orm::Set;
 use serde::Serialize;
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum LensType {
     // A simple lens with URLs & rules
@@ -25,7 +25,7 @@ impl fmt::Display for LensType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "lens")]
 pub struct Model {
     #[sea_orm(primary_key)]

@@ -3,6 +3,8 @@ use reqwest::{Client, Response};
 use url::Url;
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+const NUM_RETRIES: usize = 3;
+const RETRY_WAIT_S: u64 = 5;
 
 /// A wrapper around reqwest that for HTTP related queries that handles retries,
 /// downgrading from HTTPS -> HTTP, 429 too many requests, etc.
@@ -63,37 +65,37 @@ impl HTTPClient {
             .expect("Unable to set scheme to HTTPS");
 
         let mut res = None;
-        let mut num_retries = 0;
-        loop {
+        for _ in 0..NUM_RETRIES {
             let request = self.client.get(url.clone()).send().await;
-            if let Err(e) = &request {
+            if let Err(err) = &request {
                 // Handle 429s
-                if let Some(status) = e.status() {
+                if let Some(status) = err.status() {
                     if status == StatusCode::TOO_MANY_REQUESTS {
                         // Probably overkill, but if this becomes a problem we can revisit
                         log::warn!("Making too many requests, slowing down");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                     }
-                } else if e.is_request() && url.scheme() == "https" {
+                } else if err.is_request() && url.scheme() == "https" {
                     // Try downgrading to HTTP if we're unable to connect
                     url.set_scheme("http")
                         .expect("Unable to set scheme to HTTP");
                 }
-            } else {
-                // Success!
-                res = Some(request);
-                break;
-            }
 
-            num_retries += 1;
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            if num_retries > 3 {
+                res = Some(request);
+                tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_WAIT_S)).await;
+            } else {
+                res = Some(request);
                 break;
             }
         }
 
         match res {
-            Some(Ok(e)) => Ok(e),
+            Some(Ok(res)) => {
+                if res.status() == StatusCode::TOO_MANY_REQUESTS {
+                    dbg!(&res);
+                }
+
+                Ok(res)
+            }
             Some(Err(e)) => Err(anyhow::Error::from(e)),
             None => Err(anyhow::Error::msg(format!("Unable to query <{}>", url))),
         }

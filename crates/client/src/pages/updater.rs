@@ -39,7 +39,7 @@ pub fn updater_page() -> Html {
     html! {
         <div class="text-white h-screen relative">
             <Header label="Update Available!" classes={classes!("text-center")}/>
-            <div class="pt-4 px-8 pb-16 h-64 overflow-scroll text-sm text-center">
+            <div class="pt-4 px-8 pb-16 h-64 overflow-hidden text-sm text-center">
                 <div class="flex flex-row place-content-center">
                     <iframe
                         src={format!("https://giphy.com/embed/{}", UPDATE_GIFS[rando])}
