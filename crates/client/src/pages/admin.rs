@@ -16,7 +16,7 @@ struct ListenPayload {
     payload: String,
 }
 
-#[derive(Clone, EnumString, Display, PartialEq)]
+#[derive(Clone, EnumString, Display, PartialEq, Eq)]
 pub enum Tab {
     #[strum(serialize = "lenses")]
     LensManager,
@@ -62,7 +62,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
     }
 }
 
-#[derive(PartialEq, Properties)]
+#[derive(PartialEq, Properties, Eq)]
 pub struct SettingsPageProps {
     pub tab: Tab,
 }

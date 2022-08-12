@@ -2,7 +2,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::Set;
 use url::Url;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "link")]
 pub struct Model {
     #[sea_orm(primary_key)]

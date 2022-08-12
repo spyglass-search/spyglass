@@ -17,6 +17,7 @@ use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
+use libspyglass::task::Command;
 
 use super::response;
 
@@ -47,20 +48,12 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
 }
 
 async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
-    // Grab crawler status
-    let app_state = &state.app_state;
-    let paused_status = app_state
-        .entry("paused".to_string())
-        .or_insert("false".to_string());
-    let is_paused = *paused_status == *"true";
-
     // Grab details about index
     let index = state.index;
     let reader = index.reader.searcher();
 
     Ok(AppStatus {
         num_docs: reader.num_docs(),
-        is_paused,
     })
 }
 
@@ -340,6 +333,8 @@ pub async fn search_lenses(
 
     let query_results = lens::Entity::find()
         .filter(lens::Column::Name.like(&format!("%{}%", &param.query)))
+        .filter(lens::Column::IsEnabled.eq(true))
+        .filter(lens::Column::LensType.eq(LensType::Simple))
         .order_by_asc(lens::Column::Name)
         .all(&state.db)
         .await;
@@ -365,16 +360,17 @@ pub async fn search_lenses(
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_pause(state: AppState) -> jsonrpc_core::Result<bool> {
+pub async fn toggle_pause(state: AppState, is_paused: bool) -> jsonrpc_core::Result<()> {
     // Scope so that the app_state mutex is correctly released.
-    let app_state = &state.app_state;
-    let mut paused_status = app_state.entry("paused".into()).or_insert("false".into());
+    if let Some(sender) = state.crawler_cmd_tx.lock().await.as_ref() {
+        let _ = sender.send(if is_paused {
+            Command::PauseCrawler
+        } else {
+            Command::RunCrawler
+        });
+    }
 
-    let current_status = paused_status.to_string() == "true";
-    let updated_status = !current_status;
-    *paused_status = updated_status.to_string();
-
-    Ok(updated_status)
+    Ok(())
 }
 
 #[instrument(skip(state))]

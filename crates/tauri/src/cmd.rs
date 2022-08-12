@@ -1,19 +1,22 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{atomic::Ordering, Arc};
 
 use jsonrpc_core::Value;
 use tauri::Manager;
 use tauri::State;
 use url::Url;
 
+use crate::window::alert;
+use crate::PauseState;
 use crate::{constants, open_folder, rpc, window};
 use shared::{
     config::Config,
     event::ClientEvent,
+    form::{FormType, SettingOpts},
     request,
     response::{self, InstallableLens},
-    FormType, SettingOpts,
 };
 
 #[tauri::command]
@@ -260,6 +263,7 @@ pub async fn install_lens<'r>(
 pub async fn network_change(
     _: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
+    paused: State<'_, Arc<PauseState>>,
     is_offline: bool,
 ) -> Result<(), String> {
     log::info!(
@@ -267,28 +271,14 @@ pub async fn network_change(
         if is_offline { "offline" } else { "online" }
     );
 
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
-        .await
-    {
-        Ok(status) => {
-            // Pause the crawler if we're offline and we're currently crawling.
-            let should_toggle =
-                (!status.is_paused && is_offline) || (status.is_paused && !is_offline);
+    if is_offline {
+        let rpc = rpc.lock().await;
+        paused.store(true, Ordering::Relaxed);
 
-            if should_toggle {
-                let _ = rpc
-                    .client
-                    .call_method::<Value, bool>("toggle_pause", "", Value::Null)
-                    .await;
-            }
-        }
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-        }
+        let _ = rpc
+            .client
+            .call_method::<(bool,), ()>("toggle_pause", "", (true,))
+            .await;
     }
 
     Ok(())
@@ -369,32 +359,23 @@ pub async fn save_user_settings(
 
                     if let Some(to_update) = user_settings.plugin_settings.get_mut(plugin_name) {
                         if let Some(field_opts) = plugin_config.user_settings.get(field) {
-                            let value = match field_opts.form_type {
-                                FormType::Text => Some(value.into()),
-                                FormType::List => {
-                                    // Escape backslashes
-                                    let value = value.replace('\\', "\\\\");
-                                    // Validate the value by attempting to deserialize
-                                    match serde_json::from_str::<Vec<String>>(&value) {
-                                        Ok(parsed) => {
-                                            serde_json::to_string::<Vec<String>>(&parsed).ok()
-                                        }
-                                        Err(e) => {
-                                            window::alert(
-                                                &window,
-                                                "Unable to save settings",
-                                                &format!("Reason: {}", e),
-                                            );
-                                            received_error = true;
-                                            log::error!("unable to save setting: {}", e);
-                                            None
-                                        }
-                                    }
+                            // Validate & serialize value into something we can save.
+                            match field_opts.form_type.validate(value) {
+                                Ok(val) => {
+                                    to_update.insert(field.into(), val);
                                 }
-                            };
-
-                            if let Some(value) = value {
-                                to_update.insert(field.into(), value);
+                                Err(error) => {
+                                    // Show an alert
+                                    received_error = true;
+                                    alert(
+                                        &window,
+                                        "Error",
+                                        &format!(
+                                            "Unable to save {} due to: {}",
+                                            field_opts.label, error
+                                        ),
+                                    );
+                                }
                             }
                         }
                     }

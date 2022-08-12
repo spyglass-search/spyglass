@@ -10,7 +10,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use entities::models::{crawl_queue, lens};
 use libspyglass::plugin;
 use libspyglass::state::AppState;
-use libspyglass::task::{self, AppShutdown};
+use libspyglass::task::{self, AppShutdown, Command};
 use migration::{Migrator, MigratorTrait};
 use shared::config::Config;
 
@@ -114,14 +114,26 @@ async fn start_backend(state: &mut AppState, config: &Config) {
 
     // Channel for shutdown listeners
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
-
+    // Channel for crawle cmds
+    let (crawler_tx, _) = broadcast::channel::<Command>(16);
     // Channel for plugin commands
     let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
-    state
-        .plugin_cmd_tx
-        .lock()
-        .await
-        .replace(plugin_cmd_tx.clone());
+
+    {
+        state
+            .crawler_cmd_tx
+            .lock()
+            .await
+            .replace(crawler_tx.clone());
+    }
+
+    {
+        state
+            .plugin_cmd_tx
+            .lock()
+            .await
+            .replace(plugin_cmd_tx.clone());
+    }
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
     let lens_watcher_handle = tokio::spawn(task::lens_watcher(
@@ -134,6 +146,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
         crawl_queue_tx,
+        crawler_tx.subscribe(),
         shutdown_tx.subscribe(),
     ));
 
@@ -141,6 +154,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
         crawl_queue_rx,
+        crawler_tx.subscribe(),
         shutdown_tx.subscribe(),
     ));
 

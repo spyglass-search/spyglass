@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct QueueStatus {
     pub num_queued: u64,
     pub num_processing: u64,
@@ -17,7 +17,6 @@ impl QueueStatus {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
-    pub is_paused: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -35,7 +34,7 @@ pub struct InstallableLens {
     pub html_url: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LensResult {
     pub author: String,
     pub title: String,
@@ -45,7 +44,7 @@ pub struct LensResult {
     pub download_url: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PluginResult {
     pub author: String,
     pub title: String,

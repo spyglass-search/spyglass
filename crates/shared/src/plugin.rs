@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::SettingOpts;
+use crate::form::SettingOpts;
 
-#[derive(Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum PluginType {
     /// A more complex lens than a simple list of URLs
     /// - Registers itself as a lens, under some "trigger" label.

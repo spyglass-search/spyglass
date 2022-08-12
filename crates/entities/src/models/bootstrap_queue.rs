@@ -1,7 +1,7 @@
 use sea_orm::{entity::prelude::*, Set};
 use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "bootstrap_queue")]
 pub struct Model {
     #[sea_orm(primary_key)]

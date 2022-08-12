@@ -3,14 +3,14 @@ use sea_orm::Set;
 use serde::Serialize;
 use url::Url;
 
-#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize)]
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum FetchProtocol {
     #[sea_orm(string_value = "HTTP")]
     Http,
 }
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "fetch_history")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -87,7 +87,7 @@ pub async fn upsert(
         .one(db)
         .await?;
 
-    return match history {
+    match history {
         // Already exists, update
         Some(res) => {
             let mut model: ActiveModel = res.into();
@@ -108,7 +108,7 @@ pub async fn upsert(
 
             Ok(new_hist.insert(db).await?)
         }
-    };
+    }
 }
 
 #[cfg(test)]
