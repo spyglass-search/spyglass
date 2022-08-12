@@ -340,7 +340,9 @@ pub async fn save_user_settings(
 ) -> Result<(), String> {
     let mut user_settings = config.user_settings.clone();
     let plugin_configs = config.load_plugin_config();
+
     let mut received_error = false;
+    let mut fields_updated: usize = 0;
 
     // Update the user settings
     for (key, value) in settings.iter() {
@@ -362,6 +364,7 @@ pub async fn save_user_settings(
                             // Validate & serialize value into something we can save.
                             match field_opts.form_type.validate(value) {
                                 Ok(val) => {
+                                    fields_updated += 1;
                                     to_update.insert(field.into(), val);
                                 }
                                 Err(error) => {
@@ -385,7 +388,7 @@ pub async fn save_user_settings(
     }
 
     // Only save settings if everything is valid.
-    if !received_error {
+    if !received_error && fields_updated > 0 {
         let _ = config.save_user_settings(&user_settings);
         let app = window.app_handle();
         app.restart();
