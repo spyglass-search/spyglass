@@ -333,6 +333,8 @@ pub async fn search_lenses(
 
     let query_results = lens::Entity::find()
         .filter(lens::Column::Name.like(&format!("%{}%", &param.query)))
+        .filter(lens::Column::IsEnabled.eq(true))
+        .filter(lens::Column::LensType.eq(LensType::Simple))
         .order_by_asc(lens::Column::Name)
         .all(&state.db)
         .await;
