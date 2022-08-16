@@ -47,6 +47,9 @@
         "timestampUrl": "",
         "webviewInstallMode": {
           "type": "embedBootstrapper"
+        },
+        "wix": {
+          "template": "installer/windows/main.wxs"
         }
       }
     },
