@@ -333,13 +333,12 @@ pub struct EnqueueSettings {
     pub force_allow: bool,
 }
 
-pub async fn enqueue_all(
-    db: &DatabaseConnection,
-    urls: &[String],
+fn filter_urls(
     lenses: &[Lens],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
-) -> anyhow::Result<(), sea_orm::DbErr> {
+    urls: &[String],
+) -> Vec<String> {
     let mut allow_list: Vec<String> = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
     let mut restrict_list: Vec<String> = Vec::new();
@@ -360,8 +359,7 @@ pub async fn enqueue_all(
     let restrict_list = RegexSet::new(restrict_list).expect("Unable to create restrict list");
 
     // Ignore invalid URLs
-    let urls: Vec<String> = urls
-        .iter()
+    urls.iter()
         .filter_map(|url| {
             if let Ok(mut parsed) = Url::parse(url) {
                 // Check that we can handle this scheme
@@ -398,14 +396,25 @@ pub async fn enqueue_all(
                 if overrides.force_allow
                     || (!allow_list.is_empty() && allow_list.is_match(&normalized))
                 {
+                    dbg!(allow_list.is_match(&normalized), &normalized);
                     return Some(normalized);
                 }
             }
 
             None
         })
-        .collect();
+        .collect::<Vec<String>>()
+}
 
+pub async fn enqueue_all(
+    db: &DatabaseConnection,
+    urls: &[String],
+    lenses: &[Lens],
+    settings: &UserSettings,
+    overrides: &EnqueueSettings,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    // Filter URLs
+    let urls = filter_urls(lenses, settings, overrides, urls);
     // Ignore urls already indexed
     let mut is_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
     // Igore urls already indexed
@@ -518,7 +527,7 @@ mod test {
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
-    use super::{gen_priority_sql, gen_priority_values, EnqueueSettings};
+    use super::{filter_urls, gen_priority_sql, gen_priority_values, EnqueueSettings};
 
     #[tokio::test]
     async fn test_insert() {
@@ -763,5 +772,27 @@ mod test {
                 assert!(!allow_list.is_match(url));
             }
         }
+    }
+
+    #[test]
+    fn test_filter_urls() {
+        let settings = UserSettings::default();
+        let overrides = EnqueueSettings::default();
+
+        let lens =
+            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/bahai.ron")).unwrap();
+
+        let to_enqueue = vec![
+            "https://bahai-library.com//shoghi-effendi_goals_crusade".into(),
+            "https://www.stumbleupon.com/submit?url=https://bahaiworld.bahai.org/library/western-liberal-democracy-as-new-world-order/&title=Western%20Liberal%20Democracy%20as%20New%20World%20Order?".into(),
+            "https://www.reddit.com/submit?title=The%20Epic%20of%20Humanity&url=https://bahaiworld.bahai.org/library/the-epic-of-humanity".into()
+        ];
+
+        let mut filtered = filter_urls(&[lens], &settings, &overrides, &to_enqueue);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(
+            filtered.pop(),
+            Some("https://bahai-library.com//shoghi-effendi_goals_crusade".into())
+        );
     }
 }
