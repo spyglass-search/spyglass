@@ -18,7 +18,7 @@ pub fn regex_for_domain(domain: &str) -> String {
 
 pub fn regex_for_prefix(prefix: &str) -> String {
     if prefix.ends_with('$') {
-        return format!("^{}", prefix.to_string());
+        return format!("^{}", prefix);
     }
 
     format!("^{}.*", prefix)
