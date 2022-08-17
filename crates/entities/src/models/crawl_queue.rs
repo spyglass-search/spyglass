@@ -396,7 +396,6 @@ fn filter_urls(
                 if overrides.force_allow
                     || (!allow_list.is_empty() && allow_list.is_match(&normalized))
                 {
-                    dbg!(allow_list.is_match(&normalized), &normalized);
                     return Some(normalized);
                 }
             }
