@@ -89,13 +89,7 @@ impl HTTPClient {
         }
 
         match res {
-            Some(Ok(res)) => {
-                if res.status() == StatusCode::TOO_MANY_REQUESTS {
-                    dbg!(&res);
-                }
-
-                Ok(res)
-            }
+            Some(Ok(res)) => Ok(res),
             Some(Err(e)) => Err(anyhow::Error::from(e)),
             None => Err(anyhow::Error::msg(format!("Unable to query <{}>", url))),
         }

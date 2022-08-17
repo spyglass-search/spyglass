@@ -340,19 +340,38 @@ pub async fn save_user_settings(
 ) -> Result<(), String> {
     let mut user_settings = config.user_settings.clone();
     let plugin_configs = config.load_plugin_config();
-    let mut received_error = false;
 
-    // Update the user settings
+    let mut received_error = false;
+    let mut fields_updated: usize = 0;
+
+    // Loop through each updated settings value sent from the front-end and
+    // validate the values.
     for (key, value) in settings.iter() {
+        // Update spyglass or plugin settings?
         if let Some((parent, field)) = key.split_once('.') {
             match parent {
                 // Hacky way to update user settings directly.
                 "_" => {
                     if field == "data_directory" {
-                        user_settings.data_directory = PathBuf::from(value);
+                        match FormType::Path.validate(value) {
+                            Ok(val) => {
+                                fields_updated += 1;
+                                user_settings.data_directory = PathBuf::from(val);
+                            }
+                            Err(error) => {
+                                // Show an alert
+                                received_error = true;
+                                alert(
+                                    &window,
+                                    "Error",
+                                    &format!("Unable to save data directory due to: {}", error),
+                                );
+                            }
+                        }
                     }
                 }
                 plugin_name => {
+                    // Load plugin settings configurations
                     let plugin_config = plugin_configs
                         .get(plugin_name)
                         .expect("Unable to find plugin");
@@ -362,6 +381,7 @@ pub async fn save_user_settings(
                             // Validate & serialize value into something we can save.
                             match field_opts.form_type.validate(value) {
                                 Ok(val) => {
+                                    fields_updated += 1;
                                     to_update.insert(field.into(), val);
                                 }
                                 Err(error) => {
@@ -385,7 +405,7 @@ pub async fn save_user_settings(
     }
 
     // Only save settings if everything is valid.
-    if !received_error {
+    if !received_error && fields_updated > 0 {
         let _ = config.save_user_settings(&user_settings);
         let app = window.app_handle();
         app.restart();

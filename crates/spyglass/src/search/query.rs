@@ -54,9 +54,10 @@ pub fn build_query(
                 for prefix in &lens.urls {
                     let mut regex = regex_for_prefix(prefix);
                     // By default, a RegexQuery is assumed to be exact match.
-                    if regex.ends_with('$') {
-                        regex = regex.strip_suffix('$').expect("No $ in prefix").to_string();
-                    }
+                    regex = regex
+                        .trim_start_matches('^')
+                        .trim_end_matches('$')
+                        .to_string();
 
                     lense_queries.push((
                         Occur::Should,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use strum_macros::{Display, EnumString};
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
@@ -15,7 +16,15 @@ impl FormType {
             FormType::Path => {
                 // Escape backslashes
                 let value = value.replace('\\', "\\\\");
-                Ok(value)
+                let existence_check = Path::new(&value);
+                if existence_check.exists() {
+                    Ok(value)
+                } else {
+                    Err(format!(
+                        "Path \"{}\" is not accessible/does not exist",
+                        value
+                    ))
+                }
             }
             FormType::PathList => {
                 // Escape backslashes
@@ -23,6 +32,16 @@ impl FormType {
                 // Validate the value by attempting to deserialize
                 match serde_json::from_str::<Vec<String>>(&value) {
                     Ok(parsed) => {
+                        for path in parsed.iter() {
+                            let check = Path::new(&path);
+                            if !check.exists() {
+                                return Err(format!(
+                                    "Path \"{}\" is not accessible/does not exist",
+                                    path
+                                ));
+                            }
+                        }
+
                         Ok(serde_json::to_string::<Vec<String>>(&parsed).expect("Invalid list"))
                     }
                     Err(e) => Err(e.to_string()),
