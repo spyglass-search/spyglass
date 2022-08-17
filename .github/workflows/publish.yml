@@ -3,13 +3,12 @@ on:
   push:
     branches:
       - release
-
 jobs:
   publish-tauri:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
+        platform: [macos-latest, 'ubuntu-20.04', 'windows-latest']
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -22,10 +21,16 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
+    # Install dependencies for plugins/client
     - name: install wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: install wasm32-wasi toolchain
       run: rustup target add wasm32-wasi
+    # Install macos specific targets
+    - name: install arm64 rust target (macos only)
+      if: matrix.platform == 'macos-latest'
+      run: rustup target add aarch64-apple-darwin
+    # Install tauri build deps
     - name: install tauri-cli & tauri-build
       run: cargo install tauri-cli --version "^1.0.5"
     - name: install trunk
@@ -41,24 +46,45 @@ jobs:
           libayatana-appindicator3-dev \
           librsvg2-dev \
           patchelf
-    - name: Setup arch target (macos / linux only)
-      if: matrix.platform != 'windows-latest'
+    # Setup arch targets - linux
+    - name: setup arch target - linux
+      if: ${{startsWith(matrix.platform, 'ubuntu')}}
       run: |
         echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
         echo "target_ext=" >>$GITHUB_ENV
+    - name: setup arch target - macos
+      if: ${{startsWith(matrix.platform, 'macos')}}
+      run: |
+        echo "target_arch=universal-apple-darwin" >> $GITHUB_ENV
+        echo "target_ext=" >>$GITHUB_ENV
     - name: Setup arch target (windows only)
-      if: matrix.platform == 'windows-latest'
+      if: ${{startsWith(matrix.platform, 'windows')}}
       run: |
         echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
         echo "target_ext=.exe" >> $env:GITHUB_ENV
-    - name: build sidecar
+    # Build stuff
+    - name: build sidecar (windows/linux)
+      if: matrix.platform != 'macos-latest'
       run: |
         cargo build -p spyglass --verbose --release
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+    - name: build sidecar (macOS)
+      if: matrix.platform == 'macos-latest'
+      run: |
+        mkdir -p crates/tauri/binaries
+        cargo build -p spyglass --verbose --release --target aarch64-apple-darwin
+        cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin
+
+        cargo build -p spyglass --verbose --release --target x86_64-apple-darwin
+        cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin
+
+        lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
+          target/aarch64-apple-darwin/release/spyglass \
+          target/x86_64-apple-darwin/release/spyglass
     - name: build default plugins
       run: make build-plugins-release
-    - uses: tauri-apps/tauri-action@v0
+    - uses: a5huynh/tauri-action@3abf9a5e0cf42f7c7c88f12cb7d250028d459a17
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -78,3 +104,4 @@ jobs:
         releaseBody: "See the assets to download this version and install."
         releaseDraft: true
         prerelease: false
+        args: --target ${{ env.target_arch }}
