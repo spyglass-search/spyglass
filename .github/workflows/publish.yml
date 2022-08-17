@@ -3,13 +3,12 @@ on:
   push:
     branches:
       - release
-      - ci/build-universal-mac-app
 jobs:
   publish-tauri:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest]
+        platform: [macos-latest, 'ubuntu-20.04', 'windows-latest']
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -90,9 +89,16 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        # required for macOS code signing
+        ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
+        APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       with:
         # the action automatically replaces \_\_VERSION\_\_ with the app version
-        tagName: v20_test___VERSION__
+        tagName: v20__VERSION__
         tauriScript: cargo tauri
         releaseName: "Spyglass v20__VERSION__"
         releaseBody: "See the assets to download this version and install."
