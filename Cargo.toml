@@ -15,7 +15,6 @@ members = [
 ]
 
 [profile.release]
-panic = "abort"
 codegen-units = 1
 lto = true
 incremental = false
