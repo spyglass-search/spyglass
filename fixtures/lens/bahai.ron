@@ -1,0 +1,14 @@
+(
+    version: "1",
+    name: "test",
+    author: "tester",
+    description: Some(""),
+    is_enabled: true,
+    domains: [],
+    urls: [
+        "https://bahai.org/library",
+        "https://bahaiworld.bahai.org/",
+        "https://news.bahai.org/",
+        "https://bahai-library.com/",
+    ],
+)

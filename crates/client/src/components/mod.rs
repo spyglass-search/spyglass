@@ -115,14 +115,19 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                         .clone()
                         .unwrap_or_else(|| "example.com".to_string());
 
-                    let path = url_to_file_path(url.path(), false);
+                    let mut path = url.path().to_string();
                     let uri_icon = if url.scheme() == "file" {
+                        path = url_to_file_path(&path, false);
                         html! {
                             <icons::DesktopComputerIcon
                                 classes={classes!("inline", "align-middle")}
                             />
                         }
                     } else {
+                        if let Some(query) = url.query() {
+                            path = format!("{}?{}", path, query);
+                        }
+
                         html! {
                             <img class="w-3 inline align-middle"
                                 src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())}
