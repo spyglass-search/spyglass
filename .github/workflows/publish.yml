@@ -51,13 +51,12 @@ jobs:
       if: ${{startsWith(matrix.platform, 'ubuntu')}}
       run: |
         echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
-        echo "target_ext=" >>$GITHUB_ENV
+        echo "target_ext=" >> $GITHUB_ENV
     - name: setup arch target - macos
       if: ${{startsWith(matrix.platform, 'macos')}}
       run: |
-#        echo "target_arch=universal-apple-darwin" >> $GITHUB_ENV
         echo "target_arch=x86_64-apple-darwin" >> $GITHUB_ENV
-        echo "target_ext=" >>$GITHUB_ENV
+        echo "target_ext=" >> $GITHUB_ENV
     - name: Setup arch target (windows only)
       if: ${{startsWith(matrix.platform, 'windows')}}
       run: |
@@ -65,27 +64,12 @@ jobs:
         echo "target_ext=.exe" >> $env:GITHUB_ENV
     # Build stuff
     - name: build sidecar (windows/linux)
-      # if: matrix.platform != 'macos-latest'
       run: |
         cargo build -p spyglass --verbose --release
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-    # - name: build sidecar (macOS)
-    #   if: matrix.platform == 'macos-latest'
-    #   run: |
-    #     mkdir -p crates/tauri/binaries
-    #     cargo build -p spyglass --verbose --release --target aarch64-apple-darwin
-    #     cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin
-
-    #     cargo build -p spyglass --verbose --release --target x86_64-apple-darwin
-    #     cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin
-
-    #     lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
-    #       target/aarch64-apple-darwin/release/spyglass \
-    #       target/x86_64-apple-darwin/release/spyglass
     - name: build default plugins
       run: make build-plugins-release
-    # - uses: a5huynh/tauri-action@0c7439848bb2b3fbfad0226452f43449288a7d89
     - uses: tauri-apps/tauri-action@v0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,4 +90,3 @@ jobs:
         releaseBody: "See the assets to download this version and install."
         releaseDraft: true
         prerelease: false
-        # args: --target ${{ env.target_arch }}
