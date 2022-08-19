@@ -36,6 +36,7 @@ mod rpc;
 mod window;
 use window::{
     show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings,
+    show_wizard_window,
 };
 
 use crate::window::show_update_window;
@@ -45,7 +46,6 @@ type PauseState = AtomicBool;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
     let config = Config::new();
-
     #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telementry {
         None
@@ -179,6 +179,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                         MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                         MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
+                        MenuID::OPEN_WIZARD => { show_wizard_window(app); }
                         MenuID::SHOW_CRAWL_STATUS => {
                             show_crawl_stats_window(app);
                         }
@@ -193,7 +194,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         MenuID::QUIT => app.exit(0),
                         MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
                         MenuID::JOIN_DISCORD => {
-                            let _ = open::that(constants::DISCORD_JOIN_URL);
+                            let _ = open::that(shared::constants::DISCORD_JOIN_URL);
                         },
                         _ => {}
                     }
@@ -228,6 +229,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
+
+            if !config.user_settings.run_wizard {
+                window::show_wizard_window(&window.app_handle());
+                // Only run the wizard once.
+                let mut updated = config.user_settings.clone();
+                updated.run_wizard = true;
+                let _ = config.save_user_settings(&updated);
+            }
+
         })
         .run(ctx)
         .expect("error while running tauri application");

@@ -126,6 +126,31 @@ pub fn show_update_window(app: &AppHandle) {
         .expect("Unable to build window for updater")
     };
 
+    let _ = window.show();
+    // A little hack to bring window to the front if its hiding behind something.
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_always_on_top(false);
+    let _ = window.set_focus();
+    let _ = window.center();
+}
+
+pub fn show_wizard_window(app: &AppHandle) {
+    let window = if let Some(window) = app.get_window(constants::WIZARD_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::WIZARD_WIN_NAME,
+            WindowUrl::App("/wizard".into()),
+        )
+        .title("Spyglass - Wizard")
+        .min_inner_size(480.0, 440.0)
+        .max_inner_size(480.0, 440.0)
+        .build()
+        .expect("Unable to build window for wizard")
+    };
+
+    let _ = window.show();
     // A little hack to bring window to the front if its hiding behind something.
     let _ = window.set_always_on_top(true);
     let _ = window.set_always_on_top(false);
