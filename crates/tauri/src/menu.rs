@@ -33,7 +33,12 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
     let open_logs_folder =
         CustomMenuItem::new(MenuID::OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
 
-    let app_version = format!("v20{}", ctx.package_info().version);
+    let app_version: String = if cfg!(debug_assertions) {
+        "🚧 dev-build 🚧".into()
+    } else {
+        format!("v20{}", ctx.package_info().version)
+    };
+
     let mut tray = SystemTrayMenu::new();
 
     let settings_menu = SystemTrayMenu::new()
