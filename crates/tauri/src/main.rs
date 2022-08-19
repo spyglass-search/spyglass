@@ -10,6 +10,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use auto_launch::AutoLaunchBuilder;
 use jsonrpc_core::Value;
 use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
@@ -58,6 +59,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )))
     };
+
+    // Check and register this app to run on boot
+    if let Ok(path) = std::env::current_exe() {
+        if let Some(path) = path.to_str() {
+            let auto = AutoLaunchBuilder::new()
+                .set_app_name("com.athlabs.spyglass")
+                .set_app_path(path)
+                .set_hidden(true)
+                .set_use_launch_agent(true)
+                .build();
+
+            if let Err(e) = auto.enable() {
+                log::warn!("Unable to add spyglass to startup items: {}", e);
+            }
+        }
+    }
 
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
