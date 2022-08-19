@@ -16,6 +16,7 @@ tauri-build = { version = "1.0.0", features = [] }
 
 [dependencies]
 anyhow = "1.0"
+auto-launch = "0.2.0"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ipc"] }
 log = "0.4"

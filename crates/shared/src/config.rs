@@ -130,6 +130,8 @@ pub struct UserSettings {
     /// Plugin settings
     #[serde(default)]
     pub plugin_settings: PluginSettings,
+    #[serde(default)]
+    pub disable_autolaunch: bool,
 }
 
 impl UserSettings {
@@ -193,6 +195,7 @@ impl Default for UserSettings {
             crawl_external_links: false,
             disable_telementry: false,
             plugin_settings: Default::default(),
+            disable_autolaunch: false,
         }
     }
 }
