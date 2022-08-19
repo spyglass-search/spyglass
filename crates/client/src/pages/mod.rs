@@ -5,6 +5,7 @@ mod plugin_manager;
 mod search;
 mod settings;
 mod updater;
+mod wizard;
 
 pub use admin::*;
 pub use crawl_stats::*;
@@ -13,3 +14,4 @@ pub use plugin_manager::*;
 pub use search::*;
 pub use settings::*;
 pub use updater::*;
+pub use wizard::*;

@@ -109,7 +109,7 @@ pub struct UserSettings {
     pub inflight_crawl_limit: Limit,
     /// Number of in-flight crawls allowed per domain.
     pub inflight_domain_limit: Limit,
-    /// Should we run the setup wizard?
+    /// Have we run the wizard?
     pub run_wizard: bool,
     /// Domains explicitly allowed, regardless of what's in the blocklist.
     pub allow_list: Vec<String>,
@@ -183,7 +183,6 @@ impl Default for UserSettings {
             inflight_crawl_limit: Limit::Finite(10),
             // Limit to 2 crawlers for a domain
             inflight_domain_limit: Limit::Finite(2),
-            // Not used at the moment
             run_wizard: false,
             allow_list: Vec::new(),
             block_list: vec!["web.archive.org".to_string()],

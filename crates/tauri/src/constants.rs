@@ -9,9 +9,9 @@ pub const MIN_WINDOW_HEIGHT: f64 = 480.0;
 pub const VERSION_CHECK_INTERVAL_S: u64 = 60 * 60 * 6;
 
 pub const APP_USER_AGENT: &str = "spyglass (github.com/a5huynh/spyglass)";
-pub const DISCORD_JOIN_URL: &str = "https://discord.gg/663wPVBSTB";
 pub const LENS_DIRECTORY_INDEX_URL: &str =
     "https://raw.githubusercontent.com/spyglass-search/lens-box/main/index.ron";
 
 pub const SETTINGS_WIN_NAME: &str = "settings_window";
 pub const UPDATE_WIN_NAME: &str = "update_window";
+pub const WIZARD_WIN_NAME: &str = "wizard_window";
