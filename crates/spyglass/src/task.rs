@@ -1,3 +1,4 @@
+use notify::event::ModifyKind;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
@@ -355,14 +356,18 @@ pub async fn lens_watcher(
                         }
                     }
 
-                    if updated_lens
-                        && matches!(
-                            event.kind,
-                            EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-                        )
-                    {
-                        let _ = read_lenses(&state, &config).await;
-                        load_lenses(state.clone()).await;
+                    if updated_lens {
+                        match event.kind {
+                            EventKind::Create(_)
+                            | EventKind::Any
+                            | EventKind::Modify(ModifyKind::Data(_))
+                            | EventKind::Modify(ModifyKind::Name(_))
+                            | EventKind::Modify(ModifyKind::Other) => {
+                                let _ = read_lenses(&state, &config).await;
+                                load_lenses(state.clone()).await;
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 Err(e) => log::error!("watch error: {:?}", e),
