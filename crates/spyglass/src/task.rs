@@ -296,10 +296,12 @@ pub async fn worker_task(
 pub async fn lens_watcher(
     state: AppState,
     config: Config,
+    mut crawler_cmd: broadcast::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("👀 lens watcher started");
 
+    let mut is_paused = false;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
     let mut watcher = RecommendedWatcher::new(move |res| {
@@ -316,6 +318,25 @@ pub async fn lens_watcher(
     load_lenses(state.clone()).await;
 
     loop {
+        if is_paused {
+            tokio::select! {
+                res = crawler_cmd.recv() => {
+                    match res {
+                        Ok(Command::PauseCrawler) => is_paused = true,
+                        Ok(Command::RunCrawler) => is_paused = false,
+                        _ => {}
+                    }
+                },
+                _ = shutdown_rx.recv() => {
+                    log::info!("🛑 Shutting down worker");
+                    return;
+                }
+            };
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+
         let event = tokio::select! {
             res = rx.recv() => res,
             _ = shutdown_rx.recv() => {
