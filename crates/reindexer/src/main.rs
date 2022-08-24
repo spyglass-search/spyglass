@@ -1,6 +1,7 @@
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
 
+use entities::schema::DocFields;
 use libspyglass::crawler::Crawler;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
@@ -14,7 +15,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let state = AppState::new(&config).await;
     let crawler = Crawler::new();
 
-    let fields = Searcher::doc_fields();
+    let fields = DocFields::as_fields();
 
     // Load all indexed documents from db
     let mut pages = indexed_document::Entity::find()

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -6,14 +5,16 @@ use std::sync::{Arc, Mutex};
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{QueryParser, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
 pub mod lens;
 mod query;
+
 use crate::search::query::build_query;
+use entities::schema::DocFields;
 use shared::config::Lens;
 
 type Score = f32;
@@ -41,70 +42,15 @@ impl Debug for Searcher {
     }
 }
 
-pub struct DocFields {
-    pub id: Field,
-    pub domain: Field,
-    pub content: Field,
-    pub description: Field,
-    pub title: Field,
-    pub url: Field,
-    pub raw: Field,
-}
-
-type QueryVec = Vec<(Occur, Box<dyn Query>)>;
-
 impl Searcher {
-    pub fn schema() -> Schema {
-        let mut schema_builder = Schema::builder();
-        // Our first field is title. We want:
-        // - full-text search and
-        // - to retrieve the document after the search
-        //
-        // TEXT:    Means the field should be tokenized and indexed, along with its term
-        //          frequency and term positions.
-        // STRING:  Means the field will be untokenized and indexed unlike above
-        //
-        // STORED:  Means that the field will also be saved in a compressed, row oriented
-        //          key-value store. This store is useful to reconstruct the documents that
-        //          were selected during the search phase.
-        schema_builder.add_text_field("id", STRING | STORED);
-        schema_builder.add_text_field("domain", STRING | STORED);
-
-        schema_builder.add_text_field("title", TEXT | STORED);
-        schema_builder.add_text_field("description", TEXT | STORED);
-        schema_builder.add_text_field("url", STRING | STORED);
-        // Indexed but don't store for retreival
-        schema_builder.add_text_field("content", TEXT);
-        // Stored but not indexed
-        schema_builder.add_text_field("raw", STORED);
-
-        schema_builder.build()
-    }
-
     pub fn delete(writer: &mut IndexWriter, id: &str) -> anyhow::Result<()> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
         writer.delete_term(Term::from_field_text(fields.id, id));
         Ok(())
     }
 
-    pub fn doc_fields() -> DocFields {
-        let schema = Searcher::schema();
-
-        DocFields {
-            id: schema.get_field("id").expect("No id in schema"),
-            domain: schema.get_field("domain").expect("No domain in schema"),
-            content: schema.get_field("content").expect("No content in schema"),
-            description: schema
-                .get_field("description")
-                .expect("No description in schema"),
-            title: schema.get_field("title").expect("No title in schema"),
-            url: schema.get_field("url").expect("No url in schema"),
-            raw: schema.get_field("raw").expect("No raw in schema"),
-        }
-    }
-
     pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
         let query = TermQuery::new(
@@ -128,7 +74,7 @@ impl Searcher {
     }
 
     pub fn with_index(index_path: &IndexPath) -> Self {
-        let schema = Searcher::schema();
+        let schema = DocFields::as_schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
                 let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
@@ -167,7 +113,7 @@ impl Searcher {
         content: &str,
         raw: &str,
     ) -> tantivy::Result<String> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
 
         let doc_id = Uuid::new_v4().as_hyphenated().to_string();
         let mut doc = Document::default();
@@ -184,7 +130,7 @@ impl Searcher {
     }
 
     pub fn search(index: &Index, reader: &IndexReader, query_string: &str) -> Vec<SearchResult> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
         let query_parser = QueryParser::for_index(index, vec![fields.title, fields.content]);
@@ -212,7 +158,7 @@ impl Searcher {
         applied_lens: &[String],
         query_string: &str,
     ) -> Vec<SearchResult> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
         let query = build_query(fields, lenses, applied_lens, query_string);

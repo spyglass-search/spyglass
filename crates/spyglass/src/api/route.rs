@@ -13,7 +13,9 @@ use shared::response::{
 };
 
 use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
+use entities::schema::DocFields;
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
+
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
@@ -264,7 +266,7 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
 /// Search the user's indexed documents
 #[instrument(skip(state))]
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
-    let fields = Searcher::doc_fields();
+    let fields = DocFields::as_fields();
 
     let index = state.index;
     let searcher = index.reader.searcher();
