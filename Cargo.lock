@@ -1266,10 +1266,11 @@ dependencies = [
  "chrono",
  "log",
  "regex",
- "ron",
+ "ron 0.8.0",
  "sea-orm",
  "serde",
  "shared",
+ "tantivy",
  "tokio",
  "url 2.2.2",
 ]
@@ -4220,6 +4221,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ron"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300a51053b1cb55c80b7a9fde4120726ddf25ca241a1cbb926626f62fb136bff"
+dependencies = [
+ "base64",
+ "bitflags",
+ "serde",
+]
+
+[[package]]
 name = "route-recognizer"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4871,7 +4883,7 @@ dependencies = [
  "jsonrpc-derive",
  "log",
  "regex",
- "ron",
+ "ron 0.8.0",
  "serde",
  "serde_json",
  "strum 0.24.1",
@@ -4997,7 +5009,7 @@ dependencies = [
  "notify",
  "regex",
  "reqwest",
- "ron",
+ "ron 0.8.0",
  "rusqlite",
  "sentry",
  "serde",
@@ -5031,7 +5043,7 @@ dependencies = [
  "num-format",
  "open 2.1.3",
  "reqwest",
- "ron",
+ "ron 0.8.0",
  "sentry",
  "serde",
  "serde_json",
@@ -5075,7 +5087,7 @@ dependencies = [
 name = "spyglass-plugin"
 version = "0.1.0"
 dependencies = [
- "ron",
+ "ron 0.7.1",
  "serde",
 ]
 

@@ -25,7 +25,7 @@ migration = { path = "../migrations" }
 notify = "5.0.0-pre.15"
 regex = "1"
 reqwest = "0.11"
-ron = "0.7"
+ron = "0.8"
 rusqlite = { version = "*", features = ["bundled"] }
 sentry = "0.27.0"
 serde = { version = "1.0", features = ["derive"] }
