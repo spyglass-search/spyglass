@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "22.8.9"
+version = "22.8.10"
 edition = "2021"
 
 [dependencies]
