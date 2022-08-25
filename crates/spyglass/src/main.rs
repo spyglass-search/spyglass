@@ -139,6 +139,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     let lens_watcher_handle = tokio::spawn(task::lens_watcher(
         state.clone(),
         config.clone(),
+        crawler_tx.subscribe(),
         shutdown_tx.subscribe(),
     ));
 

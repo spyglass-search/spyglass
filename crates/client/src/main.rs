@@ -10,7 +10,7 @@ mod events;
 mod pages;
 mod utils;
 
-use crate::pages::{SearchPage, SettingsPage, StatsPage, UpdaterPage};
+use crate::pages::{SearchPage, SettingsPage, StatsPage, UpdaterPage, WizardPage};
 
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
@@ -119,6 +119,8 @@ pub enum Route {
     Status,
     #[at("/updater")]
     Updater,
+    #[at("/wizard")]
+    Wizard,
 }
 
 fn main() {
@@ -165,5 +167,6 @@ fn switch(routes: &Route) -> Html {
         Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
         Route::Status => html! { <StatsPage /> },
         Route::Updater => html! { <UpdaterPage /> },
+        Route::Wizard => html! { <WizardPage /> },
     }
 }

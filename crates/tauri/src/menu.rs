@@ -2,7 +2,7 @@ use shared::config::Config;
 use strum_macros::{Display, EnumString};
 use tauri::{
     utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu,
-    SystemTrayMenu, SystemTrayMenuItem,
+    SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu,
 };
 
 #[derive(Display, Debug, EnumString)]
@@ -16,6 +16,7 @@ pub enum MenuID {
     OPEN_LOGS_FOLDER,
     OPEN_PLUGIN_MANAGER,
     OPEN_SETTINGS_MANAGER,
+    OPEN_WIZARD,
     QUIT,
     SHOW_CRAWL_STATUS,
     SHOW_SEARCHBAR,
@@ -32,8 +33,27 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
     let open_logs_folder =
         CustomMenuItem::new(MenuID::OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
 
-    let app_version = format!("v20{}", ctx.package_info().version);
+    let app_version: String = if cfg!(debug_assertions) {
+        "🚧 dev-build 🚧".into()
+    } else {
+        format!("v20{}", ctx.package_info().version)
+    };
+
     let mut tray = SystemTrayMenu::new();
+
+    let settings_menu = SystemTrayMenu::new()
+        .add_item(CustomMenuItem::new(
+            MenuID::OPEN_LENS_MANAGER.to_string(),
+            "Manage lenses",
+        ))
+        .add_item(CustomMenuItem::new(
+            MenuID::OPEN_PLUGIN_MANAGER.to_string(),
+            "Manage plugins",
+        ))
+        .add_item(CustomMenuItem::new(
+            MenuID::OPEN_SETTINGS_MANAGER.to_string(),
+            "User Settings",
+        ));
 
     tray = tray
         .add_item(show)
@@ -47,18 +67,7 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
             MenuID::SHOW_CRAWL_STATUS.to_string(),
             "Crawl status",
         ))
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_LENS_MANAGER.to_string(),
-            "Manage lenses",
-        ))
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_PLUGIN_MANAGER.to_string(),
-            "Manage plugins",
-        ))
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_SETTINGS_MANAGER.to_string(),
-            "Preferences",
-        ))
+        .add_submenu(SystemTraySubmenu::new("Settings", settings_menu))
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(open_logs_folder);
 
@@ -74,9 +83,14 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
 
     tray.add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(
+            MenuID::OPEN_WIZARD.to_string(),
+            "Getting Started Wizard",
+        ))
+        .add_item(CustomMenuItem::new(
             MenuID::JOIN_DISCORD.to_string(),
             "Join our Discord",
         ))
+        .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)
 }
 
