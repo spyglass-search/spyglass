@@ -1,7 +1,7 @@
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::{ActiveModelTrait, EntityTrait, PaginatorTrait, QueryOrder, Set};
 
-use entities::schema::DocFields;
+use entities::schema::{DocFields, SearchDocument};
 use libspyglass::crawler::Crawler;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;

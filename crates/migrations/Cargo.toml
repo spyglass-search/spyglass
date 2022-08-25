@@ -11,3 +11,6 @@ path = "src/lib.rs"
 [dependencies]
 sea-orm-migration = { version = "0.9" }
 entities = { path = "../entities" }
+shared = { path = "../shared" }
+tantivy = "0.18"
+rayon = "1.5"

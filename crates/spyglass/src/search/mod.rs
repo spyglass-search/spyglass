@@ -14,7 +14,7 @@ pub mod lens;
 mod query;
 
 use crate::search::query::build_query;
-use entities::schema::DocFields;
+use entities::schema::{DocFields, SearchDocument};
 use shared::config::Lens;
 
 type Score = f32;

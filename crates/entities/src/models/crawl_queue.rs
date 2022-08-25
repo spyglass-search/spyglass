@@ -331,6 +331,7 @@ pub enum SkipReason {
 pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
     pub force_allow: bool,
+    pub is_recrawl: bool,
 }
 
 fn filter_urls(
@@ -414,18 +415,20 @@ pub async fn enqueue_all(
 ) -> anyhow::Result<(), sea_orm::DbErr> {
     // Filter URLs
     let urls = filter_urls(lenses, settings, overrides, urls);
+
     // Ignore urls already indexed
     let mut is_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
-    // Igore urls already indexed
-    for chunk in urls.chunks(BATCH_SIZE) {
-        let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
-        for entry in indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.is_in(chunk.clone()))
-            .all(db)
-            .await?
-            .iter()
-        {
-            is_indexed.insert(entry.url.to_string());
+    if !overrides.is_recrawl {
+        for chunk in urls.chunks(BATCH_SIZE) {
+            let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
+            for entry in indexed_document::Entity::find()
+                .filter(indexed_document::Column::Url.is_in(chunk.clone()))
+                .all(db)
+                .await?
+                .iter()
+            {
+                is_indexed.insert(entry.url.to_string());
+            }
         }
     }
 
@@ -452,12 +455,21 @@ pub async fn enqueue_all(
     if to_add.is_empty() {
         return Ok(());
     }
+
+    let on_conflict = if overrides.is_recrawl {
+        OnConflict::column(Column::Url)
+            .update_column(Column::Status)
+            .to_owned()
+    } else {
+        OnConflict::column(Column::Url).do_nothing().to_owned()
+    };
+
     for to_add in to_add.chunks(BATCH_SIZE) {
         let owned = to_add.iter().map(|r| r.to_owned()).collect::<Vec<_>>();
 
         let (sql, values) = Entity::insert_many(owned)
             .query()
-            .on_conflict(OnConflict::column(Column::Url).do_nothing().to_owned())
+            .on_conflict(on_conflict.clone())
             .build(SqliteQueryBuilder);
 
         let values: Vec<Value> = values.iter().map(|x| x.to_owned()).collect();

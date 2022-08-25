@@ -1,5 +1,26 @@
 use tantivy::schema::*;
 
+pub type FieldName = String;
+pub type SchemaMapping = Vec<(FieldName, TextOptions)>;
+
+pub trait SearchDocument {
+    fn as_field_vec() -> SchemaMapping;
+
+    fn as_schema() -> Schema {
+        mapping_to_schema(&Self::as_field_vec())
+    }
+
+    fn as_fields() -> Self;
+}
+
+pub fn mapping_to_schema(mapping: &SchemaMapping) -> Schema {
+    let mut schema_builder = Schema::builder();
+    for (name, opts) in mapping {
+        schema_builder.add_text_field(name, opts.clone());
+    }
+    schema_builder.build()
+}
+
 pub struct DocFields {
     pub id: Field,
     pub domain: Field,
@@ -10,8 +31,8 @@ pub struct DocFields {
     pub raw: Field,
 }
 
-impl DocFields {
-    pub fn as_schema() -> Schema {
+impl SearchDocument for DocFields {
+    fn as_field_vec() -> SchemaMapping {
         // TEXT:    Means the field should be tokenized and indexed, along with its term
         //          frequency and term positions.
         // STRING:  Means the field will be untokenized and indexed unlike above
@@ -19,22 +40,20 @@ impl DocFields {
         // STORED:  Means that the field will also be saved in a compressed, row oriented
         //          key-value store. This store is useful to reconstruct the documents that
         //          were selected during the search phase.
-        let mut schema_builder = Schema::builder();
-        schema_builder.add_text_field("id", STRING | STORED);
-        schema_builder.add_text_field("domain", STRING | STORED);
-
-        schema_builder.add_text_field("title", TEXT | STORED);
-        schema_builder.add_text_field("description", TEXT | STORED);
-        schema_builder.add_text_field("url", STRING | STORED);
-        // Indexed but don't store for retreival
-        schema_builder.add_text_field("content", TEXT);
-        // Stored but not indexed
-        schema_builder.add_text_field("raw", STORED);
-
-        schema_builder.build()
+        vec![
+            // Used to reference this document
+            ("id".into(), STRING | STORED | FAST),
+            // Document contents
+            ("domain".into(), STRING | STORED | FAST),
+            ("title".into(), TEXT | STORED),
+            ("description".into(), TEXT | STORED),
+            ("url".into(), STRING | STORED | FAST),
+            // Indexed
+            ("content".into(), TEXT | STORED),
+        ]
     }
 
-    pub fn as_fields() -> Self {
+    fn as_fields() -> Self {
         let schema = Self::as_schema();
         Self {
             id: schema.get_field("id").expect("No id in schema"),

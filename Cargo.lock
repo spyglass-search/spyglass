@@ -2963,7 +2963,10 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "entities",
+ "rayon",
  "sea-orm-migration",
+ "shared",
+ "tantivy",
 ]
 
 [[package]]
