@@ -27,8 +27,7 @@ pub struct DocFields {
     pub content: Field,
     pub description: Field,
     pub title: Field,
-    pub url: Field,
-    pub raw: Field,
+    pub url: Field
 }
 
 impl SearchDocument for DocFields {
@@ -63,8 +62,7 @@ impl SearchDocument for DocFields {
                 .get_field("description")
                 .expect("No description in schema"),
             title: schema.get_field("title").expect("No title in schema"),
-            url: schema.get_field("url").expect("No url in schema"),
-            raw: schema.get_field("raw").expect("No raw in schema"),
+            url: schema.get_field("url").expect("No url in schema")
         }
     }
 }

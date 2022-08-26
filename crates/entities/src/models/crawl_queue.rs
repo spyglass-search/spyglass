@@ -602,6 +602,48 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_enqueue_with_recrawl() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/".to_owned();
+
+        let _ = crawl_queue::Entity::insert(crawl_queue::ActiveModel {
+            domain: Set("oldschool.runescape.wiki".into()),
+            crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
+            url: Set(url.clone()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            ..Default::default()
+        })
+        .exec(&db)
+        .await;
+
+        let overrides = crawl_queue::EnqueueSettings {
+            force_allow: true,
+            is_recrawl: true,
+            ..Default::default()
+        };
+
+        let all = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Status.eq(crawl_queue::CrawlStatus::Completed))
+            .all(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(all.len(), 1);
+
+        crawl_queue::enqueue_all(&db, &[url], &[], &settings, &overrides)
+            .await
+            .unwrap();
+
+        let res = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Status.eq(crawl_queue::CrawlStatus::Queued))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
     async fn test_enqueue_with_rules() {
         let settings = UserSettings::default();
         let db = setup_test_db().await;

@@ -111,7 +111,8 @@ impl Searcher {
         domain: &str,
         url: &str,
         content: &str,
-        raw: &str,
+        // Save to a cache?
+        _raw: &str,
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
@@ -121,7 +122,6 @@ impl Searcher {
         doc.add_text(fields.description, description);
         doc.add_text(fields.domain, domain);
         doc.add_text(fields.id, &doc_id);
-        doc.add_text(fields.raw, raw);
         doc.add_text(fields.title, title);
         doc.add_text(fields.url, url);
         writer.add_document(doc)?;
