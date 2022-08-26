@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
             app.manage(Arc::new(Mutex::new(rpc)));
             // Load user settings
-            app.manage(config);
+            app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
 
             // Center window horizontally in the current screen
@@ -167,6 +167,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     interval.tick().await;
                 }
             });
+
+            if !config.user_settings.run_wizard {
+                window::show_wizard_window(&window.app_handle());
+                // Only run the wizard once.
+                let mut updated = config.user_settings.clone();
+                updated.run_wizard = true;
+                let _ = config.save_user_settings(&updated);
+            }
 
             Ok(())
         })
@@ -248,15 +256,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
-
-            if !config.user_settings.run_wizard {
-                window::show_wizard_window(&window.app_handle());
-                // Only run the wizard once.
-                let mut updated = config.user_settings.clone();
-                updated.run_wizard = true;
-                let _ = config.save_user_settings(&updated);
-            }
-
         })
         .run(ctx)
         .expect("error while running tauri application");
