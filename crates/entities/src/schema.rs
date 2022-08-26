@@ -32,6 +32,8 @@ pub struct DocFields {
 
 impl SearchDocument for DocFields {
     fn as_field_vec() -> SchemaMapping {
+        // FAST:    Fast fields can be random-accessed rapidly. Use this for fields useful
+        //          for scoring, filtering, or collection.
         // TEXT:    Means the field should be tokenized and indexed, along with its term
         //          frequency and term positions.
         // STRING:  Means the field will be untokenized and indexed unlike above
@@ -44,7 +46,8 @@ impl SearchDocument for DocFields {
             ("id".into(), STRING | STORED | FAST),
             // Document contents
             ("domain".into(), STRING | STORED | FAST),
-            ("title".into(), TEXT | STORED),
+            ("title".into(), TEXT | STORED | FAST),
+            // Used for display purposes
             ("description".into(), TEXT | STORED),
             ("url".into(), STRING | STORED | FAST),
             // Indexed

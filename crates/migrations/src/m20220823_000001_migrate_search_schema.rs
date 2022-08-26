@@ -51,7 +51,7 @@ impl Migration {
             ("id".into(), STRING | STORED | FAST),
             // Document contents
             ("domain".into(), STRING | STORED | FAST),
-            ("title".into(), TEXT | STORED),
+            ("title".into(), TEXT | STORED | FAST),
             ("description".into(), TEXT | STORED),
             ("url".into(), STRING | STORED | FAST),
             // Indexed
