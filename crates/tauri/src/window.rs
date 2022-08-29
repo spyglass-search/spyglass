@@ -37,6 +37,14 @@ pub fn center_search_bar(window: &Window) {
     }
 }
 
+pub fn show_search_bar(window: &Window) {
+    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = window.set_always_on_top(true);
+    center_search_bar(window);
+}
+
 pub fn hide_search_bar(window: &Window) {
     let _ = window.hide();
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
@@ -65,12 +73,13 @@ pub async fn resize_window(window: &Window, height: f64) {
     }));
 }
 
-pub fn show_search_bar(window: &Window) {
-    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+fn show_window(window: &Window) {
     let _ = window.show();
-    let _ = window.set_focus();
+    // A little hack to bring window to the front if its hiding behind something.
     let _ = window.set_always_on_top(true);
-    center_search_bar(window);
+    let _ = window.set_always_on_top(false);
+    let _ = window.set_focus();
+    let _ = window.center();
 }
 
 fn _show_tab(app: &AppHandle, tab_url: &str) {
@@ -126,12 +135,7 @@ pub fn show_update_window(app: &AppHandle) {
         .expect("Unable to build window for updater")
     };
 
-    let _ = window.show();
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
-    let _ = window.set_focus();
-    let _ = window.center();
+    show_window(&window);
 }
 
 pub fn show_startup_window(app: &AppHandle) -> Window {
@@ -151,9 +155,7 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
         .expect("Unable to build startup window")
     };
 
-    let _ = window.show();
-    let _ = window.center();
-
+    show_window(&window);
     window
 }
 
@@ -173,11 +175,7 @@ pub fn show_wizard_window(app: &AppHandle) {
         .expect("Unable to build window for wizard")
     };
 
-    let _ = window.show();
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
-    let _ = window.center();
+    show_window(&window);
 }
 
 pub fn alert(window: &Window, title: &str, message: &str) {

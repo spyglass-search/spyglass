@@ -65,6 +65,7 @@ impl HTTPClient {
             .expect("Unable to set scheme to HTTPS");
 
         let mut res = None;
+        // TODO: Clean up this retry loop, it's a little hard to follow.
         for _ in 0..NUM_RETRIES {
             let request = self.client.get(url.clone()).send().await;
             match &request {
