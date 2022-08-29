@@ -2,7 +2,7 @@ use yew::prelude::*;
 
 use crate::components::icons;
 
-#[derive(Properties, PartialEq)]
+#[derive(Properties, PartialEq, Eq)]
 pub struct StartupPageProps {
     #[prop_or_default]
     pub status_caption: String,
