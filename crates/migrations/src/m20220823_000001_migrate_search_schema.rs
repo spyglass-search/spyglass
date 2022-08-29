@@ -220,13 +220,13 @@ impl MigrationTrait for Migration {
             return Err(DbErr::Custom(format!("Unable to commit changes: {}", e)));
         }
 
-        // Remove old index
+        // Rename old index
         let backup_path = old_index_path.parent().unwrap().join("index.old");
         if let Err(e) = std::fs::rename(old_index_path, backup_path) {
             return Err(DbErr::Custom(format!("Unable to backup old index: {}", e)));
         }
 
-        // Move new index
+        // Move new index into place.
         if let Err(e) = std::fs::rename(new_index_path, config.index_dir()) {
             return Err(DbErr::Custom(format!(
                 "Unable to move new index into place: {}",
