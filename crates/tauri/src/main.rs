@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not found");
             let _ = window.set_skip_taskbar(true);
-            window::center_window(&window);
+            window::center_search_bar(&window);
             // Hide on start.
             let _ = window.hide();
 
@@ -169,9 +169,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = window.is_visible()
                                     .map(|is_visible| {
                                         if is_visible {
-                                            window::hide_window(&window);
+                                            window::hide_search_bar(&window);
                                         } else {
-                                            window::show_window(&window);
+                                            window::show_search_bar(&window);
                                         }
                                     });
                             }) {
@@ -199,7 +199,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                     if !is_focused {
                         let handle = event.window();
-                        window::hide_window(handle);
+                        window::hide_search_bar(handle);
                     }
                 }
             }
@@ -229,7 +229,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let _ = window.is_visible()
                                 .map(|is_visible| {
                                     if !is_visible {
-                                        window::show_window(&window);
+                                        window::hide_search_bar(&window);
                                     }
                                 });
                         }

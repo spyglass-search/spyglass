@@ -21,7 +21,7 @@ fn find_monitor(window: &Window) -> Option<Monitor> {
     }
 }
 
-pub fn center_window(window: &Window) {
+pub fn center_search_bar(window: &Window) {
     if let Some(monitor) = find_monitor(window) {
         let size = monitor.size();
         let scale = monitor.scale_factor();
@@ -37,7 +37,7 @@ pub fn center_window(window: &Window) {
     }
 }
 
-pub fn hide_window(window: &Window) {
+pub fn hide_search_bar(window: &Window) {
     let _ = window.hide();
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
@@ -65,12 +65,12 @@ pub async fn resize_window(window: &Window, height: f64) {
     }));
 }
 
-pub fn show_window(window: &Window) {
+pub fn show_search_bar(window: &Window) {
     let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
     let _ = window.show();
     let _ = window.set_focus();
     let _ = window.set_always_on_top(true);
-    center_window(window);
+    center_search_bar(window);
 }
 
 fn _show_tab(app: &AppHandle, tab_url: &str) {
