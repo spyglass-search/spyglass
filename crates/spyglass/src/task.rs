@@ -1,5 +1,5 @@
 use notify::event::ModifyKind;
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{EventKind, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
@@ -305,7 +305,7 @@ pub async fn lens_watcher(
     let mut is_paused = false;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
-    let mut watcher = RecommendedWatcher::new(move |res| {
+    let mut watcher = notify::recommended_watcher(move |res| {
         futures::executor::block_on(async {
             tx.send(res).await.expect("Unable to send FS event");
         })

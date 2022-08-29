@@ -22,7 +22,7 @@ jsonrpc-core = "18.0.0"
 jsonrpc-ipc-server = "18.0.0"
 log = "0.4"
 migration = { path = "../migrations" }
-notify = "5.0.0-pre.15"
+notify = "5.0.0-pre.16"
 regex = "1"
 reqwest = "0.11"
 ron = "0.8"
