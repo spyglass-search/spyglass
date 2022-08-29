@@ -23,13 +23,24 @@ pub fn init() -> TauriPlugin<Wry> {
     Builder::new("tauri-plugin-startup")
         .on_event(|app_handle, event| {
             if let RunEvent::Ready = event {
-                run_and_check_backend(app_handle);
+                // Don't block the main thread
+                tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
+
+                // Keep system tray stats updated
+                let app_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut interval = time::interval(Duration::from_secs(60));
+                    loop {
+                        update_tray_menu(&app_handle).await;
+                        interval.tick().await;
+                    }
+                });
             }
         })
         .build()
 }
 
-fn run_and_check_backend(app_handle: &AppHandle) {
+async fn run_and_check_backend(app_handle: AppHandle) {
     log::info!("Running startup tasks");
 
     let window = app_handle
@@ -42,25 +53,13 @@ fn run_and_check_backend(app_handle: &AppHandle) {
         ClientEvent::StartupProgress.as_ref(),
         "Running migrations...",
     );
-    let migration_status = tauri::async_runtime::block_on(async {
-        match Migrator::run_migrations().await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                let msg = e.to_string();
-                // This is ok, just the migrator being funky
-                if !msg.contains("been applied but its file is missing") {
-                    return Err(e);
-                }
 
-                Ok(())
-            }
-        }
-    });
-
-    if let Err(err) = migration_status {
+    if let Err(err) = Migrator::run_migrations().await {
         // Ruh-oh something went wrong
-        log::error!("Unable to migrate database - {}", err.to_string());
         sentry::capture_error(&err);
+        log::error!("Unable to migrate database - {}", err.to_string());
+
+        // Let users know something has gone wrong.
         alert(&window, "Migration Failure", &err.to_string());
         app_handle.exit(0);
     }
@@ -71,18 +70,9 @@ fn run_and_check_backend(app_handle: &AppHandle) {
         ClientEvent::StartupProgress.as_ref(),
         "Waiting for backend...",
     );
-    let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
-    app_handle.manage(Arc::new(Mutex::new(rpc)));
 
-    // Keep system tray stats updated
-    let app_handle = app_handle.clone();
-    tauri::async_runtime::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(60));
-        loop {
-            update_tray_menu(&app_handle).await;
-            interval.tick().await;
-        }
-    });
+    let rpc = rpc::RpcClient::new().await;
+    app_handle.manage(Arc::new(Mutex::new(rpc)));
 
     let _ = window.hide();
 }
