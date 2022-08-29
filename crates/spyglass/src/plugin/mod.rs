@@ -99,7 +99,7 @@ impl PluginManager {
     pub fn new() -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
 
-        let watcher = RecommendedWatcher::new(move |res| {
+        let watcher = notify::recommended_watcher(move |res| {
             futures::executor::block_on(async {
                 tx.send(res).await.expect("Unable to send FS event");
             })

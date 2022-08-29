@@ -11,14 +11,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use auto_launch::AutoLaunchBuilder;
-use jsonrpc_core::Value;
-use num_format::{Locale, ToFormattedString};
 use rpc::RpcMutex;
 use tauri::{
     AppHandle, GlobalShortcutManager, Manager, PathResolver, SystemTray, SystemTrayEvent, Window,
 };
-use tokio::sync::Mutex;
-use tokio::{time, time::Duration};
+use tokio::time::Duration;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
@@ -26,13 +23,12 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use cocoa::appkit::NSWindow;
 
 use shared::config::Config;
-use shared::response;
-use shared::response::AppStatus;
 
 mod cmd;
 mod constants;
 mod menu;
 use menu::MenuID;
+mod plugins;
 mod rpc;
 mod window;
 use window::{
@@ -94,6 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     tauri::Builder::default()
+        .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
             cmd::delete_doc,
@@ -120,6 +117,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
+            let app_handle = app.app_handle();
+            window::show_startup_window(&app_handle);
+
             let config = Config::new();
             log::info!("Loading prefs from: {:?}", Config::prefs_dir());
 
@@ -132,8 +132,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let window = app.get_window("main").expect("Main window not found");
+            let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not found");
             let _ = window.set_skip_taskbar(true);
+            window::center_search_bar(&window);
+            // Hide on start.
+            let _ = window.hide();
 
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
@@ -148,26 +151,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // for a new version.
             tauri::async_runtime::spawn(check_version_interval(window.clone()));
 
-            // Wait for the server to boot up
-            let rpc = tauri::async_runtime::block_on(rpc::RpcClient::new());
-            app.manage(Arc::new(Mutex::new(rpc)));
             // Load user settings
             app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
 
-            // Center window horizontally in the current screen
-            window::center_window(&window);
-
-            // Keep system tray stats updated
-            let app_handle = app.app_handle();
-            tauri::async_runtime::spawn(async move {
-                let mut interval = time::interval(Duration::from_secs(10));
-                loop {
-                    update_tray_menu(&app_handle).await;
-                    interval.tick().await;
+            // Register global shortcut
+            let window_clone = window.clone();
+            let mut shortcuts = window.app_handle().global_shortcut_manager();
+            match shortcuts.is_registered(&config.user_settings.shortcut) {
+                Ok(is_registered) => {
+                    if !is_registered
+                    {
+                        log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
+                        if let Err(e) = shortcuts
+                            .register(&config.user_settings.shortcut, move || {
+                                let window = window_clone.clone();
+                                let _ = window.is_visible()
+                                    .map(|is_visible| {
+                                        if is_visible {
+                                            window::hide_search_bar(&window);
+                                        } else {
+                                            window::show_search_bar(&window);
+                                        }
+                                    });
+                            }) {
+                            window::alert(&window, "Error registering global shortcut", &format!("{}", e));
+                        }
+                    }
                 }
-            });
+                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
+            }
 
+            // Run wizard on first run
             if !config.user_settings.run_wizard {
                 window::show_wizard_window(&window.app_handle());
                 // Only run the wizard once.
@@ -184,7 +199,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let tauri::WindowEvent::Focused(is_focused) = event.event() {
                     if !is_focused {
                         let handle = event.window();
-                        window::hide_window(handle);
+                        window::hide_search_bar(handle);
                     }
                 }
             }
@@ -214,7 +229,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let _ = window.is_visible()
                                 .map(|is_visible| {
                                     if !is_visible {
-                                        window::show_window(&window);
+                                        window::hide_search_bar(&window);
                                     }
                                 });
                         }
@@ -228,55 +243,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         })
-        .on_page_load(move |window, _| {
-            let config = window.state::<Config>();
-            let window_clone = window.clone();
-            // Register global shortcut
-            let mut shortcuts = window.app_handle().global_shortcut_manager();
-            match shortcuts.is_registered(&config.user_settings.shortcut) {
-                Ok(is_registered) => {
-                    if !is_registered
-                    {
-                        log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
-                        if let Err(e) = shortcuts
-                            .register(&config.user_settings.shortcut, move || {
-                                let window = window_clone.clone();
-                                let _ = window.is_visible()
-                                    .map(|is_visible| {
-                                        if is_visible {
-                                            window::hide_window(&window);
-                                        } else {
-                                            window::show_window(&window);
-                                        }
-                                    });
-                            }) {
-                            window::alert(&window, "Error registering global shortcut", &format!("{}", e));
-                        }
-                    }
-                }
-                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
-            }
-        })
         .run(ctx)
         .expect("error while running tauri application");
 
     Ok(())
-}
-
-async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
-        .await
-    {
-        Ok(resp) => Some(resp),
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            None
-        }
-    }
 }
 
 async fn pause_crawler(app: AppHandle, menu_id: String) {
@@ -330,21 +300,6 @@ fn open_folder(folder: PathBuf) {
         .arg(folder)
         .spawn()
         .expect("explorer cmd not available");
-}
-
-async fn update_tray_menu(app: &AppHandle) {
-    let rpc = app.state::<RpcMutex>().inner();
-    let app_status: Option<AppStatus> = app_status(rpc).await;
-    let handle = app.tray_handle();
-
-    if let Some(app_status) = app_status {
-        let _ = handle
-            .get_item(&MenuID::NUM_DOCS.to_string())
-            .set_title(format!(
-                "{} documents indexed",
-                app_status.num_docs.to_formatted_string(&Locale::en)
-            ));
-    }
 }
 
 async fn check_version_interval(window: Window) {

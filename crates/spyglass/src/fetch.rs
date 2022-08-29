@@ -4,7 +4,7 @@ use url::Url;
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 const NUM_RETRIES: usize = 3;
-const RETRY_WAIT_S: u64 = 5;
+const RETRY_WAIT_S: u64 = 10;
 
 /// A wrapper around reqwest that for HTTP related queries that handles retries,
 /// downgrading from HTTPS -> HTTP, 429 too many requests, etc.
@@ -65,27 +65,39 @@ impl HTTPClient {
             .expect("Unable to set scheme to HTTPS");
 
         let mut res = None;
+        // TODO: Clean up this retry loop, it's a little hard to follow.
         for _ in 0..NUM_RETRIES {
             let request = self.client.get(url.clone()).send().await;
-            if let Err(err) = &request {
-                // Handle 429s
-                if let Some(status) = err.status() {
-                    if status == StatusCode::TOO_MANY_REQUESTS {
-                        // Probably overkill, but if this becomes a problem we can revisit
-                        log::warn!("Making too many requests, slowing down");
+            match &request {
+                Err(err) => {
+                    // Handle 429s
+                    if let Some(status) = err.status() {
+                        if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() == 429 {
+                            // Probably overkill, but if this becomes a problem we can revisit
+                            log::warn!("Making too many requests, slowing down");
+                            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                        }
+                    } else if err.is_request() && url.scheme() == "https" {
+                        // Try downgrading to HTTP if we're unable to connect
+                        url.set_scheme("http")
+                            .expect("Unable to set scheme to HTTP");
                     }
-                } else if err.is_request() && url.scheme() == "https" {
-                    // Try downgrading to HTTP if we're unable to connect
-                    url.set_scheme("http")
-                        .expect("Unable to set scheme to HTTP");
-                }
 
-                res = Some(request);
-                tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_WAIT_S)).await;
-            } else {
-                res = Some(request);
-                break;
+                    res = Some(request);
+                }
+                Ok(resp) => {
+                    if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+                        log::warn!("Making too many requests, slowing down");
+                        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                        res = Some(request);
+                    } else if resp.status().is_success() || resp.status().is_client_error() {
+                        res = Some(request);
+                        break;
+                    }
+                }
             }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_WAIT_S)).await;
         }
 
         match res {

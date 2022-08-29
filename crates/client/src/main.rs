@@ -10,7 +10,7 @@ mod events;
 mod pages;
 mod utils;
 
-use crate::pages::{SearchPage, SettingsPage, StatsPage, UpdaterPage, WizardPage};
+use crate::pages::{SearchPage, SettingsPage, StartupPage, StatsPage, UpdaterPage, WizardPage};
 
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
@@ -115,6 +115,10 @@ pub enum Route {
     Search,
     #[at("/settings/:tab")]
     SettingsPage { tab: pages::Tab },
+    // On launch, display a little window while waiting for certain actions to finish
+    // aka DB migrations.
+    #[at("/startup")]
+    Startup,
     #[at("/stats")]
     Status,
     #[at("/updater")]
@@ -165,6 +169,7 @@ fn switch(routes: &Route) -> Html {
     match routes {
         Route::Search => html! { <SearchPage /> },
         Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
+        Route::Startup => html! { <StartupPage /> },
         Route::Status => html! { <StatsPage /> },
         Route::Updater => html! { <UpdaterPage /> },
         Route::Wizard => html! { <WizardPage /> },

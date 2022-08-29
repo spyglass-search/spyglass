@@ -11,7 +11,7 @@ use entities::models::{crawl_queue, lens};
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
-use migration::{Migrator, MigratorTrait};
+use migration::Migrator;
 use shared::config::Config;
 
 mod api;
@@ -61,23 +61,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("Unable to create tokio runtime");
 
-    // Initialize/Load user preferences
-    let mut state = rt.block_on(AppState::new(&config));
+    // Run any migrations, only on headless mode.
+    #[cfg(debug_assertions)]
+    {
+        let migration_status = rt.block_on(async {
+            match Migrator::run_migrations().await {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    let msg = e.to_string();
+                    // This is ok, just the migrator being funky
+                    if !msg.contains("been applied but its file is missing") {
+                        // Ruh-oh something went wrong
+                        log::error!("Unable to migrate database - {}", e.to_string());
+                        // Exit from app
+                        return Err(());
+                    }
 
-    // Run any migrations
-    match rt.block_on(Migrator::up(&state.db, None)) {
-        Ok(_) => {}
-        Err(e) => {
-            let msg = e.to_string();
-            // This is ok, just the migrator being funky
-            if !msg.contains("been applied but its file is missing") {
-                // Ruh-oh something went wrong
-                log::error!("Unable to migrate database - {}", e.to_string());
-                // Exit from app
-                return Ok(());
+                    Ok(())
+                }
             }
+        });
+
+        if migration_status.is_err() {
+            return Ok(());
         }
     }
+
+    // Initialize/Load user preferences
+    let mut state = rt.block_on(AppState::new(&config));
 
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");

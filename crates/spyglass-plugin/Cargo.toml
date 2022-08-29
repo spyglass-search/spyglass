@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-ron = "0.7"
+ron = "0.8"
 
 [lib]
 name = "spyglass_plugin"
