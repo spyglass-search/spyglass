@@ -2,18 +2,22 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::{QueryParser, TermQuery};
-use tantivy::{schema::*, DocAddress};
+use tantivy::{schema::*, DocAddress, DocId, SegmentReader};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
+use regex::Regex;
 
 pub mod lens;
 mod query;
+mod utils;
 
 use crate::search::query::build_query;
+use crate::search::utils::ff_to_string;
 use entities::schema::{DocFields, SearchDocument};
 use shared::config::Lens;
 
@@ -158,20 +162,64 @@ impl Searcher {
         applied_lens: &[String],
         query_string: &str,
     ) -> Vec<SearchResult> {
+        let start_timer = Instant::now();
+
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
-        let query = build_query(fields, lenses, applied_lens, query_string);
+        let query = build_query(fields.clone(), lenses, applied_lens, query_string);
+
+        let regex = Regex::new(".*dnd.*").unwrap();
+
+        let collector =
+            TopDocs::with_limit(5).tweak_score(move |segment_reader: &SegmentReader| {
+                let regex = regex.clone();
+                let fields = fields.clone();
+
+                let inverted_index = segment_reader
+                    .inverted_index(fields.url)
+                    .expect("Failed to get inverted index for segment");
+
+                let id_reader = segment_reader
+                    .fast_fields()
+                    .u64s(fields.id)
+                    .expect("Unable to get fast field for doc_id");
+
+                let url_reader = segment_reader
+                    .fast_fields()
+                    .u64s(fields.url)
+                    .expect("Unable to get fast field for URL");
+
+                // We can now define our actual scoring function
+                move |doc: DocId, original_score: Score| {
+                    let inverted_index = inverted_index.clone();
+                    let terms = inverted_index.terms();
+
+                    let _id = ff_to_string(doc, &id_reader, terms);
+                    let url = ff_to_string(doc, &url_reader, terms);
+
+                    if let Some(url) = url {
+                        if regex.is_match(&url) {
+                            original_score * 1.0
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        0.0
+                    }
+                }
+            });
 
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(5))
+            .search(&query, &collector)
             .expect("Unable to execute query");
 
         log::info!(
-            "query `{}` returned {} results from {} docs",
+            "query `{}` returned {} results from {} docs in {} ms",
             query_string,
             top_docs.len(),
             searcher.num_docs(),
+            Instant::now().duration_since(start_timer).as_millis()
         );
 
         top_docs.into_iter().collect()

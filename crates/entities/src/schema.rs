@@ -21,6 +21,7 @@ pub fn mapping_to_schema(mapping: &SchemaMapping) -> Schema {
     schema_builder.build()
 }
 
+#[derive(Clone)]
 pub struct DocFields {
     pub id: Field,
     pub domain: Field,
