@@ -7,11 +7,11 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use entities::models::{crawl_queue, create_connection, lens};
+use entities::models::{crawl_queue, lens};
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
-use migration::{Migrator, MigratorTrait};
+use migration::Migrator;
 use shared::config::Config;
 
 mod api;
