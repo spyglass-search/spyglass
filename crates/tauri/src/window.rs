@@ -134,6 +134,29 @@ pub fn show_update_window(app: &AppHandle) {
     let _ = window.center();
 }
 
+pub fn show_startup_window(app: &AppHandle) -> Window {
+    let window = if let Some(window) = app.get_window(constants::STARTUP_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::WIZARD_WIN_NAME,
+            WindowUrl::App("/startup".into()),
+        )
+        .title("Spyglass - Starting up")
+        .decorations(false)
+        .min_inner_size(256.0, 256.0)
+        .max_inner_size(256.0, 256.0)
+        .build()
+        .expect("Unable to build startup window")
+    };
+
+    let _ = window.show();
+    let _ = window.center();
+
+    window
+}
+
 pub fn show_wizard_window(app: &AppHandle) {
     let window = if let Some(window) = app.get_window(constants::WIZARD_WIN_NAME) {
         window
