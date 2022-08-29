@@ -83,7 +83,7 @@ impl HTTPClient {
                     }
 
                     res = Some(request);
-                },
+                }
                 Ok(resp) => {
                     if resp.status() == StatusCode::TOO_MANY_REQUESTS {
                         log::warn!("Making too many requests, slowing down");

@@ -140,7 +140,7 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
     } else {
         WindowBuilder::new(
             app,
-            constants::WIZARD_WIN_NAME,
+            constants::STARTUP_WIN_NAME,
             WindowUrl::App("/startup".into()),
         )
         .title("Spyglass - Starting up")

@@ -61,31 +61,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("Unable to create tokio runtime");
 
-    // Run any migrations
-    let migration_status = rt.block_on(async {
-        let db = create_connection(&config, false)
-            .await
-            .expect("unabe to connect to db");
+    // Run any migrations, only on headless mode.
+    #[cfg(debug_assertions)]
+    {
+        let migration_status = rt.block_on(async {
+            match Migrator::run_migrations().await {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    let msg = e.to_string();
+                    // This is ok, just the migrator being funky
+                    if !msg.contains("been applied but its file is missing") {
+                        // Ruh-oh something went wrong
+                        log::error!("Unable to migrate database - {}", e.to_string());
+                        // Exit from app
+                        return Err(());
+                    }
 
-        match Migrator::up(&db, None).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                let msg = e.to_string();
-                // This is ok, just the migrator being funky
-                if !msg.contains("been applied but its file is missing") {
-                    // Ruh-oh something went wrong
-                    log::error!("Unable to migrate database - {}", e.to_string());
-                    // Exit from app
-                    return Err(());
+                    Ok(())
                 }
-
-                Ok(())
             }
-        }
-    });
+        });
 
-    if migration_status.is_err() {
-        return Ok(());
+        if migration_status.is_err() {
+            return Ok(());
+        }
     }
 
     // Initialize/Load user preferences
