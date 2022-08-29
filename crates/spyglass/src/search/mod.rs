@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use regex::RegexSetBuilder;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::{QueryParser, TermQuery};
 use tantivy::{schema::*, DocAddress, DocId, SegmentReader};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
-use regex::Regex;
 
 pub mod lens;
 mod query;
@@ -20,6 +20,7 @@ use crate::search::query::build_query;
 use crate::search::utils::ff_to_string;
 use entities::schema::{DocFields, SearchDocument};
 use shared::config::Lens;
+use shared::regex::{regex_for_domain, regex_for_prefix};
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -167,9 +168,25 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
-        let query = build_query(fields.clone(), lenses, applied_lens, query_string);
+        let query = build_query(fields.clone(), query_string);
+        let mut patterns = Vec::new();
+        for lens in applied_lens {
+            if let Some(lens) = lenses.get(lens) {
+                for domain in &lens.domains {
+                    patterns.push(regex_for_domain(domain));
+                }
 
-        let regex = Regex::new(".*dnd.*").unwrap();
+                for prefix in &lens.urls {
+                    patterns.push(regex_for_prefix(prefix));
+                }
+            }
+        }
+
+        let regex = RegexSetBuilder::new(patterns)
+            // Allow some beefy regexes
+            .size_limit(100_000_000)
+            .build()
+            .expect("Unable to build regexset");
 
         let collector =
             TopDocs::with_limit(5).tweak_score(move |segment_reader: &SegmentReader| {
@@ -199,13 +216,13 @@ impl Searcher {
                     let url = ff_to_string(doc, &url_reader, terms);
 
                     if let Some(url) = url {
-                        if regex.is_match(&url) {
+                        if regex.is_empty() || regex.is_match(&url) {
                             original_score * 1.0
                         } else {
-                            0.0
+                            -1.0
                         }
                     } else {
-                        0.0
+                        -1.0
                     }
                 }
             });
@@ -222,7 +239,11 @@ impl Searcher {
             Instant::now().duration_since(start_timer).as_millis()
         );
 
-        top_docs.into_iter().collect()
+        top_docs
+            .into_iter()
+            // Filter out negative scores
+            .filter(|(score, _)| *score >= 0.0)
+            .collect()
     }
 }
 

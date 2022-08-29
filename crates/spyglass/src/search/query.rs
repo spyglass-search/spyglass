@@ -1,12 +1,8 @@
-use std::collections::HashMap;
-
-use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, RegexQuery, TermQuery};
+use tantivy::query::{BooleanQuery, BoostQuery, Occur, Query, TermQuery};
 use tantivy::schema::*;
 use tantivy::Score;
 
 use super::DocFields;
-use shared::config::Lens;
-use shared::regex::regex_for_prefix;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
 
@@ -21,12 +17,7 @@ fn _boosted_term(field: Field, term: &str, boost: Score) -> Box<BoostQuery> {
     ))
 }
 
-pub fn build_query(
-    fields: DocFields,
-    lenses: &HashMap<String, Lens>,
-    applied_lens: &[String],
-    query_string: &str,
-) -> BooleanQuery {
+pub fn build_query(fields: DocFields, query_string: &str) -> BooleanQuery {
     // Tokenize query string
     let query_string = query_string.to_lowercase();
     let terms: Vec<&str> = query_string
@@ -34,42 +25,6 @@ pub fn build_query(
         .into_iter()
         .map(|token| token.trim())
         .collect();
-
-    log::trace!("lenses: {:?}, terms: {:?}", applied_lens, terms);
-
-    let mut lense_queries: QueryVec = Vec::new();
-    for lens in applied_lens {
-        if lenses.contains_key(lens) {
-            if let Some(lens) = lenses.get(lens) {
-                for domain in &lens.domains {
-                    lense_queries.push((
-                        Occur::Should,
-                        Box::new(TermQuery::new(
-                            Term::from_field_text(fields.domain, domain),
-                            IndexRecordOption::Basic,
-                        )),
-                    ));
-                }
-
-                for prefix in &lens.urls {
-                    let mut regex = regex_for_prefix(prefix);
-                    // By default, a RegexQuery is assumed to be exact match.
-                    regex = regex
-                        .trim_start_matches('^')
-                        .trim_end_matches('$')
-                        .to_string();
-
-                    lense_queries.push((
-                        Occur::Should,
-                        Box::new(
-                            RegexQuery::from_pattern(&regex, fields.url)
-                                .expect("Invalid regex pattern"),
-                        ),
-                    ))
-                }
-            }
-        }
-    }
 
     let mut term_query: QueryVec = Vec::new();
     // Boost exact matches to the full query string
@@ -85,15 +40,10 @@ pub fn build_query(
     }
 
     for term in terms {
-        // Emphasize matches in the content more than words in the title
+        // Emphasize matches in the title more than words in the content
         term_query.push((Occur::Should, _boosted_term(fields.content, term, 1.0)));
         term_query.push((Occur::Should, _boosted_term(fields.title, term, 5.0)));
     }
 
-    let mut nested_query: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
-    if !lense_queries.is_empty() {
-        nested_query.push((Occur::Must, Box::new(BooleanQuery::new(lense_queries))));
-    }
-
-    BooleanQuery::new(nested_query)
+    BooleanQuery::new(vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))])
 }
