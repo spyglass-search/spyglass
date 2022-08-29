@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use entities::models::{crawl_queue, lens};
+use entities::models::{crawl_queue, create_connection, lens};
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
@@ -61,23 +61,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("Unable to create tokio runtime");
 
-    // Initialize/Load user preferences
-    let mut state = rt.block_on(AppState::new(&config));
-
     // Run any migrations
-    match rt.block_on(Migrator::up(&state.db, None)) {
-        Ok(_) => {}
-        Err(e) => {
-            let msg = e.to_string();
-            // This is ok, just the migrator being funky
-            if !msg.contains("been applied but its file is missing") {
-                // Ruh-oh something went wrong
-                log::error!("Unable to migrate database - {}", e.to_string());
-                // Exit from app
-                return Ok(());
+    let migration_status = rt.block_on(async {
+        let db = create_connection(&config, false)
+            .await
+            .expect("unabe to connect to db");
+
+        match Migrator::up(&db, None).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let msg = e.to_string();
+                // This is ok, just the migrator being funky
+                if !msg.contains("been applied but its file is missing") {
+                    // Ruh-oh something went wrong
+                    log::error!("Unable to migrate database - {}", e.to_string());
+                    // Exit from app
+                    return Err(());
+                }
+
+                Ok(())
             }
         }
+    });
+
+    if migration_status.is_err() {
+        return Ok(());
     }
+
+    // Initialize/Load user preferences
+    let mut state = rt.block_on(AppState::new(&config));
 
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");

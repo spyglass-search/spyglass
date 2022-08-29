@@ -15,7 +15,7 @@ use shared::config::{Lens, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
-const BATCH_SIZE: usize = 10000;
+const BATCH_SIZE: usize = 5_000;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
