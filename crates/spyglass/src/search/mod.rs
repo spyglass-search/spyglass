@@ -7,20 +7,21 @@ use std::time::Instant;
 use regex::RegexSetBuilder;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{QueryParser, TermQuery};
+use tantivy::query::TermQuery;
 use tantivy::{schema::*, DocAddress, DocId, SegmentReader};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-pub mod lens;
-mod query;
-mod utils;
-
 use crate::search::query::build_query;
 use crate::search::utils::ff_to_string;
 use entities::schema::{DocFields, SearchDocument};
+use entities::sea_orm::DatabaseConnection;
 use shared::config::Lens;
 use shared::regex::{regex_for_domain, regex_for_prefix};
+
+pub mod lens;
+mod query;
+mod utils;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -48,12 +49,14 @@ impl Debug for Searcher {
 }
 
 impl Searcher {
-    pub fn delete(writer: &mut IndexWriter, id: &str) -> anyhow::Result<()> {
+    /// Delete document w/ `doc_id` from index
+    pub fn delete(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
         let fields = DocFields::as_fields();
-        writer.delete_term(Term::from_field_text(fields.id, id));
+        writer.delete_term(Term::from_field_text(fields.id, doc_id));
         Ok(())
     }
 
+    /// Get document with `doc_id` from index.
     pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
@@ -65,19 +68,22 @@ impl Searcher {
 
         let res = searcher
             .search(&query, &TopDocs::with_limit(1))
-            .expect("Unable to execute query");
+            .map_or(Vec::new(), |x| x);
 
         if res.is_empty() {
             return None;
         }
 
-        let (_, doc_address) = res.first().expect("No results in search");
-        if let Ok(doc) = searcher.doc(*doc_address) {
-            return Some(doc);
+        if let Some((_, doc_address)) = res.first() {
+            if let Ok(doc) = searcher.doc(*doc_address) {
+                return Some(doc);
+            }
         }
+
         None
     }
 
+    /// Constructs a new Searcher object w/ the index @ `index_path`
     pub fn with_index(index_path: &IndexPath) -> Self {
         let schema = DocFields::as_schema();
         let index = match index_path {
@@ -134,30 +140,8 @@ impl Searcher {
         Ok(doc_id)
     }
 
-    pub fn search(index: &Index, reader: &IndexReader, query_string: &str) -> Vec<SearchResult> {
-        let fields = DocFields::as_fields();
-        let searcher = reader.searcher();
-
-        let query_parser = QueryParser::for_index(index, vec![fields.title, fields.content]);
-
-        let query = query_parser
-            .parse_query(query_string)
-            .expect("Unable to parse query");
-
-        let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(10))
-            .expect("Unable to execute query");
-
-        log::info!(
-            "query `{}` returned {} results from {} docs",
-            query_string,
-            top_docs.len(),
-            searcher.num_docs(),
-        );
-        top_docs.into_iter().collect()
-    }
-
-    pub fn search_with_lens(
+    pub async fn search_with_lens(
+        _db: DatabaseConnection,
         lenses: &HashMap<String, Lens>,
         reader: &IndexReader,
         applied_lens: &[String],
@@ -222,6 +206,7 @@ impl Searcher {
                             -1.0
                         }
                     } else {
+                        // blank URL? that seems like an error somewhere.
                         -1.0
                     }
                 }
@@ -250,7 +235,8 @@ impl Searcher {
 #[cfg(test)]
 mod test {
     use crate::search::{IndexPath, Searcher};
-    use shared::config::Lens;
+    use entities::models::create_connection;
+    use shared::config::{Config, Lens};
     use std::collections::HashMap;
 
     fn _build_test_index(searcher: &mut Searcher) {
@@ -331,17 +317,9 @@ mod test {
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 
-    #[test]
-    pub fn test_indexer() {
-        let mut searcher = Searcher::with_index(&IndexPath::Memory);
-        _build_test_index(&mut searcher);
-
-        let results = Searcher::search(&searcher.index, &searcher.reader, "gabilan mountains");
-        assert_eq!(results.len(), 2);
-    }
-
-    #[test]
-    pub fn test_basic_lense_search() {
+    #[tokio::test]
+    pub async fn test_basic_lense_search() {
+        let db = create_connection(&Config::default(), true).await.unwrap();
         let lens = Lens {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
@@ -358,12 +336,15 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        let results =
+            Searcher::search_with_lens(db, &lenses, &searcher.reader, &applied_lens, query).await;
         assert_eq!(results.len(), 1);
     }
 
-    #[test]
-    pub fn test_url_lens_search() {
+    #[tokio::test]
+    pub async fn test_url_lens_search() {
+        let db = create_connection(&Config::default(), true).await.unwrap();
+
         let lens = Lens {
             name: "wiki".to_string(),
             domains: Vec::new(),
@@ -380,12 +361,15 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        let results =
+            Searcher::search_with_lens(db, &lenses, &searcher.reader, &applied_lens, query).await;
         assert_eq!(results.len(), 1);
     }
 
-    #[test]
-    pub fn test_singular_url_lens_search() {
+    #[tokio::test]
+    pub async fn test_singular_url_lens_search() {
+        let db = create_connection(&Config::default(), true).await.unwrap();
+
         let lens = Lens {
             name: "wiki".to_string(),
             domains: Vec::new(),
@@ -402,7 +386,8 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        let results =
+            Searcher::search_with_lens(db, &lenses, &searcher.reader, &applied_lens, query).await;
         assert_eq!(results.len(), 0);
     }
 }

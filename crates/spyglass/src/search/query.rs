@@ -27,6 +27,7 @@ pub fn build_query(fields: DocFields, query_string: &str) -> BooleanQuery {
         .collect();
 
     let mut term_query: QueryVec = Vec::new();
+
     // Boost exact matches to the full query string
     if terms.len() > 1 {
         term_query.push((

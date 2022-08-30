@@ -278,11 +278,13 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
     }
 
     let docs = Searcher::search_with_lens(
+        state.db.clone(),
         &lenses,
         &index.reader,
         &search_req.lenses,
         &search_req.query,
-    );
+    )
+    .await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {

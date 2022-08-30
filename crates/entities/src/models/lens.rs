@@ -7,7 +7,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum LensType {
-    // A simple lens with URLs & rules
+    // A simple lens with URLs & rules that acts as a "filter"
     #[sea_orm(string_value = "Simple")]
     Simple,
     // A plugin based lens where queueing & rules are dynamic given whatever the
