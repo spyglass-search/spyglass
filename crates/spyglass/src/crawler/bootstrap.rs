@@ -15,7 +15,7 @@ use url::Url;
 
 use entities::models::crawl_queue::{self, EnqueueSettings};
 use entities::sea_orm::DatabaseConnection;
-use shared::config::{Lens, UserSettings};
+use shared::config::{LensConfig, UserSettings};
 
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
@@ -111,7 +111,7 @@ async fn fetch_cdx_page(
 /// from the Internet Archive. We then crawl their archived stuff as fast as possible
 /// locally to bring the index up to date.
 pub async fn bootstrap(
-    lens: &Lens,
+    lens: &LensConfig,
     db: &DatabaseConnection,
     settings: &UserSettings,
     url: &str,

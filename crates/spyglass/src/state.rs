@@ -11,13 +11,13 @@ use crate::{
     search::{IndexPath, Searcher},
     task::Command,
 };
-use shared::config::{Config, Lens, UserSettings};
+use shared::config::{Config, LensConfig, UserSettings};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub app_state: Arc<DashMap<String, String>>,
-    pub lenses: Arc<DashMap<String, Lens>>,
+    pub lenses: Arc<DashMap<String, LensConfig>>,
     pub user_settings: UserSettings,
     pub index: Searcher,
     // Crawler pause control

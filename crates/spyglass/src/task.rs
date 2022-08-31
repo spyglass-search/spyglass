@@ -6,7 +6,7 @@ use url::Url;
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::{Config, Lens};
+use shared::config::{Config, LensConfig};
 
 use crate::crawler::Crawler;
 use crate::search::{
@@ -134,7 +134,7 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
 
-            let lenses: Vec<Lens> = state
+            let lenses: Vec<LensConfig> = state
                 .lenses
                 .iter()
                 .map(|entry| entry.value().clone())

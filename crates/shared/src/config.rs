@@ -13,7 +13,7 @@ pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub lenses: HashMap<String, Lens>,
+    pub lenses: HashMap<String, LensConfig>,
     pub user_settings: UserSettings,
 }
 
@@ -54,21 +54,23 @@ impl LensRule {
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Lens {
-    #[serde(default = "Lens::default_author")]
+pub struct LensConfig {
+    #[serde(default = "LensConfig::default_author")]
     pub author: String,
     pub name: String,
     pub description: Option<String>,
     pub domains: Vec<String>,
     pub urls: Vec<String>,
     pub version: String,
-    #[serde(default = "Lens::default_is_enabled")]
+    #[serde(default = "LensConfig::default_is_enabled")]
     pub is_enabled: bool,
     #[serde(default)]
     pub rules: Vec<LensRule>,
+    #[serde(default)]
+    pub trigger: String,
 }
 
-impl Lens {
+impl LensConfig {
     fn default_author() -> String {
         "Unknown".to_string()
     }

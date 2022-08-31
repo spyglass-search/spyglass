@@ -7,7 +7,7 @@ use migration::sea_orm::DatabaseConnection;
 use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
-use shared::config::{Config, Lens, LensRule, UserSettings};
+use shared::config::{Config, LensConfig, LensRule, UserSettings};
 
 use crate::crawler::bootstrap;
 use crate::search::Searcher;
@@ -15,7 +15,7 @@ use crate::state::AppState;
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
 async fn check_and_bootstrap(
-    lens: &Lens,
+    lens: &LensConfig,
     db: &DatabaseConnection,
     user_settings: &UserSettings,
     seed_url: &str,
@@ -54,7 +54,7 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
         let path = entry.path();
         if path.is_file() && path.extension().unwrap_or_default() == "ron" {
             if let Ok(file_contents) = fs::read_to_string(path) {
-                match ron::from_str::<Lens>(&file_contents) {
+                match ron::from_str::<LensConfig>(&file_contents) {
                     Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
                     Ok(lens) => {
                         if lens.is_enabled {
@@ -72,7 +72,7 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
 /// Loop through lenses in the AppState. Update our internal db & bootstrap anything
 /// that hasn't been bootstrapped.
 pub async fn load_lenses(state: AppState) {
-    let mut new_lenses: Vec<Lens> = Vec::new();
+    let mut new_lenses: Vec<LensConfig> = Vec::new();
     for entry in state.lenses.iter() {
         let lens = entry.value();
         // Have we added this lens to the database?

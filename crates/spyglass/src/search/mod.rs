@@ -16,7 +16,7 @@ use crate::search::query::build_query;
 use crate::search::utils::ff_to_string;
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::DatabaseConnection;
-use shared::config::Lens;
+use shared::config::LensConfig;
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 pub mod lens;
@@ -142,7 +142,7 @@ impl Searcher {
 
     pub async fn search_with_lens(
         _db: DatabaseConnection,
-        lenses: &HashMap<String, Lens>,
+        lenses: &HashMap<String, LensConfig>,
         reader: &IndexReader,
         applied_lens: &[String],
         query_string: &str,
@@ -236,7 +236,7 @@ impl Searcher {
 mod test {
     use crate::search::{IndexPath, Searcher};
     use entities::models::create_connection;
-    use shared::config::{Config, Lens};
+    use shared::config::{Config, LensConfig};
     use std::collections::HashMap;
 
     fn _build_test_index(searcher: &mut Searcher) {
@@ -320,7 +320,7 @@ mod test {
     #[tokio::test]
     pub async fn test_basic_lense_search() {
         let db = create_connection(&Config::default(), true).await.unwrap();
-        let lens = Lens {
+        let lens = LensConfig {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
             urls: Vec::new(),
@@ -345,7 +345,7 @@ mod test {
     pub async fn test_url_lens_search() {
         let db = create_connection(&Config::default(), true).await.unwrap();
 
-        let lens = Lens {
+        let lens = LensConfig {
             name: "wiki".to_string(),
             domains: Vec::new(),
             urls: vec!["https://en.wikipedia.org/mice".to_string()],
@@ -370,7 +370,7 @@ mod test {
     pub async fn test_singular_url_lens_search() {
         let db = create_connection(&Config::default(), true).await.unwrap();
 
-        let lens = Lens {
+        let lens = LensConfig {
             name: "wiki".to_string(),
             domains: Vec::new(),
             urls: vec!["https://en.wikipedia.org/mice$".to_string()],
