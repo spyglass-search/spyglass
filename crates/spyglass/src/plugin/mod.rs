@@ -346,7 +346,7 @@ pub async fn plugin_load(
                 name: plug.name.clone(),
                 author: plug.author,
                 description: Some(plug.description.clone()),
-                trigger: plug.name.clone(),
+                trigger: plug.trigger.clone(),
                 ..Default::default()
             };
 

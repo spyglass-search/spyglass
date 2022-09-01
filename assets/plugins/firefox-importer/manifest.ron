@@ -4,6 +4,7 @@
     description: "Sync bookmarks / history from Firefox into Spyglass",
     version: "1",
     plugin_type: Lens,
+    trigger: "firefox",
     // User settings w/ the default value, this will be added the plugin environment
     user_settings: {
         "FIREFOX_DATA_FOLDER": (

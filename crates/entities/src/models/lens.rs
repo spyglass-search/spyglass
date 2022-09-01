@@ -86,10 +86,13 @@ pub async fn add_or_enable(
 
     // If it already exists & is not a plugin, simply enable it.
     if let Some(existing) = exists {
+        log::info!("updating lens: {}", lens.name);
+
         let mut updated: ActiveModel = existing.clone().into();
         // Update description / etc.
         updated.author = Set(lens.author.to_string());
         updated.version = Set(lens.version.to_string());
+        updated.trigger = Set(Some(lens.trigger.to_string()));
         match &lens.description {
             Some(desc) => updated.description = Set(Some(desc.clone())),
             None => updated.description = Set(None),
