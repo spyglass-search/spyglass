@@ -76,16 +76,7 @@ pub async fn load_lenses(state: AppState) {
     for entry in state.lenses.iter() {
         let lens = entry.value();
         // Have we added this lens to the database?
-        match lens::add_or_enable(
-            &state.db,
-            &lens.name,
-            &lens.author,
-            lens.description.as_ref(),
-            &lens.version,
-            lens::LensType::Simple,
-        )
-        .await
-        {
+        match lens::add_or_enable(&state.db, lens, lens::LensType::Simple).await {
             Ok(is_new) => {
                 log::info!("loaded lens {}, new? {}", lens.name, is_new);
                 new_lenses.push(lens.clone());

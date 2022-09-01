@@ -2,6 +2,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
 use sea_orm::Set;
 use serde::Serialize;
+use shared::config::LensConfig;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
@@ -75,14 +76,11 @@ pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<()> {
 /// True if the lens was added, False if it already exists.
 pub async fn add_or_enable(
     db: &DatabaseConnection,
-    name: &str,
-    author: &str,
-    description: Option<&String>,
-    version: &str,
+    lens: &LensConfig,
     lens_type: LensType,
 ) -> anyhow::Result<bool> {
     let exists = Entity::find()
-        .filter(Column::Name.eq(name.to_string()))
+        .filter(Column::Name.eq(lens.name.to_string()))
         .one(db)
         .await?;
 
@@ -90,9 +88,9 @@ pub async fn add_or_enable(
     if let Some(existing) = exists {
         let mut updated: ActiveModel = existing.clone().into();
         // Update description / etc.
-        updated.author = Set(author.to_string());
-        updated.version = Set(version.to_string());
-        match description {
+        updated.author = Set(lens.author.to_string());
+        updated.version = Set(lens.version.to_string());
+        match &lens.description {
             Some(desc) => updated.description = Set(Some(desc.clone())),
             None => updated.description = Set(None),
         }
@@ -109,13 +107,13 @@ pub async fn add_or_enable(
 
     // Otherwise add the lens & enable it.
     let new_lens = ActiveModel {
-        name: Set(name.to_owned()),
-        author: Set(author.to_owned()),
-        description: Set(description.map(String::from)),
-        version: Set(version.to_owned()),
+        name: Set(lens.name.to_owned()),
+        author: Set(lens.author.to_owned()),
+        description: Set(lens.description.clone()),
+        version: Set(lens.version.to_owned()),
         // NOTE: Only automatically enable simple lenses
         is_enabled: Set(lens_type == LensType::Simple),
-        trigger: Set(Some(name.to_owned())),
+        trigger: Set(Some(lens.name.to_owned())),
         lens_type: Set(lens_type),
         ..Default::default()
     };

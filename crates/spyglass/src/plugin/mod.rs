@@ -15,7 +15,7 @@ use wasmer::{Instance, Module, Store, WasmerEnv};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
 use entities::models::lens;
-use shared::config::Config;
+use shared::config::{Config, LensConfig};
 use shared::plugin::{PluginConfig, PluginType};
 use spyglass_plugin::{consts::env, PluginEvent, PluginSubscription};
 
@@ -341,16 +341,16 @@ pub async fn plugin_load(
         // Enable plugins that are lenses, this is the only type right so technically they
         // all will be enabled as a lens.
         if plug.plugin_type == PluginType::Lens {
-            match lens::add_or_enable(
-                &state.db,
-                &plug.name,
-                &plug.author,
-                Some(&plug.description),
-                &plug.version,
-                lens::LensType::Plugin,
-            )
-            .await
-            {
+            let plug = plug.clone();
+            let lens_config = LensConfig {
+                name: plug.name.clone(),
+                author: plug.author,
+                description: Some(plug.description.clone()),
+                trigger: plug.name.clone(),
+                ..Default::default()
+            };
+
+            match lens::add_or_enable(&state.db, &lens_config, lens::LensType::Plugin).await {
                 Ok(is_new) => {
                     log::info!("loaded lens {}, new? {}", plug.name, is_new)
                 }

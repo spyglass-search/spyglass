@@ -14,6 +14,7 @@ use shared::response::{
 
 use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
 use entities::schema::{DocFields, SearchDocument};
+use entities::sea_orm::Condition;
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
 
 use libspyglass::plugin::PluginCommand;
