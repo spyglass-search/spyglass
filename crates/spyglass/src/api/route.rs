@@ -337,7 +337,12 @@ pub async fn search_lenses(
     let mut results = Vec::new();
 
     let query_results = lens::Entity::find()
-        .filter(lens::Column::Name.like(&format!("%{}%", &param.query)))
+        // Filter either by the name of the lens or the trigger
+        .filter(
+            Condition::any()
+                .add(lens::Column::Name.like(&format!("%{}%", &param.query)))
+                .add(lens::Column::Trigger.like(&format!("%{}%", &param.query))),
+        )
         .filter(lens::Column::IsEnabled.eq(true))
         .filter(lens::Column::LensType.eq(LensType::Simple))
         .order_by_asc(lens::Column::Name)
