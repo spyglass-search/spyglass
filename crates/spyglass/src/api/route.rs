@@ -14,7 +14,6 @@ use shared::response::{
 
 use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
 use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::Condition;
 use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
 
 use libspyglass::plugin::PluginCommand;
@@ -338,23 +337,29 @@ pub async fn search_lenses(
 
     let query_results = lens::Entity::find()
         // Filter either by the name of the lens or the trigger
-        .filter(
-            Condition::any()
-                .add(lens::Column::Name.like(&format!("%{}%", &param.query)))
-                .add(lens::Column::Trigger.like(&format!("%{}%", &param.query))),
-        )
+        .filter(lens::Column::Trigger.like(&format!("%{}%", &param.query)))
         .filter(lens::Column::IsEnabled.eq(true))
-        .filter(lens::Column::LensType.eq(LensType::Simple))
-        .order_by_asc(lens::Column::Name)
+        .order_by_asc(lens::Column::Trigger)
         .all(&state.db)
         .await;
 
     match query_results {
         Ok(query_results) => {
             for lens in query_results {
+                let label = lens
+                    .trigger
+                    .and_then(|label| {
+                        if label.is_empty() {
+                            Some(lens.name.clone())
+                        } else {
+                            Some(label)
+                        }
+                    })
+                    .unwrap_or(lens.name);
+
                 results.push(LensResult {
                     author: lens.author,
-                    title: lens.name,
+                    title: label,
                     description: lens.description.unwrap_or_else(|| "".to_string()),
                     ..Default::default()
                 });
