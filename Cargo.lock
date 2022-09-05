@@ -2967,6 +2967,7 @@ dependencies = [
  "sea-orm-migration",
  "shared",
  "tantivy",
+ "tar",
 ]
 
 [[package]]
