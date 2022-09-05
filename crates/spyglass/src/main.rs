@@ -99,15 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn start_backend(state: &mut AppState, config: &Config) {
-    // TODO: Implement user-friendly start-up wizard
-    // if state.config.user_settings.run_wizard {
-    //     // Import data from Firefox
-    //     // TODO: Ask user what browser/profiles to import on first startup.
-    //     let importer = FirefoxImporter::new(&config);
-    //     let _ = importer.import(&state).await;
-    // }
-
-    // Initialize crawl_queue, set all in-flight tasks to queued.
+    // Initialize crawl_queue, requeue all in-flight tasks.
     crawl_queue::reset_processing(&state.db).await;
     if let Err(e) = lens::reset(&state.db).await {
         log::error!("Unable to reset lenses: {}", e);
@@ -192,7 +184,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     }
 
     // Plugin server
-    let pm_handle = tokio::spawn(plugin::plugin_manager(
+    let pm_handle = tokio::spawn(plugin::plugin_event_loop(
         state.clone(),
         config.clone(),
         plugin_cmd_tx.clone(),

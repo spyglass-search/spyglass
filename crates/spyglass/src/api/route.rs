@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use jsonrpc_core::{Error, ErrorCode, Result};
+use std::collections::HashMap;
 use tracing::instrument;
 use url::Url;
 
@@ -13,7 +13,7 @@ use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
 use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
 use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set, sea_query::Expr};
+use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;

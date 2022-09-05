@@ -59,7 +59,7 @@ pub(crate) struct PluginEnv {
 }
 
 #[derive(Clone)]
-struct PluginInstance {
+pub struct PluginInstance {
     id: PluginId,
     config: PluginConfig,
     instance: Instance,
@@ -86,7 +86,7 @@ impl PluginInstance {
     }
 }
 
-struct PluginManager {
+pub struct PluginManager {
     check_update_subs: HashSet<PluginId>,
     file_watch_subs: DashMap<PluginId, String>,
     plugins: DashMap<PluginId, PluginInstance>,
@@ -98,7 +98,6 @@ struct PluginManager {
 impl PluginManager {
     pub fn new() -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
-
         let watcher = notify::recommended_watcher(move |res| {
             futures::executor::block_on(async {
                 tx.send(res).await.expect("Unable to send FS event");
@@ -128,25 +127,23 @@ impl PluginManager {
 
 /// Manages plugin events
 #[tracing::instrument(skip_all)]
-pub async fn plugin_manager(
+pub async fn plugin_event_loop(
     state: AppState,
     config: Config,
     cmd_writer: mpsc::Sender<PluginCommand>,
     mut cmd_queue: mpsc::Receiver<PluginCommand>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
-    let mut config = config.clone();
-
-    log::info!("plugin manager started");
-    let mut manager = PluginManager::new();
-
+    log::info!("🔌 plugin event loop started");
     // Initial load, send some basic configuration to the plugins
+    let mut config = config.clone();
     plugin_load(&state, &mut config, &cmd_writer).await;
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
 
     loop {
+        let mut manager = state.plugin_manager.lock().await;
         // Wait for next command / handle shutdown responses
         let next_cmd = tokio::select! {
             // Listen for plugin requests
@@ -171,12 +168,18 @@ pub async fn plugin_manager(
         match next_cmd {
             Some(PluginCommand::DisablePlugin(plugin_name)) => {
                 log::info!("disabling plugin <{}>", plugin_name);
+
+                let mut disabled = Vec::new();
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = false;
-                        manager.check_update_subs.remove(&plugin.id);
+                        disabled.push(plugin.id);
                     }
                 }
+
+                disabled.iter().for_each(|pid| {
+                    manager.check_update_subs.remove(pid);
+                })
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
                 log::info!("enabling plugin <{}>", plugin_name);

@@ -7,12 +7,11 @@ use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{
-    plugin::PluginCommand,
+    plugin::{PluginCommand, PluginManager},
     search::{IndexPath, Searcher},
     task::Command,
 };
 use shared::config::{Config, LensConfig, UserSettings};
-
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
@@ -24,6 +23,7 @@ pub struct AppState {
     pub crawler_cmd_tx: Arc<Mutex<Option<broadcast::Sender<Command>>>>,
     // Plugin command/control
     pub plugin_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PluginCommand>>>>,
+    pub plugin_manager: Arc<Mutex<PluginManager>>,
 }
 
 impl AppState {
@@ -52,6 +52,7 @@ impl AppState {
             index,
             crawler_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
+            plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
         }
     }
 }

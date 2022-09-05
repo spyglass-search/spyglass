@@ -5,6 +5,12 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use shims::*;
 
+#[derive(Serialize, Deserialize)]
+pub enum SearchFilter {
+    // No filter
+    None,
+}
+
 #[macro_export]
 macro_rules! register_plugin {
     ($t:ty) => {
@@ -27,6 +33,13 @@ macro_rules! register_plugin {
                 }
             })
         }
+
+        #[no_mangle]
+        pub fn search_filter() {
+            STATE.with(|state| {
+                state.borrow_mut().search_filter();
+            })
+        }
     };
 }
 pub trait SpyglassPlugin {
@@ -35,6 +48,12 @@ pub trait SpyglassPlugin {
     fn load(&mut self);
     /// Request plugin for updates
     fn update(&mut self, event: PluginEvent);
+    /// Optional function.
+    /// Only called for Lens plugins, request a set of filters to apply to a search.
+    /// If not implemented, no filter is applied to the search.
+    fn search_filter(&mut self) {
+        let _ = object_to_stdout(&SearchFilter::None);
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
