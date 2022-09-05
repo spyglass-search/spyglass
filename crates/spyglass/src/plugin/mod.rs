@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use dashmap::DashMap;
@@ -11,6 +11,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
 use wasmer::{Instance, Module, Store, WasmerEnv};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
@@ -95,7 +96,31 @@ pub struct PluginManager {
     file_watcher: RecommendedWatcher,
 }
 
+impl Default for PluginManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginManager {
+    pub async fn call_plugin_func(instance: Instance, func_name: &str) -> anyhow::Result<()> {
+        let exports = instance.exports.clone();
+        let func = func_name.to_owned();
+        // Wrap this bad boy in something we can send across threads.
+        let async_exports = Arc::new(Mutex::new(exports));
+        // Spawn a thread so that plugins don't hold up the main thread.
+        let handle: JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
+            if let Ok(exports) = async_exports.lock() {
+                let start = exports.get_function(&func)?;
+                start.call(&[])?;
+            }
+
+            Ok(())
+        });
+        let _ = handle.await?;
+        Ok(())
+    }
+
     pub fn new() -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         let watcher = notify::recommended_watcher(move |res| {
@@ -463,11 +488,10 @@ pub async fn plugin_init(
     // Lets call the `_start` function, which is our `main` function in Rust
     if plugin.is_enabled {
         log::info!("STARTING <{}>", plugin.name);
-        let start = instance.exports.get_function("_start")?;
-        start.call(&[])?;
+        let _ = PluginManager::call_plugin_func(instance.clone(), "_start").await?;
     }
 
-    Ok((instance, wasi_env))
+    Ok((instance.clone(), wasi_env))
 }
 
 // --------------------------------------------------------------------------------
