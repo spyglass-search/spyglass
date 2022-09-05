@@ -1,7 +1,4 @@
 use std::collections::HashMap;
-
-use entities::models::crawl_queue::CrawlStatus;
-use entities::models::lens::LensType;
 use jsonrpc_core::{Error, ErrorCode, Result};
 use tracing::instrument;
 use url::Url;
@@ -12,9 +9,11 @@ use shared::response::{
     SearchResult, SearchResults,
 };
 
+use entities::models::crawl_queue::CrawlStatus;
+use entities::models::lens::LensType;
 use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
 use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
+use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set, sea_query::Expr};
 
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
@@ -336,10 +335,12 @@ pub async fn search_lenses(
     let mut results = Vec::new();
 
     let query_results = lens::Entity::find()
-        // Filter either by the name of the lens or the trigger
+        // Filter either by the trigger name, which is configurable by the user.
         .filter(lens::Column::Trigger.like(&format!("%{}%", &param.query)))
+        // Ignored disabled lenses
         .filter(lens::Column::IsEnabled.eq(true))
-        .order_by_asc(lens::Column::Trigger)
+        // Order by trigger name, case insensitve
+        .order_by_asc(Expr::cust("lower(trigger)"))
         .all(&state.db)
         .await;
 
