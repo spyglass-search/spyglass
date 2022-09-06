@@ -63,7 +63,7 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
 
         // Step 2 recreate dest directory
         std::fs::create_dir(dest)?;
-        
+
         // Step 3 Copy files from source to destination
         for entry in std::fs::read_dir(source)? {
             if let Err(e) = entry {
