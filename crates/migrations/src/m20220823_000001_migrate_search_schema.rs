@@ -16,6 +16,8 @@ use entities::schema::{mapping_to_schema, SchemaMapping};
 use entities::sea_orm::{ConnectionTrait, Statement};
 use shared::config::Config;
 
+use crate::utils::migration_utils;
+
 pub struct Migration;
 impl Migration {
     pub fn before_schema(&self) -> SchemaMapping {
@@ -220,14 +222,12 @@ impl MigrationTrait for Migration {
             return Err(DbErr::Custom(format!("Unable to commit changes: {}", e)));
         }
 
-        // Rename old index
-        let backup_path = old_index_path.parent().unwrap().join("index.old");
-        if let Err(e) = std::fs::rename(old_index_path, backup_path) {
+        if let Err(e) = migration_utils::backup_dir(&old_index_path) {
             return Err(DbErr::Custom(format!("Unable to backup old index: {}", e)));
         }
 
         // Move new index into place.
-        if let Err(e) = std::fs::rename(new_index_path, config.index_dir()) {
+        if let Err(e) = migration_utils::replace_dir(&new_index_path, &old_index_path) {
             return Err(DbErr::Custom(format!(
                 "Unable to move new index into place: {}",
                 e

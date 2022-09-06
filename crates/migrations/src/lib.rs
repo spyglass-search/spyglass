@@ -8,6 +8,7 @@ mod m20220508_000001_lens_and_crawl_queue_update;
 mod m20220522_000001_bootstrap_queue_table;
 mod m20220718_000001_add_cols_to_lens;
 mod m20220823_000001_migrate_search_schema;
+mod utils;
 
 pub struct Migrator;
 
