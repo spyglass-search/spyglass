@@ -28,7 +28,7 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: &Config) -> Self {
-        let db = create_connection(config, false)
+        let db = create_connection(config)
             .await
             .expect("Unable to connect to database");
 
