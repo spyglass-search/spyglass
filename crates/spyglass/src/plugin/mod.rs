@@ -9,6 +9,7 @@ use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use spyglass_plugin::SearchFilter;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
@@ -61,17 +62,39 @@ pub(crate) struct PluginEnv {
 
 #[derive(Clone)]
 pub struct PluginInstance {
-    id: PluginId,
-    config: PluginConfig,
-    instance: Instance,
-    env: WasiEnv,
+    pub id: PluginId,
+    pub config: PluginConfig,
+    pub instance: Instance,
+    pub env: WasiEnv,
 }
 
 impl PluginInstance {
+    pub async fn search_filters(&self) -> Vec<SearchFilter> {
+        if let Err(e) =
+            PluginManager::call_plugin_func(self.instance.clone(), "search_filter").await
+        {
+            log::error!("search_filters: {}", e);
+            return Vec::new();
+        }
+
+        match wasi_read::<Vec<SearchFilter>>(&self.env) {
+            Ok(res) => res,
+            Err(e) => {
+                log::error!(
+                    "Unable to get filters from plugin: {} - {}",
+                    self.config.name,
+                    e
+                );
+                Vec::new()
+            }
+        }
+    }
+
     pub fn update(&mut self, event: PluginEvent) {
         if !self.config.is_enabled {
             return;
         }
+
         if let Ok(func) = self.instance.exports.get_function("update") {
             match wasi_write(&self.env, &event) {
                 Err(e) => {
@@ -111,8 +134,8 @@ impl PluginManager {
         // Spawn a thread so that plugins don't hold up the main thread.
         let handle: JoinHandle<Result<(), anyhow::Error>> = tokio::spawn(async move {
             if let Ok(exports) = async_exports.lock() {
-                let start = exports.get_function(&func)?;
-                start.call(&[])?;
+                let func = exports.get_function(&func)?;
+                func.call(&[])?;
             }
 
             Ok(())
@@ -166,7 +189,7 @@ pub async fn plugin_event_loop(
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
-
+    let mut event_loop_sleep = tokio::time::interval(Duration::from_millis(100));
     loop {
         let mut manager = state.plugin_manager.lock().await;
         // Wait for next command / handle shutdown responses
@@ -181,6 +204,10 @@ pub async fn plugin_event_loop(
                     None
                 }
             },
+            _ = event_loop_sleep.tick() => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                continue;
+            }
             // Handle interval checks
             _ = interval.tick() => Some(PluginCommand::QueueIntervalCheck),
             // SHUT IT DOWN
@@ -331,9 +358,6 @@ pub async fn plugin_event_loop(
             }
             None => {}
         }
-
-        // Nothing to do
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await
     }
 }
 
@@ -488,7 +512,7 @@ pub async fn plugin_init(
     // Lets call the `_start` function, which is our `main` function in Rust
     if plugin.is_enabled {
         log::info!("STARTING <{}>", plugin.name);
-        let _ = PluginManager::call_plugin_func(instance.clone(), "_start").await?;
+        PluginManager::call_plugin_func(instance.clone(), "_start").await?;
     }
 
     Ok((instance.clone(), wasi_env))

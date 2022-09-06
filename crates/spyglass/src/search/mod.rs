@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -16,8 +15,7 @@ use crate::search::query::build_query;
 use crate::search::utils::ff_to_string;
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::DatabaseConnection;
-use shared::config::LensConfig;
-use shared::regex::{regex_for_domain, regex_for_prefix};
+use spyglass_plugin::SearchFilter;
 
 pub mod lens;
 mod query;
@@ -142,9 +140,8 @@ impl Searcher {
 
     pub async fn search_with_lens(
         _db: DatabaseConnection,
-        lenses: &HashMap<String, LensConfig>,
+        applied_lenses: &Vec<SearchFilter>,
         reader: &IndexReader,
-        applied_lens: &[String],
         query_string: &str,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
@@ -153,16 +150,12 @@ impl Searcher {
         let searcher = reader.searcher();
 
         let query = build_query(fields.clone(), query_string);
-        let mut patterns = Vec::new();
-        for lens in applied_lens {
-            if let Some(lens) = lenses.get(lens) {
-                for domain in &lens.domains {
-                    patterns.push(regex_for_domain(domain));
-                }
 
-                for prefix in &lens.urls {
-                    patterns.push(regex_for_prefix(prefix));
-                }
+        let mut patterns = Vec::new();
+        for filter in applied_lenses {
+            match filter {
+                SearchFilter::URLRegex(regex) => patterns.push(regex),
+                SearchFilter::None => {}
             }
         }
 
@@ -237,7 +230,6 @@ mod test {
     use crate::search::{IndexPath, Searcher};
     use entities::models::create_connection;
     use shared::config::{Config, LensConfig};
-    use std::collections::HashMap;
 
     fn _build_test_index(searcher: &mut Searcher) {
         let writer = &mut searcher.writer.lock().unwrap();
@@ -327,17 +319,12 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = vec!["wiki".to_string()];
-
-        let mut lenses = HashMap::new();
-        lenses.insert("wiki".to_string(), lens.clone());
-
+        let applied_lens = vec![lens.clone()];
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results =
-            Searcher::search_with_lens(db, &lenses, &searcher.reader, &applied_lens, query).await;
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
         assert_eq!(results.len(), 1);
     }
 
@@ -352,17 +339,12 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = vec!["wiki".to_string()];
-
-        let mut lenses = HashMap::new();
-        lenses.insert("wiki".to_string(), lens.clone());
-
+        let applied_lens = vec![lens.clone()];
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results =
-            Searcher::search_with_lens(db, &lenses, &searcher.reader, &applied_lens, query).await;
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
         assert_eq!(results.len(), 1);
     }
 
@@ -377,17 +359,14 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = vec!["wiki".to_string()];
-
-        let mut lenses = HashMap::new();
+        let applied_lens = vec![lens.clone()];
         lenses.insert("wiki".to_string(), lens.clone());
 
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results =
-            Searcher::search_with_lens(db, &lenses, &searcher.reader, &applied_lens, query).await;
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
         assert_eq!(results.len(), 0);
     }
 }

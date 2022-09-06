@@ -5,10 +5,11 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use shims::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SearchFilter {
     // No filter
     None,
+    URLRegex(String),
 }
 
 #[macro_export]
@@ -37,7 +38,8 @@ macro_rules! register_plugin {
         #[no_mangle]
         pub fn search_filter() {
             STATE.with(|state| {
-                state.borrow_mut().search_filter();
+                let filters = state.borrow_mut().search_filter();
+                let _ = object_to_stdout(&filters);
             })
         }
     };
@@ -51,8 +53,8 @@ pub trait SpyglassPlugin {
     /// Optional function.
     /// Only called for Lens plugins, request a set of filters to apply to a search.
     /// If not implemented, no filter is applied to the search.
-    fn search_filter(&mut self) {
-        let _ = object_to_stdout(&SearchFilter::None);
+    fn search_filter(&mut self) -> Vec<SearchFilter> {
+        vec![SearchFilter::None]
     }
 }
 
