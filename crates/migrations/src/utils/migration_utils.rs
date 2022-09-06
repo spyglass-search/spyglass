@@ -39,7 +39,7 @@ pub fn backup_dir(dir: &PathBuf) -> Result<()> {
         println!("Error adding files to tar, {:?}", e);
         return Err(e);
     }
-    return Ok(());
+    Ok(())
 }
 
 // Utility method replaces the destination directory with the contents of
@@ -59,15 +59,11 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         // Step 1 delete destination
-        if let Err(e) = std::fs::remove_dir_all(dest) {
-            return Err(e);
-        }
+        std::fs::remove_dir_all(dest)?;
 
         // Step 2 recreate dest directory
-        if let Err(e) = std::fs::create_dir(dest) {
-            return Err(e);
-        }
-
+        std::fs::create_dir(dest)?;
+        
         // Step 3 Copy files from source to destination
         for entry in std::fs::read_dir(source)? {
             if let Err(e) = entry {
@@ -91,11 +87,9 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
         }
 
         // Step 4 delete source
-        if let Err(e) = std::fs::remove_dir_all(source) {
-            return Err(e);
-        }
+        std::fs::remove_dir_all(source)?;
 
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -106,6 +100,6 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
         }
 
         // Step 2 Rename
-        return std::fs::rename(source, dest);
+        std::fs::rename(source, dest)
     }
 }
