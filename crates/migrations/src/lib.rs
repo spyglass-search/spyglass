@@ -29,7 +29,7 @@ impl Migrator {
     pub async fn run_migrations() -> Result<(), DbErr> {
         let config = Config::new();
 
-        let db = create_connection(&config)
+        let db = create_connection(&config, false)
             .await
             .expect("Unable to connect to db");
 

@@ -10,21 +10,19 @@ pub mod resource_rule;
 
 use shared::config::Config;
 
-#[cfg(test)]
-fn db_uri(_: &Config) -> String {
-    "sqlite::memory:".to_string()
-}
+pub async fn create_connection(
+    config: &Config,
+    is_test: bool,
+) -> anyhow::Result<DatabaseConnection> {
+    let db_uri = if is_test {
+        "sqlite::memory:".to_string()
+    } else {
+        format!(
+            "sqlite://{}?mode=rwc",
+            config.data_dir().join("db.sqlite").to_str().unwrap()
+        )
+    };
 
-#[cfg(not(test))]
-fn db_uri(config: &Config) -> String {
-    format!(
-        "sqlite://{}?mode=rwc",
-        config.data_dir().join("db.sqlite").to_str().unwrap()
-    )
-}
-
-pub async fn create_connection(config: &Config) -> anyhow::Result<DatabaseConnection> {
-    let db_uri = db_uri(config);
     // See https://www.sea-ql.org/SeaORM/docs/install-and-config/connection
     // for more connection options
     let mut opt = ConnectOptions::new(db_uri);
@@ -41,7 +39,7 @@ mod test {
     #[tokio::test]
     async fn test_create_connection() {
         let config = Config::default();
-        let res = create_connection(&config).await;
+        let res = create_connection(&config, true).await;
         assert!(res.is_ok());
     }
 }

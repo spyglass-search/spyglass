@@ -311,7 +311,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test_basic_lense_search() {
-        let db = create_connection(&Config::default()).await.unwrap();
+        let db = create_connection(&Config::default(), true).await.unwrap();
         let lens = LensConfig {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
@@ -330,7 +330,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test_url_lens_search() {
-        let db = create_connection(&Config::default()).await.unwrap();
+        let db = create_connection(&Config::default(), true).await.unwrap();
 
         let lens = LensConfig {
             name: "wiki".to_string(),
@@ -350,7 +350,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test_singular_url_lens_search() {
-        let db = create_connection(&Config::default()).await.unwrap();
+        let db = create_connection(&Config::default(), true).await.unwrap();
 
         let lens = LensConfig {
             name: "wiki".to_string(),

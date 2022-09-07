@@ -9,7 +9,7 @@ use crate::models::{
 #[allow(dead_code)]
 pub async fn setup_test_db() -> DatabaseConnection {
     let config = Config::default();
-    let db = create_connection(&config).await.unwrap();
+    let db = create_connection(&config, true).await.unwrap();
     setup_schema(&db).await.expect("Unable to create tables");
 
     db
