@@ -5,7 +5,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use shims::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SearchFilter {
     // No filter
     None,

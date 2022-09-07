@@ -220,27 +220,25 @@ pub async fn lens_to_filters(state: AppState, trigger: &str) -> Vec<SearchFilter
     // Based on the lens type, either use filters defined by the configuration
     // or ask the plugin for the search filter.
     let mut filters = Vec::new();
-    if let Some(result) = results {
-        for lens in result {
-            match lens.lens_type {
-                // Load lens configuration from files
-                lens::LensType::Simple => {
-                    if let Some(lens_config) = state.lenses.get(&lens.name) {
-                        filters.extend(
-                            lens_config
-                                .into_regexes()
-                                .into_iter()
-                                .map(SearchFilter::URLRegex)
-                                .collect::<Vec<SearchFilter>>(),
-                        );
-                    }
+    for lens in results.unwrap_or_default() {
+        match lens.lens_type {
+            // Load lens configuration from files
+            lens::LensType::Simple => {
+                if let Some(lens_config) = state.lenses.get(&lens.name) {
+                    filters.extend(
+                        lens_config
+                            .into_regexes()
+                            .into_iter()
+                            .map(SearchFilter::URLRegex)
+                            .collect::<Vec<SearchFilter>>(),
+                    );
                 }
-                // Ask plugin for any filter information
-                lens::LensType::Plugin => {
-                    let manager = state.plugin_manager.lock().await;
-                    if let Some(plugin) = manager.find_by_name(lens.name) {
-                        filters.extend(plugin.search_filters().await);
-                    }
+            }
+            // Ask plugin for any filter information
+            lens::LensType::Plugin => {
+                let manager = state.plugin_manager.lock().await;
+                if let Some(plugin) = manager.find_by_name(lens.name) {
+                    filters.extend(plugin.search_filters().await);
                 }
             }
         }
@@ -256,10 +254,14 @@ pub async fn lens_to_filters(state: AppState, trigger: &str) -> Vec<SearchFilter
 
 #[cfg(test)]
 mod test {
-    use super::check_and_bootstrap;
-    use entities::models::bootstrap_queue;
+    use crate::search::IndexPath;
+    use entities::models::{bootstrap_queue, lens};
+    use entities::sea_orm::EntityTrait;
     use entities::test::setup_test_db;
-    use shared::config::UserSettings;
+    use shared::config::{LensConfig, UserSettings};
+    use spyglass_plugin::SearchFilter;
+
+    use super::{check_and_bootstrap, lens_to_filters, AppState};
 
     #[tokio::test]
     async fn test_check_and_bootstrap() {
@@ -269,5 +271,38 @@ mod test {
 
         bootstrap_queue::enqueue(&db, test, 10).await.unwrap();
         assert!(!check_and_bootstrap(&Default::default(), &db, &settings, &test).await);
+    }
+
+    #[tokio::test]
+    async fn test_lens_to_filter() {
+        let db = setup_test_db().await;
+        let test_lens = LensConfig {
+            name: "test_lens".to_owned(),
+            trigger: "test".to_owned(),
+            urls: vec!["https://oldschool.runescape.wiki/wiki/".to_string()],
+            ..Default::default()
+        };
+
+        if let Err(e) = lens::add_or_enable(&db, &test_lens, lens::LensType::Simple).await {
+            eprintln!("{}", e);
+        }
+
+        // Make sure the lens was added
+        let db_rows = lens::Entity::find().all(&db).await;
+        assert_eq!(db_rows.unwrap().len(), 1);
+
+        let state = AppState::builder()
+            .with_db(db)
+            .with_lenses(&vec![test_lens])
+            .with_user_settings(&UserSettings::default())
+            .with_index(&IndexPath::Memory)
+            .build();
+
+        let filters = lens_to_filters(state, "test").await;
+        assert_eq!(filters.len(), 1);
+        assert_eq!(
+            *filters.get(0).unwrap(),
+            SearchFilter::URLRegex("^https://oldschool.runescape.wiki/wiki/.*".to_owned())
+        );
     }
 }
