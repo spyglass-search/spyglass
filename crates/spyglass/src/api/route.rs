@@ -9,7 +9,6 @@ use entities::models::lens::LensType;
 use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
-use shared::regex::{regex_for_domain, regex_for_prefix};
 use shared::request;
 use shared::response::{
     AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
@@ -18,6 +17,7 @@ use shared::response::{
 use spyglass_plugin::SearchFilter;
 
 use libspyglass::plugin::PluginCommand;
+use libspyglass::search::lens::lens_to_filters;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::Command;
@@ -269,52 +269,11 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = DocFields::as_fields();
 
-    let index = state.index;
+    let index = &state.index;
     let searcher = index.reader.searcher();
 
     let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
-        .filter_map(|trigger| async {
-            // Find the lenses that were triggered
-            let result = lens::Entity::find()
-                .filter(lens::Column::Trigger.eq(trigger.clone()))
-                .one(&state.db)
-                .await;
-
-            // Based on the lens type, either use filters defined by the configuration
-            // or ask the plugin for the search filter.
-            if let Ok(Some(lens)) = result {
-                match lens.lens_type {
-                    // Load lens configuration from files
-                    lens::LensType::Simple => {
-                        let mut filters: Vec<SearchFilter> = Vec::new();
-                        if let Some(lens_config) = state.lenses.get(&lens.name) {
-                            for domain in &lens_config.domains {
-                                filters.push(SearchFilter::URLRegex(regex_for_domain(domain)));
-                            }
-
-                            for prefix in &lens_config.urls {
-                                filters.push(SearchFilter::URLRegex(regex_for_prefix(prefix)));
-                            }
-                        }
-
-                        Some(filters)
-                    }
-                    // Ask plugin for any filter information
-                    lens::LensType::Plugin => {
-                        let manager = state.plugin_manager.lock().await;
-                        if let Some(plugin) = manager.find_by_name(lens.name) {
-                            let filters = plugin.search_filters().await;
-                            return Some(filters);
-                        }
-
-                        // plugin not enabled?
-                        None
-                    }
-                }
-            } else {
-                None
-            }
-        })
+        .filter_map(|trigger| lens_to_filters(state.clone(), trigger))
         // Gather search filters
         .collect::<Vec<Vec<SearchFilter>>>()
         .await
@@ -322,8 +281,6 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
         .into_iter()
         .flatten()
         .collect::<Vec<SearchFilter>>();
-
-    dbg!(&applied);
 
     let docs =
         Searcher::search_with_lens(state.db.clone(), &applied, &index.reader, &search_req.query)

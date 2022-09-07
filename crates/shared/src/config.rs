@@ -6,7 +6,7 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
 use crate::plugin::PluginConfig;
-use crate::regex::{regex_for_robots, WildcardType};
+use crate::regex::{regex_for_domain, regex_for_prefix, regex_for_robots, WildcardType};
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
@@ -77,6 +77,23 @@ impl LensConfig {
 
     fn default_is_enabled() -> bool {
         true
+    }
+
+    pub fn into_regexes(&self) -> Vec<String> {
+        let mut filters: Vec<String> = Vec::new();
+        for domain in &self.domains {
+            filters.push(regex_for_domain(domain));
+        }
+
+        for prefix in &self.urls {
+            filters.push(regex_for_prefix(prefix));
+        }
+
+        for rule in &self.rules {
+            filters.push(rule.to_regex());
+        }
+
+        filters
     }
 }
 
@@ -346,5 +363,27 @@ impl Config {
         fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
 
         config
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::LensConfig;
+
+    #[test]
+    fn test_into_regexes() {
+        let config = LensConfig {
+            domains: vec!["paulgraham.com".to_string()],
+            urls: vec!["https://oldschool.runescape.wiki/wiki/".to_string()],
+            ..Default::default()
+        };
+
+        let regexes = config.into_regexes();
+        dbg!(&regexes);
+        assert_eq!(regexes.len(), 2);
+        // Should contain domain regex
+        assert!(regexes.contains(&"^(http://|https://)paulgraham\\.com.*".to_string()));
+        // Should contain url prefix regex
+        assert!(regexes.contains(&"^https://oldschool.runescape.wiki/wiki/.*".to_string()));
     }
 }
