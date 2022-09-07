@@ -230,6 +230,7 @@ mod test {
     use crate::search::{IndexPath, Searcher};
     use entities::models::create_connection;
     use shared::config::{Config, LensConfig};
+    use spyglass_plugin::SearchFilter;
 
     fn _build_test_index(searcher: &mut Searcher) {
         let writer = &mut searcher.writer.lock().unwrap();
@@ -319,7 +320,11 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = vec![lens.clone()];
+        let applied_lens = lens
+            .into_regexes()
+            .into_iter()
+            .map(SearchFilter::URLRegex)
+            .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
@@ -339,7 +344,11 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = vec![lens.clone()];
+        let applied_lens = lens
+            .into_regexes()
+            .into_iter()
+            .map(SearchFilter::URLRegex)
+            .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
@@ -359,8 +368,11 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = vec![lens.clone()];
-        lenses.insert("wiki".to_string(), lens.clone());
+        let applied_lens = lens
+            .into_regexes()
+            .into_iter()
+            .map(SearchFilter::URLRegex)
+            .collect();
 
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
