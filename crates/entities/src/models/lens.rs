@@ -84,19 +84,20 @@ pub async fn add_or_enable(
         .one(db)
         .await?;
 
+    let trigger_label = if lens.trigger.is_empty() {
+        lens.name.clone()
+    } else {
+        lens.trigger.clone()
+    };
+
     // If it already exists & is not a plugin, simply enable it.
     if let Some(existing) = exists {
         log::info!("updating lens: {}", lens.name);
-
         let mut updated: ActiveModel = existing.clone().into();
         // Update description / etc.
         updated.author = Set(lens.author.to_string());
         updated.version = Set(lens.version.to_string());
-        if lens.trigger.is_empty() {
-            updated.trigger = Set(Some(lens.name.clone()));
-        } else {
-            updated.trigger = Set(Some(lens.trigger.to_string()));
-        }
+        updated.trigger = Set(Some(trigger_label));
         match &lens.description {
             Some(desc) => updated.description = Set(Some(desc.clone())),
             None => updated.description = Set(None),
@@ -113,6 +114,7 @@ pub async fn add_or_enable(
     }
 
     // Otherwise add the lens & enable it.
+    log::info!("adding lens: {}", lens.name);
     let new_lens = ActiveModel {
         name: Set(lens.name.to_owned()),
         author: Set(lens.author.to_owned()),
@@ -120,11 +122,54 @@ pub async fn add_or_enable(
         version: Set(lens.version.to_owned()),
         // NOTE: Only automatically enable simple lenses
         is_enabled: Set(lens_type == LensType::Simple),
-        trigger: Set(Some(lens.name.to_owned())),
+        trigger: Set(Some(trigger_label)),
         lens_type: Set(lens_type),
         ..Default::default()
     };
     new_lens.insert(db).await?;
 
     Ok(true)
+}
+
+#[cfg(test)]
+mod test {
+    use super::{add_or_enable, Entity};
+    use crate::test::setup_test_db;
+    use sea_orm::EntityTrait;
+    use shared::config::LensConfig;
+
+    #[tokio::test]
+    async fn test_add_or_enable() {
+        let db = setup_test_db().await;
+        let mut lens = LensConfig {
+            name: "test_lens".to_owned(),
+            trigger: "trigger".to_owned(),
+            urls: vec!["https://example.com".to_owned()],
+            ..Default::default()
+        };
+
+        let is_new = add_or_enable(&db, &lens, super::LensType::Simple)
+            .await
+            .unwrap();
+        assert_eq!(is_new, true);
+
+        // Check that we have the right values.
+        let model = Entity::find().one(&db).await.unwrap().unwrap();
+        assert_eq!(model.name, "test_lens".to_owned());
+        assert_eq!(model.trigger, Some("trigger".to_owned()));
+        assert_eq!(model.description, None);
+
+        // Update & trying to insert again should update values
+        lens.trigger = "new_trigger".to_owned();
+        lens.description = Some("description".to_owned());
+        let is_new = add_or_enable(&db, &lens, super::LensType::Simple)
+            .await
+            .unwrap();
+        assert_eq!(is_new, false);
+
+        let model = Entity::find().one(&db).await.unwrap().unwrap();
+        assert_eq!(model.name, "test_lens".to_owned());
+        assert_eq!(model.trigger, Some("new_trigger".to_owned()));
+        assert_eq!(model.description, Some("description".to_owned()));
+    }
 }
