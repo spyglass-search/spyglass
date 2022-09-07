@@ -97,7 +97,7 @@ pub enum PluginEvent {
     FileDeleted(String),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub enum PluginCommandRequest {
     DeleteDoc { url: String },
     // Enqueue a list of URLs into the crawl queue
