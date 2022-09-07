@@ -273,7 +273,14 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
     let searcher = index.reader.searcher();
 
     let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
-        .filter_map(|trigger| lens_to_filters(state.clone(), trigger))
+        .filter_map(|trigger| async {
+            let vec = lens_to_filters(state.clone(), trigger).await;
+            if vec.is_empty() {
+                None
+            } else {
+                Some(vec)
+            }
+        })
         // Gather search filters
         .collect::<Vec<Vec<SearchFilter>>>()
         .await

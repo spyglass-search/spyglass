@@ -208,43 +208,50 @@ pub async fn load_lenses(state: AppState) {
 
 /// Utility function to map a trigger to the matching lens(es) & convert that into
 /// search filters ready to be applied to a search.
-pub async fn lens_to_filters(state: AppState, trigger: &str) -> Option<Vec<SearchFilter>> {
+pub async fn lens_to_filters(state: AppState, trigger: &str) -> Vec<SearchFilter> {
     // Find the lenses that were triggered
-    let result = lens::Entity::find()
+    // NOTE: Users can combine lenses together but giving them the same trigger label
+    let results = lens::Entity::find()
         .filter(lens::Column::Trigger.eq(trigger))
-        .one(&state.db)
-        .await;
+        .all(&state.db)
+        .await
+        .ok();
 
     // Based on the lens type, either use filters defined by the configuration
     // or ask the plugin for the search filter.
-    if let Ok(Some(lens)) = result {
-        match lens.lens_type {
-            // Load lens configuration from files
-            lens::LensType::Simple => {
-                if let Some(lens_config) = state.lenses.get(&lens.name) {
-                    return Some(
-                        lens_config
-                            .into_regexes()
-                            .into_iter()
-                            .map(SearchFilter::URLRegex)
-                            .collect::<Vec<SearchFilter>>(),
-                    );
+    let mut filters = Vec::new();
+    if let Some(result) = results {
+        for lens in result {
+            match lens.lens_type {
+                // Load lens configuration from files
+                lens::LensType::Simple => {
+                    if let Some(lens_config) = state.lenses.get(&lens.name) {
+                        filters.extend(
+                            lens_config
+                                .into_regexes()
+                                .into_iter()
+                                .map(SearchFilter::URLRegex)
+                                .collect::<Vec<SearchFilter>>(),
+                        );
+                    }
                 }
-            }
-            // Ask plugin for any filter information
-            lens::LensType::Plugin => {
-                let manager = state.plugin_manager.lock().await;
-                if let Some(plugin) = manager.find_by_name(lens.name) {
-                    let filters = plugin.search_filters().await;
-                    return Some(filters);
+                // Ask plugin for any filter information
+                lens::LensType::Plugin => {
+                    let manager = state.plugin_manager.lock().await;
+                    if let Some(plugin) = manager.find_by_name(lens.name) {
+                        filters.extend(plugin.search_filters().await);
+                    }
                 }
             }
         }
     }
 
-    // lens removed / plugin not enabled?
-    log::warn!("unable to find lens for trigger: {}", trigger);
-    None
+    if filters.is_empty() {
+        // lens remove? Plugin disabled?
+        log::warn!("No filters found for trigger: {}", trigger);
+    }
+
+    filters
 }
 
 #[cfg(test)]
