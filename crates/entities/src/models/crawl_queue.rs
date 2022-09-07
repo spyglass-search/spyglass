@@ -11,7 +11,7 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use shared::config::{Lens, LensRule, Limit, UserSettings};
+use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
@@ -226,7 +226,7 @@ struct LensRuleSets {
 }
 
 /// Create a set of allow/skip rules from a Lens
-fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
+fn create_ruleset_from_lens(lens: &LensConfig) -> LensRuleSets {
     let mut allow_list = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
     let mut restrict_list: Vec<String> = Vec::new();
@@ -335,7 +335,7 @@ pub struct EnqueueSettings {
 }
 
 fn filter_urls(
-    lenses: &[Lens],
+    lenses: &[LensConfig],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
     urls: &[String],
@@ -409,7 +409,7 @@ fn filter_urls(
 pub async fn enqueue_all(
     db: &DatabaseConnection,
     urls: &[String],
-    lenses: &[Lens],
+    lenses: &[LensConfig],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
@@ -532,7 +532,7 @@ mod test {
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
-    use shared::config::{Lens, LensRule, Limit, UserSettings};
+    use shared::config::{LensConfig, LensRule, Limit, UserSettings};
     use shared::regex::{regex_for_robots, WildcardType};
 
     use crate::models::{crawl_queue, indexed_document};
@@ -583,7 +583,7 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
@@ -648,7 +648,7 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit".into()];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             rules: vec![LensRule::SkipURL(
                 "https://oldschool.runescape.wiki/*veaction=*".into(),
@@ -675,7 +675,7 @@ mod test {
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
         let prioritized = vec![];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
@@ -702,7 +702,7 @@ mod test {
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
         let prioritized = vec![];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
@@ -738,7 +738,7 @@ mod test {
         let db = setup_test_db().await;
         let overrides = EnqueueSettings::default();
 
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["en.wikipedia.com".into()],
             ..Default::default()
         };
@@ -763,8 +763,8 @@ mod test {
 
     #[tokio::test]
     async fn test_create_ruleset() {
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/test.ron")).unwrap();
+        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/test.ron"))
+            .unwrap();
 
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
@@ -783,8 +783,8 @@ mod test {
 
     #[tokio::test]
     async fn test_create_ruleset_with_limits() {
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/imdb.ron")).unwrap();
+        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/imdb.ron"))
+            .unwrap();
 
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
@@ -832,8 +832,8 @@ mod test {
         let settings = UserSettings::default();
         let overrides = EnqueueSettings::default();
 
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/bahai.ron")).unwrap();
+        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/bahai.ron"))
+            .unwrap();
 
         let to_enqueue = vec![
             "https://bahai-library.com//shoghi-effendi_goals_crusade".into(),

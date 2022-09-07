@@ -5,6 +5,13 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use shims::*;
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SearchFilter {
+    // No filter
+    None,
+    URLRegex(String),
+}
+
 #[macro_export]
 macro_rules! register_plugin {
     ($t:ty) => {
@@ -27,6 +34,14 @@ macro_rules! register_plugin {
                 }
             })
         }
+
+        #[no_mangle]
+        pub fn search_filter() {
+            STATE.with(|state| {
+                let filters = state.borrow_mut().search_filter();
+                let _ = object_to_stdout(&filters);
+            })
+        }
     };
 }
 pub trait SpyglassPlugin {
@@ -35,6 +50,12 @@ pub trait SpyglassPlugin {
     fn load(&mut self);
     /// Request plugin for updates
     fn update(&mut self, event: PluginEvent);
+    /// Optional function.
+    /// Only called for Lens plugins, request a set of filters to apply to a search.
+    /// If not implemented, no filter is applied to the search.
+    fn search_filter(&mut self) -> Vec<SearchFilter> {
+        vec![SearchFilter::None]
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]

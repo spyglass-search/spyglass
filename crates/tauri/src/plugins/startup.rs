@@ -12,6 +12,8 @@ use migration::Migrator;
 use shared::response::AppStatus;
 use shared::{event::ClientEvent, response};
 
+const TRAY_UPDATE_INTERVAL_S: u64 = 60;
+
 use crate::{
     constants,
     menu::MenuID,
@@ -29,7 +31,7 @@ pub fn init() -> TauriPlugin<Wry> {
                 // Keep system tray stats updated
                 let app_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(60));
+                    let mut interval = time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
                     loop {
                         update_tray_menu(&app_handle).await;
                         interval.tick().await;

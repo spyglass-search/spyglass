@@ -14,7 +14,7 @@ pub async fn create_connection(
     config: &Config,
     is_test: bool,
 ) -> anyhow::Result<DatabaseConnection> {
-    let db_uri: String = if is_test {
+    let db_uri = if is_test {
         "sqlite::memory:".to_string()
     } else {
         format!(

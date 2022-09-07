@@ -1,22 +1,23 @@
-use std::collections::HashMap;
-
-use entities::models::crawl_queue::CrawlStatus;
-use entities::models::lens::LensType;
+use futures::StreamExt;
 use jsonrpc_core::{Error, ErrorCode, Result};
+use std::collections::HashMap;
 use tracing::instrument;
 use url::Url;
 
+use entities::models::crawl_queue::CrawlStatus;
+use entities::models::lens::LensType;
+use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
+use entities::schema::{DocFields, SearchDocument};
+use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
 use shared::response::{
     AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
     SearchResult, SearchResults,
 };
-
-use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
-use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::{prelude::*, sea_query, QueryOrder, Set};
+use spyglass_plugin::SearchFilter;
 
 use libspyglass::plugin::PluginCommand;
+use libspyglass::search::lens::lens_to_filters;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::Command;
@@ -268,21 +269,29 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
 pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
     let fields = DocFields::as_fields();
 
-    let index = state.index;
+    let index = &state.index;
     let searcher = index.reader.searcher();
 
-    // Create a copy of the lenses for this search
-    let mut lenses = HashMap::new();
-    for entry in state.lenses.iter() {
-        lenses.insert(entry.key().clone(), entry.value().clone());
-    }
+    let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
+        .filter_map(|trigger| async {
+            let vec = lens_to_filters(state.clone(), trigger).await;
+            if vec.is_empty() {
+                None
+            } else {
+                Some(vec)
+            }
+        })
+        // Gather search filters
+        .collect::<Vec<Vec<SearchFilter>>>()
+        .await
+        // Flatten
+        .into_iter()
+        .flatten()
+        .collect::<Vec<SearchFilter>>();
 
-    let docs = Searcher::search_with_lens(
-        &lenses,
-        &index.reader,
-        &search_req.lenses,
-        &search_req.query,
-    );
+    let docs =
+        Searcher::search_with_lens(state.db.clone(), &applied, &index.reader, &search_req.query)
+            .await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {
@@ -334,19 +343,32 @@ pub async fn search_lenses(
     let mut results = Vec::new();
 
     let query_results = lens::Entity::find()
-        .filter(lens::Column::Name.like(&format!("%{}%", &param.query)))
+        // Filter either by the trigger name, which is configurable by the user.
+        .filter(lens::Column::Trigger.like(&format!("%{}%", &param.query)))
+        // Ignored disabled lenses
         .filter(lens::Column::IsEnabled.eq(true))
-        .filter(lens::Column::LensType.eq(LensType::Simple))
-        .order_by_asc(lens::Column::Name)
+        // Order by trigger name, case insensitve
+        .order_by_asc(Expr::cust("lower(trigger)"))
         .all(&state.db)
         .await;
 
     match query_results {
         Ok(query_results) => {
             for lens in query_results {
+                let label = lens
+                    .trigger
+                    .map(|label| {
+                        if label.is_empty() {
+                            lens.name.clone()
+                        } else {
+                            label
+                        }
+                    })
+                    .unwrap_or(lens.name);
+
                 results.push(LensResult {
                     author: lens.author,
-                    title: lens.name,
+                    title: label,
                     description: lens.description.unwrap_or_else(|| "".to_string()),
                     ..Default::default()
                 });
