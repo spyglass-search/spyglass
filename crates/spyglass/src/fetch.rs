@@ -5,6 +5,7 @@ use url::Url;
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 const NUM_RETRIES: usize = 3;
 const RETRY_WAIT_S: u64 = 10;
+const CODE_429_DELAY_S: u64 = 60;
 
 /// A wrapper around reqwest that for HTTP related queries that handles retries,
 /// downgrading from HTTPS -> HTTP, 429 too many requests, etc.
@@ -75,7 +76,7 @@ impl HTTPClient {
                         if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() == 429 {
                             // Probably overkill, but if this becomes a problem we can revisit
                             log::warn!("Making too many requests, slowing down");
-                            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_secs(CODE_429_DELAY_S)).await;
                         }
                     } else if err.is_request() && url.scheme() == "https" {
                         // Try downgrading to HTTP if we're unable to connect
@@ -88,7 +89,7 @@ impl HTTPClient {
                 Ok(resp) => {
                     if resp.status() == StatusCode::TOO_MANY_REQUESTS {
                         log::warn!("Making too many requests, slowing down");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(CODE_429_DELAY_S)).await;
                         res = Some(request);
                     } else if resp.status().is_success() || resp.status().is_client_error() {
                         res = Some(request);
