@@ -340,9 +340,10 @@ impl Crawler {
         let mut result = self.crawl(&url).await;
         if result.is_bad_request() {
             log::warn!("issue fetching {} {:?}", result.status, result.url);
-        } else {
-            log::trace!("fetched {} {:?}", result.status, result.url);
         }
+
+        #[cfg(debug_assertions)]
+        log::info!("fetched {} {:?}", result.status, result.url);
 
         // Check to see if a canonical URL was found, if not use the original
         // bootstrapped URL
