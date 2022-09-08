@@ -43,7 +43,7 @@ impl Migration {
 
         index
             .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
+            .reload_policy(ReloadPolicy::Manual)
             .try_into()
     }
 

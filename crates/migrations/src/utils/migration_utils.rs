@@ -15,7 +15,7 @@ pub fn backup_dir(dir: &PathBuf) -> Result<()> {
         .as_millis()
         .to_string();
     // Name of output tar file
-    let output_file = format!("{}.{}.{}", prefix.to_str().unwrap(), time_str, "old");
+    let output_file = format!("{}.{}.{}", prefix.to_str().unwrap(), time_str, "old.tar.gz");
 
     let logging_str = output_file.clone();
 
