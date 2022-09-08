@@ -4,12 +4,7 @@ use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
-use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use entities::{
-    models::crawl_queue::EnqueueSettings,
-    models::{crawl_queue::enqueue_all, indexed_document},
-    sea_orm::ModelTrait,
-};
+use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
 use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
 
 use super::{
@@ -53,22 +48,7 @@ async fn handle_plugin_cmd_request(
 ) -> anyhow::Result<()> {
     match cmd {
         PluginCommandRequest::DeleteDoc { url } => {
-            let db = env.app_state.db.clone();
-            let writer = env.app_state.index.writer.clone();
-            let doc = indexed_document::Entity::find()
-                .filter(indexed_document::Column::Url.eq(url.to_string()))
-                .one(&db)
-                .await?;
-
-            if let Some(doc) = doc {
-                let doc_id = doc.doc_id.clone();
-                // Remove from index_doc table
-                let _ = doc.delete(&db).await;
-                // Remove from search index
-                if let Ok(mut writer) = writer.lock() {
-                    Searcher::delete(&mut writer, &doc_id)?;
-                }
-            }
+            Searcher::delete_by_url(&env.app_state, url).await?
         }
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
         PluginCommandRequest::ListDir { path } => {
