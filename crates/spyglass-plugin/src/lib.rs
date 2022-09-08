@@ -58,7 +58,7 @@ pub trait SpyglassPlugin {
     }
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginSubscription {
     /// Check for updates at a fixed interval
     CheckUpdateInterval,
@@ -97,7 +97,7 @@ pub enum PluginEvent {
     FileDeleted(String),
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginCommandRequest {
     DeleteDoc { url: String },
     // Enqueue a list of URLs into the crawl queue

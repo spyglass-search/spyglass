@@ -27,6 +27,7 @@ use crate::task::AppShutdown;
 mod exports;
 
 type PluginId = usize;
+#[derive(Debug)]
 pub enum PluginCommand {
     DisablePlugin(String),
     EnablePlugin(String),

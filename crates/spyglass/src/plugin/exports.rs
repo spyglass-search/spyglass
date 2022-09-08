@@ -1,5 +1,5 @@
-use std::path::Path;
 use rusqlite::Connection;
+use std::path::Path;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
@@ -12,11 +12,11 @@ use entities::{
 };
 use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
 
-use crate::search::Searcher;
-use crate::state::AppState;
 use super::{
     wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
 };
+use crate::search::Searcher;
+use crate::state::AppState;
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -47,54 +47,44 @@ pub fn register_exports(
     exports
 }
 
-async fn handle_plugin_cmd_request(cmd: &PluginCommandRequest, env: &PluginEnv) {
+async fn handle_plugin_cmd_request(
+    cmd: &PluginCommandRequest,
+    env: &PluginEnv,
+) -> anyhow::Result<()> {
     match cmd {
         PluginCommandRequest::DeleteDoc { url } => {
             let db = env.app_state.db.clone();
             let writer = env.app_state.index.writer.clone();
             let doc = indexed_document::Entity::find()
-                .filter(indexed_document::Column::Url.eq(url))
+                .filter(indexed_document::Column::Url.eq(url.to_string()))
                 .one(&db)
-                .await;
+                .await?;
 
-            if let Ok(Some(doc)) = doc {
+            if let Some(doc) = doc {
                 let doc_id = doc.doc_id.clone();
                 // Remove from index_doc table
                 let _ = doc.delete(&db).await;
                 // Remove from search index
                 if let Ok(mut writer) = writer.lock() {
-                    match Searcher::delete(&mut writer, &doc_id) {
-                        Ok(_) => {
-                            let _ = writer.commit();
-                        }
-                        Err(e) => {
-                            log::error!("Unable to delete doc {} - {}", doc_id, e);
-                        }
-                    }
+                    Searcher::delete(&mut writer, &doc_id)?;
                 }
             }
         }
-        PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(&env, &urls),
+        PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
         PluginCommandRequest::ListDir { path } => {
-            let entries = if let Ok(entries) = std::fs::read_dir(path) {
-                entries
-                    .flatten()
-                    .map(|entry| {
-                        let path = entry.path();
-                        ListDirEntry {
-                            path: path.display().to_string(),
-                            is_file: path.is_file(),
-                            is_dir: path.is_dir(),
-                        }
-                    })
-                    .collect::<Vec<ListDirEntry>>()
-            } else {
-                Vec::new()
-            };
+            let entries = std::fs::read_dir(path)?
+                .flatten()
+                .map(|entry| {
+                    let path = entry.path();
+                    ListDirEntry {
+                        path: path.display().to_string(),
+                        is_file: path.is_file(),
+                        is_dir: path.is_dir(),
+                    }
+                })
+                .collect::<Vec<ListDirEntry>>();
 
-            if let Err(e) = wasi_write(&env.wasi_env, &entries) {
-                log::error!("<{}> unable to list dir: {}", env.name, e);
-            }
+            wasi_write(&env.wasi_env, &entries)?;
         }
         PluginCommandRequest::Subscribe(event) => {
             let writer = env.cmd_writer.clone();
@@ -102,53 +92,58 @@ async fn handle_plugin_cmd_request(cmd: &PluginCommandRequest, env: &PluginEnv) 
             let plugin_name = env.name.clone();
 
             let writer = writer.clone();
-            if let Err(e) = writer
+            writer
                 .send(PluginCommand::Subscribe(plugin_id, event.clone()))
-                .await
-            {
-                log::error!("Unable to subscribe plugin <{}> to event: {}", plugin_id, e);
-            } else {
-                log::info!("<{}> subscribed to {}", plugin_name, event);
-            }
+                .await?;
+            log::info!("<{}> subscribed to {}", plugin_name, event);
         }
         PluginCommandRequest::SqliteQuery { path, query } => {
             let path = env.data_dir.join(path);
-            if let Ok(conn) = Connection::open(path) {
-                let stmt = conn.prepare(&query);
-                if let Ok(mut stmt) = stmt {
-                    let results = stmt.query_map([], |row| {
-                        Ok(row.get::<usize, String>(0).unwrap_or_default())
-                    });
 
-                    if let Ok(results) = results {
-                        let collected: Vec<String> = results
-                            .map(|x| x.unwrap_or_default())
-                            .collect::<Vec<String>>()
-                            .into_iter()
-                            .filter(|x| !x.is_empty())
-                            .collect();
+            let conn = Connection::open(path)?;
+            let mut stmt = conn.prepare(query)?;
 
-                        if let Err(e) = wasi_write(&env.wasi_env, &collected) {
-                            log::error!("{}", e);
-                        }
-                    }
-                }
-            }
+            let results = stmt.query_map([], |row| {
+                Ok(row.get::<usize, String>(0).unwrap_or_default())
+            })?;
+
+            let collected: Vec<String> = results
+                .map(|x| x.unwrap_or_default())
+                .collect::<Vec<String>>()
+                .into_iter()
+                .filter(|x| !x.is_empty())
+                .collect();
+
+            wasi_write(&env.wasi_env, &collected)?;
         }
-        PluginCommandRequest::SyncFile { dst, src } => handle_sync_file(&env, &dst, &src),
+        PluginCommandRequest::SyncFile { dst, src } => handle_sync_file(env, dst, src),
     }
+
+    Ok(())
 }
 
+/// Handle plugin calls into the host environment. These are run as separate tokio tasks
+/// so we don't block the main thread.
 pub(crate) fn plugin_cmd(env: &PluginEnv) {
     if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
         // Handle the plugin command as a separate async task
         let rt = tokio::runtime::Handle::current();
-        let cmd = cmd.clone();
         let env = env.clone();
-        rt.spawn(handle_plugin_cmd_request(&cmd, &env));
+        rt.spawn(async move {
+            if let Err(e) = handle_plugin_cmd_request(&cmd, &env).await {
+                log::error!(
+                    "Could not handle cmd {:?} for plugin {}. Error: {}",
+                    cmd,
+                    env.name,
+                    e
+                );
+            }
+        });
     }
 }
 
+/// Log call from the plugin. This is a utility function since the plugin has
+/// has direct stdio/stdout access.
 pub(crate) fn plugin_log(env: &PluginEnv) {
     if let Ok(msg) = wasi_read_string(&env.wasi_env) {
         log::info!("{}: {}", env.name, msg);
