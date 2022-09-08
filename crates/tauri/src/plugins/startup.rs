@@ -2,6 +2,7 @@ use num_format::{Locale, ToFormattedString};
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::{
+    api::dialog::blocking::message,
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
@@ -18,7 +19,6 @@ use crate::{
     constants,
     menu::MenuID,
     rpc::{self, RpcMutex},
-    window::alert,
 };
 
 pub struct StartupProgressText(std::sync::Mutex<String>);
@@ -82,9 +82,18 @@ async fn run_and_check_backend(app_handle: AppHandle) {
         // Ruh-oh something went wrong
         sentry::capture_error(&err);
         log::error!("Unable to migrate database - {}", err.to_string());
+        progress.set(&format!("Unable to migrate database: {}", &err.to_string()));
 
         // Let users know something has gone wrong.
-        alert(&window, "Migration Failure", &err.to_string());
+        message(
+            Some(&window),
+            "Migration Failure",
+            format!(
+                "Migration error: {}\nPlease file a bug report!\nThe application will exit now.",
+                &err.to_string()
+            ),
+        );
+
         app_handle.exit(0);
     }
 
