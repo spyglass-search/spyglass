@@ -47,10 +47,13 @@ async fn handle_plugin_cmd_request(
     env: &PluginEnv,
 ) -> anyhow::Result<()> {
     match cmd {
+        // Delete document from index
         PluginCommandRequest::DeleteDoc { url } => {
             Searcher::delete_by_url(&env.app_state, url).await?
         }
+        // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
+        // Ask host for the list of files in this directory
         PluginCommandRequest::ListDir { path } => {
             let entries = std::fs::read_dir(path)?
                 .flatten()
@@ -66,19 +69,22 @@ async fn handle_plugin_cmd_request(
 
             wasi_write(&env.wasi_env, &entries)?;
         }
+        // Subscribe to a plugin event
         PluginCommandRequest::Subscribe(event) => {
-            let writer = env.cmd_writer.clone();
-            let plugin_id = env.id;
-            let plugin_name = env.name.clone();
-
-            let writer = writer.clone();
-            writer
-                .send(PluginCommand::Subscribe(plugin_id, event.clone()))
+            env.cmd_writer
+                .send(PluginCommand::Subscribe(env.id, event.clone()))
                 .await?;
-            log::info!("<{}> subscribed to {}", plugin_name, event);
+            log::info!("<{}> subscribed to {}", env.name.clone(), event);
         }
+        // NOTE: This is a hack since sqlite can't easily be compiled into WASM yet.
+        // This is for plugins who need to run a query against some sqlite3 file,
+        // for example the Firefox bookmarks/history are store in such a file.
         PluginCommandRequest::SqliteQuery { path, query } => {
             let path = env.data_dir.join(path);
+            if !path.exists() {
+                log::error!("Invalid sqlite3 db path: {}", &path.as_path().display());
+                return Ok(());
+            }
 
             let conn = Connection::open(path)?;
             let mut stmt = conn.prepare(query)?;
