@@ -19,6 +19,8 @@ pub enum ClientInvoke {
     EditPluginSettings,
     #[strum(serialize = "crawl_stats")]
     GetCrawlStats,
+    #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
+    GetStartupProgressText,
     #[strum(serialize = "list_installed_lenses")]
     ListInstalledLenses,
     #[strum(serialize = "list_installable_lenses")]

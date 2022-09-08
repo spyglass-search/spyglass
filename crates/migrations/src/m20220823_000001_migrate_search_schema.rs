@@ -4,10 +4,10 @@ use std::time::Instant;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use sea_orm_migration::prelude::*;
-use tantivy::TantivyError;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::TermQuery;
+use tantivy::TantivyError;
 use tantivy::{schema::*, IndexWriter};
 use tantivy::{Index, IndexReader, ReloadPolicy};
 
@@ -41,10 +41,10 @@ impl Migration {
         let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
         let index = Index::open_or_create(dir, mapping_to_schema(&self.before_schema()))?;
 
-        Ok(index
+        index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()?)
+            .try_into()
     }
 
     pub fn after_schema(&self) -> SchemaMapping {

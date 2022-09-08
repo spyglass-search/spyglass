@@ -1,47 +1,91 @@
-use serde::Deserialize;
+use gloo::timers::callback::Interval;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use shared::event::ClientEvent;
+use shared::event::ClientInvoke;
 
 use crate::components::icons;
-use crate::listen;
+use crate::invoke;
 
-#[derive(Debug, Deserialize)]
-struct ListenPayload {
-    payload: String,
+pub struct StartupPage {
+    progress_caption: String,
+    time_taken: i32,
+    handle: Option<Interval>,
 }
 
-#[derive(Properties, PartialEq, Eq)]
-pub struct StartupPageProps {
-    #[prop_or_default]
-    pub status_caption: String,
+pub enum Msg {
+    Done,
+    CheckStatus,
+    UpdateStatus(String),
 }
 
-#[function_component(StartupPage)]
-pub fn startup_page(props: &StartupPageProps) -> Html {
-    let status_caption = use_state_eq(|| props.status_caption.clone());
-    {
-        // Refresh search results
-        let status_caption = status_caption.clone();
-        spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-                if let Ok(obj) = payload.into_serde::<ListenPayload>() {
-                    status_caption.set(obj.payload);
-                }
-            }) as Box<dyn Fn(JsValue)>);
+impl Component for StartupPage {
+    type Message = Msg;
+    type Properties = ();
 
-            let _ = listen(ClientEvent::StartupProgress.as_ref(), &cb).await;
-            cb.forget();
-        });
+    fn create(ctx: &Context<Self>) -> Self {
+        let interval_handle = {
+            let link = ctx.link().clone();
+            Interval::new(1_000, move || link.send_message(Msg::CheckStatus))
+        };
+
+        Self {
+            handle: Some(interval_handle),
+            progress_caption: "".to_string(),
+            time_taken: 0,
+        }
     }
 
-    html! {
-        <div class="flex flex-col place-content-center place-items-center mt-14">
-            <icons::RefreshIcon animate_spin={true} height="h-16" width="w-16" />
-            <div class="mt-4 font-medium">{"Starting Spyglass"}</div>
-            <div class="mt-1 text-stone-500 text-sm">{(*status_caption).clone()}</div>
-        </div>
+    fn destroy(&mut self, _: &Context<Self>) {
+        if let Some(interval) = self.handle.take() {
+            interval.cancel();
+        }
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            Msg::UpdateStatus(value) => {
+                self.progress_caption = value;
+            }
+            Msg::CheckStatus => {
+                self.time_taken += 1;
+                let link = ctx.link().clone();
+                spawn_local(async move {
+                    if let Ok(value) =
+                        invoke(ClientInvoke::GetStartupProgressText.as_ref(), JsValue::NULL).await
+                    {
+                        if let Some(prog) = value.as_string() {
+                            if prog == "DONE" {
+                                link.send_message(Msg::Done);
+                            } else {
+                                link.send_message(Msg::UpdateStatus(prog.clone()))
+                            }
+                        }
+                    }
+                });
+            }
+            Msg::Done => {
+                if let Some(interval) = self.handle.take() {
+                    interval.cancel();
+                }
+            }
+        }
+
+        true
+    }
+
+    fn view(&self, _ctx: &Context<Self>) -> Html {
+        let status_caption = self.progress_caption.clone();
+        let time_taken = self.time_taken;
+
+        html! {
+            <div class="flex flex-col place-content-center place-items-center mt-14">
+                <icons::RefreshIcon animate_spin={true} height="h-16" width="w-16" />
+                <div class="mt-4 font-medium">{"Starting Spyglass"}</div>
+                <div class="mt-1 text-stone-500 text-sm">{status_caption}</div>
+                <div class="mt-1 text-stone-500 text-sm">{time_taken}{"s"}</div>
+            </div>
+        }
     }
 }
