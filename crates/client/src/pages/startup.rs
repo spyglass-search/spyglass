@@ -59,7 +59,7 @@ impl Component for StartupPage {
                             if prog == "DONE" {
                                 link.send_message(Msg::Done);
                             } else {
-                                link.send_message(Msg::UpdateStatus(prog.clone()))
+                                link.send_message(Msg::UpdateStatus(prog))
                             }
                         }
                     }

@@ -263,7 +263,7 @@ impl Crawler {
         // Fixes issues handling Windows drive paths
         #[cfg(target_os = "windows")]
         {
-            url_path = url_to_file_path(&url.path(), true);
+            url_path = url_to_file_path(url.path(), true);
         }
 
         let path = Path::new(&url_path);
