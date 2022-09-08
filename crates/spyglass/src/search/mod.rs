@@ -1,20 +1,25 @@
-#![allow(dead_code)]
-use std::collections::HashMap;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
+use regex::RegexSetBuilder;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
-use tantivy::query::{Occur, Query, QueryParser, TermQuery};
-use tantivy::{schema::*, DocAddress};
+use tantivy::query::TermQuery;
+use tantivy::{schema::*, DocAddress, DocId, SegmentReader};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
+use crate::search::query::build_query;
+use crate::search::utils::ff_to_string;
+use entities::schema::{DocFields, SearchDocument};
+use entities::sea_orm::DatabaseConnection;
+use spyglass_plugin::SearchFilter;
+
 pub mod lens;
 mod query;
-use crate::search::query::build_query;
-use shared::config::Lens;
+mod utils;
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -41,70 +46,17 @@ impl Debug for Searcher {
     }
 }
 
-pub struct DocFields {
-    pub id: Field,
-    pub domain: Field,
-    pub content: Field,
-    pub description: Field,
-    pub title: Field,
-    pub url: Field,
-    pub raw: Field,
-}
-
-type QueryVec = Vec<(Occur, Box<dyn Query>)>;
-
 impl Searcher {
-    pub fn schema() -> Schema {
-        let mut schema_builder = Schema::builder();
-        // Our first field is title. We want:
-        // - full-text search and
-        // - to retrieve the document after the search
-        //
-        // TEXT:    Means the field should be tokenized and indexed, along with its term
-        //          frequency and term positions.
-        // STRING:  Means the field will be untokenized and indexed unlike above
-        //
-        // STORED:  Means that the field will also be saved in a compressed, row oriented
-        //          key-value store. This store is useful to reconstruct the documents that
-        //          were selected during the search phase.
-        schema_builder.add_text_field("id", STRING | STORED);
-        schema_builder.add_text_field("domain", STRING | STORED);
-
-        schema_builder.add_text_field("title", TEXT | STORED);
-        schema_builder.add_text_field("description", TEXT | STORED);
-        schema_builder.add_text_field("url", STRING | STORED);
-        // Indexed but don't store for retreival
-        schema_builder.add_text_field("content", TEXT);
-        // Stored but not indexed
-        schema_builder.add_text_field("raw", STORED);
-
-        schema_builder.build()
-    }
-
-    pub fn delete(writer: &mut IndexWriter, id: &str) -> anyhow::Result<()> {
-        let fields = Searcher::doc_fields();
-        writer.delete_term(Term::from_field_text(fields.id, id));
+    /// Delete document w/ `doc_id` from index
+    pub fn delete(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
+        let fields = DocFields::as_fields();
+        writer.delete_term(Term::from_field_text(fields.id, doc_id));
         Ok(())
     }
 
-    pub fn doc_fields() -> DocFields {
-        let schema = Searcher::schema();
-
-        DocFields {
-            id: schema.get_field("id").expect("No id in schema"),
-            domain: schema.get_field("domain").expect("No domain in schema"),
-            content: schema.get_field("content").expect("No content in schema"),
-            description: schema
-                .get_field("description")
-                .expect("No description in schema"),
-            title: schema.get_field("title").expect("No title in schema"),
-            url: schema.get_field("url").expect("No url in schema"),
-            raw: schema.get_field("raw").expect("No raw in schema"),
-        }
-    }
-
+    /// Get document with `doc_id` from index.
     pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
         let query = TermQuery::new(
@@ -114,21 +66,24 @@ impl Searcher {
 
         let res = searcher
             .search(&query, &TopDocs::with_limit(1))
-            .expect("Unable to execute query");
+            .map_or(Vec::new(), |x| x);
 
         if res.is_empty() {
             return None;
         }
 
-        let (_, doc_address) = res.first().expect("No results in search");
-        if let Ok(doc) = searcher.doc(*doc_address) {
-            return Some(doc);
+        if let Some((_, doc_address)) = res.first() {
+            if let Ok(doc) = searcher.doc(*doc_address) {
+                return Some(doc);
+            }
         }
+
         None
     }
 
+    /// Constructs a new Searcher object w/ the index @ `index_path`
     pub fn with_index(index_path: &IndexPath) -> Self {
-        let schema = Searcher::schema();
+        let schema = DocFields::as_schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
                 let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
@@ -165,9 +120,10 @@ impl Searcher {
         domain: &str,
         url: &str,
         content: &str,
-        raw: &str,
+        // Save to a cache?
+        _raw: &str,
     ) -> tantivy::Result<String> {
-        let fields = Searcher::doc_fields();
+        let fields = DocFields::as_fields();
 
         let doc_id = Uuid::new_v4().as_hyphenated().to_string();
         let mut doc = Document::default();
@@ -175,7 +131,6 @@ impl Searcher {
         doc.add_text(fields.description, description);
         doc.add_text(fields.domain, domain);
         doc.add_text(fields.id, &doc_id);
-        doc.add_text(fields.raw, raw);
         doc.add_text(fields.title, title);
         doc.add_text(fields.url, url);
         writer.add_document(doc)?;
@@ -183,60 +138,99 @@ impl Searcher {
         Ok(doc_id)
     }
 
-    pub fn search(index: &Index, reader: &IndexReader, query_string: &str) -> Vec<SearchResult> {
-        let fields = Searcher::doc_fields();
-        let searcher = reader.searcher();
-
-        let query_parser = QueryParser::for_index(index, vec![fields.title, fields.content]);
-
-        let query = query_parser
-            .parse_query(query_string)
-            .expect("Unable to parse query");
-
-        let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(10))
-            .expect("Unable to execute query");
-
-        log::info!(
-            "query `{}` returned {} results from {} docs",
-            query_string,
-            top_docs.len(),
-            searcher.num_docs(),
-        );
-        top_docs.into_iter().collect()
-    }
-
-    pub fn search_with_lens(
-        lenses: &HashMap<String, Lens>,
+    pub async fn search_with_lens(
+        _db: DatabaseConnection,
+        applied_lenses: &Vec<SearchFilter>,
         reader: &IndexReader,
-        applied_lens: &[String],
         query_string: &str,
     ) -> Vec<SearchResult> {
-        let fields = Searcher::doc_fields();
+        let start_timer = Instant::now();
+
+        let fields = DocFields::as_fields();
         let searcher = reader.searcher();
 
-        let query = build_query(fields, lenses, applied_lens, query_string);
+        let query = build_query(fields.clone(), query_string);
+
+        let mut patterns = Vec::new();
+        for filter in applied_lenses {
+            match filter {
+                SearchFilter::URLRegex(regex) => patterns.push(regex),
+                SearchFilter::None => {}
+            }
+        }
+
+        let regex = RegexSetBuilder::new(patterns)
+            // Allow some beefy regexes
+            .size_limit(100_000_000)
+            .build()
+            .expect("Unable to build regexset");
+
+        let collector =
+            TopDocs::with_limit(5).tweak_score(move |segment_reader: &SegmentReader| {
+                let regex = regex.clone();
+                let fields = fields.clone();
+
+                let inverted_index = segment_reader
+                    .inverted_index(fields.url)
+                    .expect("Failed to get inverted index for segment");
+
+                let id_reader = segment_reader
+                    .fast_fields()
+                    .u64s(fields.id)
+                    .expect("Unable to get fast field for doc_id");
+
+                let url_reader = segment_reader
+                    .fast_fields()
+                    .u64s(fields.url)
+                    .expect("Unable to get fast field for URL");
+
+                // We can now define our actual scoring function
+                move |doc: DocId, original_score: Score| {
+                    let inverted_index = inverted_index.clone();
+                    let terms = inverted_index.terms();
+
+                    let _id = ff_to_string(doc, &id_reader, terms);
+                    let url = ff_to_string(doc, &url_reader, terms);
+
+                    if let Some(url) = url {
+                        if regex.is_empty() || regex.is_match(&url) {
+                            original_score * 1.0
+                        } else {
+                            -1.0
+                        }
+                    } else {
+                        // blank URL? that seems like an error somewhere.
+                        -1.0
+                    }
+                }
+            });
 
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(5))
+            .search(&query, &collector)
             .expect("Unable to execute query");
 
         log::info!(
-            "query `{}` returned {} results from {} docs",
+            "query `{}` returned {} results from {} docs in {} ms",
             query_string,
             top_docs.len(),
             searcher.num_docs(),
+            Instant::now().duration_since(start_timer).as_millis()
         );
 
-        top_docs.into_iter().collect()
+        top_docs
+            .into_iter()
+            // Filter out negative scores
+            .filter(|(score, _)| *score >= 0.0)
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::search::{IndexPath, Searcher};
-    use shared::config::Lens;
-    use std::collections::HashMap;
+    use entities::models::create_connection;
+    use shared::config::{Config, LensConfig};
+    use spyglass_plugin::SearchFilter;
 
     fn _build_test_index(searcher: &mut Searcher) {
         let writer = &mut searcher.writer.lock().unwrap();
@@ -316,78 +310,75 @@ mod test {
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 
-    #[test]
-    pub fn test_indexer() {
-        let mut searcher = Searcher::with_index(&IndexPath::Memory);
-        _build_test_index(&mut searcher);
-
-        let results = Searcher::search(&searcher.index, &searcher.reader, "gabilan mountains");
-        assert_eq!(results.len(), 2);
-    }
-
-    #[test]
-    pub fn test_basic_lense_search() {
-        let lens = Lens {
+    #[tokio::test]
+    pub async fn test_basic_lense_search() {
+        let db = create_connection(&Config::default(), true).await.unwrap();
+        let lens = LensConfig {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
             urls: Vec::new(),
             ..Default::default()
         };
 
-        let applied_lens = vec!["wiki".to_string()];
-
-        let mut lenses = HashMap::new();
-        lenses.insert("wiki".to_string(), lens.clone());
-
+        let applied_lens = lens
+            .into_regexes()
+            .into_iter()
+            .map(SearchFilter::URLRegex)
+            .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
         assert_eq!(results.len(), 1);
     }
 
-    #[test]
-    pub fn test_url_lens_search() {
-        let lens = Lens {
+    #[tokio::test]
+    pub async fn test_url_lens_search() {
+        let db = create_connection(&Config::default(), true).await.unwrap();
+
+        let lens = LensConfig {
             name: "wiki".to_string(),
             domains: Vec::new(),
             urls: vec!["https://en.wikipedia.org/mice".to_string()],
             ..Default::default()
         };
 
-        let applied_lens = vec!["wiki".to_string()];
-
-        let mut lenses = HashMap::new();
-        lenses.insert("wiki".to_string(), lens.clone());
-
+        let applied_lens = lens
+            .into_regexes()
+            .into_iter()
+            .map(SearchFilter::URLRegex)
+            .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
         assert_eq!(results.len(), 1);
     }
 
-    #[test]
-    pub fn test_singular_url_lens_search() {
-        let lens = Lens {
+    #[tokio::test]
+    pub async fn test_singular_url_lens_search() {
+        let db = create_connection(&Config::default(), true).await.unwrap();
+
+        let lens = LensConfig {
             name: "wiki".to_string(),
             domains: Vec::new(),
             urls: vec!["https://en.wikipedia.org/mice$".to_string()],
             ..Default::default()
         };
 
-        let applied_lens = vec!["wiki".to_string()];
-
-        let mut lenses = HashMap::new();
-        lenses.insert("wiki".to_string(), lens.clone());
+        let applied_lens = lens
+            .into_regexes()
+            .into_iter()
+            .map(SearchFilter::URLRegex)
+            .collect();
 
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(&lenses, &searcher.reader, &applied_lens, query);
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
         assert_eq!(results.len(), 0);
     }
 }

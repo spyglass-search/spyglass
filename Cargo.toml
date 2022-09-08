@@ -3,7 +3,6 @@ members = [
     "crates/client",
     "crates/entities",
     "crates/migrations",
-    "crates/reindexer",
     "crates/shared",
     "crates/spyglass",
     "crates/spyglass-plugin",

@@ -11,7 +11,7 @@ use entities::models::{crawl_queue, lens};
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
-use migration::{Migrator, MigratorTrait};
+use migration::Migrator;
 use shared::config::Config;
 
 mod api;
@@ -61,23 +61,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("Unable to create tokio runtime");
 
-    // Initialize/Load user preferences
-    let mut state = rt.block_on(AppState::new(&config));
+    // Run any migrations, only on headless mode.
+    #[cfg(debug_assertions)]
+    {
+        let migration_status = rt.block_on(async {
+            match Migrator::run_migrations().await {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    let msg = e.to_string();
+                    // This is ok, just the migrator being funky
+                    if !msg.contains("been applied but its file is missing") {
+                        // Ruh-oh something went wrong
+                        log::error!("Unable to migrate database - {}", e.to_string());
+                        // Exit from app
+                        return Err(());
+                    }
 
-    // Run any migrations
-    match rt.block_on(Migrator::up(&state.db, None)) {
-        Ok(_) => {}
-        Err(e) => {
-            let msg = e.to_string();
-            // This is ok, just the migrator being funky
-            if !msg.contains("been applied but its file is missing") {
-                // Ruh-oh something went wrong
-                log::error!("Unable to migrate database - {}", e.to_string());
-                // Exit from app
-                return Ok(());
+                    Ok(())
+                }
             }
+        });
+
+        if migration_status.is_err() {
+            return Ok(());
         }
     }
+
+    // Initialize/Load user preferences
+    let mut state = rt.block_on(AppState::new(&config));
 
     // Start IPC server
     let server = start_api_ipc(&state).expect("Unable to start IPC server");
@@ -88,15 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn start_backend(state: &mut AppState, config: &Config) {
-    // TODO: Implement user-friendly start-up wizard
-    // if state.config.user_settings.run_wizard {
-    //     // Import data from Firefox
-    //     // TODO: Ask user what browser/profiles to import on first startup.
-    //     let importer = FirefoxImporter::new(&config);
-    //     let _ = importer.import(&state).await;
-    // }
-
-    // Initialize crawl_queue, set all in-flight tasks to queued.
+    // Initialize crawl_queue, requeue all in-flight tasks.
     crawl_queue::reset_processing(&state.db).await;
     if let Err(e) = lens::reset(&state.db).await {
         log::error!("Unable to reset lenses: {}", e);
@@ -181,7 +184,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     }
 
     // Plugin server
-    let pm_handle = tokio::spawn(plugin::plugin_manager(
+    let pm_handle = tokio::spawn(plugin::plugin_event_loop(
         state.clone(),
         config.clone(),
         plugin_cmd_tx.clone(),

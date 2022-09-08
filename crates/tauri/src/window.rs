@@ -21,7 +21,7 @@ fn find_monitor(window: &Window) -> Option<Monitor> {
     }
 }
 
-pub fn center_window(window: &Window) {
+pub fn center_search_bar(window: &Window) {
     if let Some(monitor) = find_monitor(window) {
         let size = monitor.size();
         let scale = monitor.scale_factor();
@@ -37,7 +37,15 @@ pub fn center_window(window: &Window) {
     }
 }
 
-pub fn hide_window(window: &Window) {
+pub fn show_search_bar(window: &Window) {
+    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = window.set_always_on_top(true);
+    center_search_bar(window);
+}
+
+pub fn hide_search_bar(window: &Window) {
     let _ = window.hide();
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
@@ -65,12 +73,13 @@ pub async fn resize_window(window: &Window, height: f64) {
     }));
 }
 
-pub fn show_window(window: &Window) {
-    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+fn show_window(window: &Window) {
     let _ = window.show();
-    let _ = window.set_focus();
+    // A little hack to bring window to the front if its hiding behind something.
     let _ = window.set_always_on_top(true);
-    center_window(window);
+    let _ = window.set_always_on_top(false);
+    let _ = window.set_focus();
+    let _ = window.center();
 }
 
 fn _show_tab(app: &AppHandle, tab_url: &str) {
@@ -126,12 +135,28 @@ pub fn show_update_window(app: &AppHandle) {
         .expect("Unable to build window for updater")
     };
 
-    let _ = window.show();
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
-    let _ = window.set_focus();
-    let _ = window.center();
+    show_window(&window);
+}
+
+pub fn show_startup_window(app: &AppHandle) -> Window {
+    let window = if let Some(window) = app.get_window(constants::STARTUP_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::STARTUP_WIN_NAME,
+            WindowUrl::App("/startup".into()),
+        )
+        .title("Spyglass - Starting up")
+        .decorations(false)
+        .min_inner_size(256.0, 256.0)
+        .max_inner_size(256.0, 256.0)
+        .build()
+        .expect("Unable to build startup window")
+    };
+
+    show_window(&window);
+    window
 }
 
 pub fn show_wizard_window(app: &AppHandle) {
@@ -150,11 +175,7 @@ pub fn show_wizard_window(app: &AppHandle) {
         .expect("Unable to build window for wizard")
     };
 
-    let _ = window.show();
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
-    let _ = window.center();
+    show_window(&window);
 }
 
 pub fn alert(window: &Window, title: &str, message: &str) {

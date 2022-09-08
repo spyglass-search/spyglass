@@ -1,12 +1,12 @@
 use notify::event::ModifyKind;
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{EventKind, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::{Config, Lens};
+use shared::config::{Config, LensConfig};
 
 use crate::crawler::Crawler;
 use crate::search::{
@@ -134,7 +134,7 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
 
-            let lenses: Vec<Lens> = state
+            let lenses: Vec<LensConfig> = state
                 .lenses
                 .iter()
                 .map(|entry| entry.value().clone())
@@ -305,7 +305,7 @@ pub async fn lens_watcher(
     let mut is_paused = false;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
-    let mut watcher = RecommendedWatcher::new(move |res| {
+    let mut watcher = notify::recommended_watcher(move |res| {
         futures::executor::block_on(async {
             tx.send(res).await.expect("Unable to send FS event");
         })

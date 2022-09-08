@@ -21,7 +21,7 @@ use shared::{
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
-    window::hide_window(&window);
+    window::hide_search_bar(&window);
     Ok(())
 }
 

@@ -33,7 +33,7 @@ pub fn enqueue_all(urls: &[String]) {
 }
 
 /// List dir
-pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::Error> {
+pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::error::SpannedError> {
     if object_to_stdout(&PluginCommandRequest::ListDir {
         path: path.to_string(),
     })
@@ -58,7 +58,7 @@ pub fn log(msg: String) {
 
 /// Hacky workaround until rusqlite can compile to wasm easily.
 /// Path is expected to be rooted in the plugins data directory.
-pub fn sqlite3_query(path: &str, query: &str) -> Result<Vec<String>, ron::Error> {
+pub fn sqlite3_query(path: &str, query: &str) -> Result<Vec<String>, ron::error::SpannedError> {
     if object_to_stdout(&PluginCommandRequest::SqliteQuery {
         path: path.to_string(),
         query: query.to_string(),
@@ -88,7 +88,7 @@ extern "C" {
 }
 
 #[doc(hidden)]
-pub fn object_from_stdin<T: DeserializeOwned>() -> Result<T, ron::Error> {
+pub fn object_from_stdin<T: DeserializeOwned>() -> Result<T, ron::error::SpannedError> {
     let mut buf = String::new();
     io::stdin().read_line(&mut buf).unwrap();
     ron::from_str(&buf)

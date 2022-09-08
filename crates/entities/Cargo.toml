@@ -13,8 +13,9 @@ regex = "1"
 sea-orm = { version = "0.9", features = ["macros", "sqlx-sqlite", "runtime-tokio-rustls", "with-chrono"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 shared = { path = "../shared" }
+tantivy = "0.18"
 tokio = { version = "1", features = ["full"] }
 url = "2.2"
 
 [dev-dependencies]
-ron = "0.7"
+ron = "0.8"

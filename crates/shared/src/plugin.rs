@@ -21,6 +21,8 @@ pub struct PluginConfig {
     pub author: String,
     pub description: String,
     pub version: String,
+    // Trigger command for this plugin (if a lens),
+    pub trigger: String,
     #[serde(default)]
     pub path: Option<PathBuf>,
     pub plugin_type: PluginType,

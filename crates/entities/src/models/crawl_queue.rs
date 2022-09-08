@@ -11,11 +11,11 @@ use serde::Serialize;
 use url::Url;
 
 use super::indexed_document;
-use shared::config::{Lens, LensRule, Limit, UserSettings};
+use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
-const BATCH_SIZE: usize = 10000;
+const BATCH_SIZE: usize = 5_000;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
@@ -226,7 +226,7 @@ struct LensRuleSets {
 }
 
 /// Create a set of allow/skip rules from a Lens
-fn create_ruleset_from_lens(lens: &Lens) -> LensRuleSets {
+fn create_ruleset_from_lens(lens: &LensConfig) -> LensRuleSets {
     let mut allow_list = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
     let mut restrict_list: Vec<String> = Vec::new();
@@ -331,10 +331,11 @@ pub enum SkipReason {
 pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
     pub force_allow: bool,
+    pub is_recrawl: bool,
 }
 
 fn filter_urls(
-    lenses: &[Lens],
+    lenses: &[LensConfig],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
     urls: &[String],
@@ -408,24 +409,26 @@ fn filter_urls(
 pub async fn enqueue_all(
     db: &DatabaseConnection,
     urls: &[String],
-    lenses: &[Lens],
+    lenses: &[LensConfig],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
     // Filter URLs
     let urls = filter_urls(lenses, settings, overrides, urls);
+
     // Ignore urls already indexed
     let mut is_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
-    // Igore urls already indexed
-    for chunk in urls.chunks(BATCH_SIZE) {
-        let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
-        for entry in indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.is_in(chunk.clone()))
-            .all(db)
-            .await?
-            .iter()
-        {
-            is_indexed.insert(entry.url.to_string());
+    if !overrides.is_recrawl {
+        for chunk in urls.chunks(BATCH_SIZE) {
+            let chunk = chunk.iter().map(|url| url.to_string()).collect::<Vec<_>>();
+            for entry in indexed_document::Entity::find()
+                .filter(indexed_document::Column::Url.is_in(chunk.clone()))
+                .all(db)
+                .await?
+                .iter()
+            {
+                is_indexed.insert(entry.url.to_string());
+            }
         }
     }
 
@@ -452,12 +455,21 @@ pub async fn enqueue_all(
     if to_add.is_empty() {
         return Ok(());
     }
+
+    let on_conflict = if overrides.is_recrawl {
+        OnConflict::column(Column::Url)
+            .update_column(Column::Status)
+            .to_owned()
+    } else {
+        OnConflict::column(Column::Url).do_nothing().to_owned()
+    };
+
     for to_add in to_add.chunks(BATCH_SIZE) {
         let owned = to_add.iter().map(|r| r.to_owned()).collect::<Vec<_>>();
 
         let (sql, values) = Entity::insert_many(owned)
             .query()
-            .on_conflict(OnConflict::column(Column::Url).do_nothing().to_owned())
+            .on_conflict(on_conflict.clone())
             .build(SqliteQueryBuilder);
 
         let values: Vec<Value> = values.iter().map(|x| x.to_owned()).collect();
@@ -520,7 +532,7 @@ mod test {
     use sea_orm::{ActiveModelTrait, Set};
     use url::Url;
 
-    use shared::config::{Lens, LensRule, Limit, UserSettings};
+    use shared::config::{LensConfig, LensRule, Limit, UserSettings};
     use shared::regex::{regex_for_robots, WildcardType};
 
     use crate::models::{crawl_queue, indexed_document};
@@ -571,7 +583,7 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
@@ -590,11 +602,53 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_enqueue_with_recrawl() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/".to_owned();
+
+        let _ = crawl_queue::Entity::insert(crawl_queue::ActiveModel {
+            domain: Set("oldschool.runescape.wiki".into()),
+            crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
+            url: Set(url.clone()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            ..Default::default()
+        })
+        .exec(&db)
+        .await;
+
+        let overrides = crawl_queue::EnqueueSettings {
+            force_allow: true,
+            is_recrawl: true,
+            ..Default::default()
+        };
+
+        let all = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Status.eq(crawl_queue::CrawlStatus::Completed))
+            .all(&db)
+            .await
+            .unwrap();
+
+        assert_eq!(all.len(), 1);
+
+        crawl_queue::enqueue_all(&db, &[url], &[], &settings, &overrides)
+            .await
+            .unwrap();
+
+        let res = crawl_queue::Entity::find()
+            .filter(crawl_queue::Column::Status.eq(crawl_queue::CrawlStatus::Queued))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
     async fn test_enqueue_with_rules() {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/w/Worn_Equipment?veaction=edit".into()];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             rules: vec![LensRule::SkipURL(
                 "https://oldschool.runescape.wiki/*veaction=*".into(),
@@ -621,7 +675,7 @@ mod test {
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
         let prioritized = vec![];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
@@ -648,7 +702,7 @@ mod test {
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
         let prioritized = vec![];
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
         };
@@ -684,7 +738,7 @@ mod test {
         let db = setup_test_db().await;
         let overrides = EnqueueSettings::default();
 
-        let lens = Lens {
+        let lens = LensConfig {
             domains: vec!["en.wikipedia.com".into()],
             ..Default::default()
         };
@@ -709,8 +763,8 @@ mod test {
 
     #[tokio::test]
     async fn test_create_ruleset() {
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/test.ron")).unwrap();
+        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/test.ron"))
+            .unwrap();
 
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
@@ -729,8 +783,8 @@ mod test {
 
     #[tokio::test]
     async fn test_create_ruleset_with_limits() {
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/imdb.ron")).unwrap();
+        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/imdb.ron"))
+            .unwrap();
 
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
@@ -778,8 +832,8 @@ mod test {
         let settings = UserSettings::default();
         let overrides = EnqueueSettings::default();
 
-        let lens =
-            ron::from_str::<Lens>(include_str!("../../../../fixtures/lens/bahai.ron")).unwrap();
+        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/bahai.ron"))
+            .unwrap();
 
         let to_enqueue = vec![
             "https://bahai-library.com//shoghi-effendi_goals_crusade".into(),

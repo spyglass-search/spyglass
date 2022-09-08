@@ -1270,6 +1270,7 @@ dependencies = [
  "sea-orm",
  "serde",
  "shared",
+ "tantivy",
  "tokio",
  "url 2.2.2",
 ]
@@ -2962,7 +2963,11 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "entities",
+ "rayon",
  "sea-orm-migration",
+ "shared",
+ "tantivy",
+ "tar",
 ]
 
 [[package]]
@@ -3089,9 +3094,9 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "5.0.0-pre.15"
+version = "5.0.0-pre.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "553f9844ad0b0824605c20fb55a661679782680410abfb1a8144c2e7e437e7a7"
+checksum = "530f6314d6904508082f4ea424a0275cf62d341e118b313663f266429cb19693"
 dependencies = [
  "bitflags",
  "crossbeam-channel",
@@ -4076,19 +4081,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reindexer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "entities",
- "sea-orm",
- "shared",
- "spyglass",
- "tokio",
- "url 2.2.2",
-]
-
-[[package]]
 name = "remove_dir_all"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4210,9 +4202,9 @@ dependencies = [
 
 [[package]]
 name = "ron"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88073939a61e5b7680558e6be56b419e208420c2adb92be54921fa6b72283f1a"
+checksum = "300a51053b1cb55c80b7a9fde4120726ddf25ca241a1cbb926626f62fb136bff"
 dependencies = [
  "base64",
  "bitflags",
@@ -4974,7 +4966,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass"
-version = "22.8.11"
+version = "22.9.1"
 dependencies = [
  "addr",
  "anyhow",
@@ -5028,6 +5020,7 @@ dependencies = [
  "jsonrpc-core",
  "jsonrpc-core-client",
  "log",
+ "migration",
  "num-format",
  "open 2.1.3",
  "reqwest",
