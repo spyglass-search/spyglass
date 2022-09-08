@@ -76,7 +76,8 @@ impl HTTPClient {
                         if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() == 429 {
                             // Probably overkill, but if this becomes a problem we can revisit
                             log::warn!("Making too many requests, slowing down");
-                            tokio::time::sleep(tokio::time::Duration::from_secs(CODE_429_DELAY_S)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_secs(CODE_429_DELAY_S))
+                                .await;
                         }
                     } else if err.is_request() && url.scheme() == "https" {
                         // Try downgrading to HTTP if we're unable to connect
@@ -89,7 +90,8 @@ impl HTTPClient {
                 Ok(resp) => {
                     if resp.status() == StatusCode::TOO_MANY_REQUESTS {
                         log::warn!("Making too many requests, slowing down");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(CODE_429_DELAY_S)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(CODE_429_DELAY_S))
+                            .await;
                         res = Some(request);
                     } else if resp.status().is_success() || resp.status().is_client_error() {
                         res = Some(request);
