@@ -117,6 +117,8 @@ export let invoke = async (func_name, params) => {
                 help_text: "List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specifiy the parent folder.",
             }]
         ];
+    } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
+        return "Reticulating splines...";
     }
 
     return [];

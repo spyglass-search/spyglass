@@ -7,6 +7,7 @@ use sea_orm_migration::prelude::*;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::TermQuery;
+use tantivy::TantivyError;
 use tantivy::{schema::*, IndexWriter};
 use tantivy::{Index, IndexReader, ReloadPolicy};
 
@@ -36,16 +37,14 @@ impl Migration {
         ]
     }
 
-    pub fn before_reader(&self, path: &PathBuf) -> IndexReader {
+    pub fn before_reader(&self, path: &PathBuf) -> Result<IndexReader, TantivyError> {
         let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
-        let index = Index::open_or_create(dir, mapping_to_schema(&self.before_schema()))
-            .expect("Unable to open search index");
+        let index = Index::open_or_create(dir, mapping_to_schema(&self.before_schema()))?;
 
         index
             .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
+            .reload_policy(ReloadPolicy::Manual)
             .try_into()
-            .expect("Unable to create reader")
     }
 
     pub fn after_schema(&self) -> SchemaMapping {
@@ -167,7 +166,14 @@ impl MigrationTrait for Migration {
 
         let old_schema = mapping_to_schema(&self.before_schema());
         let new_schema = mapping_to_schema(&self.after_schema());
-        let old_reader = self.before_reader(&old_index_path);
+        let old_reader_res = self.before_reader(&old_index_path);
+        if let Err(err) = old_reader_res {
+            // Potentially already migrated?
+            println!("Error opening index: {}", err);
+            return Ok(());
+        }
+        let old_reader = old_reader_res.expect("Unable to open index for migration");
+
         let mut new_writer = self.after_writer(&new_index_path);
 
         let recrawl_urls = result
