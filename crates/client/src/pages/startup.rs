@@ -76,15 +76,18 @@ impl Component for StartupPage {
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
-        let status_caption = self.progress_caption.clone();
-        let time_taken = self.time_taken;
+        let time_taken = if self.time_taken > 0 {
+            format!("{}s", self.time_taken)
+        } else {
+            "".to_string()
+        };
 
         html! {
             <div class="flex flex-col place-content-center place-items-center mt-14">
                 <icons::RefreshIcon animate_spin={true} height="h-16" width="w-16" />
                 <div class="mt-4 font-medium">{"Starting Spyglass"}</div>
-                <div class="mt-1 text-stone-500 text-sm">{status_caption}</div>
-                <div class="mt-1 text-stone-500 text-sm">{time_taken}{"s"}</div>
+                <div class="mt-1 text-stone-500 text-sm">{self.progress_caption.clone()}</div>
+                <div class="mt-1 text-stone-500 text-sm">{time_taken}</div>
             </div>
         }
     }
