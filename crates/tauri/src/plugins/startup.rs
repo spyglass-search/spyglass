@@ -1,6 +1,5 @@
 use num_format::{Locale, ToFormattedString};
 use serde_json::Value;
-use std::sync::Arc;
 use tauri::{
     api::dialog::blocking::message,
     plugin::{Builder, TauriPlugin},
@@ -101,7 +100,7 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     log::info!("Waiting for server backend");
     progress.set("Waiting for backend...");
     let rpc = rpc::RpcClient::new().await;
-    app_handle.manage(Arc::new(Mutex::new(rpc)));
+    app_handle.manage(RpcMutex::new(Mutex::new(rpc)));
 
     // Will cancel and clear any interval checks in the client
     progress.set("DONE");
