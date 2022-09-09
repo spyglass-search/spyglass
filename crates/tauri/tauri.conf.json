@@ -70,7 +70,7 @@
       "decorations": false,
       "center": true,
       "width": 640,
-      "height": 92
+      "height": 96
     }],
     "security": {
       "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'; script-src 'unsafe-eval'"
