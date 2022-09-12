@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 mod utils;
 use utils::{regex_for_domain, regex_for_prefix, regex_for_robots};
@@ -73,5 +74,13 @@ impl LensConfig {
         }
 
         filters
+    }
+
+    pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        match ron::from_str::<LensConfig>(&contents) {
+            Ok(lens) => Ok(lens),
+            Err(e) => Err(anyhow::Error::msg(e.to_string())),
+        }
     }
 }
