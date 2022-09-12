@@ -1,8 +1,13 @@
 [package]
 name = "spyglass-plugin"
 version = "0.1.0"
-edition = "2021"
+authors = ["Andrew Huynh <andrew@spyglass.fyi>"]
 description = "A small client-side library for writing spyglass plugins"
+homepage = "https://github.com/a5huynh/spyglass/tree/main/crates/spyglass-plugin"
+repository = "https://github.com/a5huynh/spyglass/tree/main/crates/spyglass-plugin"
+readme = "README.md"
+keywords = ["spyglass", "webassembly", "wasm", "plugins"]
+edition = "2021"
 license = "MIT"
 
 [dependencies]
