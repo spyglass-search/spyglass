@@ -5,8 +5,10 @@ members = [
     "crates/migrations",
     "crates/shared",
     "crates/spyglass",
-    "crates/spyglass-plugin",
     "crates/tauri",
+    # Publically published crates
+    "crates/spyglass-plugin",
+    "crates/spyglass-lens",
     # Default plugins
     "plugins/chrome-importer",
     "plugins/firefox-importer",

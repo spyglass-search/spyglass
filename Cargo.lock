@@ -4866,6 +4866,7 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
+ "spyglass-lens",
  "strum 0.24.1",
  "strum_macros 0.24.2",
  "url 2.2.2",
@@ -5062,6 +5063,16 @@ dependencies = [
  "web-sys",
  "yew",
  "yew-router",
+]
+
+[[package]]
+name = "spyglass-lens"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "ron",
+ "serde",
 ]
 
 [[package]]
