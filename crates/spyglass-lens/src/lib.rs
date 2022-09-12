@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 mod utils;
 use utils::{regex_for_domain, regex_for_prefix, regex_for_robots};
 
@@ -82,5 +82,27 @@ impl LensConfig {
             Ok(lens) => Ok(lens),
             Err(e) => Err(anyhow::Error::msg(e.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::LensConfig;
+
+    #[test]
+    fn test_into_regexes() {
+        let config = LensConfig {
+            domains: vec!["paulgraham.com".to_string()],
+            urls: vec!["https://oldschool.runescape.wiki/wiki/".to_string()],
+            ..Default::default()
+        };
+
+        let regexes = config.into_regexes();
+        dbg!(&regexes);
+        assert_eq!(regexes.len(), 2);
+        // Should contain domain regex
+        assert!(regexes.contains(&"^(http://|https://)paulgraham\\.com/.*".to_string()));
+        // Should contain url prefix regex
+        assert!(regexes.contains(&"^https://oldschool.runescape.wiki/wiki/.*".to_string()));
     }
 }
