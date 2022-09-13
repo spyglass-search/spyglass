@@ -114,6 +114,6 @@ impl SpyglassPlugin for Plugin {
     }
 
     fn search_filter(&mut self) -> Vec<SearchFilter> {
-        vec![SearchFilter::URLRegex("file://.*".to_string())]
+        vec![SearchFilter::URLRegexAllow("file://.*".to_string())]
     }
 }

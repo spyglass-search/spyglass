@@ -1,6 +1,6 @@
 [package]
 name = "spyglass-plugin"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Andrew Huynh <andrew@spyglass.fyi>"]
 description = "A small client-side library for writing spyglass plugins"
 homepage = "https://github.com/a5huynh/spyglass/tree/main/crates/spyglass-plugin"

@@ -151,23 +151,31 @@ impl Searcher {
 
         let query = build_query(fields.clone(), query_string);
 
-        let mut patterns = Vec::new();
+        let mut allowed = Vec::new();
+        let mut skipped = Vec::new();
         for filter in applied_lenses {
             match filter {
-                SearchFilter::URLRegex(regex) => patterns.push(regex),
+                SearchFilter::URLRegexAllow(regex) => allowed.push(regex),
+                SearchFilter::URLRegexSkip(regex) => skipped.push(regex),
                 SearchFilter::None => {}
             }
         }
 
-        let regex = RegexSetBuilder::new(patterns)
+        let regex_allow = RegexSetBuilder::new(allowed)
             // Allow some beefy regexes
+            .size_limit(100_000_000)
+            .build()
+            .expect("Unable to build regexset");
+
+        let regex_skip = RegexSetBuilder::new(skipped)
             .size_limit(100_000_000)
             .build()
             .expect("Unable to build regexset");
 
         let collector =
             TopDocs::with_limit(5).tweak_score(move |segment_reader: &SegmentReader| {
-                let regex = regex.clone();
+                let regex_allow = regex_allow.clone();
+                let regex_skip = regex_skip.clone();
                 let fields = fields.clone();
 
                 let inverted_index = segment_reader
@@ -193,7 +201,9 @@ impl Searcher {
                     let url = ff_to_string(doc, &url_reader, terms);
 
                     if let Some(url) = url {
-                        if regex.is_empty() || regex.is_match(&url) {
+                        if regex_skip.is_match(&url) {
+                            -1.0
+                        } else if regex_allow.is_empty() || regex_allow.is_match(&url) {
                             original_score * 1.0
                         } else {
                             -1.0

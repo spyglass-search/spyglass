@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
 mod utils;
 use utils::{regex_for_domain, regex_for_prefix, regex_for_robots};
 
@@ -31,6 +32,11 @@ impl LensRule {
     }
 }
 
+pub struct LensFilters {
+    pub allowed: Vec<String>,
+    pub skipped: Vec<String>,
+}
+
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -59,21 +65,26 @@ impl LensConfig {
         true
     }
 
-    pub fn into_regexes(&self) -> Vec<String> {
-        let mut filters: Vec<String> = Vec::new();
+    pub fn into_regexes(&self) -> LensFilters {
+        let mut allowed = Vec::new();
+        let mut skipped = Vec::new();
+
         for domain in &self.domains {
-            filters.push(regex_for_domain(domain));
+            allowed.push(regex_for_domain(domain));
         }
 
         for prefix in &self.urls {
-            filters.push(regex_for_prefix(prefix));
+            allowed.push(regex_for_prefix(prefix));
         }
 
         for rule in &self.rules {
-            filters.push(rule.to_regex());
+            match rule {
+                LensRule::LimitURLDepth { .. } => allowed.push(rule.to_regex()),
+                LensRule::SkipURL(_) => skipped.push(rule.to_regex()),
+            }
         }
 
-        filters
+        LensFilters { allowed, skipped }
     }
 
     pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
@@ -93,16 +104,18 @@ mod test {
     fn test_into_regexes() {
         let config = LensConfig {
             domains: vec!["paulgraham.com".to_string()],
-            urls: vec!["https://oldschool.runescape.wiki/wiki/".to_string()],
+            urls: vec!["https://oldschool.runescape.wiki/w/".to_string()],
             ..Default::default()
         };
 
-        let regexes = config.into_regexes();
-        dbg!(&regexes);
-        assert_eq!(regexes.len(), 2);
-        // Should contain domain regex
-        assert!(regexes.contains(&"^(http://|https://)paulgraham\\.com/.*".to_string()));
-        // Should contain url prefix regex
-        assert!(regexes.contains(&"^https://oldschool.runescape.wiki/wiki/.*".to_string()));
+        let regexes = config.into_regexes().unwrap();
+        assert_eq!(regexes.allowed.len(), 2);
+        assert!(regexes.skipped.is_none());
+
+        assert!(regexes.is_allowed("http://paulgraham.com"));
+        assert!(regexes.is_allowed("https://paulgraham.com"));
+
+        assert!(regexes.is_allowed("https://oldschool.runescape.wiki/w/Test_Page"));
+        assert!(!regexes.is_allowed("https://oldschool.runescape.wiki/root"));
     }
 }

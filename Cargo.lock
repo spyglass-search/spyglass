@@ -5067,7 +5067,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "regex",
@@ -5077,7 +5077,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-plugin"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ron",
  "serde",
