@@ -311,7 +311,7 @@ mod test {
         assert_eq!(filters.len(), 1);
         assert_eq!(
             *filters.get(0).unwrap(),
-            SearchFilter::URLRegex("^https://oldschool.runescape.wiki/wiki/.*".to_owned())
+            SearchFilter::URLRegexAllow("^https://oldschool.runescape.wiki/wiki/.*".to_owned())
         );
     }
 }

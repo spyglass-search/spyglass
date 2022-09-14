@@ -332,8 +332,9 @@ mod test {
 
         let applied_lens = lens
             .into_regexes()
+            .allowed
             .into_iter()
-            .map(SearchFilter::URLRegex)
+            .map(SearchFilter::URLRegexAllow)
             .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
@@ -356,8 +357,9 @@ mod test {
 
         let applied_lens = lens
             .into_regexes()
+            .allowed
             .into_iter()
-            .map(SearchFilter::URLRegex)
+            .map(SearchFilter::URLRegexAllow)
             .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory);
         _build_test_index(&mut searcher);
@@ -380,8 +382,9 @@ mod test {
 
         let applied_lens = lens
             .into_regexes()
+            .allowed
             .into_iter()
-            .map(SearchFilter::URLRegex)
+            .map(SearchFilter::URLRegexAllow)
             .collect();
 
         let mut searcher = Searcher::with_index(&IndexPath::Memory);

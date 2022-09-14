@@ -108,14 +108,17 @@ mod test {
             ..Default::default()
         };
 
-        let regexes = config.into_regexes().unwrap();
+        let regexes = config.into_regexes();
         assert_eq!(regexes.allowed.len(), 2);
-        assert!(regexes.skipped.is_none());
+        assert_eq!(regexes.skipped.len(), 0);
 
-        assert!(regexes.is_allowed("http://paulgraham.com"));
-        assert!(regexes.is_allowed("https://paulgraham.com"));
+        dbg!(&regexes.allowed);
 
-        assert!(regexes.is_allowed("https://oldschool.runescape.wiki/w/Test_Page"));
-        assert!(!regexes.is_allowed("https://oldschool.runescape.wiki/root"));
+        assert!(regexes
+            .allowed
+            .contains(&"^(http://|https://)paulgraham\\.com.*".to_string()));
+        assert!(regexes
+            .allowed
+            .contains(&"^https://oldschool.runescape.wiki/w/.*".to_string()));
     }
 }
