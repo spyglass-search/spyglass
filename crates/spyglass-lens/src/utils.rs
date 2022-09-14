@@ -9,7 +9,7 @@ pub fn regex_for_domain(domain: &str) -> String {
         }
     }
 
-    format!("^(http://|https://){}/.*", regex)
+    format!("^(http://|https://){}.*", regex)
 }
 
 pub fn regex_for_prefix(prefix: &str) -> String {
