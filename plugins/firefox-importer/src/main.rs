@@ -64,6 +64,7 @@ impl SpyglassPlugin for Plugin {
         // Perioodically resync w/ Firefox database
         if let Some(profile_path) = &self.profile_path {
             if self.last_update.elapsed() >= Duration::from_secs(SYNC_INTERVAL_S) {
+                self.last_update = Instant::now();
                 sync_file(DATA_DIR.to_string(), profile_path.display().to_string())
             }
         }
