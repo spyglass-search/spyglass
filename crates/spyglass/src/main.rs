@@ -17,8 +17,6 @@ use shared::config::Config;
 
 mod api;
 
-use crate::api::start_api_ipc;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
 
@@ -90,11 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize/Load user preferences
     let mut state = rt.block_on(AppState::new(&config));
-
-    // Start IPC server
-    let server = start_api_ipc(&state).expect("Unable to start IPC server");
     rt.block_on(start_backend(&mut state, &config));
-    server.close();
 
     Ok(())
 }
@@ -211,6 +205,9 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         shutdown_tx.subscribe(),
     ));
 
+    // API server
+    let api_server = tokio::spawn(api::start_api_server(state.clone()));
+
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
@@ -229,5 +226,5 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         }
     }
 
-    let _ = tokio::join!(manager_handle, worker_handle, pm_handle);
+    let _ = tokio::join!(manager_handle, worker_handle, pm_handle, api_server);
 }

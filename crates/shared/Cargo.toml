@@ -8,9 +8,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 directories = "4.0"
-jsonrpc-core = "18.0.0"
-jsonrpc-core-client = "18.0.0"
-jsonrpc-derive = "18.0.0"
+# We only need the macros functionality for the shared library
+jsonrpsee = { version = "0.15", features = ["macros"] }
 log = "0.4"
 regex = "1"
 ron = "0.8"

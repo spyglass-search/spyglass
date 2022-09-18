@@ -1,5 +1,5 @@
-use jsonrpc_core::{BoxFuture, Result};
-use jsonrpc_derive::rpc;
+use jsonrpsee::core::Error;
+use jsonrpsee::proc_macros::rpc;
 
 use crate::request::{SearchLensesParam, SearchParam};
 use crate::response::{
@@ -15,42 +15,42 @@ pub fn gen_ipc_path() -> String {
 }
 
 /// Rpc trait
-#[rpc]
+#[rpc(server, client, namespace = "state")]
 pub trait Rpc {
     /// Returns a protocol version
-    #[rpc(name = "protocol_version")]
-    fn protocol_version(&self) -> Result<String>;
+    #[method(name = "protocol_version")]
+    fn protocol_version(&self) -> Result<String, Error>;
 
-    #[rpc(name = "app_status")]
-    fn app_status(&self) -> BoxFuture<Result<AppStatus>>;
+    #[method(name = "app_status")]
+    async fn app_status(&self) -> Result<AppStatus, Error>;
 
-    #[rpc(name = "crawl_stats")]
-    fn crawl_stats(&self) -> BoxFuture<Result<CrawlStats>>;
+    #[method(name = "crawl_stats")]
+    async fn crawl_stats(&self) -> Result<CrawlStats, Error>;
 
-    #[rpc(name = "delete_doc")]
-    fn delete_doc(&self, id: String) -> BoxFuture<Result<()>>;
+    #[method(name = "delete_doc")]
+    async fn delete_doc(&self, id: String) -> Result<(), Error>;
 
-    #[rpc(name = "delete_domain")]
-    fn delete_domain(&self, domain: String) -> BoxFuture<Result<()>>;
+    #[method(name = "delete_domain")]
+    async fn delete_domain(&self, domain: String) -> Result<(), Error>;
 
-    #[rpc(name = "list_installed_lenses")]
-    fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>>;
+    #[method(name = "list_installed_lenses")]
+    async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error>;
 
-    #[rpc(name = "list_plugins")]
-    fn list_plugins(&self) -> BoxFuture<Result<Vec<PluginResult>>>;
+    #[method(name = "list_plugins")]
+    async fn list_plugins(&self) -> Result<Vec<PluginResult>, Error>;
 
-    #[rpc(name = "recrawl_domain")]
-    fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>>;
+    #[method(name = "recrawl_domain")]
+    async fn recrawl_domain(&self, domain: String) -> Result<(), Error>;
 
-    #[rpc(name = "search_docs")]
-    fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>>;
+    #[method(name = "search_docs")]
+    async fn search_docs(&self, query: SearchParam) -> Result<SearchResults, Error>;
 
-    #[rpc(name = "search_lenses")]
-    fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>>;
+    #[method(name = "search_lenses")]
+    async fn search_lenses(&self, query: SearchLensesParam) -> Result<SearchLensesResp, Error>;
 
-    #[rpc(name = "toggle_pause")]
-    fn toggle_pause(&self, is_paused: bool) -> BoxFuture<Result<()>>;
+    #[method(name = "toggle_pause")]
+    async fn toggle_pause(&self, is_paused: bool) -> Result<(), Error>;
 
-    #[rpc(name = "toggle_plugin")]
-    fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>>;
+    #[method(name = "toggle_plugin")]
+    async fn toggle_plugin(&self, name: String) -> Result<(), Error>;
 }

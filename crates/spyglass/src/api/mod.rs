@@ -1,85 +1,82 @@
-extern crate jsonrpc_ipc_server;
-
-use jsonrpc_core::{BoxFuture, IoHandler, Result};
-use jsonrpc_ipc_server::{Server, ServerBuilder};
-
+use jsonrpsee::core::{async_trait, Error};
 use libspyglass::state::AppState;
+use std::net::SocketAddr;
+
+use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{AppStatus, CrawlStats, LensResult, SearchLensesResp, SearchResults};
-use shared::rpc::{gen_ipc_path, Rpc};
+use shared::rpc::RpcServer;
 
 mod response;
 mod route;
 
-pub struct SpyglassRPC {
+pub struct SpyglassRpc {
     state: AppState,
 }
 
-impl Rpc for SpyglassRPC {
-    fn protocol_version(&self) -> Result<String> {
+#[async_trait]
+impl RpcServer for SpyglassRpc {
+    fn protocol_version(&self) -> Result<String, Error> {
         Ok("version1".into())
     }
 
-    fn app_status(&self) -> BoxFuture<Result<AppStatus>> {
-        Box::pin(route::app_status(self.state.clone()))
+    async fn app_status(&self) -> Result<AppStatus, Error> {
+        route::app_status(self.state.clone()).await
     }
 
-    fn crawl_stats(&self) -> BoxFuture<Result<CrawlStats>> {
-        Box::pin(route::crawl_stats(self.state.clone()))
+    async fn crawl_stats(&self) -> Result<CrawlStats, Error> {
+        route::crawl_stats(self.state.clone()).await
     }
 
-    fn delete_doc(&self, id: String) -> BoxFuture<Result<()>> {
-        Box::pin(route::delete_doc(self.state.clone(), id))
+    async fn delete_doc(&self, id: String) -> Result<(), Error> {
+        route::delete_doc(self.state.clone(), id).await
     }
 
-    fn delete_domain(&self, domain: String) -> BoxFuture<Result<()>> {
-        Box::pin(route::delete_domain(self.state.clone(), domain))
+    async fn delete_domain(&self, domain: String) -> Result<(), Error> {
+        route::delete_domain(self.state.clone(), domain).await
     }
 
-    fn list_installed_lenses(&self) -> BoxFuture<Result<Vec<LensResult>>> {
-        Box::pin(route::list_installed_lenses(self.state.clone()))
+    async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error> {
+        route::list_installed_lenses(self.state.clone()).await
     }
 
-    fn list_plugins(&self) -> BoxFuture<Result<Vec<shared::response::PluginResult>>> {
-        Box::pin(route::list_plugins(self.state.clone()))
+    async fn list_plugins(&self) -> Result<Vec<shared::response::PluginResult>, Error> {
+        route::list_plugins(self.state.clone()).await
     }
 
-    fn recrawl_domain(&self, domain: String) -> BoxFuture<Result<()>> {
-        Box::pin(route::recrawl_domain(self.state.clone(), domain))
+    async fn recrawl_domain(&self, domain: String) -> Result<(), Error> {
+        route::recrawl_domain(self.state.clone(), domain).await
     }
 
-    fn search_docs(&self, query: SearchParam) -> BoxFuture<Result<SearchResults>> {
-        Box::pin(route::search(self.state.clone(), query))
+    async fn search_docs(&self, query: SearchParam) -> Result<SearchResults, Error> {
+        route::search(self.state.clone(), query).await
     }
 
-    fn search_lenses(&self, query: SearchLensesParam) -> BoxFuture<Result<SearchLensesResp>> {
-        Box::pin(route::search_lenses(self.state.clone(), query))
+    async fn search_lenses(&self, query: SearchLensesParam) -> Result<SearchLensesResp, Error> {
+        route::search_lenses(self.state.clone(), query).await
     }
 
-    fn toggle_pause(&self, is_paused: bool) -> BoxFuture<Result<()>> {
-        Box::pin(route::toggle_pause(self.state.clone(), is_paused))
+    async fn toggle_pause(&self, is_paused: bool) -> Result<(), Error> {
+        route::toggle_pause(self.state.clone(), is_paused).await
     }
 
-    fn toggle_plugin(&self, name: String) -> BoxFuture<Result<()>> {
-        Box::pin(route::toggle_plugin(self.state.clone(), name))
+    async fn toggle_plugin(&self, name: String) -> Result<(), Error> {
+        route::toggle_plugin(self.state.clone(), name).await
     }
 }
 
-pub fn start_api_ipc(state: &AppState) -> anyhow::Result<Server, ()> {
-    let endpoint = gen_ipc_path();
+pub async fn start_api_server(state: AppState) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+    let server = HttpServerBuilder::default()
+        .build("127.0.0.1:0".parse::<SocketAddr>()?)
+        .await?;
 
-    let mut io = IoHandler::new();
-    let rpc = SpyglassRPC {
+    let rpc_module = SpyglassRpc {
         state: state.clone(),
     };
-    io.extend_with(rpc.to_delegate());
+    let addr = server.local_addr()?;
+    let server_handle = server.start(rpc_module.into_rpc())?;
 
-    let server = ServerBuilder::new(io)
-        .start(&endpoint)
-        .map_err(|_| log::warn!("Couldn't open socket"))
-        .expect("Unable to open ipc socket");
-
-    log::info!("Started IPC server at {}", endpoint);
-    Ok(server)
+    log::info!("starting server @ {}", addr);
+    Ok((addr, server_handle))
 }

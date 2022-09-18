@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use jsonrpc_core::{Error, ErrorCode, Result};
+use jsonrpsee::core::Error;
 use std::collections::HashMap;
 use tracing::instrument;
 use url::Url;
@@ -26,7 +26,10 @@ use super::response;
 
 /// Add url to queue
 #[instrument(skip(state))]
-pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> Result<String> {
+pub async fn add_queue(
+    state: AppState,
+    queue_item: request::QueueItemParam,
+) -> Result<String, Error> {
     let db = &state.db;
 
     if let Ok(parsed) = Url::parse(&queue_item.url) {
@@ -39,18 +42,14 @@ pub async fn add_queue(state: AppState, queue_item: request::QueueItemParam) -> 
 
         return match new_task.insert(db).await {
             Ok(_) => Ok("ok".to_string()),
-            Err(err) => Err(Error {
-                code: ErrorCode::InternalError,
-                message: err.to_string(),
-                data: None,
-            }),
+            Err(err) => Err(Error::Custom(err.to_string())),
         };
     }
 
     Ok("ok".to_string())
 }
 
-async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
     // Grab details about index
     let index = state.index;
     let reader = index.reader.searcher();
@@ -62,22 +61,22 @@ async fn _get_current_status(state: AppState) -> jsonrpc_core::Result<AppStatus>
 
 /// Fun stats about index size, etc.
 #[instrument(skip(state))]
-pub async fn app_status(state: AppState) -> jsonrpc_core::Result<AppStatus> {
+pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
     _get_current_status(state).await
 }
 
 #[instrument(skip(state))]
-pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
+pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
     let queue_stats = crawl_queue::queue_stats(&state.db).await;
     if let Err(err) = queue_stats {
         log::error!("queue_stats {:?}", err);
-        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+        return Err(Error::Custom(err.to_string()));
     }
 
     let indexed_stats = indexed_document::indexed_stats(&state.db).await;
     if let Err(err) = indexed_stats {
         log::error!("index_stats {:?}", err);
-        return Err(jsonrpc_core::Error::new(ErrorCode::InternalError));
+        return Err(Error::Custom(err.to_string()));
     }
 
     let mut by_domain = HashMap::new();
@@ -112,7 +111,7 @@ pub async fn crawl_stats(state: AppState) -> jsonrpc_core::Result<CrawlStats> {
 
 /// Remove a doc from the index
 #[instrument(skip(state))]
-pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
+pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
     if let Ok(mut writer) = state.index.writer.lock() {
         if let Err(e) = Searcher::delete(&mut writer, &id) {
             log::error!("Unable to delete doc {} due to {}", id, e);
@@ -135,7 +134,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
 
 /// Remove a domain from crawl queue & index
 #[instrument(skip(state))]
-pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
+pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error> {
     // Remove domain from bootstrap queue
     if let Err(err) =
         bootstrap_queue::dequeue(&state.db, format!("https://{}", domain).as_str()).await
@@ -174,7 +173,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<()> {
 
 /// List of installed lenses
 #[instrument(skip(state))]
-pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
+pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, Error> {
     let mut lenses: Vec<LensResult> = state
         .lenses
         .iter()
@@ -191,7 +190,7 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>> {
     Ok(lenses)
 }
 
-pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>> {
+pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {
     let mut plugins = Vec::new();
     let result = lens::Entity::find()
         .filter(lens::Column::LensType.eq(LensType::Plugin))
@@ -215,22 +214,18 @@ pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>> {
 
 /// Show the list of URLs in the queue and their status
 #[instrument(skip(state))]
-pub async fn list_queue(state: AppState) -> Result<response::ListQueue> {
+pub async fn list_queue(state: AppState) -> Result<response::ListQueue, Error> {
     let db = &state.db;
     let queue = crawl_queue::Entity::find().all(db).await;
 
     match queue {
         Ok(queue) => Ok(response::ListQueue { queue }),
-        Err(err) => Err(Error {
-            code: ErrorCode::InternalError,
-            message: err.to_string(),
-            data: None,
-        }),
+        Err(err) => Err(Error::Custom(err.to_string())),
     }
 }
 
 #[instrument(skip(state))]
-pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
+pub async fn recrawl_domain(state: AppState, domain: String) -> Result<(), Error> {
     log::info!("handling recrawl domain: {}", domain);
     let db = &state.db;
 
@@ -266,7 +261,10 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<()> {
 
 /// Search the user's indexed documents
 #[instrument(skip(state))]
-pub async fn search(state: AppState, search_req: request::SearchParam) -> Result<SearchResults> {
+pub async fn search(
+    state: AppState,
+    search_req: request::SearchParam,
+) -> Result<SearchResults, Error> {
     let fields = DocFields::as_fields();
 
     let index = &state.index;
@@ -339,7 +337,7 @@ pub async fn search(state: AppState, search_req: request::SearchParam) -> Result
 pub async fn search_lenses(
     state: AppState,
     param: request::SearchLensesParam,
-) -> Result<SearchLensesResp> {
+) -> Result<SearchLensesResp, Error> {
     let mut results = Vec::new();
 
     let query_results = lens::Entity::find()
@@ -378,13 +376,13 @@ pub async fn search_lenses(
         }
         Err(err) => {
             log::error!("Unable to search lenses: {:?}", err);
-            Err(jsonrpc_core::Error::new(ErrorCode::InternalError))
+            Err(Error::Custom(err.to_string()))
         }
     }
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_pause(state: AppState, is_paused: bool) -> jsonrpc_core::Result<()> {
+pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error> {
     // Scope so that the app_state mutex is correctly released.
     if let Some(sender) = state.crawler_cmd_tx.lock().await.as_ref() {
         let _ = sender.send(if is_paused {
@@ -398,7 +396,7 @@ pub async fn toggle_pause(state: AppState, is_paused: bool) -> jsonrpc_core::Res
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_plugin(state: AppState, name: String) -> jsonrpc_core::Result<()> {
+pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
     // Find the plugin
     let plugin = lens::Entity::find()
         .filter(lens::Column::Name.eq(name))
