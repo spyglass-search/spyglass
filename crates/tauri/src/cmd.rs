@@ -1,4 +1,3 @@
-use shared::rpc::RpcClient;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -18,6 +17,7 @@ use shared::{
     request,
     response::{self, InstallableLens},
 };
+use spyglass_rpc::RpcClient;
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {

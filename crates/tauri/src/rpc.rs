@@ -39,6 +39,7 @@ impl RpcClient {
         #[cfg(not(debug_assertions))]
         let sidecar_handle = Some(RpcClient::check_and_start_backend());
 
+        log::info!("backend started");
         let client = try_connect(&endpoint)
             .await
             .expect("Unable to connect to spyglass backend!");

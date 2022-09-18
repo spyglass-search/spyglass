@@ -23,7 +23,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use cocoa::appkit::NSWindow;
 
 use shared::config::Config;
-use shared::rpc::RpcClient;
+use spyglass_rpc::RpcClient;
 
 mod cmd;
 mod constants;

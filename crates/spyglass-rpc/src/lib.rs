@@ -1,18 +1,10 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
 
-use crate::request::{SearchLensesParam, SearchParam};
-use crate::response::{
+use shared::request::{SearchLensesParam, SearchParam};
+use shared::response::{
     AppStatus, CrawlStats, LensResult, PluginResult, SearchLensesResp, SearchResults,
 };
-
-pub fn gen_ipc_path() -> String {
-    if cfg!(windows) {
-        r"\\.\pipe\ipc-spyglass".to_string()
-    } else {
-        r"/tmp/ipc-spyglass".to_string()
-    }
-}
 
 /// Rpc trait
 #[rpc(server, client, namespace = "state")]

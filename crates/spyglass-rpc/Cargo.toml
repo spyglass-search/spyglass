@@ -1,0 +1,16 @@
+[package]
+name = "spyglass-rpc"
+version = "0.1.0"
+authors = ["Andrew Huynh <andrew@spyglass.fyi>"]
+description = "RPC definitions for spyglass server"
+edition = "2021"
+
+[dependencies]
+# We only need the macros functionality for the shared library
+jsonrpsee = { version = "0.15", features = ["macros"] }
+shared = { path = "../shared" }
+
+[lib]
+name = "spyglass_rpc"
+path = "src/lib.rs"
+crate-type = ["lib"]

@@ -8,9 +8,9 @@ use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 
 use migration::Migrator;
+use shared::response;
 use shared::response::AppStatus;
-use shared::{response, rpc::RpcClient};
-
+use spyglass_rpc::RpcClient;
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
 use crate::{

@@ -4985,7 +4985,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "directories",
- "jsonrpsee",
  "log",
  "regex",
  "ron",
@@ -5137,6 +5136,7 @@ dependencies = [
  "sha2",
  "shared",
  "spyglass-plugin",
+ "spyglass-rpc",
  "tantivy",
  "tendril",
  "tokio",
@@ -5169,6 +5169,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "spyglass-rpc",
  "strum 0.24.1",
  "strum_macros 0.24.2",
  "tauri",
@@ -5220,6 +5221,14 @@ version = "0.1.1"
 dependencies = [
  "ron",
  "serde",
+]
+
+[[package]]
+name = "spyglass-rpc"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
+ "shared",
 ]
 
 [[package]]

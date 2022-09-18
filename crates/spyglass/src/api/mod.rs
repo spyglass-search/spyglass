@@ -6,7 +6,7 @@ use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{AppStatus, CrawlStats, LensResult, SearchLensesResp, SearchResults};
-use shared::rpc::RpcServer;
+use spyglass_rpc::RpcServer;
 
 mod response;
 mod route;
@@ -68,7 +68,7 @@ impl RpcServer for SpyglassRpc {
 
 pub async fn start_api_server(state: AppState) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let server = HttpServerBuilder::default()
-        .build("127.0.0.1:0".parse::<SocketAddr>()?)
+        .build("127.0.0.1:1234".parse::<SocketAddr>()?)
         .await?;
 
     let rpc_module = SpyglassRpc {
