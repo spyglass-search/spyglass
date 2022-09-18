@@ -23,6 +23,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use cocoa::appkit::NSWindow;
 
 use shared::config::Config;
+use shared::rpc::RpcClient;
 
 mod cmd;
 mod constants;
@@ -258,7 +259,7 @@ async fn pause_crawler(app: AppHandle, menu_id: String) {
 
     match rpc
         .client
-        .call_method::<(bool,), ()>("toggle_pause", "", (!is_paused.load(Ordering::Relaxed),))
+        .toggle_pause(!is_paused.load(Ordering::Relaxed))
         .await
     {
         Ok(_) => {

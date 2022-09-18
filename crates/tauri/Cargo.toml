@@ -17,8 +17,7 @@ tauri-build = { version = "1.0.0", features = [] }
 [dependencies]
 anyhow = "1.0"
 auto-launch = "0.2.0"
-jsonrpc-core = "18.0.0"
-jsonrpc-core-client = { version = "18.0.0", features = ["ipc"] }
+jsonrpsee = { version = "0.15", features = ["full"] }
 log = "0.4"
 migration = { path = "../migrations" }
 num-format = "0.4"

@@ -1,5 +1,4 @@
 use num_format::{Locale, ToFormattedString};
-use serde_json::Value;
 use tauri::{
     api::dialog::blocking::message,
     plugin::{Builder, TauriPlugin},
@@ -9,8 +8,8 @@ use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 
 use migration::Migrator;
-use shared::response;
 use shared::response::AppStatus;
+use shared::{response, rpc::RpcClient};
 
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
@@ -125,16 +124,11 @@ async fn update_tray_menu(app: &AppHandle) {
 }
 
 async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
-        .await
-    {
+    let rpc = rpc.lock().await;
+    match rpc.client.app_status().await {
         Ok(resp) => Some(resp),
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
             None
         }
     }

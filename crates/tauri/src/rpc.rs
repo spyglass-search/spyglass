@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use jsonrpc_core_client::{transports::ipc, TypedClient};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use shared::rpc::gen_ipc_path;
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use tauri::api::process::{Command, CommandEvent};
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::Mutex;
@@ -13,31 +10,30 @@ use tokio_retry::Retry;
 pub type RpcMutex = Arc<Mutex<RpcClient>>;
 
 pub struct RpcClient {
-    pub client: TypedClient,
+    pub client: HttpClient,
     pub endpoint: String,
     pub sidecar_handle: Option<JoinHandle<()>>,
 }
 
-async fn connect(endpoint: &str) -> Result<TypedClient, ()> {
-    match ipc::connect(endpoint).await {
+async fn connect(endpoint: &str) -> anyhow::Result<HttpClient> {
+    match HttpClientBuilder::default().build(endpoint) {
         Ok(client) => Ok(client),
         Err(e) => {
             sentry::capture_error(&e);
-            Err(())
+            Err(anyhow::anyhow!(e.to_string()))
         }
     }
 }
 
-async fn try_connect(endpoint: &str) -> Result<TypedClient, ()> {
+async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
     let retry_strategy = ExponentialBackoff::from_millis(10).take(10);
-
     Retry::spawn(retry_strategy, || connect(endpoint)).await
 }
 
 impl RpcClient {
     pub async fn new() -> Self {
-        let endpoint = gen_ipc_path();
-        log::info!("Starting backend");
+        log::info!("Connecting to backend");
+        let endpoint = "http://127.0.0.1:1234".to_string();
 
         // Only startup & manage sidecar in release mode.
         #[cfg(not(debug_assertions))]
@@ -54,22 +50,6 @@ impl RpcClient {
             client,
             endpoint: endpoint.clone(),
             sidecar_handle,
-        }
-    }
-
-    pub async fn call<T: Serialize, R: DeserializeOwned + Default>(
-        &mut self,
-        method: &str,
-        args: T,
-    ) -> R {
-        match self.client.call_method::<T, R>(method, "", args).await {
-            Ok(resp) => resp,
-            Err(err) => {
-                sentry::capture_error(&err);
-                log::error!("Error sending RPC: {}", err);
-                self.reconnect().await;
-                R::default()
-            }
         }
     }
 

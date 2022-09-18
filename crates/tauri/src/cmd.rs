@@ -1,9 +1,9 @@
+use shared::rpc::RpcClient;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{atomic::Ordering, Arc};
 
-use jsonrpc_core::Value;
 use tauri::Manager;
 use tauri::State;
 use url::Url;
@@ -78,11 +78,7 @@ pub async fn crawl_stats<'r>(
     rpc: State<'_, rpc::RpcMutex>,
 ) -> Result<response::CrawlStats, String> {
     let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::CrawlStats>("crawl_stats", "", Value::Null)
-        .await
-    {
+    match rpc.client.crawl_stats().await {
         Ok(resp) => Ok(resp),
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
@@ -99,10 +95,14 @@ pub async fn list_installed_lenses(
     _: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
 ) -> Result<Vec<response::LensResult>, String> {
-    let mut rpc = rpc.lock().await;
-    Ok(rpc
-        .call::<Value, Vec<response::LensResult>>("list_installed_lenses", Value::Null)
-        .await)
+    let rpc = rpc.lock().await;
+    match rpc.client.list_installed_lenses().await {
+        Ok(lenses) => Ok(lenses),
+        Err(err) => {
+            log::error!("Unable to list installed lenses: {}", err.to_string());
+            Ok(Vec::new())
+        }
+    }
 }
 
 #[tauri::command]
@@ -139,14 +139,10 @@ pub async fn search_docs<'r>(
     };
 
     let rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(request::SearchParam,), response::SearchResults>("search_docs", "", (data,))
-        .await
-    {
+    match rpc.client.search_docs(data).await {
         Ok(resp) => Ok(resp.results.to_vec()),
         Err(err) => {
-            log::error!("rpc resp {}", err);
+            log::error!("search_docs err: {}", err);
             Ok(Vec::new())
         }
     }
@@ -162,11 +158,14 @@ pub async fn search_lenses<'r>(
         query: query.to_string(),
     };
 
-    let mut rpc = rpc.lock().await;
-    let resp = rpc
-        .call::<(request::SearchLensesParam,), response::SearchLensesResp>("search_lenses", (data,))
-        .await;
-    Ok(resp.results)
+    let rpc = rpc.lock().await;
+    match rpc.client.search_lenses(data).await {
+        Ok(resp) => Ok(resp.results),
+        Err(err) => {
+            log::error!("search_lenses err: {}", err.to_string());
+            Ok(Vec::new())
+        }
+    }
 }
 
 #[tauri::command]
@@ -175,22 +174,17 @@ pub async fn delete_doc<'r>(
     rpc: State<'_, rpc::RpcMutex>,
     id: &str,
 ) -> Result<(), String> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(String,), ()>("delete_doc", "", (id.into(),))
-        .await
-    {
+    let rpc = rpc.lock().await;
+    match rpc.client.delete_doc(id.to_string()).await {
         Ok(_) => {
             let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
-            Ok(())
         }
         Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(())
+            log::error!("delete_doc err: {}", err);
         }
     }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -199,22 +193,17 @@ pub async fn delete_domain<'r>(
     rpc: State<'_, rpc::RpcMutex>,
     domain: &str,
 ) -> Result<(), String> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(String,), ()>("delete_domain", "", (domain.into(),))
-        .await
-    {
+    let rpc = rpc.lock().await;
+    match rpc.client.delete_domain(domain.to_string()).await {
         Ok(_) => {
             let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
-            Ok(())
         }
         Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(())
+            log::error!("delete_domain err: {}", err);
         }
     }
+
+    Ok(())
 }
 
 /// Install a lens (assumes correct format) from a URL
@@ -274,11 +263,7 @@ pub async fn network_change(
     if is_offline {
         let rpc = rpc.lock().await;
         paused.store(true, Ordering::Relaxed);
-
-        let _ = rpc
-            .client
-            .call_method::<(bool,), ()>("toggle_pause", "", (true,))
-            .await;
+        let _ = rpc.client.toggle_pause(true).await;
     }
 
     Ok(())
@@ -291,20 +276,12 @@ pub async fn recrawl_domain(
     domain: &str,
 ) -> Result<(), String> {
     log::info!("recrawling {}", domain);
-    let mut rpc = rpc.lock().await;
-
-    match rpc
-        .client
-        .call_method::<(String,), ()>("recrawl_domain", "", (domain.into(),))
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(())
-        }
+    let rpc = rpc.lock().await;
+    if let Err(err) = rpc.client.recrawl_domain(domain.to_string()).await {
+        log::error!("recrawl_domain err: {}", err);
     }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -312,10 +289,14 @@ pub async fn list_plugins(
     _: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
 ) -> Result<Vec<response::PluginResult>, String> {
-    let mut rpc = rpc.lock().await;
-    Ok(rpc
-        .call::<Value, Vec<response::PluginResult>>("list_plugins", Value::Null)
-        .await)
+    let rpc = rpc.lock().await;
+    match rpc.client.list_plugins().await {
+        Ok(plugins) => Ok(plugins),
+        Err(err) => {
+            log::error!("list_plugins err: {}", err.to_string());
+            Ok(Vec::new())
+        }
+    }
 }
 
 #[tauri::command]
@@ -324,9 +305,8 @@ pub async fn toggle_plugin(
     rpc: State<'_, rpc::RpcMutex>,
     name: &str,
 ) -> Result<(), String> {
-    let mut rpc = rpc.lock().await;
-    rpc.call::<(String,), ()>("toggle_plugin", (name.into(),))
-        .await;
+    let rpc = rpc.lock().await;
+    let _ = rpc.client.toggle_plugin(name.to_string()).await;
     let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
 
     Ok(())
