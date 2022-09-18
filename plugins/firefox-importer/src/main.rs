@@ -1,8 +1,12 @@
 use spyglass_plugin::*;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 const DATA_DIR: &str = "/";
 const DB_FILE: &str = "places.sqlite";
+// How often we want to sync w/ the firefox database
+const SYNC_INTERVAL_S: u64 = 60 * 5;
+// SQL query to find bookmarks
 const BOOKMARK_QUERY: &str = "
     SELECT
         DISTINCT url
@@ -13,8 +17,19 @@ const BOOKMARK_QUERY: &str = "
         AND url like 'http%'
 ";
 
-#[derive(Default)]
-struct Plugin;
+struct Plugin {
+    last_update: Instant,
+    profile_path: Option<PathBuf>,
+}
+
+impl Default for Plugin {
+    fn default() -> Self {
+        Plugin {
+            last_update: Instant::now(),
+            profile_path: None,
+        }
+    }
+}
 
 register_plugin!(Plugin);
 
@@ -37,6 +52,7 @@ impl SpyglassPlugin for Plugin {
         // Grab a copy of the firefox data into our plugin data folder.
         // This is required because Firefox locks the file when running.
         if let Some(profile_path) = profile_path {
+            self.profile_path = Some(profile_path.clone());
             log(format!("Using profile: {}", profile_path.display()));
             sync_file(DATA_DIR.to_string(), profile_path.display().to_string());
         }
@@ -44,6 +60,14 @@ impl SpyglassPlugin for Plugin {
 
     fn update(&mut self, _: PluginEvent) {
         let path = Path::new(DATA_DIR).join(DB_FILE);
+
+        // Perioodically resync w/ Firefox database
+        if let Some(profile_path) = &self.profile_path {
+            if self.last_update.elapsed() >= Duration::from_secs(SYNC_INTERVAL_S) {
+                sync_file(DATA_DIR.to_string(), profile_path.display().to_string())
+            }
+        }
+
         if path.exists() {
             enqueue_all(&self.read_bookmarks());
         } else {
