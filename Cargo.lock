@@ -4983,6 +4983,7 @@ dependencies = [
  "hostname",
  "html5ever",
  "http",
+ "hyper",
  "jsonrpc-core",
  "jsonrpc-ipc-server",
  "log",
