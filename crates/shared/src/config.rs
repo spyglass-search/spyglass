@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-pub use spyglass_lens::{LensConfig, LensRule};
+pub use spyglass_lens::{LensConfig, LensRule, PipelineConfiguration};
 
 use crate::plugin::PluginConfig;
 
@@ -14,6 +14,7 @@ pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 #[derive(Clone, Debug)]
 pub struct Config {
     pub lenses: HashMap<String, LensConfig>,
+    pub pipelines: HashMap<String, PipelineConfiguration>,
     pub user_settings: UserSettings,
 }
 
@@ -258,6 +259,10 @@ impl Config {
         self.data_dir().join("lenses")
     }
 
+    pub fn pipelines_dir(&self) -> PathBuf {
+        self.data_dir().join("pipelines")
+    }
+
     pub fn new() -> Self {
         let prefs_dir = Config::prefs_dir();
         fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
@@ -270,6 +275,7 @@ impl Config {
 
         let config = Config {
             lenses: HashMap::new(),
+            pipelines: HashMap::new(),
             user_settings,
         };
 
@@ -284,6 +290,9 @@ impl Config {
 
         let lenses_dir = config.lenses_dir();
         fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
+
+        let pipelines_dir = config.pipelines_dir();
+        fs::create_dir_all(&pipelines_dir).expect("Unable to create `pipelines` folder");
 
         let plugins_dir = config.plugins_dir();
         fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");

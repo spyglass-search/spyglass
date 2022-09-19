@@ -3,6 +3,7 @@ extern crate html5ever;
 
 pub mod crawler;
 pub mod fetch;
+pub mod pipeline;
 pub mod plugin;
 pub mod scraper;
 pub mod search;

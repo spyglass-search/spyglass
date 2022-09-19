@@ -7,23 +7,26 @@ use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{
+    pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
     search::{IndexPath, Searcher},
     task::Command,
 };
-use shared::config::{Config, LensConfig, UserSettings};
+use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, LensConfig>>,
+    pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
     pub user_settings: UserSettings,
     pub index: Searcher,
     // Crawler pause control
     pub crawler_cmd_tx: Arc<Mutex<Option<broadcast::Sender<Command>>>>,
     // Plugin command/control
     pub plugin_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PluginCommand>>>>,
+    pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
     pub plugin_manager: Arc<Mutex<PluginManager>>,
 }
 
@@ -45,14 +48,21 @@ impl AppState {
             lenses.insert(key.clone(), value.clone());
         }
 
+        let pipelines = DashMap::new();
+        for (key, value) in config.pipelines.iter() {
+            pipelines.insert(key.clone(), value.clone());
+        }
+
         AppState {
             db,
             app_state: Arc::new(app_state),
             user_settings: config.user_settings.clone(),
             lenses: Arc::new(lenses),
+            pipelines: Arc::new(pipelines),
             index,
             crawler_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
+            pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
         }
     }
@@ -67,6 +77,7 @@ pub struct AppStateBuilder {
     db: Option<DatabaseConnection>,
     index: Option<Searcher>,
     lenses: Option<Vec<LensConfig>>,
+    pipelines: Option<Vec<PipelineConfiguration>>,
     user_settings: Option<UserSettings>,
 }
 
@@ -76,6 +87,13 @@ impl AppStateBuilder {
         if let Some(res) = &self.lenses {
             for lens in res {
                 lenses.insert(lens.name.clone(), lens.to_owned());
+            }
+        }
+
+        let pipelines = DashMap::new();
+        if let Some(res) = &self.pipelines {
+            for pipeline in res {
+                pipelines.insert(pipeline.kind.clone(), pipeline.to_owned());
             }
         }
 
@@ -89,8 +107,10 @@ impl AppStateBuilder {
                 .to_owned(),
             index: self.index.as_ref().expect("Must set index").to_owned(),
             lenses: Arc::new(lenses),
+            pipelines: Arc::new(pipelines),
             crawler_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
+            pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
         }
     }

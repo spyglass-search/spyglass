@@ -189,6 +189,7 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
                 force_allow: true,
                 ..Default::default()
             },
+            Option::None,
         )
         .await
         {

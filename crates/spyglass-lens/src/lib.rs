@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-
+pub mod pipeline;
 mod utils;
+
+pub use crate::pipeline::PipelineConfiguration;
 use utils::{regex_for_domain, regex_for_prefix, regex_for_robots};
 
 /// Different rules that filter out the URLs that would be crawled for a lens
@@ -54,6 +56,8 @@ pub struct LensConfig {
     pub rules: Vec<LensRule>,
     #[serde(default)]
     pub trigger: String,
+    #[serde(default)]
+    pub pipeline: Option<String>,
 }
 
 impl LensConfig {
