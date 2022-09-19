@@ -45,6 +45,7 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
 }
 
 impl SpyglassServerClient {
+    /// Monitors the health of the backend & recreates it necessary.
     pub async fn daemon_eyes(rpc: RpcMutex) {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
         loop {
@@ -59,9 +60,10 @@ impl SpyglassServerClient {
                 _ = interval.tick() => {
                     let mut rpc = rpc.lock().await;
                     if let Err(err) = rpc.client.protocol_version().await {
-                        log::error!("rpc health check error: {}, restart #: {}", err, rpc.restarts.load(Ordering::Relaxed));
+                        // Keep track of the number restarts
+                        let num_restarts = rpc.restarts.fetch_add(1, Ordering::SeqCst);
+                        log::error!("rpc health check error: {}, restart #: {}", err, num_restarts);
                         rpc.reconnect().await;
-                        rpc.restarts.fetch_add(1, Ordering::SeqCst);
                         log::info!("restarted");
                     }
                 }
