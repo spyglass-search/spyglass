@@ -8,6 +8,7 @@ mod m20220508_000001_lens_and_crawl_queue_update;
 mod m20220522_000001_bootstrap_queue_table;
 mod m20220718_000001_add_cols_to_lens;
 mod m20220823_000001_migrate_search_schema;
+mod m20220917_000001_add_col_to_queue;
 mod utils;
 
 pub struct Migrator;
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20220522_000001_bootstrap_queue_table::Migration),
             Box::new(m20220718_000001_add_cols_to_lens::Migration),
             Box::new(m20220823_000001_migrate_search_schema::Migration),
+            Box::new(m20220917_000001_add_col_to_queue::Migration),
         ]
     }
 }

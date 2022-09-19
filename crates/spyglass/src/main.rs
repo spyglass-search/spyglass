@@ -8,6 +8,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use entities::models::{crawl_queue, lens};
+use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
@@ -122,6 +123,16 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     // Channel for plugin commands
     let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
 
+    let (pipeline_cmd_tx, pipeline_cmd_rx) = mpsc::channel(16);
+
+    // Loads and processes pipeline commands
+    let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
+        state.clone(),
+        config.clone(),
+        pipeline_cmd_rx,
+        shutdown_tx.clone(),
+    ));
+
     {
         state
             .crawler_cmd_tx
@@ -136,6 +147,14 @@ async fn start_backend(state: &mut AppState, config: &Config) {
             .lock()
             .await
             .replace(plugin_cmd_tx.clone());
+    }
+
+    {
+        state
+            .pipeline_cmd_tx
+            .lock()
+            .await
+            .replace(pipeline_cmd_tx.clone());
     }
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.

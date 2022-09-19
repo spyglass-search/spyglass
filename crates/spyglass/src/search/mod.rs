@@ -17,6 +17,7 @@ use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::DatabaseConnection;
 use spyglass_plugin::SearchFilter;
 
+pub mod grouping;
 pub mod lens;
 mod query;
 mod utils;

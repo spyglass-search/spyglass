@@ -115,6 +115,7 @@ pub async fn bootstrap(
     db: &DatabaseConnection,
     settings: &UserSettings,
     url: &str,
+    pipeline: Option<String>,
 ) -> anyhow::Result<usize> {
     // Check for valid URL and normalize it.
     let url = Url::parse(url)?;
@@ -136,7 +137,15 @@ pub async fn bootstrap(
             // Add URLs to crawl queue
             log::info!("enqueing {} urls", urls.len());
             let urls: Vec<String> = urls.into_iter().collect();
-            crawl_queue::enqueue_all(db, &urls, &[lens.clone()], settings, &overrides).await?;
+            crawl_queue::enqueue_all(
+                db,
+                &urls,
+                &[lens.clone()],
+                settings,
+                &overrides,
+                pipeline.clone(),
+            )
+            .await?;
             count += urls.len();
 
             if resume.is_none() {
@@ -166,6 +175,7 @@ pub async fn bootstrap(
                 force_allow: true,
                 ..Default::default()
             },
+            pipeline,
         )
         .await?;
         count += 1;
@@ -193,7 +203,14 @@ mod test {
         };
 
         let lens = Default::default();
-        let res = bootstrap(&lens, &db, &settings, "https://roll20.net/compendium/dnd5e").await;
+        let res = bootstrap(
+            &lens,
+            &db,
+            &settings,
+            "https://roll20.net/compendium/dnd5e",
+            Option::None,
+        )
+        .await;
         assert!(res.unwrap() > 2000);
         let num_queue = crawl_queue::num_queued(&db, crawl_queue::CrawlStatus::Queued)
             .await
