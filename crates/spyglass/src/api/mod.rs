@@ -1,6 +1,6 @@
 use jsonrpsee::core::{async_trait, Error};
 use libspyglass::state::AppState;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 
@@ -67,9 +67,8 @@ impl RpcServer for SpyglassRpc {
 }
 
 pub async fn start_api_server(state: AppState) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default()
-        .build("127.0.0.1:1234".parse::<SocketAddr>()?)
-        .await?;
+    let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), state.user_settings.port);
+    let server = HttpServerBuilder::default().build(server_addr).await?;
 
     let rpc_module = SpyglassRpc {
         state: state.clone(),

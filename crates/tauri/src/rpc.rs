@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use shared::config::Config;
 use tauri::api::process::{Command, CommandEvent};
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::Mutex;
@@ -31,9 +32,9 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
 }
 
 impl RpcClient {
-    pub async fn new() -> Self {
-        log::info!("Connecting to backend");
-        let endpoint = "http://127.0.0.1:1234".to_string();
+    pub async fn new(config: &Config) -> Self {
+        let endpoint = format!("http://127.0.0.1:{}", config.user_settings.port);
+        log::info!("Connecting to backend @ {}", &endpoint);
 
         // Only startup & manage sidecar in release mode.
         #[cfg(not(debug_assertions))]

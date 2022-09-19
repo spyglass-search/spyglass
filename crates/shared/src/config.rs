@@ -78,6 +78,8 @@ pub struct UserSettings {
     pub plugin_settings: PluginSettings,
     #[serde(default)]
     pub disable_autolaunch: bool,
+    #[serde(default = "UserSettings::default_port")]
+    pub port: u16,
 }
 
 impl UserSettings {
@@ -87,6 +89,10 @@ impl UserSettings {
 
     fn default_shortcut() -> String {
         "CmdOrCtrl+Shift+/".to_string()
+    }
+
+    fn default_port() -> u16 {
+        4664
     }
 
     pub fn constraint_limits(&mut self) {
@@ -142,6 +148,7 @@ impl Default for UserSettings {
             disable_telementry: false,
             plugin_settings: Default::default(),
             disable_autolaunch: false,
+            port: UserSettings::default_port(),
         }
     }
 }

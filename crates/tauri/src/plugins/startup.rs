@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 
 use migration::Migrator;
-use shared::response;
 use shared::response::AppStatus;
+use shared::{config::Config, response};
 use spyglass_rpc::RpcClient;
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
@@ -98,7 +98,10 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     // Wait for the server to boot up
     log::info!("Waiting for server backend");
     progress.set("Waiting for backend...");
-    let rpc = rpc::RpcClient::new().await;
+
+    let config = app_handle.state::<Config>();
+    let rpc = rpc::RpcClient::new(&config).await;
+
     app_handle.manage(RpcMutex::new(Mutex::new(rpc)));
 
     // Will cancel and clear any interval checks in the client
