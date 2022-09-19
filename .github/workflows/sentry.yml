@@ -1,0 +1,70 @@
+name: "Sentry: Upload debug symbols"
+on:
+  push:
+    branches:
+      - release
+      - ci/upload-sentry-debug-info
+jobs:
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, 'ubuntu-20.04', 'windows-latest']
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - name: install Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    # Install sentry-cli
+    - name: install sentry-cli
+      run: npm install @sentry/cli
+    # Install dependencies for plugins/client
+    - name: install wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: install wasm32-wasi toolchain
+      run: rustup target add wasm32-wasi
+    # Install macos specific targets
+    - name: install arm64 rust target (macos only)
+      if: matrix.platform == 'macos-latest'
+      run: rustup target add aarch64-apple-darwin
+    # Install tauri build deps
+    - name: install tauri-cli & tauri-build
+      run: cargo install tauri-cli --version "^1.0.5"
+    - name: install trunk
+      run: cargo install --locked trunk
+    # Install linux specific dependencies
+    - name: install dependencies (ubuntu only)
+      if: matrix.platform == 'ubuntu-20.04'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-3-dev \
+          webkit2gtk-4.0 \
+          libappindicator3-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          patchelf
+    # Setup arch targets - linux
+    - name: setup arch target - linux
+      if: ${{startsWith(matrix.platform, 'ubuntu')}}
+      run: echo "target_ext=" >> $GITHUB_ENV
+    - name: setup arch target - macos
+      if: ${{startsWith(matrix.platform, 'macos')}}
+      run: echo "target_ext=" >> $GITHUB_ENV
+    - name: Setup arch target (windows only)
+      if: ${{startsWith(matrix.platform, 'windows')}}
+      run: echo "target_ext=.exe" >> $env:GITHUB_ENV
+    # search backend
+    - name: build search backend & upload to sentry
+      run: |
+        cargo build -p spyglass --verbose --profile sentry
+        npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
+    # tauri client
+    - name: build fronted & upload to sentry
+      run: |
+        cargo build -p spyglass-app --verbose --profile sentry
+        npx sentry-cli difutil check target/sentry/spyglass-app${{ env.target_ext }}
+    - name: test
+      run: ls target/sentry
