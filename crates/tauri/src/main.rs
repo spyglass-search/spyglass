@@ -251,32 +251,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn pause_crawler(app: AppHandle, menu_id: String) {
-    let rpc = app.state::<RpcMutex>().inner();
-    let pause_state = app.state::<Arc<PauseState>>().inner();
+    if let Some(rpc) = app.try_state::<RpcMutex>() {
+        let pause_state = app.state::<Arc<PauseState>>().inner();
+        let rpc = rpc.lock().await;
+        let is_paused = pause_state.clone();
 
-    let rpc = rpc.lock().await;
-    let is_paused = pause_state.clone();
+        match rpc
+            .client
+            .toggle_pause(!is_paused.load(Ordering::Relaxed))
+            .await
+        {
+            Ok(_) => {
+                let is_paused = !pause_state.load(Ordering::Relaxed);
+                pause_state.store(is_paused, Ordering::Relaxed);
 
-    match rpc
-        .client
-        .toggle_pause(!is_paused.load(Ordering::Relaxed))
-        .await
-    {
-        Ok(_) => {
-            let is_paused = !pause_state.load(Ordering::Relaxed);
-            pause_state.store(is_paused, Ordering::Relaxed);
+                let new_label = if is_paused {
+                    "▶️ Resume indexing"
+                } else {
+                    "⏸ Pause indexing"
+                };
 
-            let new_label = if is_paused {
-                "▶️ Resume indexing"
-            } else {
-                "⏸ Pause indexing"
-            };
-
-            let item_handle = app.tray_handle().get_item(&menu_id);
-            let _ = item_handle.set_title(new_label);
-            let _ = item_handle.set_enabled(true);
+                let item_handle = app.tray_handle().get_item(&menu_id);
+                let _ = item_handle.set_title(new_label);
+                let _ = item_handle.set_enabled(true);
+            }
+            Err(err) => log::error!("Error sending RPC: {}", err),
         }
-        Err(err) => log::error!("Error sending RPC: {}", err),
     }
 }
 
