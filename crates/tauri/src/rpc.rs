@@ -23,11 +23,12 @@ pub struct SpyglassServerClient {
     pub restarts: AtomicU8,
 }
 
-async fn connect(endpoint: &str) -> anyhow::Result<HttpClient> {
+/// Build client & attempt a connection to the health check endpoint.
+async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
     match HttpClientBuilder::default().build(endpoint) {
         Ok(client) => {
             // Wait until we have a connection
-            let retry_strategy = ExponentialBackoff::from_millis(100).take(3);
+            let retry_strategy = ExponentialBackoff::from_millis(100).take(5);
             match Retry::spawn(retry_strategy, || client.protocol_version()).await {
                 Ok(v) => {
                     log::info!("connected to daemon w/ version: {}", v);
@@ -41,11 +42,6 @@ async fn connect(endpoint: &str) -> anyhow::Result<HttpClient> {
             Err(anyhow::anyhow!(e.to_string()))
         }
     }
-}
-
-async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
-    let retry_strategy = ExponentialBackoff::from_millis(10).take(10);
-    Retry::spawn(retry_strategy, || connect(endpoint)).await
 }
 
 impl SpyglassServerClient {
