@@ -11,6 +11,9 @@ use migration::Migrator;
 use shared::response::AppStatus;
 use shared::{config::Config, response};
 use spyglass_rpc::RpcClient;
+use crate::rpc::SpyglassServerClient;
+
+
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
 use crate::{
@@ -100,9 +103,9 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     progress.set("Waiting for backend...");
 
     let config = app_handle.state::<Config>();
-    let rpc = rpc::RpcClient::new(&config).await;
-
-    app_handle.manage(RpcMutex::new(Mutex::new(rpc)));
+    let rpc = SpyglassServerClient::new(&config).await;
+    let rpc_mutex = RpcMutex::new(Mutex::new(rpc));
+    app_handle.manage(rpc_mutex.clone());
 
     // Will cancel and clear any interval checks in the client
     progress.set("DONE");

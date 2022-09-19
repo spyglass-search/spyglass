@@ -8,9 +8,9 @@ use tokio::sync::Mutex;
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_retry::Retry;
 
-pub type RpcMutex = Arc<Mutex<RpcClient>>;
+pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
-pub struct RpcClient {
+pub struct SpyglassServerClient {
     pub client: HttpClient,
     pub endpoint: String,
     pub sidecar_handle: Option<JoinHandle<()>>,
@@ -31,7 +31,8 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
     Retry::spawn(retry_strategy, || connect(endpoint)).await
 }
 
-impl RpcClient {
+impl SpyglassServerClient {
+
     pub async fn new(config: &Config) -> Self {
         let endpoint = format!("http://127.0.0.1:{}", config.user_settings.port);
         log::info!("Connecting to backend @ {}", &endpoint);
@@ -48,7 +49,7 @@ impl RpcClient {
         #[cfg(debug_assertions)]
         let sidecar_handle = None;
 
-        RpcClient {
+        SpyglassServerClient {
             client,
             endpoint: endpoint.clone(),
             sidecar_handle,
@@ -63,7 +64,7 @@ impl RpcClient {
 
             log::info!("Attempting to restart backend");
             sidecar.abort();
-            self.sidecar_handle = Some(RpcClient::check_and_start_backend());
+            self.sidecar_handle = Some(SpyglassServerClient::check_and_start_backend());
         }
 
         log::info!("Trying to reconnect to backend...");
