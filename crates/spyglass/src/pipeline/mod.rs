@@ -55,8 +55,8 @@ pub async fn initialize_pipelines(
 
     // Yes probably should do some error handling, but not really needed. No pipelines
     // just means not tasks to send.
-    lens::read_lenses(&app_state, &config).await;
-    read_pipelines(&app_state, &config).await;
+    let _ = lens::read_lenses(&app_state, &config).await;
+    let _ = read_pipelines(&app_state, &config).await;
 
     // Grab all pipelines
     let configured_pipelines: HashSet<String> = app_state
