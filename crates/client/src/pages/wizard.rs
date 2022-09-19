@@ -17,7 +17,7 @@ pub fn wizard_page() -> Html {
     html! {
         <div class="p-4">
             <h1 class="text-2xl mb-4 flex flex-row gap-4">
-                <div class="animate-bounce">{"👋"}</div>
+                <div class="animate-wiggle-short hover:animate-wiggle">{"👋"}</div>
                 <div>{"Let's Get Started"}</div>
             </h1>
             <div class="text-sm">
