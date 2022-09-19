@@ -252,11 +252,20 @@ pub async fn lens_to_filters(state: AppState, trigger: &str) -> Vec<SearchFilter
             // Load lens configuration from files
             lens::LensType::Simple => {
                 if let Some(lens_config) = state.lenses.get(&lens.name) {
+                    let lens_filters = lens_config.into_regexes();
                     filters.extend(
-                        lens_config
-                            .into_regexes()
+                        lens_filters
+                            .allowed
                             .into_iter()
-                            .map(SearchFilter::URLRegex)
+                            .map(SearchFilter::URLRegexAllow)
+                            .collect::<Vec<SearchFilter>>(),
+                    );
+
+                    filters.extend(
+                        lens_filters
+                            .skipped
+                            .into_iter()
+                            .map(SearchFilter::URLRegexSkip)
                             .collect::<Vec<SearchFilter>>(),
                     );
                 }
@@ -329,7 +338,7 @@ mod test {
         assert_eq!(filters.len(), 1);
         assert_eq!(
             *filters.get(0).unwrap(),
-            SearchFilter::URLRegex("^https://oldschool.runescape.wiki/wiki/.*".to_owned())
+            SearchFilter::URLRegexAllow("^https://oldschool.runescape.wiki/wiki/.*".to_owned())
         );
     }
 }
