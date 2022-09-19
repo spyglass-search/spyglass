@@ -77,12 +77,11 @@ pub async fn crawl_stats<'r>(
     _: tauri::Window,
     rpc: State<'_, rpc::RpcMutex>,
 ) -> Result<response::CrawlStats, String> {
-    let mut rpc = rpc.lock().await;
+    let rpc = rpc.lock().await;
     match rpc.client.crawl_stats().await {
         Ok(resp) => Ok(resp),
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
             Ok(response::CrawlStats {
                 by_domain: Vec::new(),
             })

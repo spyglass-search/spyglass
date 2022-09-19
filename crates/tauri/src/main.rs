@@ -254,7 +254,7 @@ async fn pause_crawler(app: AppHandle, menu_id: String) {
     let rpc = app.state::<RpcMutex>().inner();
     let pause_state = app.state::<Arc<PauseState>>().inner();
 
-    let mut rpc = rpc.lock().await;
+    let rpc = rpc.lock().await;
     let is_paused = pause_state.clone();
 
     match rpc
@@ -276,10 +276,7 @@ async fn pause_crawler(app: AppHandle, menu_id: String) {
             let _ = item_handle.set_title(new_label);
             let _ = item_handle.set_enabled(true);
         }
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-        }
+        Err(err) => log::error!("Error sending RPC: {}", err),
     }
 }
 
