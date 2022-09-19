@@ -1,5 +1,4 @@
 use num_format::{Locale, ToFormattedString};
-use serde_json::Value;
 use tauri::{
     api::dialog::blocking::message,
     plugin::{Builder, TauriPlugin},
@@ -8,9 +7,11 @@ use tauri::{
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 
+use crate::rpc::SpyglassServerClient;
 use migration::Migrator;
-use shared::response;
 use shared::response::AppStatus;
+use shared::{config::Config, response};
+use spyglass_rpc::RpcClient;
 
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
@@ -99,8 +100,12 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     // Wait for the server to boot up
     log::info!("Waiting for server backend");
     progress.set("Waiting for backend...");
-    let rpc = rpc::RpcClient::new().await;
-    app_handle.manage(RpcMutex::new(Mutex::new(rpc)));
+
+    let config = app_handle.state::<Config>();
+    let rpc = SpyglassServerClient::new(&config).await;
+    let rpc_mutex = RpcMutex::new(Mutex::new(rpc));
+    app_handle.manage(rpc_mutex.clone());
+    tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(rpc_mutex));
 
     // Will cancel and clear any interval checks in the client
     progress.set("DONE");
@@ -125,16 +130,11 @@ async fn update_tray_menu(app: &AppHandle) {
 }
 
 async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::AppStatus>("app_status", "", Value::Null)
-        .await
-    {
+    let rpc = rpc.lock().await;
+    match rpc.client.app_status().await {
         Ok(resp) => Some(resp),
         Err(err) => {
             log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
             None
         }
     }

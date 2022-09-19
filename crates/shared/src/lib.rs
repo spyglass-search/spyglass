@@ -6,7 +6,6 @@ pub mod plugin;
 pub mod regex;
 pub mod request;
 pub mod response;
-pub mod rpc;
 
 /// A platform-agnostic way to turn a URL file path into something that can
 /// be opened & crawled.

@@ -18,6 +18,7 @@ use tokio::sync::{broadcast, mpsc};
 // The pipeline context is a context object that is passed between
 // all stages of the pipeline. This allows later stages in the pipeline
 // to change behavior based on previous stages.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PipelineContext {
     pipeline_name: String,

@@ -9,6 +9,7 @@ members = [
     # Publically published crates
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
+    "crates/spyglass-rpc",
     # Default plugins
     "plugins/chrome-importer",
     "plugins/firefox-importer",
