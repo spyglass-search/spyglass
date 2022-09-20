@@ -68,9 +68,10 @@ jobs:
         echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
         echo "target_ext=.exe" >> $env:GITHUB_ENV
     # search backend
-    - name: build search backend & upload to sentry
+    - name: build search backend
+      run: cargo build -p spyglass --profile sentry
+    - name: upload backend to sentry
       run: |
-        cargo build -p spyglass --profile sentry
         npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
         npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass${{ env.target_ext }}
       env:
@@ -83,8 +84,9 @@ jobs:
     - name: build frontend
       run: cd crates/client && trunk build
     - name: build tauri app
+      run: cargo build -p spyglass-app --profile sentry
+    - name: upload frontend sentry
       run: |
-        cargo build -p spyglass-app --profile sentry
         npx sentry-cli difutil check target/sentry/spyglass-app${{ env.target_ext }}
         npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app${{ env.target_ext }}
       env:
