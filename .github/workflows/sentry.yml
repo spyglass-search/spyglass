@@ -73,6 +73,8 @@ jobs:
         cargo build -p spyglass --profile sentry
         npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
         npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass${{ env.target_ext }}
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     # build front & tauri app
     - name: copy sidebar
       run: |
@@ -85,3 +87,5 @@ jobs:
         cargo build -p spyglass-app --profile sentry
         npx sentry-cli difutil check target/sentry/spyglass-app${{ env.target_ext }}
         npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app${{ env.target_ext }}
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
