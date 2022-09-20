@@ -3,16 +3,15 @@ on:
   push:
     branches:
       - release
-      - ci/upload-sentry-debug-info
 jobs:
   sentry-upload:
     strategy:
       fail-fast: false
       matrix:
         platform: [
-          #macos-latest,
+          macos-latest,
           'ubuntu-20.04',
-          #'windows-latest'
+          'windows-latest'
         ]
 
     runs-on: ${{ matrix.platform }}
@@ -73,7 +72,7 @@ jobs:
       run: |
         cargo build -p spyglass --profile sentry
         npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
-        npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources --no-upload target/sentry/spyglass${{ env.target_ext }}
+        npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass${{ env.target_ext }}
     # build front & tauri app
     - name: copy sidebar
       run: |
@@ -85,6 +84,4 @@ jobs:
       run: |
         cargo build -p spyglass-app --profile sentry
         npx sentry-cli difutil check target/sentry/spyglass-app${{ env.target_ext }}
-        npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources --no-upload target/sentry/spyglass-app${{ env.target_ext }}
-    - name: test
-      run: ls target/sentry
+        npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app${{ env.target_ext }}
