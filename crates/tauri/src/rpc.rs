@@ -1,48 +1,85 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU8, Ordering},
+    Arc,
+};
 
-use jsonrpc_core_client::{transports::ipc, TypedClient};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use shared::rpc::gen_ipc_path;
+use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use tauri::api::process::{Command, CommandEvent};
 use tauri::async_runtime::JoinHandle;
+use tokio::signal;
 use tokio::sync::Mutex;
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_retry::Retry;
 
-pub type RpcMutex = Arc<Mutex<RpcClient>>;
+use shared::config::Config;
+use spyglass_rpc::RpcClient;
 
-pub struct RpcClient {
-    pub client: TypedClient,
+pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
+
+pub struct SpyglassServerClient {
+    pub client: HttpClient,
     pub endpoint: String,
     pub sidecar_handle: Option<JoinHandle<()>>,
+    pub restarts: AtomicU8,
 }
 
-async fn connect(endpoint: &str) -> Result<TypedClient, ()> {
-    match ipc::connect(endpoint).await {
-        Ok(client) => Ok(client),
+/// Build client & attempt a connection to the health check endpoint.
+async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
+    match HttpClientBuilder::default().build(endpoint) {
+        Ok(client) => {
+            // Wait until we have a connection
+            let retry_strategy = ExponentialBackoff::from_millis(100).take(5);
+            match Retry::spawn(retry_strategy, || client.protocol_version()).await {
+                Ok(v) => {
+                    log::info!("connected to daemon w/ version: {}", v);
+                    Ok(client)
+                }
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
+            }
+        }
         Err(e) => {
             sentry::capture_error(&e);
-            Err(())
+            Err(anyhow::anyhow!(e.to_string()))
         }
     }
 }
 
-async fn try_connect(endpoint: &str) -> Result<TypedClient, ()> {
-    let retry_strategy = ExponentialBackoff::from_millis(10).take(10);
+impl SpyglassServerClient {
+    /// Monitors the health of the backend & recreates it necessary.
+    pub async fn daemon_eyes(rpc: RpcMutex) {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+        loop {
+            tokio::select! {
+                _ = signal::ctrl_c() => {
+                    let rpc = rpc.lock().await;
+                    if let Some(handle) = &rpc.sidecar_handle {
+                        handle.abort();
+                    }
+                    break;
+                },
+                _ = interval.tick() => {
+                    let mut rpc = rpc.lock().await;
+                    if let Err(err) = rpc.client.protocol_version().await {
+                        // Keep track of the number restarts
+                        let num_restarts = rpc.restarts.fetch_add(1, Ordering::SeqCst);
+                        log::error!("rpc health check error: {}, restart #: {}", err, num_restarts);
+                        rpc.reconnect().await;
+                        log::info!("restarted");
+                    }
+                }
+            }
+        }
+    }
 
-    Retry::spawn(retry_strategy, || connect(endpoint)).await
-}
-
-impl RpcClient {
-    pub async fn new() -> Self {
-        let endpoint = gen_ipc_path();
-        log::info!("Starting backend");
+    pub async fn new(config: &Config) -> Self {
+        let endpoint = format!("http://127.0.0.1:{}", config.user_settings.port);
+        log::info!("Connecting to backend @ {}", &endpoint);
 
         // Only startup & manage sidecar in release mode.
         #[cfg(not(debug_assertions))]
-        let sidecar_handle = Some(RpcClient::check_and_start_backend());
+        let sidecar_handle = Some(SpyglassServerClient::check_and_start_backend());
 
+        log::info!("backend started");
         let client = try_connect(&endpoint)
             .await
             .expect("Unable to connect to spyglass backend!");
@@ -50,26 +87,11 @@ impl RpcClient {
         #[cfg(debug_assertions)]
         let sidecar_handle = None;
 
-        RpcClient {
+        SpyglassServerClient {
             client,
             endpoint: endpoint.clone(),
             sidecar_handle,
-        }
-    }
-
-    pub async fn call<T: Serialize, R: DeserializeOwned + Default>(
-        &mut self,
-        method: &str,
-        args: T,
-    ) -> R {
-        match self.client.call_method::<T, R>(method, "", args).await {
-            Ok(resp) => resp,
-            Err(err) => {
-                sentry::capture_error(&err);
-                log::error!("Error sending RPC: {}", err);
-                self.reconnect().await;
-                R::default()
-            }
+            restarts: AtomicU8::new(0),
         }
     }
 
@@ -78,17 +100,16 @@ impl RpcClient {
         if let Some(sidecar) = &self.sidecar_handle {
             log::info!("child process killed");
             tauri::api::process::kill_children();
+            sidecar.abort();
 
             log::info!("Attempting to restart backend");
-            sidecar.abort();
-            self.sidecar_handle = Some(RpcClient::check_and_start_backend());
+            self.sidecar_handle = Some(SpyglassServerClient::check_and_start_backend());
         }
 
-        log::info!("Trying to reconnect to backend...");
+        log::info!("reconnecting to {}", self.endpoint);
         self.client = try_connect(&self.endpoint)
             .await
             .expect("Unable to connect to spyglass backend!");
-        log::info!("Connected!");
     }
 
     pub fn check_and_start_backend() -> JoinHandle<()> {

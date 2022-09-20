@@ -3,7 +3,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{atomic::Ordering, Arc};
 
-use jsonrpc_core::Value;
 use tauri::Manager;
 use tauri::State;
 use url::Url;
@@ -18,6 +17,7 @@ use shared::{
     request,
     response::{self, InstallableLens},
 };
+use spyglass_rpc::RpcClient;
 
 #[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
@@ -73,36 +73,41 @@ pub async fn resize_window(window: tauri::Window, height: f64) {
 }
 
 #[tauri::command]
-pub async fn crawl_stats<'r>(
-    _: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-) -> Result<response::CrawlStats, String> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<Value, response::CrawlStats>("crawl_stats", "", Value::Null)
-        .await
-    {
-        Ok(resp) => Ok(resp),
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(response::CrawlStats {
-                by_domain: Vec::new(),
-            })
+pub async fn crawl_stats<'r>(win: tauri::Window) -> Result<response::CrawlStats, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.crawl_stats().await {
+            Ok(resp) => Ok(resp),
+            Err(err) => {
+                log::error!("Error sending RPC: {}", err);
+                Ok(response::CrawlStats {
+                    by_domain: Vec::new(),
+                })
+            }
         }
+    } else {
+        Ok(response::CrawlStats {
+            by_domain: Vec::new(),
+        })
     }
 }
 
 #[tauri::command]
 pub async fn list_installed_lenses(
-    _: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
+    win: tauri::Window,
 ) -> Result<Vec<response::LensResult>, String> {
-    let mut rpc = rpc.lock().await;
-    Ok(rpc
-        .call::<Value, Vec<response::LensResult>>("list_installed_lenses", Value::Null)
-        .await)
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.list_installed_lenses().await {
+            Ok(lenses) => Ok(lenses),
+            Err(err) => {
+                log::error!("Unable to list installed lenses: {}", err.to_string());
+                Ok(Vec::new())
+            }
+        }
+    } else {
+        Ok(Vec::new())
+    }
 }
 
 #[tauri::command]
@@ -128,93 +133,84 @@ pub async fn list_installable_lenses(
 
 #[tauri::command]
 pub async fn search_docs<'r>(
-    _: tauri::Window,
-    rpc: State<'r, rpc::RpcMutex>,
+    win: tauri::Window,
     lenses: Vec<String>,
     query: &str,
 ) -> Result<Vec<response::SearchResult>, String> {
-    let data = request::SearchParam {
-        lenses,
-        query: query.to_string(),
-    };
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let data = request::SearchParam {
+            lenses,
+            query: query.to_string(),
+        };
 
-    let rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(request::SearchParam,), response::SearchResults>("search_docs", "", (data,))
-        .await
-    {
-        Ok(resp) => Ok(resp.results.to_vec()),
-        Err(err) => {
-            log::error!("rpc resp {}", err);
-            Ok(Vec::new())
+        let rpc = rpc.lock().await;
+        match rpc.client.search_docs(data).await {
+            Ok(resp) => Ok(resp.results.to_vec()),
+            Err(err) => {
+                log::error!("search_docs err: {}", err);
+                Ok(Vec::new())
+            }
         }
+    } else {
+        Ok(Vec::new())
     }
 }
 
 #[tauri::command]
 pub async fn search_lenses<'r>(
-    _: tauri::Window,
-    rpc: State<'r, rpc::RpcMutex>,
+    win: tauri::Window,
     query: &str,
 ) -> Result<Vec<response::LensResult>, String> {
-    let data = request::SearchLensesParam {
-        query: query.to_string(),
-    };
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let data = request::SearchLensesParam {
+            query: query.to_string(),
+        };
 
-    let mut rpc = rpc.lock().await;
-    let resp = rpc
-        .call::<(request::SearchLensesParam,), response::SearchLensesResp>("search_lenses", (data,))
-        .await;
-    Ok(resp.results)
-}
-
-#[tauri::command]
-pub async fn delete_doc<'r>(
-    window: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-    id: &str,
-) -> Result<(), String> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(String,), ()>("delete_doc", "", (id.into(),))
-        .await
-    {
-        Ok(_) => {
-            let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
-            Ok(())
+        let rpc = rpc.lock().await;
+        match rpc.client.search_lenses(data).await {
+            Ok(resp) => Ok(resp.results),
+            Err(err) => {
+                log::error!("search_lenses err: {}", err.to_string());
+                Ok(Vec::new())
+            }
         }
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(())
-        }
+    } else {
+        Ok(Vec::new())
     }
 }
 
 #[tauri::command]
-pub async fn delete_domain<'r>(
-    window: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-    domain: &str,
-) -> Result<(), String> {
-    let mut rpc = rpc.lock().await;
-    match rpc
-        .client
-        .call_method::<(String,), ()>("delete_domain", "", (domain.into(),))
-        .await
-    {
-        Ok(_) => {
-            let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
-            Ok(())
-        }
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(())
+pub async fn delete_doc<'r>(window: tauri::Window, id: &str) -> Result<(), String> {
+    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.delete_doc(id.to_string()).await {
+            Ok(_) => {
+                let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
+            }
+            Err(err) => {
+                log::error!("delete_doc err: {}", err);
+            }
         }
     }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_domain<'r>(window: tauri::Window, domain: &str) -> Result<(), String> {
+    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.delete_domain(domain.to_string()).await {
+            Ok(_) => {
+                let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
+            }
+            Err(err) => {
+                log::error!("delete_domain err: {}", err);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Install a lens (assumes correct format) from a URL
@@ -261,8 +257,7 @@ pub async fn install_lens<'r>(
 
 #[tauri::command]
 pub async fn network_change(
-    _: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
+    win: tauri::Window,
     paused: State<'_, Arc<PauseState>>,
     is_offline: bool,
 ) -> Result<(), String> {
@@ -272,62 +267,52 @@ pub async fn network_change(
     );
 
     if is_offline {
-        let rpc = rpc.lock().await;
-        paused.store(true, Ordering::Relaxed);
-
-        let _ = rpc
-            .client
-            .call_method::<(bool,), ()>("toggle_pause", "", (true,))
-            .await;
+        if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+            let rpc = rpc.lock().await;
+            paused.store(true, Ordering::Relaxed);
+            let _ = rpc.client.toggle_pause(true).await;
+        }
     }
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn recrawl_domain(
-    _: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-    domain: &str,
-) -> Result<(), String> {
+pub async fn recrawl_domain(win: tauri::Window, domain: &str) -> Result<(), String> {
     log::info!("recrawling {}", domain);
-    let mut rpc = rpc.lock().await;
-
-    match rpc
-        .client
-        .call_method::<(String,), ()>("recrawl_domain", "", (domain.into(),))
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            rpc.reconnect().await;
-            Ok(())
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc.client.recrawl_domain(domain.to_string()).await {
+            log::error!("recrawl_domain err: {}", err);
         }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_plugins(win: tauri::Window) -> Result<Vec<response::PluginResult>, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.list_plugins().await {
+            Ok(plugins) => Ok(plugins),
+            Err(err) => {
+                log::error!("list_plugins err: {}", err.to_string());
+                Ok(Vec::new())
+            }
+        }
+    } else {
+        Ok(Vec::new())
     }
 }
 
 #[tauri::command]
-pub async fn list_plugins(
-    _: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-) -> Result<Vec<response::PluginResult>, String> {
-    let mut rpc = rpc.lock().await;
-    Ok(rpc
-        .call::<Value, Vec<response::PluginResult>>("list_plugins", Value::Null)
-        .await)
-}
-
-#[tauri::command]
-pub async fn toggle_plugin(
-    window: tauri::Window,
-    rpc: State<'_, rpc::RpcMutex>,
-    name: &str,
-) -> Result<(), String> {
-    let mut rpc = rpc.lock().await;
-    rpc.call::<(String,), ()>("toggle_plugin", (name.into(),))
-        .await;
-    let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
+pub async fn toggle_plugin(window: tauri::Window, name: &str) -> Result<(), String> {
+    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        let _ = rpc.client.toggle_plugin(name.to_string()).await;
+        let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
+    }
 
     Ok(())
 }

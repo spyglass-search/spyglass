@@ -1,0 +1,22 @@
+[package]
+name = "spyglass-lens"
+version = "0.1.2"
+edition = "2021"
+authors = ["Andrew Huynh <andrew@spyglass.fyi>"]
+description = "A small library for reading/writing spyglass lens files."
+homepage = "https://github.com/a5huynh/spyglass/tree/main/crates/spyglass-lens"
+repository = "https://github.com/a5huynh/spyglass/tree/main/crates/spyglass-lens"
+readme = "README.md"
+keywords = ["spyglass", "lens", "lenses"]
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+regex = "1"
+ron = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+
+[lib]
+name = "spyglass_lens"
+path = "src/lib.rs"
+crate-type = ["lib"]

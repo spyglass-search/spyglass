@@ -138,7 +138,7 @@ impl Crawler {
     }
 
     /// Fetches and parses the content of a page.
-    async fn crawl(&self, url: &Url) -> CrawlResult {
+    async fn crawl(&self, url: &Url, parse_results: bool) -> CrawlResult {
         let url = url.clone();
 
         // Fetch & store page data.
@@ -162,9 +162,22 @@ impl Crawler {
             // to a different URL.
             let end_url = res.url().to_owned();
             if let Ok(raw_body) = res.text().await {
-                let mut scrape_result = self.scrape_page(&end_url, &raw_body).await;
-                scrape_result.status = status;
-                return scrape_result;
+                if parse_results {
+                    let mut scrape_result = self.scrape_page(&end_url, &raw_body).await;
+                    scrape_result.status = status;
+                    return scrape_result;
+                } else {
+                    return CrawlResult {
+                        content_hash: None,
+                        content: None,
+                        description: None,
+                        status: 200,
+                        title: None,
+                        url: end_url.to_string(),
+                        links: HashSet::new(),
+                        raw: Some(raw_body.to_string()),
+                    };
+                }
             }
         }
 
@@ -211,6 +224,7 @@ impl Crawler {
         &self,
         db: &DatabaseConnection,
         id: i64,
+        parse_results: bool,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?;
         if crawl.is_none() {
@@ -234,7 +248,10 @@ impl Crawler {
         // handle any fetching/parsing.
         match url.scheme() {
             "file" => self.handle_file_fetch(&crawl, &url).await,
-            "http" | "https" => self.handle_http_fetch(db, &crawl, &url).await,
+            "http" | "https" => {
+                self.handle_http_fetch(db, &crawl, &url, parse_results)
+                    .await
+            }
             _ => {
                 // unknown scheme, ignore
                 log::warn!("Ignoring unhandled scheme: {}", &url);
@@ -317,7 +334,9 @@ impl Crawler {
         db: &DatabaseConnection,
         crawl: &crawl_queue::Model,
         url: &Url,
+        parse_results: bool,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        println!("Http fetch");
         // Modify bootstrapped URLs to pull from the Internet Archive
         let url: Url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
             Url::parse(&create_archive_url(url.as_ref())).expect("Unable to create archive URL")
@@ -337,7 +356,7 @@ impl Crawler {
         }
 
         // Crawl & save the data
-        let mut result = self.crawl(&url).await;
+        let mut result = self.crawl(&url, parse_results).await;
         if result.is_bad_request() {
             log::warn!("issue fetching {} {:?}", result.status, result.url);
         }
@@ -409,7 +428,7 @@ mod test {
     async fn test_crawl() {
         let crawler = Crawler::new();
         let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
-        let result = crawler.crawl(&url).await;
+        let result = crawler.crawl(&url, true).await;
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
@@ -430,7 +449,7 @@ mod test {
         };
         let model = query.insert(&db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -455,7 +474,7 @@ mod test {
         };
         let model = query.insert(&db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -478,7 +497,7 @@ mod test {
         };
         let model = query.insert(&db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -524,7 +543,7 @@ mod test {
         };
         let _ = rule.insert(&db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
         assert!(crawl_result.is_none());
     }
 

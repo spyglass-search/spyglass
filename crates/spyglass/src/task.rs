@@ -3,6 +3,7 @@ use notify::{EventKind, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc};
 use url::Url;
 
+use crate::pipeline::PipelineCommand;
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -68,8 +69,11 @@ pub async fn manager_task(
 
         for entry in state.lenses.iter() {
             let value = entry.value();
-            prioritized_domains.extend(value.domains.clone());
-            prioritized_prefixes.extend(value.urls.clone());
+
+            if value.pipeline.is_none() {
+                prioritized_domains.extend(value.domains.clone());
+                prioritized_prefixes.extend(value.urls.clone());
+            }
         }
 
         // tokio::select allows us to listen to a shutdown message while
@@ -99,10 +103,32 @@ pub async fn manager_task(
         match next_url {
             Err(err) => log::error!("Unable to dequeue: {}", err),
             Ok(Some(task)) => {
-                // Send to worker
-                let cmd = Command::Fetch(CrawlTask { id: task.id });
-                if queue.send(cmd).await.is_err() {
-                    eprintln!("unable to send command to worker");
+                match &task.pipeline {
+                    Some(pipeline) => {
+                        let mut pipeline_tx = state.pipeline_cmd_tx.lock().await;
+                        match &mut *pipeline_tx {
+                            Some(pipeline_tx) => {
+                                println!("Sending crawl task to pipeline");
+                                let cmd = PipelineCommand::ProcessUrl(
+                                    pipeline.clone(),
+                                    CrawlTask { id: task.id },
+                                );
+                                if let Err(err) = pipeline_tx.send(cmd).await {
+                                    eprintln!("Unable to send crawl task to pipeline {:?}", err);
+                                }
+                            }
+                            None => {
+                                eprintln!("Unable to send crawl task to pipeline, no queue found");
+                            }
+                        }
+                    }
+                    None => {
+                        // Send to worker
+                        let cmd = Command::Fetch(CrawlTask { id: task.id });
+                        if queue.send(cmd).await.is_err() {
+                            eprintln!("unable to send command to worker");
+                        }
+                    }
                 }
             }
             // ignore everything else
@@ -116,7 +142,7 @@ pub async fn manager_task(
 
 #[tracing::instrument(skip(state, crawler))]
 async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
-    let result = crawler.fetch_by_job(&state.db, task.id).await;
+    let result = crawler.fetch_by_job(&state.db, task.id, true).await;
 
     match result {
         Ok(Some(crawl_result)) => {
@@ -134,9 +160,11 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
 
+            // Collect all lenses that do not
             let lenses: Vec<LensConfig> = state
                 .lenses
                 .iter()
+                .filter(|entry| entry.value().pipeline.is_none())
                 .map(|entry| entry.value().clone())
                 .collect();
 
@@ -146,6 +174,7 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                 &lenses,
                 &state.user_settings,
                 &Default::default(),
+                Option::None,
             )
             .await
             {

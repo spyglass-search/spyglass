@@ -8,15 +8,15 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use entities::models::{crawl_queue, lens};
+use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
+#[allow(unused_imports)]
 use migration::Migrator;
 use shared::config::Config;
 
 mod api;
-
-use crate::api::start_api_ipc;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -89,11 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize/Load user preferences
     let mut state = rt.block_on(AppState::new(&config));
-
-    // Start IPC server
-    let server = start_api_ipc(&state).expect("Unable to start IPC server");
     rt.block_on(start_backend(&mut state, &config));
-    server.close();
 
     Ok(())
 }
@@ -122,6 +118,16 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     // Channel for plugin commands
     let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
 
+    let (pipeline_cmd_tx, pipeline_cmd_rx) = mpsc::channel(16);
+
+    // Loads and processes pipeline commands
+    let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
+        state.clone(),
+        config.clone(),
+        pipeline_cmd_rx,
+        shutdown_tx.clone(),
+    ));
+
     {
         state
             .crawler_cmd_tx
@@ -136,6 +142,14 @@ async fn start_backend(state: &mut AppState, config: &Config) {
             .lock()
             .await
             .replace(plugin_cmd_tx.clone());
+    }
+
+    {
+        state
+            .pipeline_cmd_tx
+            .lock()
+            .await
+            .replace(pipeline_cmd_tx.clone());
     }
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
@@ -192,6 +206,9 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         shutdown_tx.subscribe(),
     ));
 
+    // API server
+    let api_server = tokio::spawn(api::start_api_server(state.clone()));
+
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
@@ -210,5 +227,5 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         }
     }
 
-    let _ = tokio::join!(manager_handle, worker_handle, pm_handle);
+    let _ = tokio::join!(manager_handle, worker_handle, pm_handle, api_server);
 }

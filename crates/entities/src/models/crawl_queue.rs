@@ -89,6 +89,7 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     /// When this task was last updated.
     pub updated_at: DateTimeUtc,
+    pub pipeline: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -412,6 +413,7 @@ pub async fn enqueue_all(
     lenses: &[LensConfig],
     settings: &UserSettings,
     overrides: &EnqueueSettings,
+    pipeline: Option<String>,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
     // Filter URLs
     let urls = filter_urls(lenses, settings, overrides, urls);
@@ -443,6 +445,7 @@ pub async fn enqueue_all(
                             domain: Set(domain.to_string()),
                             crawl_type: Set(overrides.crawl_type.clone()),
                             url: Set(url.to_string()),
+                            pipeline: Set(pipeline.clone()),
                             ..Default::default()
                         });
                     }
@@ -588,9 +591,16 @@ mod test {
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
-            .await
-            .unwrap();
+        crawl_queue::enqueue_all(
+            &db,
+            &url,
+            &[lens],
+            &settings,
+            &Default::default(),
+            Option::None,
+        )
+        .await
+        .unwrap();
 
         let crawl = crawl_queue::Entity::find()
             .filter(crawl_queue::Column::Url.eq(url[0].to_string()))
@@ -631,7 +641,7 @@ mod test {
 
         assert_eq!(all.len(), 1);
 
-        crawl_queue::enqueue_all(&db, &[url], &[], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &[url], &[], &settings, &overrides, Option::None)
             .await
             .unwrap();
 
@@ -656,9 +666,16 @@ mod test {
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
-            .await
-            .unwrap();
+        crawl_queue::enqueue_all(
+            &db,
+            &url,
+            &[lens],
+            &settings,
+            &Default::default(),
+            Option::None,
+        )
+        .await
+        .unwrap();
 
         let crawl = crawl_queue::Entity::find()
             .filter(crawl_queue::Column::Url.eq(url[0].to_string()))
@@ -680,9 +697,16 @@ mod test {
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
-            .await
-            .unwrap();
+        crawl_queue::enqueue_all(
+            &db,
+            &url,
+            &[lens],
+            &settings,
+            &Default::default(),
+            Option::None,
+        )
+        .await
+        .unwrap();
 
         let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
             .await
@@ -707,9 +731,16 @@ mod test {
             ..Default::default()
         };
 
-        crawl_queue::enqueue_all(&db, &url, &[lens], &settings, &Default::default())
-            .await
-            .unwrap();
+        crawl_queue::enqueue_all(
+            &db,
+            &url,
+            &[lens],
+            &settings,
+            &Default::default(),
+            Option::None,
+        )
+        .await
+        .unwrap();
         let doc = indexed_document::ActiveModel {
             domain: Set(parsed.host_str().unwrap().to_string()),
             url: Set(url[0].clone()),
@@ -751,7 +782,7 @@ mod test {
             "https://en.wikipedia.com/wiki/Testing?action=edit".into(),
         ];
 
-        crawl_queue::enqueue_all(&db, &urls, &[lens], &settings, &overrides)
+        crawl_queue::enqueue_all(&db, &urls, &[lens], &settings, &overrides, Option::None)
             .await
             .unwrap();
 

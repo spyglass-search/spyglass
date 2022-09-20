@@ -1,15 +1,15 @@
 pub mod consts;
 mod shims;
-use std::fmt;
-
 use serde::{Deserialize, Serialize};
 pub use shims::*;
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SearchFilter {
     // No filter
     None,
-    URLRegex(String),
+    URLRegexAllow(String),
+    URLRegexSkip(String),
 }
 
 #[macro_export]
