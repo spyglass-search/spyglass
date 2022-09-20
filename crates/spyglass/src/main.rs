@@ -12,6 +12,7 @@ use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppShutdown, Command};
+#[allow(unused_imports)]
 use migration::Migrator;
 use shared::config::Config;
 
