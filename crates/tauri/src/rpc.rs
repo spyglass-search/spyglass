@@ -130,10 +130,6 @@ impl SpyglassServerClient {
                         return;
                     }
                     CommandEvent::Terminated(payload) => {
-                        sentry::capture_error(&std::io::Error::new(
-                            std::io::ErrorKind::BrokenPipe,
-                            format!("sidecar terminated: {:?}", payload),
-                        ));
                         log::error!("sidecar terminated: {:?}", payload);
                         return;
                     }
