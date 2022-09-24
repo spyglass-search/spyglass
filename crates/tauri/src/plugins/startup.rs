@@ -37,25 +37,40 @@ pub fn init() -> TauriPlugin<Wry> {
     Builder::new("tauri-plugin-startup")
         .invoke_handler(tauri::generate_handler![get_startup_progress])
         .on_event(|app_handle, event| {
-            if let RunEvent::Ready = event {
-                app_handle.manage(StartupProgressText(std::sync::Mutex::new(
-                    "Running startup tasks...".to_string(),
-                )));
+            match event {
+                RunEvent::Ready => {
+                    app_handle.manage(StartupProgressText(std::sync::Mutex::new(
+                        "Running startup tasks...".to_string(),
+                    )));
 
-                // Don't block the main thread
-                tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
+                    // Don't block the main thread
+                    tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
 
-                // Keep system tray stats updated
-                let app_handle = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
-                    loop {
-                        tokio::select! {
-                            _ = signal::ctrl_c() => break,
-                            _ = interval.tick() => update_tray_menu(&app_handle).await
+                    // Keep system tray stats updated
+                    let app_handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let mut interval =
+                            time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
+                        loop {
+                            tokio::select! {
+                                _ = signal::ctrl_c() => break,
+                                _ = interval.tick() => update_tray_menu(&app_handle).await
+                            }
                         }
+                    });
+                }
+                RunEvent::Exit => {
+                    let app_handle = app_handle.clone();
+                    if let Some(rpc) = app_handle.try_state::<RpcMutex>() {
+                        tauri::async_runtime::block_on(async move {
+                            let rpc = rpc.lock().await;
+                            if let Some(sidecar) = &rpc.sidecar_handle {
+                                sidecar.abort();
+                            }
+                        });
                     }
-                });
+                }
+                _ => {}
             }
         })
         .build()
