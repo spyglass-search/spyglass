@@ -4,8 +4,8 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
-use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
+use tokio::{signal, sync::Mutex};
 
 use migration::Migrator;
 use shared::response::AppStatus;
@@ -24,6 +24,7 @@ use crate::{
 };
 
 pub struct StartupProgressText(std::sync::Mutex<String>);
+
 impl StartupProgressText {
     pub fn set(&self, new_value: &str) {
         if let Ok(mut value) = self.0.lock() {
@@ -49,8 +50,10 @@ pub fn init() -> TauriPlugin<Wry> {
                 tauri::async_runtime::spawn(async move {
                     let mut interval = time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
                     loop {
-                        update_tray_menu(&app_handle).await;
-                        interval.tick().await;
+                        tokio::select! {
+                            _ = signal::ctrl_c() => break,
+                            _ = interval.tick() => update_tray_menu(&app_handle).await
+                        }
                     }
                 });
             }
