@@ -80,8 +80,8 @@ fn stats_bar(props: &StatsBarProps) -> Html {
         "h-8",
         "p-2",
         props.color.clone(),
-        props.is_start.then(|| Some("rounded-l-lg")),
-        props.is_end.then(|| Some("rounded-r-lg")),
+        props.is_start.then_some(Some("rounded-l-lg")),
+        props.is_end.then_some(Some("rounded-r-lg")),
     );
 
     html! {
