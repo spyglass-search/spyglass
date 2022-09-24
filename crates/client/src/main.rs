@@ -167,11 +167,17 @@ pub fn app() -> Html {
 
 fn switch(routes: &Route) -> Html {
     match routes {
+        #[allow(clippy::let_unit_value)]
         Route::Search => html! { <SearchPage /> },
+        #[allow(clippy::let_unit_value)]
         Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
+        #[allow(clippy::let_unit_value)]
         Route::Startup => html! { <StartupPage /> },
+        #[allow(clippy::let_unit_value)]
         Route::Status => html! { <StatsPage /> },
+        #[allow(clippy::let_unit_value)]
         Route::Updater => html! { <UpdaterPage /> },
+        #[allow(clippy::let_unit_value)]
         Route::Wizard => html! { <WizardPage /> },
     }
 }

@@ -51,7 +51,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
         <Link<Route>
             classes={
                 classes!(
-                    (props.current == props.tab).then(|| Some("bg-stone-700")),
+                    (props.current == props.tab).then_some(Some("bg-stone-700")),
                     link_styles
                 )
             }
@@ -143,9 +143,13 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
             <div class="flex-col flex-1">
             {
                 match props.tab {
+                    #[allow(clippy::let_unit_value)]
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
+                    #[allow(clippy::let_unit_value)]
                     Tab::PluginsManager => html! { <pages::PluginManagerPage /> },
+                    #[allow(clippy::let_unit_value)]
                     Tab::Stats => html!{ <pages::StatsPage /> },
+                    #[allow(clippy::let_unit_value)]
                     Tab::UserSettings => html! { <pages::UserSettingsPage /> },
                 }
             }

@@ -17,7 +17,7 @@ impl IconProps {
     pub fn class(&self) -> Classes {
         classes!(
             self.classes.clone(),
-            self.animate_spin.then(|| Some("animate-spin")),
+            self.animate_spin.then_some(Some("animate-spin")),
             Some(format!("{} {}", self.height, self.width))
         )
     }

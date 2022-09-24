@@ -25,6 +25,7 @@ use libspyglass::task::Command;
 use super::response;
 
 /// Add url to queue
+#[allow(dead_code)]
 #[instrument(skip(state))]
 pub async fn add_queue(
     state: AppState,
@@ -213,6 +214,7 @@ pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {
 }
 
 /// Show the list of URLs in the queue and their status
+#[allow(dead_code)]
 #[instrument(skip(state))]
 pub async fn list_queue(state: AppState) -> Result<response::ListQueue, Error> {
     let db = &state.db;
