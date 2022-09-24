@@ -183,15 +183,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
 
-            // Run wizard on first run
-            if !config.user_settings.run_wizard {
-                window::show_wizard_window(&window.app_handle());
-                // Only run the wizard once.
-                let mut updated = config.user_settings.clone();
-                updated.run_wizard = true;
-                let _ = config.save_user_settings(&updated);
-            }
-
             Ok(())
         })
         .on_window_event(|event| {

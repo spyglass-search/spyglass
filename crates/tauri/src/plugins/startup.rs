@@ -7,11 +7,13 @@ use tauri::{
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 
-use crate::rpc::SpyglassServerClient;
 use migration::Migrator;
 use shared::response::AppStatus;
 use shared::{config::Config, response};
 use spyglass_rpc::RpcClient;
+
+use crate::rpc::SpyglassServerClient;
+use crate::window::show_wizard_window;
 
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
@@ -110,6 +112,15 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     // Will cancel and clear any interval checks in the client
     progress.set("DONE");
     let _ = window.hide();
+
+    // Run wizard on first run
+    if !config.user_settings.run_wizard {
+        show_wizard_window(&window.app_handle());
+        // Only run the wizard once.
+        let mut updated = config.user_settings.clone();
+        updated.run_wizard = true;
+        let _ = config.save_user_settings(&updated);
+    }
 }
 
 async fn update_tray_menu(app: &AppHandle) {
