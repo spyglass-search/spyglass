@@ -91,6 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     tauri::Builder::default()
+        .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
