@@ -104,9 +104,10 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     progress.set("Waiting for backend...");
 
     let config = app_handle.state::<Config>();
-    let rpc = SpyglassServerClient::new(&config).await;
+    let rpc = SpyglassServerClient::new(&config, &app_handle).await;
     let rpc_mutex = RpcMutex::new(Mutex::new(rpc));
     app_handle.manage(rpc_mutex.clone());
+    // Watch and restart backend if it goes down
     tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(rpc_mutex));
 
     // Will cancel and clear any interval checks in the client
