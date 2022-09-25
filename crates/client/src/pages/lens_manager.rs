@@ -20,32 +20,26 @@ pub struct LensProps {
     pub is_installed: bool,
 }
 
-fn fetch_installed_lenses(
-    lenses_handle: UseStateHandle<Vec<LensResult>>,
-    req_state: UseStateHandle<RequestState>,
-) {
-    spawn_local(async move {
-        match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {
-            Ok(results) => {
-                lenses_handle.set(results.into_serde().unwrap());
-                req_state.set(RequestState::Finished);
-            }
+async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
+    match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {
+        Ok(results) => match results.into_serde() {
+            Ok(parsed) => Some(parsed),
             Err(e) => {
-                log::info!("Error fetching lenses: {:?}", e);
-                req_state.set(RequestState::Error);
+                log::error!("Unable to deserialize results: {}", e.to_string());
+                None
             }
+        },
+        Err(e) => {
+            log::error!("Error fetching lenses: {:?}", e);
+            None
         }
-    });
+    }
 }
 
-fn fetch_installable_lenses(
-    data_handle: UseStateHandle<Vec<LensResult>>,
-    req_state: UseStateHandle<RequestState>,
-) {
-    spawn_local(async move {
-        match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
-            Ok(results) => {
-                let lenses: Vec<InstallableLens> = results.into_serde().unwrap();
+async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
+    match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
+        Ok(results) => match results.into_serde::<Vec<InstallableLens>>() {
+            Ok(lenses) => {
                 let parsed: Vec<LensResult> = lenses
                     .iter()
                     .map(|lens| LensResult {
@@ -57,15 +51,18 @@ fn fetch_installable_lenses(
                     })
                     .collect();
 
-                data_handle.set(parsed);
-                req_state.set(RequestState::Finished);
+                Some(parsed)
             }
             Err(e) => {
-                log::info!("Error: {:?}", e);
-                req_state.set(RequestState::Error);
+                log::error!("Unable to deserialize results: {}", e);
+                None
             }
+        },
+        Err(e) => {
+            log::error!("Error: {:?}", e);
+            None
         }
-    });
+    }
 }
 
 #[derive(Properties, PartialEq, Eq)]
@@ -168,116 +165,183 @@ pub fn lens_component(props: &LensProps) -> Html {
     }
 }
 
-#[function_component(LensManagerPage)]
-pub fn lens_manager_page() -> Html {
-    let active_tab = use_state_eq(|| 0);
-    let user_installed: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
-    let installable: UseStateHandle<Vec<LensResult>> = use_state_eq(Vec::new);
+pub struct LensManagerPage {
+    active_tab: usize,
+    req_user_installed: RequestState,
+    req_available: RequestState,
+    user_installed: Vec<LensResult>,
+    installable: Vec<LensResult>,
+}
+pub enum Msg {
+    RunLensUpdate,
+    RunOpenFolder,
+    RunRefresher,
+    SetActiveTab(usize),
+    SetUserInstalled(Option<Vec<LensResult>>),
+    SetAvailable(Option<Vec<LensResult>>),
+}
 
-    let ui_req_state = use_state_eq(|| RequestState::NotStarted);
-    if *ui_req_state == RequestState::NotStarted {
-        ui_req_state.set(RequestState::InProgress);
-        fetch_installed_lenses(user_installed.clone(), ui_req_state.clone());
-    }
-
-    let i_req_state = use_state_eq(|| RequestState::NotStarted);
-    if *i_req_state == RequestState::NotStarted {
-        i_req_state.set(RequestState::InProgress);
-        fetch_installable_lenses(installable.clone(), i_req_state.clone());
-    }
-
-    let on_open_folder = Callback::from(move |_| {
-        spawn_local(async {
-            let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
-        });
-    });
-
-    let on_refresh = {
-        let ui_req_state = ui_req_state.clone();
-        let i_req_state = i_req_state.clone();
-        Callback::from(move |_| {
-            ui_req_state.set(RequestState::NotStarted);
-            i_req_state.set(RequestState::NotStarted);
-        })
-    };
-
-    let already_installed: HashSet<String> =
-        user_installed.iter().map(|x| x.title.clone()).collect();
-    installable.set(
-        installable
+impl LensManagerPage {
+    fn available_lenses_tabview(&self) -> Html {
+        // Filter already installed lenses from list of available
+        let already_installed: HashSet<String> = self
+            .user_installed
+            .iter()
+            .map(|x| x.title.clone())
+            .collect();
+        let installable = self
+            .installable
             .iter()
             .filter(|x| !already_installed.contains(&x.title))
             .map(|x| x.to_owned())
-            .collect::<Vec<LensResult>>(),
-    );
+            .collect::<Vec<LensResult>>();
 
-    // Handle refreshing the list
-    {
-        let ui_req_state = ui_req_state.clone();
-        let i_req_state = i_req_state.clone();
-        spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move |_| {
-                ui_req_state.set(RequestState::NotStarted);
-                i_req_state.set(RequestState::NotStarted);
-            }) as Box<dyn Fn(JsValue)>);
-
-            let _ = listen(ClientEvent::RefreshLensManager.as_ref(), &cb).await;
-            cb.forget();
-        });
+        installable
+            .iter()
+            .map(|data| {
+                html! {<Lens result={data.clone()} is_installed={false} /> }
+            })
+            .collect::<Html>()
     }
 
-    let contents = if ui_req_state.is_done() && i_req_state.is_done() {
-        if *active_tab == 0 {
-            html! {
-                <>
+    fn user_installed_tabview(&self) -> Html {
+        self.user_installed
+            .iter()
+            .map(|data| {
+                html! {<Lens result={data.clone()} is_installed={true} /> }
+            })
+            .collect::<Html>()
+    }
+}
+
+impl Component for LensManagerPage {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let link = ctx.link();
+        link.send_message(Msg::RunRefresher);
+
+        // Handle refreshing the list
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::RunRefresher);
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = listen(ClientEvent::RefreshLensManager.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
+        Self {
+            active_tab: 0,
+            req_user_installed: RequestState::NotStarted,
+            req_available: RequestState::NotStarted,
+            user_installed: Vec::new(),
+            installable: Vec::new(),
+        }
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let link = ctx.link();
+        match msg {
+            Msg::SetActiveTab(idx) => {
+                self.active_tab = idx;
+                true
+            }
+            Msg::RunOpenFolder => {
+                spawn_local(async {
+                    let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
+                });
+
+                false
+            }
+            Msg::RunLensUpdate => false,
+            Msg::RunRefresher => {
+                // Don't run if requests are in flight.
+                if self.req_available == RequestState::InProgress
+                    || self.req_user_installed == RequestState::InProgress
                 {
-                    user_installed.iter().map(|data| {
-                        html! {<Lens result={data.clone()} is_installed={true} /> }
-                    }).collect::<Html>()
+                    return false;
                 }
-                </>
+
+                self.req_user_installed = RequestState::InProgress;
+                self.req_available = RequestState::InProgress;
+
+                link.send_future(async { Msg::SetAvailable(fetch_available_lenses().await) });
+                link.send_future(async {
+                    Msg::SetUserInstalled(fetch_user_installed_lenses().await)
+                });
+
+                false
+            }
+            Msg::SetAvailable(lenses) => {
+                if let Some(lenses) = lenses {
+                    self.req_available = RequestState::Finished;
+                    self.installable = lenses;
+                    true
+                } else {
+                    self.req_available = RequestState::Error;
+                    false
+                }
+            }
+            Msg::SetUserInstalled(lenses) => {
+                if let Some(lenses) = lenses {
+                    self.req_user_installed = RequestState::Finished;
+                    self.user_installed = lenses;
+                    true
+                } else {
+                    self.req_user_installed = RequestState::Error;
+                    false
+                }
+            }
+        }
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+
+        let contents = if self.req_user_installed.is_done() && self.req_available.is_done() {
+            if self.active_tab == 0 {
+                self.user_installed_tabview()
+            } else {
+                self.available_lenses_tabview()
             }
         } else {
             html! {
-                <>
-                {
-                    installable.iter().map(|data| {
-                        html! {<Lens result={data.clone()} is_installed={false} /> }
-                    }).collect::<Html>()
-                }
-            </>
-            }
-        }
-    } else {
-        html! {
-            <div class="flex justify-center">
-                <div class="p-16">
-                    <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                <div class="flex justify-center">
+                    <div class="p-16">
+                        <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                    </div>
                 </div>
+            }
+        };
+
+        let tabs = html! {
+            <Tabs
+                onchange={link.callback(|e: TabEvent| Msg::SetActiveTab(e.tab_idx))}
+                tabs={vec!["Installed".to_string(), "Available".to_string()]}
+            />
+        };
+
+        html! {
+            <div class="text-white relative">
+                <Header label="Lens Manager" tabs={tabs}>
+                    <Btn onclick={link.callback(|_| Msg::RunOpenFolder)}>
+                        <icons::FolderOpenIcon />
+                        <div class="ml-2">{"Lens folder"}</div>
+                    </Btn>
+                    <Btn onclick={link.callback(|_| Msg::RunLensUpdate)}>
+                        <icons::RefreshIcon />
+                    </Btn>
+                    <Btn onclick={link.callback(|_| Msg::RunRefresher)}>
+                        <icons::RefreshIcon />
+                    </Btn>
+                </Header>
+                <div>{contents}</div>
             </div>
         }
-    };
-
-    let handle_tab_change = Callback::from(move |evnt: TabEvent| {
-        active_tab.set(evnt.tab_idx);
-    });
-
-    let tabs = html! {
-        <Tabs onchange={handle_tab_change} tabs={vec!["Installed".to_string(), "Uninstalled".to_string()]} />
-    };
-
-    html! {
-        <div class="text-white relative">
-            <Header label="Lens Manager" tabs={tabs}>
-                <Btn onclick={on_open_folder}>
-                    <icons::FolderOpenIcon />
-                    <div class="ml-2">{"Lens folder"}</div>
-                </Btn>
-                <Btn onclick={on_refresh}>
-                    <icons::RefreshIcon />
-                </Btn>
-            </Header>
-            <div>{contents}</div>
-        </div>
     }
 }

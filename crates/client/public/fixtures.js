@@ -1,3 +1,7 @@
+let CALLBACKS = {};
+
+// This is used to mock endpoints when running the client headless via
+// make run-headless-client
 export let invoke = async (func_name, params) => {
     console.log(`calling: ${func_name} w/`, params);
 
@@ -45,43 +49,19 @@ export let invoke = async (func_name, params) => {
             html_url: null,
             download_url: null,
         }];
-    } else if (func_name == "list_installable_lenses") {
+    } else if (func_name == "plugin:lens-updater|list_installable_lenses") {
         return [{
-            author: "testing",
+            author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            name: "2007scape",
-            sha: "12345678990",
-            download_url: "",
-            html_url: "",
-        }, {
-            author: "testing",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            name: "2007scape",
-            sha: "12345678990",
-            download_url: "",
-            html_url: "",
-        }, {
-            author: "testing",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            name: "2007scape",
-            sha: "12345678990",
-            download_url: "",
-            html_url: "",
-        }, {
-            author: "testing",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            name: "2007scape",
-            sha: "12345678990",
-            download_url: "",
-            html_url: "",
-        }, {
-            author: "testing",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            name: "2007scape",
-            sha: "12345678990",
-            download_url: "",
-            html_url: "",
+            name: "installable",
+            sha: "fake-sha",
+            html_url: "https://example.com",
+            download_url: "https://example.com",
         }];
+    } else if (func_name == "install_lens") {
+        window.setTimeout(() => {
+            CALLBACKS["RefreshLensManager"]();
+        }, 5000);
     } else if (func_name == "list_plugins") {
         return [{
             author: "a5huynh",
@@ -124,7 +104,9 @@ export let invoke = async (func_name, params) => {
     return [];
 };
 
-export let listen = async () => {
+export let listen = async (event, callback) => {
+    console.log(`listen called w/ ${event}`);
+    CALLBACKS[event] = callback;
     return {};
 };
 

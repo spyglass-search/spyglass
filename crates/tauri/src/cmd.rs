@@ -14,8 +14,7 @@ use shared::{
     config::Config,
     event::ClientEvent,
     form::{FormType, SettingOpts},
-    request,
-    response::{self, InstallableLens},
+    request, response,
 };
 use spyglass_rpc::RpcClient;
 
@@ -108,27 +107,6 @@ pub async fn list_installed_lenses(
     } else {
         Ok(Vec::new())
     }
-}
-
-#[tauri::command]
-pub async fn list_installable_lenses(
-    _: tauri::Window,
-) -> Result<Vec<response::InstallableLens>, String> {
-    let client = reqwest::Client::builder()
-        .user_agent(constants::APP_USER_AGENT)
-        .build()
-        .expect("Unable to create reqwest client");
-
-    if let Ok(res) = client.get(constants::LENS_DIRECTORY_INDEX_URL).send().await {
-        if let Ok(file_contents) = res.text().await {
-            return match ron::from_str::<Vec<InstallableLens>>(&file_contents) {
-                Ok(json) => Ok(json),
-                Err(e) => Err(format!("Unable to parse index: {}", e)),
-            };
-        }
-    }
-
-    Ok(Vec::new())
 }
 
 #[tauri::command]
