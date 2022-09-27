@@ -72,6 +72,7 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
     let installed = get_installed_lenses(app_handle).await?;
 
     // Loop through each one and check if it needs an update
+    let mut lenses_updated = 0;
     for lens in installed {
         if lens_index_map.contains_key(&lens.title) {
             // Compare hash from index to local hash
@@ -83,15 +84,23 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
                     latest.download_url
                 );
 
+                // Remove old lens
+                if let Some(old_file) = lens.file_path {
+                    fs::remove_file(old_file)?;
+                }
+
                 if let Err(e) =
                     install_lens_to_path(&latest.download_url, config.lenses_dir()).await
                 {
                     log::error!("Unable to install lens: {}", e);
+                } else {
+                    lenses_updated += 1;
                 }
             }
         }
     }
 
+    log::info!("updated {} lenses", lenses_updated);
     Ok(())
 }
 

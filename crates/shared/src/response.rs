@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -41,6 +43,8 @@ pub struct LensResult {
     pub description: String,
     // Used to determine whether a lens needs an update
     pub hash: String,
+    // For installed lenses.
+    pub file_path: Option<PathBuf>,
     // Only relevant for installable lenses
     pub html_url: Option<String>,
     pub download_url: Option<String>,

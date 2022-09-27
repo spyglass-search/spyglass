@@ -183,6 +183,7 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
             title: lens.name.clone(),
             description: lens.description.clone().unwrap_or_else(|| "".into()),
             hash: lens.hash.clone(),
+            file_path: Some(lens.file_path.clone()),
             ..Default::default()
         })
         .collect();

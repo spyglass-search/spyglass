@@ -47,6 +47,7 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                         title: lens.name.clone(),
                         description: lens.description.clone(),
                         hash: lens.sha.clone(),
+                        file_path: None,
                         html_url: Some(lens.html_url.clone()),
                         download_url: Some(lens.download_url.clone()),
                     })
