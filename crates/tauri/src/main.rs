@@ -295,18 +295,21 @@ async fn check_version_interval(window: Window) {
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
     let app_handle = window.app_handle();
-
     loop {
-        interval.tick().await;
-        log::info!("checking for update...");
-        if let Ok(response) = app_handle.updater().check().await {
-            if response.is_update_available() {
-                // show update dialog
-                show_update_window(&app_handle);
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                break;
+            },
+            _ = interval.tick() => {
+                log::info!("checking for update...");
+                if let Ok(response) = app_handle.updater().check().await {
+                    if response.is_update_available() {
+                        // show update dialog
+                        show_update_window(&app_handle);
+                    }
+                }
             }
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 }
 
