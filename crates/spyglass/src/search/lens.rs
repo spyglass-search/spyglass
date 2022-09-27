@@ -56,13 +56,11 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
     for entry in (fs::read_dir(lense_dir)?).flatten() {
         let path = entry.path();
         if path.is_file() && path.extension().unwrap_or_default() == "ron" {
-            if let Ok(file_contents) = fs::read_to_string(path) {
-                match ron::from_str::<LensConfig>(&file_contents) {
-                    Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
-                    Ok(lens) => {
-                        if lens.is_enabled {
-                            state.lenses.insert(lens.name.clone(), lens);
-                        }
+            match LensConfig::from_path(path) {
+                Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
+                Ok(lens) => {
+                    if lens.is_enabled {
+                        state.lenses.insert(lens.name.clone(), lens);
                     }
                 }
             }

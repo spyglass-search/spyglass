@@ -1,5 +1,8 @@
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+use blake2::{Blake2s256, Digest};
+use serde::{Deserialize, Serialize};
+
 pub mod pipeline;
 mod utils;
 
@@ -58,6 +61,11 @@ pub struct LensConfig {
     pub trigger: String,
     #[serde(default)]
     pub pipeline: Option<String>,
+    // Used internally & should not be serialized/deserialized
+    #[serde(skip)]
+    pub file_path: PathBuf,
+    #[serde(skip)]
+    pub hash: String,
 }
 
 impl LensConfig {
@@ -91,10 +99,27 @@ impl LensConfig {
         LensFilters { allowed, skipped }
     }
 
+    pub fn from_string(contents: &str) -> anyhow::Result<Self> {
+        let mut hasher = Blake2s256::new();
+        hasher.update(contents);
+        let hash_hex = hex::encode(hasher.finalize());
+
+        match ron::from_str::<LensConfig>(contents) {
+            Ok(mut lens) => {
+                lens.hash = hash_hex;
+                Ok(lens)
+            }
+            Err(e) => Err(anyhow::Error::msg(e.to_string())),
+        }
+    }
+
     pub fn from_path(path: PathBuf) -> anyhow::Result<Self> {
-        let contents = std::fs::read_to_string(path)?;
-        match ron::from_str::<LensConfig>(&contents) {
-            Ok(lens) => Ok(lens),
+        let contents = std::fs::read_to_string(path.clone())?;
+        match Self::from_string(&contents) {
+            Ok(mut lens) => {
+                lens.file_path = path;
+                Ok(lens)
+            }
             Err(e) => Err(anyhow::Error::msg(e.to_string())),
         }
     }

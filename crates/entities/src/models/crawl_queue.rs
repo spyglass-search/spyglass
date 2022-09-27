@@ -794,8 +794,8 @@ mod test {
 
     #[tokio::test]
     async fn test_create_ruleset() {
-        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/test.ron"))
-            .unwrap();
+        let lens =
+            LensConfig::from_string(include_str!("../../../../fixtures/lens/test.ron")).unwrap();
 
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
@@ -814,8 +814,8 @@ mod test {
 
     #[tokio::test]
     async fn test_create_ruleset_with_limits() {
-        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/imdb.ron"))
-            .unwrap();
+        let lens =
+            LensConfig::from_string(include_str!("../../../../fixtures/lens/imdb.ron")).unwrap();
 
         let rules = super::create_ruleset_from_lens(&lens);
         let allow_list = regex::RegexSet::new(rules.allow_list).unwrap();
@@ -863,8 +863,8 @@ mod test {
         let settings = UserSettings::default();
         let overrides = EnqueueSettings::default();
 
-        let lens = ron::from_str::<LensConfig>(include_str!("../../../../fixtures/lens/bahai.ron"))
-            .unwrap();
+        let lens =
+            LensConfig::from_string(include_str!("../../../../fixtures/lens/bahai.ron")).unwrap();
 
         let to_enqueue = vec![
             "https://bahai-library.com//shoghi-effendi_goals_crusade".into(),

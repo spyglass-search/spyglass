@@ -99,7 +99,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::delete_domain,
             cmd::escape,
             cmd::install_lens,
-            cmd::list_installed_lenses,
             cmd::list_plugins,
             cmd::load_user_settings,
             cmd::network_change,

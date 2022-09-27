@@ -43,11 +43,12 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                 let parsed: Vec<LensResult> = lenses
                     .iter()
                     .map(|lens| LensResult {
-                        author: lens.author.to_owned(),
-                        title: lens.name.to_owned(),
-                        description: lens.description.to_owned(),
-                        html_url: Some(lens.html_url.to_owned()),
-                        download_url: Some(lens.download_url.to_owned()),
+                        author: lens.author.clone(),
+                        title: lens.name.clone(),
+                        description: lens.description.clone(),
+                        hash: lens.sha.clone(),
+                        html_url: Some(lens.html_url.clone()),
+                        download_url: Some(lens.download_url.clone()),
                     })
                     .collect();
 
@@ -258,7 +259,13 @@ impl Component for LensManagerPage {
 
                 false
             }
-            Msg::RunLensUpdate => false,
+            Msg::RunLensUpdate => {
+                spawn_local(async {
+                    let _ = invoke(ClientInvoke::RunLensUpdater.as_ref(), JsValue::NULL).await;
+                });
+
+                false
+            }
             Msg::RunRefresher => {
                 // Don't run if requests are in flight.
                 if self.req_available == RequestState::InProgress
