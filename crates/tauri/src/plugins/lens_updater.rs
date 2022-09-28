@@ -13,6 +13,7 @@ use url::Url;
 
 use crate::{constants, rpc};
 use shared::config::Config;
+use shared::event::ClientEvent;
 use shared::response::{InstallableLens, LensResult};
 use spyglass_rpc::RpcClient;
 
@@ -100,6 +101,7 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
         }
     }
 
+    let _ = app_handle.emit_all(ClientEvent::UpdateLensFinished.as_ref(), true);
     log::info!("updated {} lenses", lenses_updated);
     Ok(())
 }

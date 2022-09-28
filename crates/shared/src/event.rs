@@ -9,6 +9,7 @@ pub enum ClientEvent {
     RefreshPluginManager,
     RefreshSearchResults,
     StartupProgress,
+    UpdateLensFinished,
 }
 
 #[derive(AsRefStr, Display)]

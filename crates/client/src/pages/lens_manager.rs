@@ -169,7 +169,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
 pub struct LensManagerPage {
     active_tab: usize,
-
+    lens_updater: RequestState,
     req_user_installed: RequestState,
     req_available: RequestState,
     user_installed: Vec<LensResult>,
@@ -179,6 +179,7 @@ pub enum Msg {
     RunLensUpdate,
     RunOpenFolder,
     RunRefresher,
+    UpdaterFinished,
     SetActiveTab(usize),
     SetUserInstalled(Option<Vec<LensResult>>),
     SetAvailable(Option<Vec<LensResult>>),
@@ -238,8 +239,21 @@ impl Component for LensManagerPage {
             });
         }
 
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::UpdaterFinished);
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = listen(ClientEvent::UpdateLensFinished.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
         Self {
             active_tab: 0,
+            lens_updater: RequestState::NotStarted,
             req_user_installed: RequestState::NotStarted,
             req_available: RequestState::NotStarted,
             user_installed: Vec::new(),
@@ -262,11 +276,12 @@ impl Component for LensManagerPage {
                 false
             }
             Msg::RunLensUpdate => {
+                self.lens_updater = RequestState::InProgress;
                 spawn_local(async {
                     let _ = invoke(ClientInvoke::RunLensUpdater.as_ref(), JsValue::NULL).await;
                 });
 
-                false
+                true
             }
             Msg::RunRefresher => {
                 // Don't run if requests are in flight.
@@ -306,6 +321,10 @@ impl Component for LensManagerPage {
                     false
                 }
             }
+            Msg::UpdaterFinished => {
+                self.lens_updater = RequestState::Finished;
+                true
+            }
         }
     }
 
@@ -335,6 +354,12 @@ impl Component for LensManagerPage {
             />
         };
 
+        let lens_update_icon = if self.lens_updater.in_progress() {
+            html! { <icons::RefreshIcon animate_spin={true} /> }
+        } else {
+            html! { <icons::DocumentArrowDown /> }
+        };
+
         html! {
             <div class="text-white relative">
                 <Header label="Lens Manager" tabs={tabs}>
@@ -343,7 +368,7 @@ impl Component for LensManagerPage {
                         <div class="ml-2">{"Lens folder"}</div>
                     </Btn>
                     <Btn onclick={link.callback(|_| Msg::RunLensUpdate)}>
-                        <icons::DocumentArrowDown />
+                        {lens_update_icon}
                         <div class="ml-2">{"Update"}</div>
                     </Btn>
                     <Btn onclick={link.callback(|_| Msg::RunRefresher)}>
