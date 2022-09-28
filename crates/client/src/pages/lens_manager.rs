@@ -169,6 +169,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
 pub struct LensManagerPage {
     active_tab: usize,
+
     req_user_installed: RequestState,
     req_available: RequestState,
     user_installed: Vec<LensResult>,
@@ -342,10 +343,11 @@ impl Component for LensManagerPage {
                         <div class="ml-2">{"Lens folder"}</div>
                     </Btn>
                     <Btn onclick={link.callback(|_| Msg::RunLensUpdate)}>
-                        <icons::RefreshIcon />
+                        <icons::DocumentArrowDown />
+                        <div class="ml-2">{"Update"}</div>
                     </Btn>
                     <Btn onclick={link.callback(|_| Msg::RunRefresher)}>
-                        <icons::RefreshIcon />
+                        <icons::RefreshIcon animate_spin={self.req_available.in_progress() || self.req_user_installed.in_progress()} />
                     </Btn>
                 </Header>
                 <div>{contents}</div>
