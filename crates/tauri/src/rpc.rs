@@ -10,15 +10,14 @@ use tauri::{
     api::process::{Command, CommandEvent},
     AppHandle, Manager,
 };
-use tokio::signal;
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
 use shared::config::Config;
 use spyglass_rpc::RpcClient;
 
-use crate::constants;
+use crate::{constants, AppShutdown};
 
 pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
@@ -56,16 +55,19 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
 
 impl SpyglassServerClient {
     /// Monitors the health of the backend & recreates it necessary.
-    pub async fn daemon_eyes(rpc: RpcMutex) {
+    pub async fn daemon_eyes(rpc: RpcMutex, mut shutdown: broadcast::Receiver<AppShutdown>) {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
         loop {
             tokio::select! {
-                _ = signal::ctrl_c() => {
+                _ = shutdown.recv() => {
+                    log::info!("🛑 Shutting down sidecar");
+
                     let rpc = rpc.lock().await;
                     if let Some(handle) = &rpc.sidecar_handle {
                         handle.abort();
                     }
-                    break;
+
+                    return;
                 },
                 _ = interval.tick() => {
                     let mut rpc = rpc.lock().await;

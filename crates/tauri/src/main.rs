@@ -13,8 +13,10 @@ use std::sync::Arc;
 use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
 use tauri::{
-    AppHandle, GlobalShortcutManager, Manager, PathResolver, SystemTray, SystemTrayEvent, Window,
+    AppHandle, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
+    Window,
 };
+use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
@@ -39,6 +41,8 @@ use window::{
 
 use crate::window::show_update_window;
 
+#[derive(Clone)]
+pub struct AppShutdown;
 type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -90,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
@@ -119,6 +123,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .setup(move |app| {
             let app_handle = app.app_handle();
             window::show_startup_window(&app_handle);
+
+            let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(1);
+            app.manage(shutdown_tx);
 
             let config = Config::new();
             log::info!("Loading prefs from: {:?}", Config::prefs_dir());
@@ -234,8 +241,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         })
-        .run(ctx)
+        .build(ctx)
         .expect("error while running tauri application");
+
+    app.run(|app_handle, e| match e {
+        RunEvent::ExitRequested { .. } => {
+            // Do some cleanup for long running tasks
+            let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+            let _ = shutdown_tx.send(AppShutdown);
+        }
+        RunEvent::Exit { .. } => {
+            log::info!("😔 bye bye");
+        }
+        _ => {}
+    });
 
     Ok(())
 }
@@ -295,10 +314,14 @@ async fn check_version_interval(window: Window) {
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
     let app_handle = window.app_handle();
+    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+    let mut shutdown = shutdown_tx.subscribe();
+
     loop {
         tokio::select! {
-            _ = tokio::signal::ctrl_c() => {
-                break;
+            _ = shutdown.recv() => {
+                log::info!("🛑 Shutting down version checker");
+                return;
             },
             _ = interval.tick() => {
                 log::info!("checking for update...");

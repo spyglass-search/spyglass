@@ -4,8 +4,8 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
+use tokio::sync::{broadcast, Mutex};
 use tokio::time::{self, Duration};
-use tokio::{signal, sync::Mutex};
 
 use migration::Migrator;
 use shared::response::AppStatus;
@@ -21,6 +21,7 @@ use crate::{
     constants,
     menu::MenuID,
     rpc::{self, RpcMutex},
+    AppShutdown,
 };
 
 pub struct StartupProgressText(std::sync::Mutex<String>);
@@ -48,12 +49,18 @@ pub fn init() -> TauriPlugin<Wry> {
 
                     // Keep system tray stats updated
                     let app_handle = app_handle.clone();
+                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+                    let mut shutdown = shutdown_tx.subscribe();
+
                     tauri::async_runtime::spawn(async move {
                         let mut interval =
                             time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
                         loop {
                             tokio::select! {
-                                _ = signal::ctrl_c() => break,
+                                _ = shutdown.recv() => {
+                                    log::info!("🛑 Shutting down system tray updater");
+                                    return;
+                                }
                                 _ = interval.tick() => update_tray_menu(&app_handle).await
                             }
                         }
@@ -125,8 +132,13 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     let rpc = SpyglassServerClient::new(&config, &app_handle).await;
     let rpc_mutex = RpcMutex::new(Mutex::new(rpc));
     app_handle.manage(rpc_mutex.clone());
+
+    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
     // Watch and restart backend if it goes down
-    tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(rpc_mutex));
+    tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(
+        rpc_mutex,
+        shutdown_tx.subscribe(),
+    ));
 
     // Will cancel and clear any interval checks in the client
     progress.set("DONE");

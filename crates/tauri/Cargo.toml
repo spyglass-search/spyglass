@@ -31,7 +31,7 @@ shared = { path = "../shared" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"
 strum_macros = "0.24"
-tauri = { version = "1.0.5", features = ["api-all", "devtools", "dialog", "notification", "process-command-api", "system-tray", "updater"] }
+tauri = { version = "1.1", features = ["api-all", "devtools", "dialog", "notification", "process-command-api", "system-tray", "updater"] }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"

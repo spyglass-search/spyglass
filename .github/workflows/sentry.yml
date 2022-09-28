@@ -36,7 +36,7 @@ jobs:
       run: rustup target add aarch64-apple-darwin
     # Install tauri build deps
     - name: install tauri-cli & tauri-build
-      run: cargo install tauri-cli --version "^1.0.5"
+      run: cargo install tauri-cli --version "^1.1"
     - name: install trunk
       run: cargo install --locked trunk
     # Install linux specific dependencies

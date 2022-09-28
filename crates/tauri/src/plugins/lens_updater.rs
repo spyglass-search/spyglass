@@ -7,11 +7,11 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
-use tokio::signal;
+use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 use url::Url;
 
-use crate::{constants, rpc};
+use crate::{constants, rpc, AppShutdown};
 use shared::config::Config;
 use shared::event::ClientEvent;
 use shared::response::{InstallableLens, LensResult};
@@ -34,10 +34,17 @@ pub fn init() -> TauriPlugin<Wry> {
                     let mut interval = time::interval(Duration::from_secs(
                         constants::LENS_UPDATE_CHECK_INTERVAL_S,
                     ));
+
                     let app_handle = app_handle.clone();
+                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+                    let mut shutdown = shutdown_tx.subscribe();
+
                     loop {
                         tokio::select! {
-                            _ = signal::ctrl_c() => break,
+                            _ = shutdown.recv() => {
+                                log::info!("🛑 Shutting down lens updater");
+                                return;
+                            },
                             _ = interval.tick() => {
                                 let _ = check_for_lens_updates(&app_handle).await;
                             },
