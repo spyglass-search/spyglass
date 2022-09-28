@@ -140,7 +140,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not found");
-            let _ = window.set_skip_taskbar(true);
             window::center_search_bar(&window);
             // Hide on start.
             let _ = window.hide();

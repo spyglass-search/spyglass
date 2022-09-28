@@ -198,7 +198,7 @@ pub fn search_page() -> Html {
     };
 
     html! {
-        <div ref={node_ref} class="relative overflow-hidden">
+        <div ref={node_ref} class="relative overflow-hidden rounded-xl">
             <div class="flex flex-nowrap w-full">
                 <SelectedLens lens={(*lens).clone()} />
                 <input
