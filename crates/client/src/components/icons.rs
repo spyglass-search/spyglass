@@ -95,6 +95,15 @@ pub fn desktop_computer_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(DocumentArrowDown)]
+pub fn document_arrow_down(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+        </svg>
+    }
+}
+
 #[function_component(DocumentDownloadIcon)]
 pub fn document_download_icon(props: &IconProps) -> Html {
     html! {
@@ -181,8 +190,8 @@ pub fn pencil_icon(props: &IconProps) -> Html {
 #[function_component(RefreshIcon)]
 pub fn refresh_icon(props: &IconProps) -> Html {
     html! {
-        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
         </svg>
     }
 }

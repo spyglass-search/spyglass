@@ -91,6 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     tauri::Builder::default()
+        .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
             cmd::crawl_stats,
@@ -98,8 +99,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::delete_domain,
             cmd::escape,
             cmd::install_lens,
-            cmd::list_installable_lenses,
-            cmd::list_installed_lenses,
             cmd::list_plugins,
             cmd::load_user_settings,
             cmd::network_change,
@@ -296,18 +295,21 @@ async fn check_version_interval(window: Window) {
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
     let app_handle = window.app_handle();
-
     loop {
-        interval.tick().await;
-        log::info!("checking for update...");
-        if let Ok(response) = app_handle.updater().check().await {
-            if response.is_update_available() {
-                // show update dialog
-                show_update_window(&app_handle);
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                break;
+            },
+            _ = interval.tick() => {
+                log::info!("checking for update...");
+                if let Ok(response) = app_handle.updater().check().await {
+                    if response.is_update_available() {
+                        // show update dialog
+                        show_update_window(&app_handle);
+                    }
+                }
             }
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 }
 
