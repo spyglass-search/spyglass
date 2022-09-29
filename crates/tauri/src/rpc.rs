@@ -37,7 +37,7 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
     {
         Ok(client) => {
             // Wait until we have a connection
-            let retry_strategy = FixedInterval::from_millis(100).take(4);
+            let retry_strategy = FixedInterval::from_millis(5000).take(4);
             match Retry::spawn(retry_strategy, || client.protocol_version()).await {
                 Ok(v) => {
                     log::info!("connected to daemon w/ version: {}", v);
