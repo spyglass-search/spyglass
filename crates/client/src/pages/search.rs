@@ -205,7 +205,7 @@ pub fn search_page() -> Html {
                     ref={query_ref}
                     id="searchbox"
                     type="text"
-                    class="bg-neutral-800 text-white text-5xl p-4 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
+                    class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
                     placeholder="Search"
                     {onkeyup}
                     {onkeydown}
