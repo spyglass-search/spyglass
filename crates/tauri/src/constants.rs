@@ -7,6 +7,8 @@ pub const MIN_WINDOW_HEIGHT: f64 = 480.0;
 
 // Check for a new version every 6 hours. 60 seconds * 60 minutes * 6 hours
 pub const VERSION_CHECK_INTERVAL_S: u64 = 60 * 60 * 6;
+// Check on start & every hour for new lenses
+pub const LENS_UPDATE_CHECK_INTERVAL_S: u64 = 60 * 60;
 
 pub const APP_USER_AGENT: &str = "spyglass (github.com/a5huynh/spyglass)";
 pub const LENS_DIRECTORY_INDEX_URL: &str =

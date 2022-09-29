@@ -83,7 +83,7 @@ impl Component for StartupPage {
         };
 
         html! {
-            <div class="flex flex-col place-content-center place-items-center mt-14">
+            <div class="bg-neutral-800 flex-col place-content-center place-items-center mt-14">
                 <icons::RefreshIcon animate_spin={true} height="h-16" width="w-16" />
                 <div class="mt-4 font-medium">{"Starting Spyglass"}</div>
                 <div class="mt-1 text-stone-500 text-sm">{self.progress_caption.clone()}</div>

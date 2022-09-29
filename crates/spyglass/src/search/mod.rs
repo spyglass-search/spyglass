@@ -83,12 +83,12 @@ impl Searcher {
     }
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
-    pub fn with_index(index_path: &IndexPath) -> Self {
+    pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
         let schema = DocFields::as_schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
-                let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
-                Index::open_or_create(dir, schema).expect("Unable to open search index")
+                let dir = MmapDirectory::open(path)?;
+                Index::open_or_create(dir, schema)?
             }
             IndexPath::Memory => Index::create_in_ram(schema),
         };
@@ -107,11 +107,11 @@ impl Searcher {
             .try_into()
             .expect("Unable to create reader");
 
-        Searcher {
+        Ok(Searcher {
             index,
             reader,
             writer: Arc::new(Mutex::new(writer)),
-        }
+        })
     }
 
     pub fn add_document(
@@ -337,7 +337,7 @@ mod test {
             .into_iter()
             .map(SearchFilter::URLRegexAllow)
             .collect();
-        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let query = "salinas";
@@ -362,7 +362,7 @@ mod test {
             .into_iter()
             .map(SearchFilter::URLRegexAllow)
             .collect();
-        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let query = "salinas";
@@ -388,7 +388,7 @@ mod test {
             .map(SearchFilter::URLRegexAllow)
             .collect();
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory);
+        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let query = "salinas";

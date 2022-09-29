@@ -95,10 +95,7 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
     #[cfg(not(target_os = "windows"))]
     {
         // Step 1 delete destination
-        if let Err(e) = std::fs::remove_dir_all(dest) {
-            return Err(e);
-        }
-
+        std::fs::remove_dir_all(dest)?;
         // Step 2 Rename
         std::fs::rename(source, dest)
     }

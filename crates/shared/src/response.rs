@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -24,7 +26,7 @@ pub struct CrawlStats {
     pub by_domain: Vec<(String, QueueStatus)>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct InstallableLens {
     pub author: String,
     pub description: String,
@@ -39,6 +41,10 @@ pub struct LensResult {
     pub author: String,
     pub title: String,
     pub description: String,
+    // Used to determine whether a lens needs an update
+    pub hash: String,
+    // For installed lenses.
+    pub file_path: Option<PathBuf>,
     // Only relevant for installable lenses
     pub html_url: Option<String>,
     pub download_url: Option<String>,

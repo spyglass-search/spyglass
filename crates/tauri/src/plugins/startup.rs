@@ -4,14 +4,16 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tokio::time::{self, Duration};
 
-use crate::rpc::SpyglassServerClient;
 use migration::Migrator;
 use shared::response::AppStatus;
 use shared::{config::Config, response};
 use spyglass_rpc::RpcClient;
+
+use crate::rpc::SpyglassServerClient;
+use crate::window::show_wizard_window;
 
 const TRAY_UPDATE_INTERVAL_S: u64 = 60;
 
@@ -19,9 +21,11 @@ use crate::{
     constants,
     menu::MenuID,
     rpc::{self, RpcMutex},
+    AppShutdown,
 };
 
 pub struct StartupProgressText(std::sync::Mutex<String>);
+
 impl StartupProgressText {
     pub fn set(&self, new_value: &str) {
         if let Ok(mut value) = self.0.lock() {
@@ -34,23 +38,46 @@ pub fn init() -> TauriPlugin<Wry> {
     Builder::new("tauri-plugin-startup")
         .invoke_handler(tauri::generate_handler![get_startup_progress])
         .on_event(|app_handle, event| {
-            if let RunEvent::Ready = event {
-                app_handle.manage(StartupProgressText(std::sync::Mutex::new(
-                    "Running startup tasks...".to_string(),
-                )));
+            match event {
+                RunEvent::Ready => {
+                    app_handle.manage(StartupProgressText(std::sync::Mutex::new(
+                        "Running startup tasks...".to_string(),
+                    )));
 
-                // Don't block the main thread
-                tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
+                    // Don't block the main thread
+                    tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
 
-                // Keep system tray stats updated
-                let app_handle = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
-                    loop {
-                        update_tray_menu(&app_handle).await;
-                        interval.tick().await;
+                    // Keep system tray stats updated
+                    let app_handle = app_handle.clone();
+                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+                    let mut shutdown = shutdown_tx.subscribe();
+
+                    tauri::async_runtime::spawn(async move {
+                        let mut interval =
+                            time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
+                        loop {
+                            tokio::select! {
+                                _ = shutdown.recv() => {
+                                    log::info!("🛑 Shutting down system tray updater");
+                                    return;
+                                }
+                                _ = interval.tick() => update_tray_menu(&app_handle).await
+                            }
+                        }
+                    });
+                }
+                RunEvent::Exit => {
+                    let app_handle = app_handle.clone();
+                    if let Some(rpc) = app_handle.try_state::<RpcMutex>() {
+                        tauri::async_runtime::block_on(async move {
+                            let rpc = rpc.lock().await;
+                            if let Some(sidecar) = &rpc.sidecar_handle {
+                                sidecar.abort();
+                            }
+                        });
                     }
-                });
+                }
+                _ => {}
             }
         })
         .build()
@@ -102,14 +129,29 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     progress.set("Waiting for backend...");
 
     let config = app_handle.state::<Config>();
-    let rpc = SpyglassServerClient::new(&config).await;
+    let rpc = SpyglassServerClient::new(&config, &app_handle).await;
     let rpc_mutex = RpcMutex::new(Mutex::new(rpc));
     app_handle.manage(rpc_mutex.clone());
-    tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(rpc_mutex));
+
+    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+    // Watch and restart backend if it goes down
+    tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(
+        rpc_mutex,
+        shutdown_tx.subscribe(),
+    ));
 
     // Will cancel and clear any interval checks in the client
     progress.set("DONE");
     let _ = window.hide();
+
+    // Run wizard on first run
+    if !config.user_settings.run_wizard {
+        show_wizard_window(&window.app_handle());
+        // Only run the wizard once.
+        let mut updated = config.user_settings.clone();
+        updated.run_wizard = true;
+        let _ = config.save_user_settings(&updated);
+    }
 }
 
 async fn update_tray_menu(app: &AppHandle) {

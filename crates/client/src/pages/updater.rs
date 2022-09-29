@@ -8,7 +8,7 @@ use crate::invoke;
 use shared::event::ClientInvoke;
 
 // Random gif for your viewing pleasure.
-const UPDATE_GIFS: [&str; 6] = [
+const UPDATE_GIFS: [&str; 5] = [
     // Adventure Time
     "10bxTLrpJNS0PC",
     "fm4WhPMzu9hRK",
@@ -16,8 +16,6 @@ const UPDATE_GIFS: [&str; 6] = [
     "13FBIII8M4IDDi",
     // Futurama
     "gYZ7qO81g4dt6",
-    // Elmo
-    "MdqE46HziuFJTlIwjw",
 ];
 
 #[function_component(UpdaterPage)]

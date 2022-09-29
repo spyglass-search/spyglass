@@ -36,7 +36,8 @@ impl AppState {
             .await
             .expect("Unable to connect to database");
 
-        let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()));
+        let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()))
+            .expect("Unable to open index.");
 
         // TODO: Load from saved preferences
         let app_state = DashMap::new();
@@ -135,7 +136,7 @@ impl AppStateBuilder {
     }
 
     pub fn with_index(&mut self, index: &IndexPath) -> &mut Self {
-        self.index = Some(Searcher::with_index(index));
+        self.index = Some(Searcher::with_index(index).expect("Unable to open index"));
         self
     }
 }

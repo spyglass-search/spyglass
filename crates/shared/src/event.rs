@@ -9,6 +9,7 @@ pub enum ClientEvent {
     RefreshPluginManager,
     RefreshSearchResults,
     StartupProgress,
+    UpdateLensFinished,
 }
 
 #[derive(AsRefStr, Display)]
@@ -21,14 +22,16 @@ pub enum ClientInvoke {
     GetCrawlStats,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
-    #[strum(serialize = "list_installed_lenses")]
+    #[strum(serialize = "plugin:lens-updater|list_installed_lenses")]
     ListInstalledLenses,
-    #[strum(serialize = "list_installable_lenses")]
+    #[strum(serialize = "plugin:lens-updater|list_installable_lenses")]
     ListInstallableLenses,
     #[strum(serialize = "list_plugins")]
     ListPlugins,
     #[strum(serialize = "load_user_settings")]
     LoadUserSettings,
+    #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
+    RunLensUpdater,
     #[strum(serialize = "open_lens_folder")]
     OpenLensFolder,
     #[strum(serialize = "open_settings_folder")]
