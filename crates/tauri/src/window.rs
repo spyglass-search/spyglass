@@ -149,8 +149,9 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
         )
         .title("Spyglass - Starting up")
         .decorations(false)
-        .min_inner_size(256.0, 256.0)
-        .max_inner_size(256.0, 256.0)
+        .min_inner_size(256.0, 272.0)
+        .max_inner_size(256.0, 272.0)
+        .transparent(true)
         .build()
         .expect("Unable to build startup window")
     };

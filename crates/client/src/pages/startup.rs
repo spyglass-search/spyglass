@@ -32,7 +32,7 @@ impl Component for StartupPage {
 
         Self {
             handle: Some(interval_handle),
-            progress_caption: "".to_string(),
+            progress_caption: "Reticulating splines...".to_string(),
             time_taken: 0,
         }
     }
@@ -83,11 +83,13 @@ impl Component for StartupPage {
         };
 
         html! {
-            <div class="bg-neutral-800 flex flex-col place-content-center place-items-center mt-14">
-                <icons::RefreshIcon animate_spin={true} height="h-16" width="w-16" />
-                <div class="mt-4 font-medium">{"Starting Spyglass"}</div>
-                <div class="mt-1 text-stone-500 text-sm">{self.progress_caption.clone()}</div>
-                <div class="mt-1 text-stone-500 text-sm">{time_taken}</div>
+            <div class="bg-neutral-800 py-12 rounded-xl">
+                <div class="flex flex-col place-content-center place-items-center">
+                    <icons::RefreshIcon animate_spin={true} height="h-16" width="w-16" />
+                    <div class="mt-4 font-medium">{"Starting Spyglass"}</div>
+                    <div class="mt-1 text-stone-500 text-sm">{self.progress_caption.clone()}</div>
+                    <div class="mt-1 text-stone-500 text-sm">{time_taken}</div>
+                </div>
             </div>
         }
     }
