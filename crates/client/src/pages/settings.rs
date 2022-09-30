@@ -197,7 +197,7 @@ pub fn user_settings_page() -> Html {
         .collect::<Html>();
 
     html! {
-        <div class="text-white bg-neutral-800 h-screen">
+        <div class="text-white bg-neutral-800 h-full">
             <Header label="User Settings">
                 <btn::Btn onclick={handle_show_folder}>
                     <icons::FolderOpenIcon classes={classes!("mr-2")}/>

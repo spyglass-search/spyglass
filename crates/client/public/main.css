@@ -743,8 +743,8 @@ video {
   height: 4rem;
 }
 
-.h-screen {
-  height: 100vh;
+.h-full {
+  height: 100%;
 }
 
 .h-8 {
@@ -755,8 +755,8 @@ video {
   height: 1.5rem;
 }
 
-.h-full {
-  height: 100%;
+.h-screen {
+  height: 100vh;
 }
 
 .h-64 {
