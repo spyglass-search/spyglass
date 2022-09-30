@@ -99,7 +99,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
 
     html! {
         <div class="text-white flex">
-            <div class="flex-col h-screen w-48 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky">
+            <div class="flex-col w-48 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
                 <div class="mb-6">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"Spyglass"}
