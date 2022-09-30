@@ -151,7 +151,7 @@ pub fn stats_page() -> Html {
     }
 
     html! {
-        <div class="text-white">
+        <div class="text-white bg-neutral-800 h-screen">
             <div class="py-4 px-8 top-0 sticky bg-stone-800 z-40 border-b-2 border-stone-900">
                 <div class="flex flex-row items-center">
                     <h1 class="text-2xl grow p-0">

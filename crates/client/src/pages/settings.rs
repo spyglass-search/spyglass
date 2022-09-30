@@ -197,7 +197,7 @@ pub fn user_settings_page() -> Html {
         .collect::<Html>();
 
     html! {
-        <div class="text-white">
+        <div class="text-white bg-neutral-800 h-screen">
             <Header label="User Settings">
                 <btn::Btn onclick={handle_show_folder}>
                     <icons::FolderOpenIcon classes={classes!("mr-2")}/>
@@ -207,7 +207,7 @@ pub fn user_settings_page() -> Html {
                     {"Save & Restart"}
                 </btn::Btn>
             </Header>
-            <div class="pt-8">
+            <div class="pt-8 bg-netural-800">
                 {contents}
             </div>
         </div>
