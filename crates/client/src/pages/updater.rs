@@ -35,7 +35,7 @@ pub fn updater_page() -> Html {
     let rando: usize = (Math::floor(Math::random() * UPDATE_GIFS.len() as f64)) as usize;
 
     html! {
-        <div class="text-white h-screen relative">
+        <div class="text-white h-screen relative bg-neutral-800">
             <Header label="Update Available!" classes={classes!("text-center")}/>
             <div class="pt-4 px-8 pb-16 h-64 overflow-hidden text-sm text-center">
                 <div class="flex flex-row place-content-center">
