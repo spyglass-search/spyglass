@@ -131,8 +131,8 @@ pub async fn manager_task(
                     }
                 }
             }
-            // ignore everything else
-            _ => {}
+            // Nothing to do... sleepy time!
+            Ok(None) => tokio::time::sleep(tokio::time::Duration::from_secs(5)).await,
         }
 
         // Wait a little before we dequeue another URL

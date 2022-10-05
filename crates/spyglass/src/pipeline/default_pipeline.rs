@@ -68,7 +68,6 @@ pub async fn pipeline_loop(
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        continue;
     }
 }
 

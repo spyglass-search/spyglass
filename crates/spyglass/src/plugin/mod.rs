@@ -189,7 +189,6 @@ pub async fn plugin_event_loop(
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
-    let mut event_loop_sleep = tokio::time::interval(Duration::from_millis(100));
     loop {
         let mut manager = state.plugin_manager.lock().await;
         // Wait for next command / handle shutdown responses
@@ -204,10 +203,6 @@ pub async fn plugin_event_loop(
                     None
                 }
             },
-            _ = event_loop_sleep.tick() => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                continue;
-            }
             // Handle interval checks
             _ = interval.tick() => Some(PluginCommand::QueueIntervalCheck),
             // SHUT IT DOWN

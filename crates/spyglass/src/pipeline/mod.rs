@@ -133,6 +133,8 @@ pub async fn initialize_pipelines(
                 }
             }
         }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
 
