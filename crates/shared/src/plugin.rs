@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::form::SettingOpts;
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum PluginType {
     /// A more complex lens than a simple list of URLs
     /// - Registers itself as a lens, under some "trigger" label.
@@ -15,7 +15,7 @@ pub enum PluginType {
 
 pub type PluginUserSettings = HashMap<String, SettingOpts>;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PluginConfig {
     pub name: String,
     pub author: String,

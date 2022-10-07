@@ -19,6 +19,7 @@ hex = "0.4"
 hostname = "^0.3"
 html5ever = "0.25"
 http = "0.2"
+ignore = "0.4"
 jsonrpsee = { version = "0.15", features = ["http-server"] }
 log = "0.4"
 migration = { path = "../migrations" }

@@ -113,21 +113,9 @@ pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
-    if let Ok(mut writer) = state.index.writer.lock() {
-        if let Err(e) = Searcher::delete(&mut writer, &id) {
-            log::error!("Unable to delete doc {} due to {}", id, e);
-        } else {
-            let _ = writer.commit();
-        }
-    }
-
-    // Remove from indexed_doc table
-    if let Ok(Some(model)) = indexed_document::Entity::find()
-        .filter(indexed_document::Column::DocId.eq(id))
-        .one(&state.db)
-        .await
-    {
-        let _ = model.delete(&state.db).await;
+    if let Err(e) = Searcher::delete_by_id(&state, &id).await {
+        log::error!("Unable to delete doc {} due to {}", id, e);
+        return Err(Error::Custom(e.to_string()));
     }
 
     Ok(())
@@ -161,11 +149,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
     if let Ok(indexed) = indexed {
         for result in indexed {
-            if let Ok(mut writer) = state.index.writer.lock() {
-                let _ = Searcher::delete(&mut writer, &result.doc_id);
-                let _ = writer.commit();
-            }
-            let _ = result.delete(&state.db).await;
+            let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
         }
     }
 

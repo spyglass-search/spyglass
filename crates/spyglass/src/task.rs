@@ -202,7 +202,7 @@ async fn _handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                 // Delete old document, if any.
                 if let Some(doc) = &existing {
                     if let Ok(mut index_writer) = state.index.writer.lock() {
-                        let _ = Searcher::delete(&mut index_writer, &doc.doc_id);
+                        let _ = Searcher::remove_from_index(&mut index_writer, &doc.doc_id);
                     }
                 }
 

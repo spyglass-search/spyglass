@@ -157,12 +157,10 @@ async fn process_lens_rules(lens: LensConfig, state: &AppState) {
                     // Remove matching indexed documents
                     match indexed_document::remove_by_rule(&state.db, &rule_like).await {
                         Ok(doc_ids) => {
-                            if let Ok(mut writer) = state.index.writer.lock() {
-                                for doc_id in doc_ids {
-                                    let res = Searcher::delete(&mut writer, &doc_id);
-                                    if let Err(err) = res {
-                                        log::error!("Unable to remove docs: {:?}", err);
-                                    }
+                            for doc_id in doc_ids {
+                                let res = Searcher::delete_by_id(state, &doc_id).await;
+                                if let Err(err) = res {
+                                    log::error!("Unable to remove docs: {:?}", err);
                                 }
                             }
                         }
@@ -214,12 +212,10 @@ async fn process_lens_rules(lens: LensConfig, state: &AppState) {
                             }
                         }
 
-                        if let Ok(mut writer) = state.index.writer.lock() {
-                            for doc_id in doc_ids {
-                                let res = Searcher::delete(&mut writer, &doc_id);
-                                if let Err(err) = res {
-                                    log::error!("Unable to remove docs: {:?}", err);
-                                }
+                        for doc_id in doc_ids {
+                            let res = Searcher::delete_by_id(state, &doc_id).await;
+                            if let Err(err) = res {
+                                log::error!("Unable to remove docs: {:?}", err);
                             }
                         }
 
