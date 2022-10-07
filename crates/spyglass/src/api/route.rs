@@ -112,10 +112,10 @@ pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
 
 /// Remove a doc from the index
 #[instrument(skip(state))]
-pub async fn delete_doc(state: AppState, id: String) -> Result<()> {
+pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
     if let Err(e) = Searcher::delete_by_id(&state, &id).await {
         log::error!("Unable to delete doc {} due to {}", id, e);
-        return Err(jsonrpc_core::Error::internal_error());
+        return Err(Error::Custom(e.to_string()));
     }
 
     Ok(())

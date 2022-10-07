@@ -143,9 +143,7 @@ async fn start_crawl(
 
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
-                            if let Ok(mut index_writer) = state.index.writer.lock() {
-                                let _ = Searcher::delete(&mut index_writer, &doc.doc_id);
-                            }
+                            let _ = Searcher::delete_by_id(&state, &doc.doc_id).await;
                         }
 
                         // Add document to index
