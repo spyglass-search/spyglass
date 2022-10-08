@@ -1,3 +1,5 @@
+use anyhow::Error;
+use ignore::WalkBuilder;
 use rusqlite::Connection;
 use std::path::Path;
 use tokio::sync::mpsc::Sender;
@@ -55,14 +57,28 @@ async fn handle_plugin_cmd_request(
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
         // Ask host for the list of files in this directory
         PluginCommandRequest::ListDir { path } => {
-            let entries = std::fs::read_dir(path)?
-                .flatten()
-                .map(|entry| {
-                    let path = entry.path();
-                    ListDirEntry {
-                        path: path.display().to_string(),
-                        is_file: path.is_file(),
-                        is_dir: path.is_dir(),
+            let dir_path = Path::new(&path);
+            if !dir_path.exists() {
+                return Err(Error::msg(format!("Invalid path: {}", path)));
+            }
+
+            let walker = WalkBuilder::new(dir_path)
+                .standard_filters(true)
+                .max_depth(Some(0))
+                .build();
+
+            let entries = walker
+                .into_iter()
+                .filter_map(|result| {
+                    if let Ok(entry) = result {
+                        let path = entry.path();
+                        Some(ListDirEntry {
+                            path: path.display().to_string(),
+                            is_file: path.is_file(),
+                            is_dir: path.is_dir(),
+                        })
+                    } else {
+                        None
                     }
                 })
                 .collect::<Vec<ListDirEntry>>();
@@ -80,13 +96,12 @@ async fn handle_plugin_cmd_request(
         // This is for plugins who need to run a query against some sqlite3 file,
         // for example the Firefox bookmarks/history are store in such a file.
         PluginCommandRequest::SqliteQuery { path, query } => {
-            let path = env.data_dir.join(path);
-            if !path.exists() {
-                log::error!("Invalid sqlite3 db path: {}", &path.as_path().display());
-                return Ok(());
+            let db_path = env.data_dir.join(path);
+            if !db_path.exists() {
+                return Err(Error::msg(format!("Invalid sqlite db path: {}", path)));
             }
 
-            let conn = Connection::open(path)?;
+            let conn = Connection::open(db_path)?;
             let mut stmt = conn.prepare(query)?;
 
             let results = stmt.query_map([], |row| {
