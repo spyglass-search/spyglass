@@ -61,7 +61,9 @@ impl Plugin {
 
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
+        // TODO: Make this configurable.
         self.extensions = HashSet::from_iter(vec!["md".to_string(), "txt".to_string()].into_iter());
+        // List of paths being checked.
         self.processed_paths = match std::fs::read_to_string(PLUGIN_DATA) {
             Ok(blob) => {
                 if let Ok(paths) = serde_json::from_str::<HashSet<String>>(&blob) {

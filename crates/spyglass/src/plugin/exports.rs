@@ -1,13 +1,15 @@
 use anyhow::Error;
 use ignore::WalkBuilder;
 use rusqlite::Connection;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
-use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
+use spyglass_plugin::PluginCommandRequest;
 
 use super::{
     wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
@@ -62,28 +64,9 @@ async fn handle_plugin_cmd_request(
                 return Err(Error::msg(format!("Invalid path: {}", path)));
             }
 
-            let walker = WalkBuilder::new(dir_path)
-                .standard_filters(true)
-                .max_depth(Some(0))
-                .build();
-
-            let entries = walker
-                .into_iter()
-                .filter_map(|result| {
-                    if let Ok(entry) = result {
-                        let path = entry.path();
-                        Some(ListDirEntry {
-                            path: path.display().to_string(),
-                            is_file: path.is_file(),
-                            is_dir: path.is_dir(),
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<ListDirEntry>>();
-
-            wasi_write(&env.wasi_env, &entries)?;
+            log::info!("{} crawling path: {}", env.name, path);
+            let stats = handle_list_dir(dir_path.to_path_buf(), &Vec::new());
+            wasi_write(&env.wasi_env, &stats)?;
         }
         // Subscribe to a plugin event
         PluginCommandRequest::Subscribe(event) => {
@@ -193,4 +176,60 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             log::error!("error adding to queue: {}", e);
         }
     });
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct WalkStats {
+    pub dirs: i32,
+    pub files: i32,
+    pub skipped: i32,
+}
+
+fn handle_list_dir(path: PathBuf, extensions: &[String]) -> WalkStats {
+    let exts: HashSet<String> = extensions
+        .iter()
+        .map(|x| x.to_owned())
+        .collect::<HashSet<String>>();
+
+    let walker = WalkBuilder::new(path)
+        .standard_filters(true)
+        .build();
+
+    let mut stats = WalkStats::default();
+    for entry in walker.flatten() {
+        if let Some(file_type) = entry.file_type() {
+            if file_type.is_dir() {
+                stats.dirs += 1;
+                continue;
+            }
+
+            let ext = entry.path()
+                .extension()
+                .and_then(|ext| ext.to_str());
+
+            if let Some(ext) = ext {
+                if exts.contains(ext) {
+                    stats.files += 1;
+                } else {
+                    stats.skipped += 1;
+                }
+            }
+        }
+    }
+
+    stats
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+    use super::handle_list_dir;
+
+    #[test]
+    fn test_list_dir() {
+        let ext = vec!["md".into(), "txt".into()];
+        let path = Path::new("/Users/a5huynh/Documents");
+        let stats = handle_list_dir(path.to_path_buf(), &ext);
+        println!("stats: {:?}", stats);
+    }
 }
