@@ -1,8 +1,11 @@
+use std::collections::HashSet;
+use std::fmt;
+
 pub mod consts;
 mod shims;
+
 use serde::{Deserialize, Serialize};
 pub use shims::*;
-use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SearchFilter {
@@ -126,7 +129,7 @@ pub enum PluginCommandRequest {
     // Walk & enqueue the contents of a directory
     WalkAndEnqueue {
         path: String,
-        extensions: Vec<String>,
+        extensions: HashSet<String>,
     },
 }
 

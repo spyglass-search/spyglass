@@ -200,12 +200,7 @@ pub struct WalkStats {
     pub skipped: i32,
 }
 
-fn handle_walk_and_enqueue(path: PathBuf, extensions: &[String]) -> WalkStats {
-    let exts: HashSet<String> = extensions
-        .iter()
-        .map(|x| x.to_owned())
-        .collect::<HashSet<String>>();
-
+fn handle_walk_and_enqueue(path: PathBuf, supported_exts: &HashSet<String>) -> WalkStats {
     let walker = WalkBuilder::new(path).standard_filters(true).build();
 
     let mut stats = WalkStats::default();
@@ -219,7 +214,7 @@ fn handle_walk_and_enqueue(path: PathBuf, extensions: &[String]) -> WalkStats {
             let ext = entry.path().extension().and_then(|ext| ext.to_str());
 
             if let Some(ext) = ext {
-                if exts.contains(ext) {
+                if supported_exts.contains(ext) {
                     stats.files += 1;
                 } else {
                     stats.skipped += 1;
@@ -234,11 +229,14 @@ fn handle_walk_and_enqueue(path: PathBuf, extensions: &[String]) -> WalkStats {
 #[cfg(test)]
 mod test {
     use super::handle_walk_and_enqueue;
+    use std::collections::HashSet;
     use std::path::Path;
 
     #[test]
     fn test_walk_and_enqueue() {
-        let ext = vec!["md".into(), "txt".into()];
+        let ext: HashSet<String> =
+            HashSet::from_iter(vec!["md".into(), "txt".into()].iter().cloned());
+
         let path = Path::new("/Users/a5huynh/Documents");
         let stats = handle_walk_and_enqueue(path.to_path_buf(), &ext);
         println!("stats: {:?}", stats);

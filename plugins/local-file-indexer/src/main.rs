@@ -57,12 +57,10 @@ impl SpyglassPlugin for Plugin {
             Vec::new()
         };
 
-        let exts: Vec<String> = self.extensions.iter().map(|x| x.to_owned()).collect();
-
         for path in paths {
             // Have we processed this directory?
             if !self.processed_paths.contains(&path) {
-                if let Err(e) = walk_and_enqueue_dir(&path, &exts) {
+                if let Err(e) = walk_and_enqueue_dir(&path, &self.extensions) {
                     log(format!("Unable to process dir: {}", e));
                 } else {
                     self.processed_paths.insert(path.to_string());
