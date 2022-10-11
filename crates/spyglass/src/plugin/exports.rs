@@ -2,14 +2,14 @@ use anyhow::Error;
 use ignore::WalkBuilder;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
-use spyglass_plugin::PluginCommandRequest;
+use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
 
 use super::{
     wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
@@ -57,16 +57,20 @@ async fn handle_plugin_cmd_request(
         }
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
-        // Ask host for the list of files in this directory
         PluginCommandRequest::ListDir { path } => {
-            let dir_path = Path::new(&path);
-            if !dir_path.exists() {
-                return Err(Error::msg(format!("Invalid path: {}", path)));
-            }
-
-            log::info!("{} crawling path: {}", env.name, path);
-            let stats = handle_list_dir(dir_path.to_path_buf(), &Vec::new());
-            wasi_write(&env.wasi_env, &stats)?;
+            log::info!("{} ListDir path: {}", env.name, path);
+            let entries = std::fs::read_dir(path)?
+                .flatten()
+                .map(|entry| {
+                    let path = entry.path();
+                    ListDirEntry {
+                        path: path.display().to_string(),
+                        is_file: path.is_file(),
+                        is_dir: path.is_dir(),
+                    }
+                })
+                .collect::<Vec<ListDirEntry>>();
+            wasi_write(&env.wasi_env, &entries)?;
         }
         // Subscribe to a plugin event
         PluginCommandRequest::Subscribe(event) => {
@@ -101,6 +105,17 @@ async fn handle_plugin_cmd_request(
             wasi_write(&env.wasi_env, &collected)?;
         }
         PluginCommandRequest::SyncFile { dst, src } => handle_sync_file(env, dst, src),
+        // Walk through a path & enqueue matching files for indexing.
+        PluginCommandRequest::WalkAndEnqueue { path, extensions } => {
+            let dir_path = Path::new(&path);
+            if !dir_path.exists() {
+                return Err(Error::msg(format!("Invalid path: {}", path)));
+            }
+
+            log::info!("{} crawling path: {}", env.name, path);
+            let stats = handle_walk_and_enqueue(dir_path.to_path_buf(), extensions);
+            wasi_write(&env.wasi_env, &stats)?;
+        }
     }
 
     Ok(())
@@ -185,15 +200,13 @@ pub struct WalkStats {
     pub skipped: i32,
 }
 
-fn handle_list_dir(path: PathBuf, extensions: &[String]) -> WalkStats {
+fn handle_walk_and_enqueue(path: PathBuf, extensions: &[String]) -> WalkStats {
     let exts: HashSet<String> = extensions
         .iter()
         .map(|x| x.to_owned())
         .collect::<HashSet<String>>();
 
-    let walker = WalkBuilder::new(path)
-        .standard_filters(true)
-        .build();
+    let walker = WalkBuilder::new(path).standard_filters(true).build();
 
     let mut stats = WalkStats::default();
     for entry in walker.flatten() {
@@ -203,9 +216,7 @@ fn handle_list_dir(path: PathBuf, extensions: &[String]) -> WalkStats {
                 continue;
             }
 
-            let ext = entry.path()
-                .extension()
-                .and_then(|ext| ext.to_str());
+            let ext = entry.path().extension().and_then(|ext| ext.to_str());
 
             if let Some(ext) = ext {
                 if exts.contains(ext) {
@@ -222,8 +233,8 @@ fn handle_list_dir(path: PathBuf, extensions: &[String]) -> WalkStats {
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
     use super::handle_list_dir;
+    use std::path::Path;
 
     #[test]
     fn test_list_dir() {

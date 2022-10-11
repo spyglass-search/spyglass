@@ -99,18 +99,35 @@ pub enum PluginEvent {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginCommandRequest {
-    DeleteDoc { url: String },
+    DeleteDoc {
+        url: String,
+    },
     // Enqueue a list of URLs into the crawl queue
-    Enqueue { urls: Vec<String> },
-    // List the contents of a directory
-    ListDir { path: String },
+    Enqueue {
+        urls: Vec<String>,
+    },
+    // Ask host to list the contents of a directory
+    ListDir {
+        path: String,
+    },
     // Subscribe to PluginEvents
     Subscribe(PluginSubscription),
     // Run a sqlite query on a db file. NOTE: This is a workaround due to the fact
     // that sqlite can not be easily compiled to wasm... yet!
-    SqliteQuery { path: String, query: String },
+    SqliteQuery {
+        path: String,
+        query: String,
+    },
     // Request mounting a file & its contents to the plugin VFS
-    SyncFile { dst: String, src: String },
+    SyncFile {
+        dst: String,
+        src: String,
+    },
+    // Walk & enqueue the contents of a directory
+    WalkAndEnqueue {
+        path: String,
+        extensions: Vec<String>,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
