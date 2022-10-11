@@ -1,6 +1,5 @@
 use spyglass_plugin::*;
 use std::collections::HashSet;
-use std::path::Path;
 use url::Url;
 
 #[derive(Default)]
@@ -16,6 +15,9 @@ register_plugin!(Plugin);
 
 // Create a file URI
 fn to_uri(path: &str) -> String {
+    // Eventually this will be away to keep track of multiple devices and searching across
+    // them. Might make sense to generate a UUID and assign to this computer(?) hostname
+    // can be changed by the user.
     let host = if let Ok(hname) = std::env::var("HOST_NAME") {
         hname
     } else {
@@ -27,36 +29,6 @@ fn to_uri(path: &str) -> String {
     // Fixes issues handling windows drive letters
     new_url.set_path(&path.replace(':', "%3A"));
     new_url.to_string()
-}
-
-impl Plugin {
-    fn walk_and_enqueue(&self, path: &str) {
-        if let Ok(folder_entries) = list_dir(path) {
-            let mut filtered = Vec::new();
-            // Filter out only files that match our extension list
-            for entry in folder_entries {
-                if entry.is_dir {
-                    self.walk_and_enqueue(&entry.path);
-                } else {
-                    let path = Path::new(&entry.path);
-                    if let Some(ext) = path
-                        .extension()
-                        .and_then(|x| x.to_str())
-                        .map(|x| x.to_string())
-                    {
-                        if self.extensions.contains(&ext) {
-                            filtered.push(to_uri(&entry.path));
-                        }
-                    }
-                }
-            }
-
-            // Add to crawl_queue & mark as processed
-            if !filtered.is_empty() {
-                enqueue_all(&filtered);
-            }
-        }
-    }
 }
 
 impl SpyglassPlugin for Plugin {
@@ -85,11 +57,16 @@ impl SpyglassPlugin for Plugin {
             Vec::new()
         };
 
+        let exts: Vec<String> = self.extensions.iter().map(|x| x.to_owned()).collect();
+
         for path in paths {
             // Have we processed this directory?
             if !self.processed_paths.contains(&path) {
-                self.walk_and_enqueue(&path);
-                self.processed_paths.insert(path.to_string());
+                if let Err(e) = walk_and_enqueue_dir(&path, &exts) {
+                    log(format!("Unable to process dir: {}", e));
+                } else {
+                    self.processed_paths.insert(path.to_string());
+                }
             }
 
             // List to notifications

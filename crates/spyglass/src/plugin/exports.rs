@@ -58,7 +58,7 @@ async fn handle_plugin_cmd_request(
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
         PluginCommandRequest::ListDir { path } => {
-            log::info!("{} ListDir path: {}", env.name, path);
+            log::info!("{} listing path: {}", env.name, path);
             let entries = std::fs::read_dir(path)?
                 .flatten()
                 .map(|entry| {
@@ -233,14 +233,14 @@ fn handle_walk_and_enqueue(path: PathBuf, extensions: &[String]) -> WalkStats {
 
 #[cfg(test)]
 mod test {
-    use super::handle_list_dir;
+    use super::handle_walk_and_enqueue;
     use std::path::Path;
 
     #[test]
-    fn test_list_dir() {
+    fn test_walk_and_enqueue() {
         let ext = vec!["md".into(), "txt".into()];
         let path = Path::new("/Users/a5huynh/Documents");
-        let stats = handle_list_dir(path.to_path_buf(), &ext);
+        let stats = handle_walk_and_enqueue(path.to_path_buf(), &ext);
         println!("stats: {:?}", stats);
     }
 }
