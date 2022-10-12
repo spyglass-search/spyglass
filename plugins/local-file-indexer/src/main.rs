@@ -11,13 +11,25 @@ struct Plugin {
 
 const PLUGIN_DATA: &str = "/data.json";
 const FOLDERS_LIST_ENV: &str = "FOLDERS_LIST";
+const EXTS_LIST_ENV: &str = "EXTS_LIST";
 
 register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
-        // TODO: Make this configurable.
-        self.extensions = HashSet::from_iter(vec!["md".to_string(), "txt".to_string()].into_iter());
+        // List of supported file types
+        let default_exts =
+            HashSet::from_iter(vec!["md".to_string(), "txt".to_string()].into_iter());
+        self.extensions = if let Ok(blob) = std::env::var(EXTS_LIST_ENV) {
+            if let Ok(exts) = serde_json::from_str(&blob) {
+                exts
+            } else {
+                default_exts
+            }
+        } else {
+            default_exts
+        };
+
         // List of paths being checked.
         self.processed_paths = match std::fs::read_to_string(PLUGIN_DATA) {
             Ok(blob) => {

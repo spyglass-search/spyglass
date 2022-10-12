@@ -96,7 +96,7 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
             <div>
                 {
                     match &props.opts.form_type {
-                        FormType::PathList => {
+                        FormType::PathList | FormType::StringList => {
                             html! {
                                 <textarea
                                     ref={input_ref.clone()}
