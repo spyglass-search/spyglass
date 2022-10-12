@@ -280,6 +280,8 @@ mod test {
 
     #[tokio::test]
     async fn test_walk_and_enqueue() {
+        let test_folder = Path::new("/tmp/walk_and_enqueue");
+
         let db = setup_test_db().await;
         let state = AppStateBuilder::new()
             .with_db(db)
@@ -287,11 +289,23 @@ mod test {
             .with_user_settings(&UserSettings::default())
             .build();
 
-        let ext: HashSet<String> =
-            HashSet::from_iter(vec!["md".into(), "txt".into()].iter().cloned());
+        let ext: HashSet<String> = HashSet::from_iter(vec!["txt".into()].iter().cloned());
 
-        let path = Path::new("/Users/a5huynh/Documents");
-        let stats = handle_walk_and_enqueue(&state, path.to_path_buf(), &ext).await;
+        // Create a tmp directory for testing
+        std::fs::create_dir_all(test_folder)
+            .expect("Unable to create test dir for test_walk_and_enqueue");
+        // Generate some random files
+        for idx in 0..100 {
+            let ext = if idx % 5 == 0 { ".txt" } else { "" };
+
+            std::fs::write(
+                test_folder.join(format!("{}{}", idx, ext)),
+                format!("file contents {}", idx),
+            )
+            .expect("Unable to write test file");
+        }
+
+        let stats = handle_walk_and_enqueue(&state, test_folder.to_path_buf(), &ext).await;
         assert!(stats.files > 0);
 
         // Crawl queue should have the same number of documents
@@ -299,5 +313,10 @@ mod test {
             .await
             .expect("Unable to query queue");
         assert_eq!(num_queued, stats.files as u64);
+
+        // Cleanup
+        if test_folder.exists() {
+            std::fs::remove_dir_all(test_folder).expect("Unable to clean up folder");
+        }
     }
 }

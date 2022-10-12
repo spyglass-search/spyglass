@@ -19,7 +19,9 @@ impl FormType {
                 let value = value.replace('\\', "\\\\");
                 // Validate the value by attempting to deserialize
                 match serde_json::from_str::<Vec<String>>(&value) {
-                    Ok(parsed) => Ok(serde_json::to_string::<Vec<String>>(&parsed).expect("Invalid list")),
+                    Ok(parsed) => {
+                        Ok(serde_json::to_string::<Vec<String>>(&parsed).expect("Invalid list"))
+                    }
                     Err(e) => Err(e.to_string()),
                 }
             }
