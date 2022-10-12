@@ -15,7 +15,7 @@ use crate::search::Searcher;
 use crate::state::AppState;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
-use spyglass_plugin::{ListDirEntry, PluginCommandRequest, utils::path_to_uri};
+use spyglass_plugin::{utils::path_to_uri, ListDirEntry, PluginCommandRequest};
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -262,6 +262,7 @@ async fn handle_walk_and_enqueue(
         .await;
     }
 
+    log::info!("walked & enqueued: {:?}", stats);
     stats
 }
 
@@ -271,10 +272,10 @@ mod test {
     use std::path::Path;
 
     use super::handle_walk_and_enqueue;
-    use crate::state::AppStateBuilder;
     use crate::search::IndexPath;
+    use crate::state::AppStateBuilder;
+    use entities::models::crawl_queue::{num_queued, CrawlStatus};
     use entities::test::setup_test_db;
-    use entities::models::crawl_queue::{CrawlStatus, num_queued};
     use shared::config::UserSettings;
 
     #[tokio::test]
@@ -294,7 +295,9 @@ mod test {
         assert!(stats.files > 0);
 
         // Crawl queue should have the same number of documents
-        let num_queued = num_queued(&state.db, CrawlStatus::Queued).await.expect("Unable to query queue");
+        let num_queued = num_queued(&state.db, CrawlStatus::Queued)
+            .await
+            .expect("Unable to query queue");
         assert_eq!(num_queued, stats.files as u64);
     }
 }

@@ -1,8 +1,7 @@
 use std::collections::HashSet;
-use std::path::Path;
 
-use spyglass_plugin::*;
 use spyglass_plugin::utils::path_to_uri;
+use spyglass_plugin::*;
 
 #[derive(Default)]
 struct Plugin {
@@ -67,9 +66,13 @@ impl SpyglassPlugin for Plugin {
     fn update(&mut self, event: PluginEvent) {
         match event {
             PluginEvent::FileCreated(path) | PluginEvent::FileUpdated(path) => {
-                enqueue_all(&[path_to_uri(Path::new(&path).to_path_buf())])
+                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                    if self.extensions.contains(ext) {
+                        enqueue_all(&[path_to_uri(path)])
+                    }
+                }
             }
-            PluginEvent::FileDeleted(path) => delete_doc(&path_to_uri(Path::new(&path).to_path_buf())),
+            PluginEvent::FileDeleted(path) => delete_doc(&path_to_uri(path)),
             _ => {}
         }
     }

@@ -316,7 +316,11 @@ pub async fn plugin_event_loop(
                 }
 
                 for updated_path in file_event.paths {
-                    let updated_path = updated_path.display().to_string();
+                    log::trace!(
+                        "notifying plugins of file_event: {:?} for <{}>",
+                        file_event.kind,
+                        updated_path.display()
+                    );
 
                     let event = match &file_event.kind {
                         EventKind::Create(_) => {

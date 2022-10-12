@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 use std::fmt;
+use std::path::PathBuf;
 
 pub mod consts;
-pub mod utils;
 mod shims;
+pub mod utils;
 
 use serde::{Deserialize, Serialize};
 pub use shims::*;
@@ -96,9 +97,9 @@ impl fmt::Display for PluginSubscription {
 pub enum PluginEvent {
     IntervalUpdate,
     // File watcher updates
-    FileCreated(String),
-    FileUpdated(String),
-    FileDeleted(String),
+    FileCreated(PathBuf),
+    FileUpdated(PathBuf),
+    FileDeleted(PathBuf),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
