@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 pub mod consts;
+pub mod utils;
 mod shims;
 
 use serde::{Deserialize, Serialize};

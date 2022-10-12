@@ -8,14 +8,14 @@ use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
-use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
-use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
-
 use super::{
     wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
 };
 use crate::search::Searcher;
 use crate::state::AppState;
+
+use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
+use spyglass_plugin::{ListDirEntry, PluginCommandRequest, utils::path_to_uri};
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -113,7 +113,8 @@ async fn handle_plugin_cmd_request(
             }
 
             log::info!("{} crawling path: {}", env.name, path);
-            let stats = handle_walk_and_enqueue(dir_path.to_path_buf(), extensions);
+            let stats =
+                handle_walk_and_enqueue(&env.app_state, dir_path.to_path_buf(), extensions).await;
             wasi_write(&env.wasi_env, &stats)?;
         }
     }
@@ -200,10 +201,20 @@ pub struct WalkStats {
     pub skipped: i32,
 }
 
-fn handle_walk_and_enqueue(path: PathBuf, supported_exts: &HashSet<String>) -> WalkStats {
+async fn handle_walk_and_enqueue(
+    state: &AppState,
+    path: PathBuf,
+    supported_exts: &HashSet<String>,
+) -> WalkStats {
     let walker = WalkBuilder::new(path).standard_filters(true).build();
+    let enqueue_settings = EnqueueSettings {
+        force_allow: true,
+        ..Default::default()
+    };
 
     let mut stats = WalkStats::default();
+    let mut to_enqueue: Vec<String> = Vec::new();
+
     for entry in walker.flatten() {
         if let Some(file_type) = entry.file_type() {
             if file_type.is_dir() {
@@ -215,12 +226,40 @@ fn handle_walk_and_enqueue(path: PathBuf, supported_exts: &HashSet<String>) -> W
 
             if let Some(ext) = ext {
                 if supported_exts.contains(ext) {
+                    to_enqueue.push(path_to_uri(entry.path().to_path_buf()));
                     stats.files += 1;
                 } else {
                     stats.skipped += 1;
                 }
             }
         }
+
+        // Chunk out enqueues so we don't run into some crazy amount at once.
+        if to_enqueue.len() > 1000 {
+            let _ = enqueue_all(
+                &state.db,
+                &to_enqueue,
+                &[],
+                &state.user_settings,
+                &enqueue_settings,
+                None,
+            )
+            .await;
+            to_enqueue.clear();
+        }
+    }
+
+    // Add whatever is leftover
+    if !to_enqueue.is_empty() {
+        let _ = enqueue_all(
+            &state.db,
+            &to_enqueue,
+            &[],
+            &state.user_settings,
+            &enqueue_settings,
+            None,
+        )
+        .await;
     }
 
     stats
@@ -228,17 +267,34 @@ fn handle_walk_and_enqueue(path: PathBuf, supported_exts: &HashSet<String>) -> W
 
 #[cfg(test)]
 mod test {
-    use super::handle_walk_and_enqueue;
     use std::collections::HashSet;
     use std::path::Path;
 
-    #[test]
-    fn test_walk_and_enqueue() {
+    use super::handle_walk_and_enqueue;
+    use crate::state::AppStateBuilder;
+    use crate::search::IndexPath;
+    use entities::test::setup_test_db;
+    use entities::models::crawl_queue::{CrawlStatus, num_queued};
+    use shared::config::UserSettings;
+
+    #[tokio::test]
+    async fn test_walk_and_enqueue() {
+        let db = setup_test_db().await;
+        let state = AppStateBuilder::new()
+            .with_db(db)
+            .with_index(&IndexPath::Memory)
+            .with_user_settings(&UserSettings::default())
+            .build();
+
         let ext: HashSet<String> =
             HashSet::from_iter(vec!["md".into(), "txt".into()].iter().cloned());
 
         let path = Path::new("/Users/a5huynh/Documents");
-        let stats = handle_walk_and_enqueue(path.to_path_buf(), &ext);
-        println!("stats: {:?}", stats);
+        let stats = handle_walk_and_enqueue(&state, path.to_path_buf(), &ext).await;
+        assert!(stats.files > 0);
+
+        // Crawl queue should have the same number of documents
+        let num_queued = num_queued(&state.db, CrawlStatus::Queued).await.expect("Unable to query queue");
+        assert_eq!(num_queued, stats.files as u64);
     }
 }

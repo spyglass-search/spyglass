@@ -1,6 +1,8 @@
-use spyglass_plugin::*;
 use std::collections::HashSet;
-use url::Url;
+use std::path::Path;
+
+use spyglass_plugin::*;
+use spyglass_plugin::utils::path_to_uri;
 
 #[derive(Default)]
 struct Plugin {
@@ -12,24 +14,6 @@ const PLUGIN_DATA: &str = "/data.json";
 const FOLDERS_LIST_ENV: &str = "FOLDERS_LIST";
 
 register_plugin!(Plugin);
-
-// Create a file URI
-fn to_uri(path: &str) -> String {
-    // Eventually this will be away to keep track of multiple devices and searching across
-    // them. Might make sense to generate a UUID and assign to this computer(?) hostname
-    // can be changed by the user.
-    let host = if let Ok(hname) = std::env::var("HOST_NAME") {
-        hname
-    } else {
-        "home.local".into()
-    };
-
-    let mut new_url = Url::parse("file://").expect("Base URI");
-    let _ = new_url.set_host(Some(&host));
-    // Fixes issues handling windows drive letters
-    new_url.set_path(&path.replace(':', "%3A"));
-    new_url.to_string()
-}
 
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
@@ -83,9 +67,9 @@ impl SpyglassPlugin for Plugin {
     fn update(&mut self, event: PluginEvent) {
         match event {
             PluginEvent::FileCreated(path) | PluginEvent::FileUpdated(path) => {
-                enqueue_all(&[to_uri(&path)])
+                enqueue_all(&[path_to_uri(Path::new(&path).to_path_buf())])
             }
-            PluginEvent::FileDeleted(path) => delete_doc(&to_uri(&path)),
+            PluginEvent::FileDeleted(path) => delete_doc(&path_to_uri(Path::new(&path).to_path_buf())),
             _ => {}
         }
     }
