@@ -1,5 +1,7 @@
 pub mod btn;
+pub mod forms;
 pub mod icons;
+pub mod tooltip;
 
 use yew::prelude::*;
 

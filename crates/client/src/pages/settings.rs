@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::JsValue;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 use crate::{
-    components::{btn, icons, Header},
+    components::{btn, forms, icons, Header},
     invoke, save_user_settings,
     utils::RequestState,
 };
@@ -96,7 +96,12 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
             <div>
                 {
                     match &props.opts.form_type {
-                        FormType::PathList | FormType::StringList => {
+                        FormType::PathList => {
+                            html! {
+                                <forms::PathList value={props.opts.value.clone()} oninput={oninput} />
+                            }
+                        }
+                        FormType::StringList => {
                             html! {
                                 <textarea
                                     ref={input_ref.clone()}
@@ -138,10 +143,10 @@ pub fn user_settings_page() -> Html {
         let current_settings = current_settings.clone();
         spawn_local(async move {
             if let Ok(res) = invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
-                if let Ok(deser) = JsValue::into_serde::<Vec<(String, SettingOpts)>>(&res) {
+                if let Ok(deser) = serde_wasm_bindgen::from_value::<Vec<(String, SettingOpts)>>(res.clone()) {
                     current_settings.set(deser);
                 } else {
-                    log::error!("unable to deserialize");
+                    log::error!("unable to deserialize: {:?}", res.as_string());
                 }
             } else {
                 log::error!("unable to invoke");
@@ -175,7 +180,7 @@ pub fn user_settings_page() -> Html {
             let updated = (*changes).clone();
             spawn_local(async move {
                 // Send changes to backend to be validated & saved.
-                if let Ok(ser) = JsValue::from_serde(&updated.clone()) {
+                if let Ok(ser) = serde_wasm_bindgen::to_value(&updated.clone()) {
                     // TODO: Handle any validation errors from backend and show
                     // them to user.
                     let _ = save_user_settings(ser).await;

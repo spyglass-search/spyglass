@@ -22,7 +22,7 @@ pub struct LensProps {
 
 async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {
-        Ok(results) => match results.into_serde() {
+        Ok(results) => match serde_wasm_bindgen::from_value(results) {
             Ok(parsed) => Some(parsed),
             Err(e) => {
                 log::error!("Unable to deserialize results: {}", e.to_string());
@@ -38,7 +38,7 @@ async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
 
 async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
-        Ok(results) => match results.into_serde::<Vec<InstallableLens>>() {
+        Ok(results) => match serde_wasm_bindgen::from_value::<Vec<InstallableLens>>(results) {
             Ok(lenses) => {
                 let parsed: Vec<LensResult> = lenses
                     .iter()

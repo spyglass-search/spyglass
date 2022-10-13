@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
 use tauri::Manager;
 use tauri::State;
+use tauri::api::dialog::FileDialogBuilder;
 
 use crate::plugins::lens_updater::install_lens_to_path;
 use crate::window::alert;
@@ -18,8 +19,28 @@ use shared::{
 use spyglass_rpc::RpcClient;
 
 #[tauri::command]
+pub async fn choose_folder(_: tauri::Window) -> Result<String, String> {
+    log::info!("choose_folder");
+    FileDialogBuilder::new()
+        .pick_folder(|folder_path| {
+            // do something with the optional folder path here
+            // the folder path is `None` if the user closed the dialog
+            log::info!("folder_path: {:?}", folder_path);
+        });
+
+    Ok("fake".to_string())
+}
+
+#[tauri::command]
 pub async fn escape(window: tauri::Window) -> Result<(), String> {
     window::hide_search_bar(&window);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_folder_path(_: tauri::Window, path: &str) -> Result<(), String> {
+    log::info!("open_folder_path: {}", path);
+    open_folder(Path::new(path).to_path_buf());
     Ok(())
 }
 

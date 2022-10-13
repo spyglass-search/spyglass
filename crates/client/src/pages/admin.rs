@@ -73,7 +73,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-            if let Ok(payload) = payload.into_serde::<ListenPayload>() {
+            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
                     "/settings/lenses" => history.push(Route::SettingsPage {
                         tab: pages::Tab::LensManager,

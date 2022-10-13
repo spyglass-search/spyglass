@@ -92,9 +92,15 @@ export let invoke = async (func_name, params) => {
             }],
             ["local-file-indexer.FOLDERS_LIST", {
                 label: "Folders List",
-                value: "",
-                form_type: "List",
+                value: "[\"/Users/a5huynh/Documents\", \"/Users/a5huynh/Andrew's Vault\"]",
+                form_type: "PathList",
                 help_text: "List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specifiy the parent folder.",
+            }],
+            ["local-file-indexer.EXTS_LIST", {
+                label: "File Types",
+                value: "[\"md\", \"txt\"]",
+                form_type: "StringList",
+                help_text: "List of file types to index.",
             }]
         ];
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {

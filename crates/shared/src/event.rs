@@ -14,6 +14,8 @@ pub enum ClientEvent {
 
 #[derive(AsRefStr, Display)]
 pub enum ClientInvoke {
+    #[strum(serialize = "choose_folder")]
+    ChooseFolder,
     #[strum(serialize = "escape")]
     Escape,
     #[strum(serialize = "open_plugins_folder")]
@@ -32,6 +34,8 @@ pub enum ClientInvoke {
     LoadUserSettings,
     #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
+    #[strum(serialize = "open_folder_path")]
+    OpenFolder,
     #[strum(serialize = "open_lens_folder")]
     OpenLensFolder,
     #[strum(serialize = "open_settings_folder")]
