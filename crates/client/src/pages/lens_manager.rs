@@ -209,12 +209,21 @@ impl LensManagerPage {
     }
 
     fn user_installed_tabview(&self) -> Html {
-        self.user_installed
-            .iter()
-            .map(|data| {
-                html! {<Lens result={data.clone()} is_installed={true} /> }
-            })
-            .collect::<Html>()
+        if self.user_installed.is_empty() {
+            html! {
+                <div class="grid place-content-center h-48 w-full text-neutral-500">
+                    <icons::EmojiSadIcon height="h-20" width="w-20" classes={classes!("mx-auto")}/>
+                    <div class="mt-4">{"Install some lenses to get started!"}</div>
+                </div>
+            }
+        } else {
+            self.user_installed
+                .iter()
+                .map(|data| {
+                    html! {<Lens result={data.clone()} is_installed={true} /> }
+                })
+                .collect::<Html>()
+        }
     }
 }
 
