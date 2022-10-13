@@ -68,7 +68,7 @@ pub enum PluginSubscription {
     /// Check for updates at a fixed interval
     CheckUpdateInterval,
     WatchDirectory {
-        path: String,
+        path: PathBuf,
         recurse: bool,
     },
 }
@@ -82,7 +82,7 @@ impl fmt::Display for PluginSubscription {
             PluginSubscription::WatchDirectory { path, recurse } => write!(
                 f,
                 "<WatchDirectory {} - {}>",
-                path,
+                path.display(),
                 if *recurse {
                     "recursive"
                 } else {
@@ -130,7 +130,7 @@ pub enum PluginCommandRequest {
     },
     // Walk & enqueue the contents of a directory
     WalkAndEnqueue {
-        path: String,
+        path: PathBuf,
         extensions: HashSet<String>,
     },
 }

@@ -109,10 +109,10 @@ async fn handle_plugin_cmd_request(
         PluginCommandRequest::WalkAndEnqueue { path, extensions } => {
             let dir_path = Path::new(&path);
             if !dir_path.exists() {
-                return Err(Error::msg(format!("Invalid path: {}", path)));
+                return Err(Error::msg(format!("Invalid path: {}", path.display())));
             }
 
-            log::info!("{} crawling path: {}", env.name, path);
+            log::info!("{} crawling path: {}", env.name, path.display());
             let stats =
                 handle_walk_and_enqueue(&env.app_state, dir_path.to_path_buf(), extensions).await;
             wasi_write(&env.wasi_env, &stats)?;

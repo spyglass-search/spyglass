@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -113,7 +113,7 @@ impl PluginInstance {
 
 pub struct PluginManager {
     check_update_subs: HashSet<PluginId>,
-    file_watch_subs: DashMap<PluginId, String>,
+    file_watch_subs: DashMap<PluginId, PathBuf>,
     plugins: DashMap<PluginId, PluginInstance>,
     // For file watching subscribers
     file_events: Receiver<notify::Result<notify::Event>>,
@@ -276,15 +276,14 @@ pub async fn plugin_event_loop(
                         .await;
                 }
                 PluginSubscription::WatchDirectory { path, recurse } => {
-                    let dir_path = Path::new(&path);
                     // Ignore invalid directory paths
-                    if !dir_path.exists() || !dir_path.is_dir() {
-                        log::warn!("Ignoring invalid path: {}", path);
+                    if !path.exists() || !path.is_dir() {
+                        log::warn!("Ignoring invalid path: {}", path.display());
                         return;
                     }
 
                     let _ = manager.file_watcher.watch(
-                        dir_path,
+                        &path,
                         if recurse {
                             RecursiveMode::Recursive
                         } else {

@@ -1,6 +1,6 @@
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashSet;
 use std::io;
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::{ListDirEntry, PluginCommandRequest, PluginSubscription};
 
@@ -51,11 +51,11 @@ pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::error::SpannedErro
 
 /// Recursively walk & enqueue contents of a path.
 pub fn walk_and_enqueue_dir(
-    path: &str,
+    path: PathBuf,
     extensions: &HashSet<String>,
 ) -> Result<(), ron::error::SpannedError> {
     if object_to_stdout(&PluginCommandRequest::WalkAndEnqueue {
-        path: path.to_string(),
+        path,
         extensions: extensions.clone(),
     })
     .is_ok()
