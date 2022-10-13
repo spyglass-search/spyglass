@@ -1,17 +1,21 @@
+use anyhow::Error;
+use ignore::WalkBuilder;
 use rusqlite::Connection;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
-
-use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
-use spyglass_plugin::{ListDirEntry, PluginCommandRequest};
 
 use super::{
     wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
 };
 use crate::search::Searcher;
 use crate::state::AppState;
+
+use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
+use spyglass_plugin::{utils::path_to_uri, ListDirEntry, PluginCommandRequest};
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -53,8 +57,8 @@ async fn handle_plugin_cmd_request(
         }
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
-        // Ask host for the list of files in this directory
         PluginCommandRequest::ListDir { path } => {
+            log::info!("{} listing path: {}", env.name, path);
             let entries = std::fs::read_dir(path)?
                 .flatten()
                 .map(|entry| {
@@ -66,7 +70,6 @@ async fn handle_plugin_cmd_request(
                     }
                 })
                 .collect::<Vec<ListDirEntry>>();
-
             wasi_write(&env.wasi_env, &entries)?;
         }
         // Subscribe to a plugin event
@@ -80,13 +83,12 @@ async fn handle_plugin_cmd_request(
         // This is for plugins who need to run a query against some sqlite3 file,
         // for example the Firefox bookmarks/history are store in such a file.
         PluginCommandRequest::SqliteQuery { path, query } => {
-            let path = env.data_dir.join(path);
-            if !path.exists() {
-                log::error!("Invalid sqlite3 db path: {}", &path.as_path().display());
-                return Ok(());
+            let db_path = env.data_dir.join(path);
+            if !db_path.exists() {
+                return Err(Error::msg(format!("Invalid sqlite db path: {}", path)));
             }
 
-            let conn = Connection::open(path)?;
+            let conn = Connection::open(db_path)?;
             let mut stmt = conn.prepare(query)?;
 
             let results = stmt.query_map([], |row| {
@@ -103,6 +105,18 @@ async fn handle_plugin_cmd_request(
             wasi_write(&env.wasi_env, &collected)?;
         }
         PluginCommandRequest::SyncFile { dst, src } => handle_sync_file(env, dst, src),
+        // Walk through a path & enqueue matching files for indexing.
+        PluginCommandRequest::WalkAndEnqueue { path, extensions } => {
+            let dir_path = Path::new(&path);
+            if !dir_path.exists() {
+                return Err(Error::msg(format!("Invalid path: {}", path.display())));
+            }
+
+            log::info!("{} crawling path: {}", env.name, path.display());
+            let stats =
+                handle_walk_and_enqueue(&env.app_state, dir_path.to_path_buf(), extensions).await;
+            wasi_write(&env.wasi_env, &stats)?;
+        }
     }
 
     Ok(())
@@ -178,4 +192,131 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             log::error!("error adding to queue: {}", e);
         }
     });
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct WalkStats {
+    pub dirs: i32,
+    pub files: i32,
+    pub skipped: i32,
+}
+
+async fn handle_walk_and_enqueue(
+    state: &AppState,
+    path: PathBuf,
+    supported_exts: &HashSet<String>,
+) -> WalkStats {
+    let walker = WalkBuilder::new(path).standard_filters(true).build();
+    let enqueue_settings = EnqueueSettings {
+        force_allow: true,
+        ..Default::default()
+    };
+
+    let mut stats = WalkStats::default();
+    let mut to_enqueue: Vec<String> = Vec::new();
+
+    for entry in walker.flatten() {
+        if let Some(file_type) = entry.file_type() {
+            if file_type.is_dir() {
+                stats.dirs += 1;
+                continue;
+            }
+
+            let ext = entry.path().extension().and_then(|ext| ext.to_str());
+
+            if let Some(ext) = ext {
+                if supported_exts.contains(ext) {
+                    to_enqueue.push(path_to_uri(entry.path().to_path_buf()));
+                    stats.files += 1;
+                } else {
+                    stats.skipped += 1;
+                }
+            }
+        }
+
+        // Chunk out enqueues so we don't run into some crazy amount at once.
+        if to_enqueue.len() > 1000 {
+            let _ = enqueue_all(
+                &state.db,
+                &to_enqueue,
+                &[],
+                &state.user_settings,
+                &enqueue_settings,
+                None,
+            )
+            .await;
+            to_enqueue.clear();
+        }
+    }
+
+    // Add whatever is leftover
+    if !to_enqueue.is_empty() {
+        let _ = enqueue_all(
+            &state.db,
+            &to_enqueue,
+            &[],
+            &state.user_settings,
+            &enqueue_settings,
+            None,
+        )
+        .await;
+    }
+
+    log::info!("walked & enqueued: {:?}", stats);
+    stats
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashSet;
+    use std::path::Path;
+
+    use super::handle_walk_and_enqueue;
+    use crate::search::IndexPath;
+    use crate::state::AppStateBuilder;
+    use entities::models::crawl_queue::{num_queued, CrawlStatus};
+    use entities::test::setup_test_db;
+    use shared::config::UserSettings;
+
+    #[tokio::test]
+    async fn test_walk_and_enqueue() {
+        let test_folder = Path::new("/tmp/walk_and_enqueue");
+
+        let db = setup_test_db().await;
+        let state = AppStateBuilder::new()
+            .with_db(db)
+            .with_index(&IndexPath::Memory)
+            .with_user_settings(&UserSettings::default())
+            .build();
+
+        let ext: HashSet<String> = HashSet::from_iter(vec!["txt".into()].iter().cloned());
+
+        // Create a tmp directory for testing
+        std::fs::create_dir_all(test_folder)
+            .expect("Unable to create test dir for test_walk_and_enqueue");
+        // Generate some random files
+        for idx in 0..100 {
+            let ext = if idx % 5 == 0 { ".txt" } else { "" };
+
+            std::fs::write(
+                test_folder.join(format!("{}{}", idx, ext)),
+                format!("file contents {}", idx),
+            )
+            .expect("Unable to write test file");
+        }
+
+        let stats = handle_walk_and_enqueue(&state, test_folder.to_path_buf(), &ext).await;
+        assert!(stats.files > 0);
+
+        // Crawl queue should have the same number of documents
+        let num_queued = num_queued(&state.db, CrawlStatus::Queued)
+            .await
+            .expect("Unable to query queue");
+        assert_eq!(num_queued, stats.files as u64);
+
+        // Cleanup
+        if test_folder.exists() {
+            std::fs::remove_dir_all(test_folder).expect("Unable to clean up folder");
+        }
+    }
 }

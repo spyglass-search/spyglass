@@ -1,104 +1,83 @@
+use chrono::prelude::*;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use spyglass_plugin::utils::path_to_uri;
 use spyglass_plugin::*;
-use std::collections::HashSet;
-use std::path::Path;
-use url::Url;
 
 #[derive(Default)]
 struct Plugin {
     extensions: HashSet<String>,
-    processed_paths: HashSet<String>,
+    last_synced: SyncData,
 }
 
 const PLUGIN_DATA: &str = "/data.json";
 const FOLDERS_LIST_ENV: &str = "FOLDERS_LIST";
+const EXTS_LIST_ENV: &str = "EXTS_LIST";
+
+#[derive(Default, Deserialize, Serialize)]
+struct SyncData {
+    path_to_times: HashMap<PathBuf, DateTime<Utc>>,
+}
 
 register_plugin!(Plugin);
 
-// Create a file URI
-fn to_uri(path: &str) -> String {
-    let host = if let Ok(hname) = std::env::var("HOST_NAME") {
-        hname
-    } else {
-        "home.local".into()
-    };
-
-    let mut new_url = Url::parse("file://").expect("Base URI");
-    let _ = new_url.set_host(Some(&host));
-    // Fixes issues handling windows drive letters
-    new_url.set_path(&path.replace(':', "%3A"));
-    new_url.to_string()
-}
-
-impl Plugin {
-    fn walk_and_enqueue(&self, path: &str) {
-        if let Ok(folder_entries) = list_dir(path) {
-            let mut filtered = Vec::new();
-            // Filter out only files that match our extension list
-            for entry in folder_entries {
-                if entry.is_dir {
-                    self.walk_and_enqueue(&entry.path);
-                } else {
-                    let path = Path::new(&entry.path);
-                    if let Some(ext) = path
-                        .extension()
-                        .and_then(|x| x.to_str())
-                        .map(|x| x.to_string())
-                    {
-                        if self.extensions.contains(&ext) {
-                            filtered.push(to_uri(&entry.path));
-                        }
-                    }
-                }
-            }
-
-            // Add to crawl_queue & mark as processed
-            if !filtered.is_empty() {
-                enqueue_all(&filtered);
-            }
-        }
-    }
-}
-
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
-        self.extensions = HashSet::from_iter(vec!["md".to_string(), "txt".to_string()].into_iter());
-        self.processed_paths = match std::fs::read_to_string(PLUGIN_DATA) {
-            Ok(blob) => {
-                if let Ok(paths) = serde_json::from_str::<HashSet<String>>(&blob) {
-                    paths
-                } else {
-                    HashSet::new()
-                }
+        // List of supported file types
+        let default_exts =
+            HashSet::from_iter(vec!["md".to_string(), "txt".to_string()].into_iter());
+        self.extensions = if let Ok(blob) = std::env::var(EXTS_LIST_ENV) {
+            if let Ok(exts) = serde_json::from_str(&blob) {
+                exts
+            } else {
+                default_exts
             }
-            Err(_) => HashSet::new(),
+        } else {
+            default_exts
+        };
+
+        // When paths were last synced
+        self.last_synced = if let Ok(blob) = std::fs::read_to_string(PLUGIN_DATA) {
+            serde_json::from_str::<SyncData>(&blob).map_or(Default::default(), |x| x)
+        } else {
+            Default::default()
         };
 
         let paths = if let Ok(blob) = std::env::var(FOLDERS_LIST_ENV) {
-            if let Ok(folders) = serde_json::from_str::<Vec<String>>(&blob) {
-                folders
-            } else {
-                Vec::new()
-            }
+            serde_json::from_str::<Vec<String>>(&blob).map_or(Vec::new(), |x| x)
         } else {
             Vec::new()
         };
 
-        for path in paths {
-            // Have we processed this directory?
-            if !self.processed_paths.contains(&path) {
-                self.walk_and_enqueue(&path);
-                self.processed_paths.insert(path.to_string());
+        for path in paths.iter().map(|path| Path::new(&path).to_path_buf()) {
+            let now = Utc::now();
+
+            let last_processed_time = self
+                .last_synced
+                .path_to_times
+                .entry(path.to_path_buf())
+                .or_default();
+
+            let diff = now - *last_processed_time;
+            if diff.num_days() > 1 {
+                if let Err(e) = walk_and_enqueue_dir(path.to_path_buf(), &self.extensions) {
+                    log(format!("Unable to process dir: {}", e));
+                } else {
+                    *last_processed_time = now;
+                }
             }
 
             // List to notifications
             subscribe(PluginSubscription::WatchDirectory {
-                path: path.to_string(),
+                path: path.to_path_buf(),
                 recurse: true,
             });
         }
 
         // Save list of processed paths to data dir
-        if let Ok(blob) = serde_json::to_string_pretty(&self.processed_paths) {
+        if let Ok(blob) = serde_json::to_string_pretty(&self.last_synced) {
             let _ = std::fs::write(PLUGIN_DATA, blob);
         }
     }
@@ -106,9 +85,13 @@ impl SpyglassPlugin for Plugin {
     fn update(&mut self, event: PluginEvent) {
         match event {
             PluginEvent::FileCreated(path) | PluginEvent::FileUpdated(path) => {
-                enqueue_all(&[to_uri(&path)])
+                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                    if self.extensions.contains(ext) {
+                        enqueue_all(&[path_to_uri(path)])
+                    }
+                }
             }
-            PluginEvent::FileDeleted(path) => delete_doc(&to_uri(&path)),
+            PluginEvent::FileDeleted(path) => delete_doc(&path_to_uri(path)),
             _ => {}
         }
     }

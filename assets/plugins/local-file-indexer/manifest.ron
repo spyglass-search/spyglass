@@ -12,6 +12,12 @@
             value: "",
             form_type: PathList,
             help_text: Some("List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specify the parent folder.")
+        ),
+        "EXTS_LIST": (
+            label: "File Types",
+            value: "[\"md\", \"txt\"]",
+            form_type: StringList,
+            help_text: Some("List of supported file types that will be indexed.")
         )
     }
 )
