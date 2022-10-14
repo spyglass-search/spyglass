@@ -15,16 +15,18 @@ pub struct PathListProps {
     pub onchange: Callback<SettingChangeEvent>,
 }
 
-pub struct PathList {
-    pub paths: Vec<PathBuf>,
-}
-
 #[derive(Debug, Clone)]
 pub enum Msg {
     AddPath(PathBuf),
     OpenFolderDialog,
     OpenPath(PathBuf),
     RemovePath(PathBuf),
+}
+
+/// A variation of a string list that opens a native folder chooser dialog to add
+/// a new value to the list.
+pub struct PathList {
+    pub paths: Vec<PathBuf>,
 }
 
 impl PathList {
