@@ -22,8 +22,8 @@ pub struct SettingFormProps {
 
 #[derive(Clone)]
 pub struct SettingChangeEvent {
-    setting_ref: String,
-    new_value: String,
+    pub setting_ref: String,
+    pub new_value: String,
 }
 
 #[function_component(SettingForm)]
@@ -99,7 +99,11 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                     match &props.opts.form_type {
                         FormType::PathList => {
                             html! {
-                                <forms::PathList value={props.opts.value.clone()} oninput={oninput} />
+                                <forms::PathList
+                                    name={props.setting_ref.clone()}
+                                    value={props.opts.value.clone()}
+                                    onchange={props.onchange.clone()}
+                                />
                             }
                         }
                         FormType::StringList => {
@@ -158,7 +162,7 @@ impl UserSettingsPage {
                     log::error!("Unable to deserialize results: {}", e.to_string());
                     Vec::new()
                 }
-            }
+            },
             Err(e) => {
                 log::error!("Error fetching user settings: {:?}", e);
                 Vec::new()
@@ -179,7 +183,7 @@ impl Component for UserSettingsPage {
             current_settings: Vec::new(),
             changes: HashMap::new(),
             has_changes: false,
-            req_settings: RequestState::NotStarted
+            req_settings: RequestState::NotStarted,
         }
     }
 
@@ -188,7 +192,9 @@ impl Component for UserSettingsPage {
         match msg {
             Msg::FetchSettings => {
                 self.req_settings = RequestState::InProgress;
-                link.send_future(async { Msg::SetCurrentSettings(UserSettingsPage::fetch_user_settings().await) });
+                link.send_future(async {
+                    Msg::SetCurrentSettings(UserSettingsPage::fetch_user_settings().await)
+                });
 
                 false
             }
@@ -229,7 +235,8 @@ impl Component for UserSettingsPage {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
 
-        let contents = self.current_settings
+        let contents = self
+            .current_settings
             .iter()
             .map(|(setting_ref, setting)| {
                 html! {

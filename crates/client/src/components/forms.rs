@@ -4,13 +4,15 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::{btn, icons};
+use crate::pages::SettingChangeEvent;
 use crate::{invoke, listen, open_folder_path};
 use shared::event::{ClientEvent, ClientInvoke, ListenPayload};
 
 #[derive(Properties, PartialEq)]
 pub struct PathListProps {
+    pub name: String,
     pub value: String,
-    pub oninput: Callback<InputEvent>,
+    pub onchange: Callback<SettingChangeEvent>,
 }
 
 pub struct PathList {
@@ -23,6 +25,19 @@ pub enum Msg {
     OpenFolderDialog,
     OpenPath(PathBuf),
     RemovePath(PathBuf),
+}
+
+impl PathList {
+    pub fn emit_onchange(&self, ctx: &Context<Self>) {
+        let props = ctx.props();
+
+        if let Ok(new_value) = serde_json::to_string(&self.paths) {
+            props.onchange.emit(SettingChangeEvent {
+                setting_ref: props.name.clone(),
+                new_value,
+            });
+        }
+    }
 }
 
 impl Component for PathList {
@@ -55,11 +70,13 @@ impl Component for PathList {
         Self { paths }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::AddPath(path) => {
                 self.paths.push(path);
                 self.paths.sort();
+                self.emit_onchange(ctx);
+
                 true
             }
             Msg::OpenFolderDialog => {
@@ -78,6 +95,8 @@ impl Component for PathList {
             }
             Msg::RemovePath(path) => {
                 self.paths.retain(|s| **s != path);
+                self.emit_onchange(ctx);
+
                 true
             }
         }
