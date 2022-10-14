@@ -1,9 +1,16 @@
+use serde::Deserialize;
 use strum_macros::{AsRefStr, Display};
+
+#[derive(Debug, Deserialize)]
+pub struct ListenPayload {
+    pub payload: String,
+}
 
 #[derive(AsRefStr, Display)]
 pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
+    FolderChosen,
     Navigate,
     RefreshLensManager,
     RefreshPluginManager,

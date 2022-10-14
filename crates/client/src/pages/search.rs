@@ -235,7 +235,8 @@ pub fn show_lens_results(
     spawn_local(async move {
         match search_lenses(query).await {
             Ok(results) => {
-                let results: Vec<response::LensResult> = serde_wasm_bindgen::from_value(results).unwrap();
+                let results: Vec<response::LensResult> =
+                    serde_wasm_bindgen::from_value(results).unwrap();
                 let results = results
                     .iter()
                     .map(|x| x.into())
@@ -273,7 +274,8 @@ pub fn show_doc_results(
     spawn_local(async move {
         match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
             Ok(results) => {
-                let results: Vec<response::SearchResult> = serde_wasm_bindgen::from_value(results).unwrap();
+                let results: Vec<response::SearchResult> =
+                    serde_wasm_bindgen::from_value(results).unwrap();
                 let results = results
                     .iter()
                     .map(|x| x.into())

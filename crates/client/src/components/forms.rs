@@ -1,10 +1,11 @@
-use wasm_bindgen::JsValue;
+use std::path::{Path, PathBuf};
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::{btn, icons};
-use crate::{invoke, open_folder_path};
-use shared::event::ClientInvoke;
+use crate::{invoke, listen, open_folder_path};
+use shared::event::{ClientEvent, ClientInvoke, ListenPayload};
 
 #[derive(Properties, PartialEq)]
 pub struct PathListProps {
@@ -13,14 +14,15 @@ pub struct PathListProps {
 }
 
 pub struct PathList {
-    pub paths: Vec<String>,
+    pub paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Msg {
-    Add,
-    OpenPath(String),
-    RemovePath(String),
+    AddPath(PathBuf),
+    OpenFolderDialog,
+    OpenPath(PathBuf),
+    RemovePath(PathBuf),
 }
 
 impl Component for PathList {
@@ -28,28 +30,48 @@ impl Component for PathList {
     type Properties = PathListProps;
 
     fn create(ctx: &Context<Self>) -> Self {
+        let link = ctx.link();
         let props = ctx.props();
 
-        let mut paths = serde_json::from_str::<Vec<String>>(&props.value).map_or(Vec::new(), |x| x);
+        // Listen for new folder paths chosen
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |payload: JsValue| {
+                    if let Ok(res) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
+                        link.send_message(Msg::AddPath(Path::new(&res.payload).to_path_buf()));
+                    }
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = listen(ClientEvent::FolderChosen.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
+        let mut paths =
+            serde_json::from_str::<Vec<PathBuf>>(&props.value).map_or(Vec::new(), |x| x);
         paths.sort();
 
         Self { paths }
     }
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
-        log::info!("msg recv: {:?}", msg);
         match msg {
-            Msg::Add => {
+            Msg::AddPath(path) => {
+                self.paths.push(path);
+                self.paths.sort();
+                true
+            }
+            Msg::OpenFolderDialog => {
                 spawn_local(async {
-                    let res = invoke(ClientInvoke::ChooseFolder.as_ref(), JsValue::NULL).await;
-                    log::info!("{:?}", res);
+                    let _ = invoke(ClientInvoke::ChooseFolder.as_ref(), JsValue::NULL).await;
                 });
 
                 false
             }
             Msg::OpenPath(path) => {
-                spawn_local(async {
-                    let _ = open_folder_path(path).await;
+                spawn_local(async move {
+                    let _ = open_folder_path(path.display().to_string()).await;
                 });
 
                 false
@@ -78,7 +100,7 @@ impl Component for PathList {
                             classes={classes!("stroke-slate-400")}
                         />
                     </button>
-                    <div class={classes!("grow", "text-sm")}>{path.clone()}</div>
+                    <div class={classes!("grow", "text-sm")}>{path.display()}</div>
                     <button class={classes!("flex-none", "group")} onclick={link.callback(move |_| rm_msg.clone())}>
                         <icons::TrashIcon
                             height="h-5"
@@ -95,7 +117,7 @@ impl Component for PathList {
             <div>
                 {paths_html}
                 <div class="mt-4">
-                    <btn::Btn onclick={link.callback(|_| Msg::Add)}>
+                    <btn::Btn onclick={link.callback(|_| Msg::OpenFolderDialog)}>
                         <icons::FolderPlusIcon classes="mr-2" />
                         {"Add Folder"}
                     </btn::Btn>

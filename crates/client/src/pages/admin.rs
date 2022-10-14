@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -9,12 +8,7 @@ use yew_router::hooks::use_history;
 
 use crate::components::icons;
 use crate::{listen, pages, Route};
-use shared::event::ClientEvent;
-
-#[derive(Debug, Deserialize)]
-struct ListenPayload {
-    payload: String,
-}
+use shared::event::{ClientEvent, ListenPayload};
 
 #[derive(Clone, EnumString, Display, PartialEq, Eq)]
 pub enum Tab {

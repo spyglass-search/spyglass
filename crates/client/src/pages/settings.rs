@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
@@ -20,6 +20,7 @@ pub struct SettingFormProps {
     opts: SettingOpts,
 }
 
+#[derive(Clone)]
 pub struct SettingChangeEvent {
     setting_ref: String,
     new_value: String,
@@ -132,89 +133,130 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
     }
 }
 
-#[function_component(UserSettingsPage)]
-pub fn user_settings_page() -> Html {
-    let current_settings: UseStateHandle<Vec<(String, SettingOpts)>> = use_state_eq(Vec::new);
-    let changes: UseStateHandle<HashMap<String, String>> = use_state_eq(HashMap::new);
+#[derive(Clone)]
+pub enum Msg {
+    FetchSettings,
+    HandleOnChange(SettingChangeEvent),
+    HandleSave,
+    HandleShowFolder,
+    SetCurrentSettings(Vec<(String, SettingOpts)>),
+}
 
-    let req_state = use_state_eq(|| RequestState::NotStarted);
-    if *req_state == RequestState::NotStarted {
-        req_state.set(RequestState::InProgress);
-        let current_settings = current_settings.clone();
-        spawn_local(async move {
-            if let Ok(res) = invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
-                if let Ok(deser) = serde_wasm_bindgen::from_value::<Vec<(String, SettingOpts)>>(res.clone()) {
-                    current_settings.set(deser);
-                } else {
-                    log::error!("unable to deserialize: {:?}", res.as_string());
+pub struct UserSettingsPage {
+    current_settings: Vec<(String, SettingOpts)>,
+    changes: HashMap<String, String>,
+    has_changes: bool,
+    req_settings: RequestState,
+}
+
+impl UserSettingsPage {
+    async fn fetch_user_settings() -> Vec<(String, SettingOpts)> {
+        match invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
+            Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    log::error!("Unable to deserialize results: {}", e.to_string());
+                    Vec::new()
                 }
-            } else {
-                log::error!("unable to invoke");
             }
-        })
+            Err(e) => {
+                log::error!("Error fetching user settings: {:?}", e);
+                Vec::new()
+            }
+        }
+    }
+}
+
+impl Component for UserSettingsPage {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let link = ctx.link();
+        link.send_message(Msg::FetchSettings);
+
+        Self {
+            current_settings: Vec::new(),
+            changes: HashMap::new(),
+            has_changes: false,
+            req_settings: RequestState::NotStarted
+        }
     }
 
-    // Detect changes in setting values & enable the save changes button
-    let has_changes = use_state_eq(|| false);
-    let onchange = {
-        let has_changes = has_changes.clone();
-        let changes = changes.clone();
-        Callback::from(move |evt: SettingChangeEvent| {
-            has_changes.set(true);
-            let mut updated = (*changes).clone();
-            updated.insert(evt.setting_ref, evt.new_value);
-            changes.set(updated);
-        })
-    };
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let link = ctx.link();
+        match msg {
+            Msg::FetchSettings => {
+                self.req_settings = RequestState::InProgress;
+                link.send_future(async { Msg::SetCurrentSettings(UserSettingsPage::fetch_user_settings().await) });
 
-    let handle_show_folder = Callback::from(|_| {
-        spawn_local(async move {
-            let _ = invoke(ClientInvoke::OpenSettingsFolder.as_ref(), JsValue::NULL).await;
-        });
-    });
-
-    let handle_save_changes = {
-        let has_changes = has_changes.clone();
-        Callback::from(move |_| {
-            let changes_ref = changes.clone();
-            let updated = (*changes).clone();
-            spawn_local(async move {
-                // Send changes to backend to be validated & saved.
-                if let Ok(ser) = serde_wasm_bindgen::to_value(&updated.clone()) {
-                    // TODO: Handle any validation errors from backend and show
-                    // them to user.
-                    let _ = save_user_settings(ser).await;
-                }
-            });
-
-            changes_ref.set(HashMap::new());
-            has_changes.set(false);
-        })
-    };
-
-    let contents = current_settings
-        .iter()
-        .map(|(setting_ref, setting)| {
-            html! {
-                <SettingForm onchange={onchange.clone()} setting_ref={setting_ref.clone()} opts={setting.clone()} />
+                false
             }
-        })
-        .collect::<Html>();
+            Msg::HandleOnChange(evt) => {
+                self.has_changes = true;
+                self.changes.insert(evt.setting_ref, evt.new_value);
+                true
+            }
+            Msg::HandleSave => {
+                let changes = self.changes.clone();
+                spawn_local(async move {
+                    // Send changes to backend to be validated & saved.
+                    if let Ok(ser) = serde_wasm_bindgen::to_value(&changes) {
+                        // TODO: Handle any validation errors from backend and show
+                        // them to user.
+                        let _ = save_user_settings(ser).await;
+                    }
+                });
 
-    html! {
-        <div class="text-white bg-neutral-800 h-full">
-            <Header label="User Settings">
-                <btn::Btn onclick={handle_show_folder}>
-                    <icons::FolderOpenIcon classes={classes!("mr-2")}/>
-                    {"Settings folder"}
-                </btn::Btn>
-                <btn::Btn onclick={handle_save_changes} disabled={!*has_changes}>
-                    {"Save & Restart"}
-                </btn::Btn>
-            </Header>
-            <div class="pt-8 bg-netural-800">
-                {contents}
+                self.changes.clear();
+                self.has_changes = false;
+                true
+            }
+            Msg::HandleShowFolder => {
+                spawn_local(async move {
+                    let _ = invoke(ClientInvoke::OpenSettingsFolder.as_ref(), JsValue::NULL).await;
+                });
+
+                false
+            }
+            Msg::SetCurrentSettings(settings) => {
+                self.current_settings = settings;
+                true
+            }
+        }
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+
+        let contents = self.current_settings
+            .iter()
+            .map(|(setting_ref, setting)| {
+                html! {
+                    <SettingForm
+                        onchange={link.callback(Msg::HandleOnChange)}
+                        setting_ref={setting_ref.clone()}
+                        opts={setting.clone()}
+                    />
+                }
+            })
+            .collect::<Html>();
+
+        html! {
+            <div class="text-white bg-neutral-800 h-full">
+                <Header label="User Settings">
+                    <btn::Btn onclick={link.callback(|_| Msg::HandleShowFolder)}>
+                        <icons::FolderOpenIcon classes={classes!("mr-2")}/>
+                        {"Settings folder"}
+                    </btn::Btn>
+                    <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes}>
+                        {"Save & Restart"}
+                    </btn::Btn>
+                </Header>
+                <div class="pt-8 bg-netural-800">
+                    {contents}
+                </div>
             </div>
-        </div>
+        }
     }
 }

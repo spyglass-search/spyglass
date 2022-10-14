@@ -26,7 +26,7 @@ export async function recrawl_domain(domain) {
 }
 
 export async function save_user_settings(settings) {
-    return await invoke('save_user_settings', { settings });
+    return await invoke('save_user_settings', { settings: Object.fromEntries(settings) });
 }
 
 export async function searchDocs(lenses, query) {
