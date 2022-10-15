@@ -24,7 +24,7 @@ pub struct FormProps {
 }
 
 pub enum Msg {
-    HandleInput
+    HandleInput,
 }
 
 pub struct FormElement {
@@ -63,7 +63,8 @@ impl Component for FormElement {
         let link = ctx.link();
         let props = ctx.props();
 
-        let (parent, _) = props.setting_name
+        let (parent, _) = props
+            .setting_name
             .split_once('.')
             .unwrap_or((&props.setting_name, ""));
 

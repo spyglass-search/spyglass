@@ -1,8 +1,8 @@
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
-use crate::components::{btn, icons};
 use crate::components::forms::SettingChangeEvent;
+use crate::components::{btn, icons};
 
 #[derive(Properties, PartialEq)]
 pub struct StringListProps {

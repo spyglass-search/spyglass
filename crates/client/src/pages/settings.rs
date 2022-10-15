@@ -3,12 +3,12 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
+use crate::components::forms::{FormElement, SettingChangeEvent};
 use crate::{
     components::{btn, icons, Header},
     invoke, save_user_settings,
     utils::RequestState,
 };
-use crate::components::forms::{FormElement, SettingChangeEvent};
 use shared::event::ClientInvoke;
 use shared::form::SettingOpts;
 

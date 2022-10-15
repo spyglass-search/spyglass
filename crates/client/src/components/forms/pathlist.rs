@@ -3,8 +3,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::{btn, icons};
 use crate::components::forms::SettingChangeEvent;
+use crate::components::{btn, icons};
 use crate::{invoke, listen, open_folder_path};
 use shared::event::{ClientEvent, ClientInvoke, ListenPayload};
 
