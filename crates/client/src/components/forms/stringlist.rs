@@ -67,6 +67,7 @@ impl Component for StringList {
             Msg::HandleAdd => {
                 if let Some(el) = self.new_value_input.cast::<HtmlInputElement>() {
                     link.send_message(Msg::Add(el.value()));
+                    el.set_value("");
                 }
 
                 false
