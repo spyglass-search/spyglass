@@ -370,7 +370,7 @@ impl Component for LensManagerPage {
         };
 
         html! {
-            <div class="text-white bg-neutral-800 h-full relative">
+            <div>
                 <Header label="Lens Manager" tabs={tabs}>
                     <Btn onclick={link.callback(|_| Msg::RunOpenFolder)}>
                         <icons::FolderOpenIcon />

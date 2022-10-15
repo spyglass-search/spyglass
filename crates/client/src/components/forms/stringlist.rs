@@ -2,7 +2,7 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 use crate::components::{btn, icons};
-use crate::pages::SettingChangeEvent;
+use crate::components::forms::SettingChangeEvent;
 
 #[derive(Properties, PartialEq)]
 pub struct StringListProps {
@@ -29,7 +29,7 @@ impl StringList {
 
         if let Ok(new_value) = serde_json::to_string(&self.values) {
             props.onchange.emit(SettingChangeEvent {
-                setting_ref: props.name.clone(),
+                setting_name: props.name.clone(),
                 new_value,
             });
         }
@@ -104,7 +104,7 @@ impl Component for StringList {
 
         html! {
             <div>
-                <div class="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-scroll">
+                <div class="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-y-auto">
                     {list_html}
                 </div>
                 <div class="mt-4 flex flex-row gap-4">

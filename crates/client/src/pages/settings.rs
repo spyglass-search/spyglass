@@ -1,137 +1,16 @@
 use std::collections::HashMap;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 use crate::{
-    components::{btn, forms, icons, Header},
+    components::{btn, icons, Header},
     invoke, save_user_settings,
     utils::RequestState,
 };
+use crate::components::forms::{FormElement, SettingChangeEvent};
 use shared::event::ClientInvoke;
-use shared::form::{FormType, SettingOpts};
-
-#[derive(Properties, PartialEq)]
-pub struct SettingFormProps {
-    #[prop_or_default]
-    onchange: Callback<SettingChangeEvent>,
-    setting_ref: String,
-    opts: SettingOpts,
-}
-
-#[derive(Clone)]
-pub struct SettingChangeEvent {
-    pub setting_ref: String,
-    pub new_value: String,
-}
-
-#[function_component(SettingForm)]
-pub fn setting_form(props: &SettingFormProps) -> Html {
-    let input_ref = use_node_ref();
-
-    {
-        let input_ref = input_ref.clone();
-        let value = props.opts.value.clone();
-        use_effect(move || {
-            if let Some(el) = input_ref.cast::<HtmlInputElement>() {
-                // Only set the input once on render
-                if el.value().is_empty() && !value.is_empty() {
-                    el.set_value(&value);
-                }
-            }
-
-            || {}
-        });
-    }
-
-    let (parent, _) = props
-        .setting_ref
-        .split_once('.')
-        .unwrap_or((&props.setting_ref, ""));
-
-    let oninput = {
-        let onchange = props.onchange.clone();
-        let setting_ref = props.setting_ref.clone();
-        Callback::from(move |e: InputEvent| {
-            e.stop_immediate_propagation();
-            let input: HtmlInputElement = e.target_unchecked_into();
-            let input_value = input.value();
-            onchange.emit(SettingChangeEvent {
-                setting_ref: setting_ref.clone(),
-                new_value: input_value,
-            });
-        })
-    };
-
-    // System settings have "_" as the parent.
-    let label = if parent != "_" {
-        html! {
-            <>
-                <span class="text-white">{format!("{}: ", parent)}</span>
-                {props.opts.label.clone()}
-            </>
-        }
-    } else {
-        html! { props.opts.label.clone() }
-    };
-
-    html! {
-        <div class="px-8 mb-8">
-            <div class="mb-2">
-                <label class="text-yellow-500">{label}</label>
-                {
-                    if let Some(help_text) = props.opts.help_text.clone() {
-                        html! {
-                            <div>
-                                <small class="text-gray-500">
-                                    {help_text.clone()}
-                                </small>
-                            </div>
-                        }
-                    } else {
-                        html! { }
-                    }
-                }
-            </div>
-            <div>
-                {
-                    match &props.opts.form_type {
-                        FormType::PathList => {
-                            html! {
-                                <forms::PathList
-                                    name={props.setting_ref.clone()}
-                                    value={props.opts.value.clone()}
-                                    onchange={props.onchange.clone()}
-                                />
-                            }
-                        }
-                        FormType::StringList => {
-                            html! {
-                                <forms::StringList
-                                    name={props.setting_ref.clone()}
-                                    value={props.opts.value.clone()}
-                                    onchange={props.onchange.clone()}
-                                />
-                            }
-                        }
-                        FormType::Text | FormType::Path => {
-                            html! {
-                                <input
-                                    ref={input_ref.clone()}
-                                    spellcheck="false"
-                                    oninput={oninput}
-                                    type="text"
-                                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
-                                />
-                            }
-                        }
-                    }
-                }
-            </div>
-        </div>
-    }
-}
+use shared::form::SettingOpts;
 
 #[derive(Clone)]
 pub enum Msg {
@@ -196,7 +75,7 @@ impl Component for UserSettingsPage {
             }
             Msg::HandleOnChange(evt) => {
                 self.has_changes = true;
-                self.changes.insert(evt.setting_ref, evt.new_value);
+                self.changes.insert(evt.setting_name, evt.new_value);
                 true
             }
             Msg::HandleSave => {
@@ -236,9 +115,9 @@ impl Component for UserSettingsPage {
             .iter()
             .map(|(setting_ref, setting)| {
                 html! {
-                    <SettingForm
+                    <FormElement
                         onchange={link.callback(Msg::HandleOnChange)}
-                        setting_ref={setting_ref.clone()}
+                        setting_name={setting_ref.clone()}
                         opts={setting.clone()}
                     />
                 }
@@ -246,11 +125,11 @@ impl Component for UserSettingsPage {
             .collect::<Html>();
 
         html! {
-            <div class="text-white bg-neutral-800 h-full">
+            <div>
                 <Header label="User Settings">
                     <btn::Btn onclick={link.callback(|_| Msg::HandleShowFolder)}>
                         <icons::FolderOpenIcon classes={classes!("mr-2")}/>
-                        {"Settings folder"}
+                        {"Show Folder"}
                     </btn::Btn>
                     <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes}>
                         {"Save & Restart"}

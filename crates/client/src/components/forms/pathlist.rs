@@ -4,7 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::{btn, icons};
-use crate::pages::SettingChangeEvent;
+use crate::components::forms::SettingChangeEvent;
 use crate::{invoke, listen, open_folder_path};
 use shared::event::{ClientEvent, ClientInvoke, ListenPayload};
 
@@ -35,7 +35,7 @@ impl PathList {
 
         if let Ok(new_value) = serde_json::to_string(&self.paths) {
             props.onchange.emit(SettingChangeEvent {
-                setting_ref: props.name.clone(),
+                setting_name: props.name.clone(),
                 new_value,
             });
         }
@@ -136,7 +136,7 @@ impl Component for PathList {
 
         html! {
             <div>
-                <div class="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-scroll">
+                <div class="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-y-auto">
                     {paths_html}
                 </div>
                 <div class="mt-4">

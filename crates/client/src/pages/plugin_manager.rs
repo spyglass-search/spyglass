@@ -137,7 +137,7 @@ pub fn plugin_manager_page() -> Html {
     }
 
     html! {
-        <div class="text-white h-full bg-neutral-800">
+        <div>
             <Header label="Plugins" />
             <div>{contents}</div>
         </div>

@@ -134,7 +134,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     </ul>
                 </div>
             </div>
-            <div class="flex-col flex-1">
+            <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
             {
                 match props.tab {
                     #[allow(clippy::let_unit_value)]
