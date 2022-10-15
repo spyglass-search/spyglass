@@ -84,6 +84,12 @@ export let invoke = async (func_name, params) => {
                 form_type: "Text",
                 help_text: "The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.",
             }],
+            ["_.disable_telemetry", {
+                label: "Disable Telemetry",
+                value: "false",
+                form_type: "Bool",
+                help_text: "Disable any telemetry sent by the application.",
+            }],
             ["chrome-importer.CHROME_DATA_FOLDER", {
                 label: "Chrome Data Folder",
                 value: "",

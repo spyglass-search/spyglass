@@ -4,9 +4,10 @@ use strum_macros::{Display, EnumString};
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum FormType {
-    StringList,
+    Bool,
     Path,
     PathList,
+    StringList,
     Text,
 }
 
@@ -66,6 +67,7 @@ impl FormType {
 
                 Ok(value.into())
             }
+            _ => Ok(value.into()),
         }
     }
 }
