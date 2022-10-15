@@ -1,13 +1,16 @@
-use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 use shared::form::{FormType, SettingOpts};
 
 mod pathlist;
 mod stringlist;
+mod text;
+mod toggle;
 
 pub use pathlist::*;
 pub use stringlist::*;
+pub use text::*;
+pub use toggle::*;
 
 #[derive(Clone)]
 pub struct SettingChangeEvent {
@@ -23,12 +26,7 @@ pub struct FormProps {
     pub opts: SettingOpts,
 }
 
-pub enum Msg {
-    HandleInput,
-}
-
 pub struct FormElement {
-    node_ref: NodeRef,
     onchange: Callback<SettingChangeEvent>,
     opts: SettingOpts,
 }
@@ -42,7 +40,6 @@ impl FormElement {
     }
 
     fn element(&self, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
         let props = ctx.props();
         let onchange = self.onchange.clone();
 
@@ -67,28 +64,20 @@ impl FormElement {
             }
             FormType::Text | FormType::Path => {
                 html! {
-                    <input
-                        ref={self.node_ref.clone()}
-                        spellcheck="false"
-                        oninput={link.callback(|_| Msg::HandleInput)}
-                        type="text"
-                        class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
+                    <Text
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }
             }
             FormType::Bool => {
                 html! {
-                    <div class="grow items-center mt-2 justify-end flex">
-                        <label for="toggle" class="items-center cursor-pointer">
-                            <div class="relative">
-                                <input type="checkbox" id="toggle" class="sr-only" />
-                                <div class="block bg-stone-700 w-14 h-8 rounded-full"></div>
-                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition text-center">
-                                    {"Y"}
-                                </div>
-                            </div>
-                        </label>
-                    </div>
+                    <Toggle
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
+                    />
                 }
             }
         }
@@ -96,7 +85,7 @@ impl FormElement {
 }
 
 impl Component for FormElement {
-    type Message = Msg;
+    type Message = ();
     type Properties = FormProps;
 
     fn create(ctx: &Context<Self>) -> Self {
@@ -105,21 +94,10 @@ impl Component for FormElement {
         Self {
             onchange: props.onchange.clone(),
             opts: props.opts.clone(),
-            node_ref: NodeRef::default(),
         }
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        let props = ctx.props();
-        match msg {
-            Msg::HandleInput => {
-                let input: HtmlInputElement = self.node_ref.cast().expect("node ref not set");
-                self.onchange.emit(SettingChangeEvent {
-                    setting_name: props.setting_name.clone(),
-                    new_value: input.value(),
-                });
-            }
-        }
+    fn update(&mut self, _ctx: &Context<Self>, _msg: Self::Message) -> bool {
         false
     }
 
