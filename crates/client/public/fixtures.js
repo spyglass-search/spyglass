@@ -148,6 +148,10 @@ export async function searchLenses(query) {
     return await invoke('search_lenses', { query });
 }
 
+export async function open_folder_path(path) {
+    return await invoke('open_folder_path', { path });
+}
+
 export async function openResult(url) {
     return await invoke('open_result', { url });
 }

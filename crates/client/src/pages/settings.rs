@@ -108,15 +108,11 @@ pub fn setting_form(props: &SettingFormProps) -> Html {
                         }
                         FormType::StringList => {
                             html! {
-                                <textarea
-                                    ref={input_ref.clone()}
-                                    spellcheck="false"
-                                    oninput={oninput}
-                                    class="form-input w-full text-sm rounded bg-stone-700 border-stone-800"
-                                    rows="5"
-                                    placeholder={"[\"/Users/example/Documents\", \"/Users/example/Desktop/Notes\"]"}
-                                >
-                                </textarea>
+                                <forms::StringList
+                                    name={props.setting_ref.clone()}
+                                    value={props.opts.value.clone()}
+                                    onchange={props.onchange.clone()}
+                                />
                             }
                         }
                         FormType::Text | FormType::Path => {

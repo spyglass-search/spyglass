@@ -205,6 +205,16 @@ pub fn pencil_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(PlusIcon)]
+pub fn plus_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
+        </svg>
+
+    }
+}
+
 #[function_component(RefreshIcon)]
 pub fn refresh_icon(props: &IconProps) -> Html {
     html! {

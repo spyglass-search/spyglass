@@ -113,7 +113,7 @@ impl Component for PathList {
             let rm_msg = Msg::RemovePath(path.clone());
 
             html!  {
-                <div class="flex items-center rounded-md p-1.5">
+                <div class="flex items-center p-1.5">
                     <button class={classes!("flex-none", "mr-2", "group")} onclick={link.callback(move |_| open_msg.clone())} >
                         <icons::FolderIcon
                             height="h-5"
@@ -136,7 +136,9 @@ impl Component for PathList {
 
         html! {
             <div>
-                {paths_html}
+                <div class="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-scroll">
+                    {paths_html}
+                </div>
                 <div class="mt-4">
                     <btn::Btn onclick={link.callback(|_| Msg::OpenFolderDialog)}>
                         <icons::FolderPlusIcon classes="mr-2" />
