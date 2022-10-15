@@ -67,18 +67,17 @@ impl Component for FormElement {
             .split_once('.')
             .unwrap_or((&props.setting_name, ""));
 
-        // System settings have "_" as the parent.
-        let label = html! {
-            <>
-                {
-                    if parent != "_" {
-                        html! { <span class="text-white">{format!("{}: ", parent)}</span> }
-                    } else {
-                        html! {}
-                    }
-                }
-                {props.setting_name.clone()}
-            </>
+        // Show a label w/ the "parent name: label", i.e.  "local-file-indexer: Folder List".
+        // System settings have "_" as the parent and will show up as just the label.
+        let label = if parent != "_" {
+            html! {
+                <>
+                    <span class="text-white">{format!("{}: ", parent)}</span>
+                    <span>{props.opts.label.clone()}</span>
+                </>
+            }
+        } else {
+            html! { <span>{props.opts.label.clone()}</span> }
         };
 
         let onchange = props.onchange.clone();
@@ -89,10 +88,8 @@ impl Component for FormElement {
                     {
                         if let Some(help_text) = props.opts.help_text.clone() {
                             html! {
-                                <div>
-                                    <small class="text-gray-500">
-                                        {help_text.clone()}
-                                    </small>
+                                <div class="text-gray-500 text-sm">
+                                    {help_text.clone()}
                                 </div>
                             }
                         } else {
