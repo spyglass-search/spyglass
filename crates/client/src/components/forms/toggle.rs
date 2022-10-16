@@ -53,7 +53,7 @@ impl Component for Toggle {
         let toggle_id = format!("toggle_{}", props.name);
 
         html! {
-            <div class="grow items-center pl-4 mt-2 justify-end flex">
+            <div class="grow items-center pl-4 justify-end flex">
                 <label for={toggle_id.clone()} class="items-center cursor-pointer">
                     <div class="relative">
                         <input type="checkbox" id={toggle_id} class="sr-only" checked={self.state} onchange={link.callback(|_| Msg::Toggle)} />

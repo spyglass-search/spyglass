@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
 
     #[cfg(not(debug_assertions))]
-    let _guard = if config.user_settings.disable_telementry {
+    let _guard = if config.user_settings.disable_telemetry {
         None
     } else {
         Some(sentry::init((

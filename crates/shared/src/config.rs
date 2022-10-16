@@ -75,7 +75,7 @@ pub struct UserSettings {
     pub crawl_external_links: bool,
     /// Should we disable telemetry
     #[serde(default)]
-    pub disable_telementry: bool,
+    pub disable_telemetry: bool,
     /// Plugin settings
     #[serde(default)]
     pub plugin_settings: PluginSettings,
@@ -119,7 +119,7 @@ impl UserSettings {
 // TODO: Turn this into procedural macro that we can use to tag attributes in the UserSetting struct
 impl From<UserSettings> for Vec<(String, SettingOpts)> {
     fn from(settings: UserSettings) -> Self {
-        vec![
+        let mut config = vec![
             ("_.data_directory".into(), SettingOpts {
                 label: "Data Directory".into(),
                 value: settings.data_directory.to_str().map_or(String::new(), |s| s.to_string()),
@@ -128,13 +128,13 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
             }),
             ("_.disable_autolaunch".into(), SettingOpts {
                 label: "Disable Autolaunch".into(),
-                value: settings.disable_autolaunch.to_string(),
+                value: serde_json::to_string(&settings.disable_autolaunch).expect("Unable to ser autolaunch value"),
                 form_type: FormType::Bool,
                 help_text: Some("Prevents Spyglass from automatically launching when your computer first starts up.".into())
             }),
             ("_.disable_telemetry".into(), SettingOpts {
-                label: "Disable Telemtry".into(),
-                value: settings.disable_autolaunch.to_string(),
+                label: "Disable Telemetry".into(),
+                value: serde_json::to_string(&settings.disable_telemetry).expect("Unable to ser autolaunch value"),
                 form_type: FormType::Bool,
                 help_text: Some("Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.".into())
             }),
@@ -144,13 +144,44 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 form_type: FormType::Number,
                 help_text: Some("Port number used by the Spyglass background services. Only change this if you already have another serive running on this port.".into())
             }),
-        ]
+        ];
+
+        if let Limit::Finite(val) = settings.inflight_crawl_limit {
+            config.push((
+                "_.inflight_crawl_limit".into(),
+                SettingOpts {
+                    label: "Max number of crawlers".into(),
+                    value: val.to_string(),
+                    form_type: FormType::Number,
+                    help_text: Some(
+                        "Maximum number of concurrent crawlers in total used by Spyglass".into(),
+                    ),
+                },
+            ));
+        }
+
+        if let Limit::Finite(val) = settings.inflight_domain_limit {
+            config.push((
+                "_.inflight_domain_limit".into(),
+                SettingOpts {
+                    label: "Max number crawlers per domain".into(),
+                    value: val.to_string(),
+                    form_type: FormType::Number,
+                    help_text: Some(
+                        "Maximum number of concurrent crawlers used per site/app.".into(),
+                    ),
+                },
+            ));
+        }
+
+        config
     }
 }
 
 impl Default for UserSettings {
     fn default() -> Self {
         UserSettings {
+            // Max number of pages to crawl per domain
             domain_crawl_limit: Limit::Finite(500000),
             // 10 total crawlers at a time
             inflight_crawl_limit: Limit::Finite(10),
@@ -164,7 +195,7 @@ impl Default for UserSettings {
             // Where to store the metadata & index
             data_directory: UserSettings::default_data_dir(),
             crawl_external_links: false,
-            disable_telementry: false,
+            disable_telemetry: false,
             plugin_settings: Default::default(),
             disable_autolaunch: false,
             port: UserSettings::default_port(),

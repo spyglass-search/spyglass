@@ -9,7 +9,7 @@ use tauri::State;
 use crate::plugins::lens_updater::install_lens_to_path;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
-use shared::config::{Config, UserSettings};
+use shared::config::{Config, Limit, UserSettings};
 use shared::{event::ClientEvent, form::SettingOpts, request, response};
 use spyglass_rpc::RpcClient;
 
@@ -306,8 +306,18 @@ pub async fn save_user_settings(
                                             serde_json::from_str(value).unwrap_or_default();
                                     }
                                     "disable_telemetry" => {
-                                        current_settings.disable_telementry =
+                                        current_settings.disable_telemetry =
                                             serde_json::from_str(value).unwrap_or_default();
+                                    }
+                                    "inflight_crawl_limit" => {
+                                        let limit: u32 = serde_json::from_str(value).unwrap_or(10);
+                                        current_settings.inflight_crawl_limit =
+                                            Limit::Finite(limit);
+                                    }
+                                    "inflight_domain_limit" => {
+                                        let limit: u32 = serde_json::from_str(value).unwrap_or(2);
+                                        current_settings.inflight_domain_limit =
+                                            Limit::Finite(limit);
                                     }
                                     "port" => {
                                         current_settings.port = serde_json::from_str(value)
