@@ -9,8 +9,8 @@ use tauri::State;
 use crate::plugins::lens_updater::install_lens_to_path;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
-use shared::{event::ClientEvent, form::SettingOpts, request, response};
 use shared::config::{Config, UserSettings};
+use shared::{event::ClientEvent, form::SettingOpts, request, response};
 use spyglass_rpc::RpcClient;
 
 #[tauri::command]
@@ -311,7 +311,7 @@ pub async fn save_user_settings(
                                     }
                                     "port" => {
                                         current_settings.port = serde_json::from_str(value)
-                                            .unwrap_or(UserSettings::default_port());
+                                            .unwrap_or_else(|_| UserSettings::default_port());
                                     }
                                     _ => {}
                                 }

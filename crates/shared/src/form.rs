@@ -17,18 +17,14 @@ impl FormType {
     pub fn validate(&self, value: &str) -> Result<String, String> {
         let value = value.trim();
         match self {
-            FormType::Bool => {
-                match serde_json::from_str::<bool>(&value) {
-                    Ok(_) => Ok(value.to_string()),
-                    Err(e) => Err(e.to_string())
-                }
-            }
-            FormType::Number => {
-                match serde_json::from_str::<u64>(&value) {
-                    Ok(_) => Ok(value.to_string()),
-                    Err(e) => Err(e.to_string())
-                }
-            }
+            FormType::Bool => match serde_json::from_str::<bool>(value) {
+                Ok(_) => Ok(value.to_string()),
+                Err(e) => Err(e.to_string()),
+            },
+            FormType::Number => match serde_json::from_str::<u64>(value) {
+                Ok(_) => Ok(value.to_string()),
+                Err(e) => Err(e.to_string()),
+            },
             FormType::StringList => {
                 // Escape backslashes
                 let value = value.replace('\\', "\\\\");
