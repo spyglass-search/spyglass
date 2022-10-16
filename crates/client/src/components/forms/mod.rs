@@ -46,6 +46,24 @@ impl FormElement {
         let onchange = self.onchange.clone();
 
         match &self.opts.form_type {
+            FormType::Bool => {
+                html! {
+                    <Toggle
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
+                    />
+                }
+            }
+            FormType::Number => {
+                html! {
+                    <Text
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
+                    />
+                }
+            }
             FormType::PathList => {
                 html! {
                     <PathList
@@ -67,15 +85,6 @@ impl FormElement {
             FormType::Text | FormType::Path => {
                 html! {
                     <Text
-                        name={props.setting_name.clone()}
-                        value={self.opts.value.clone()}
-                        onchange={Callback::from(move |evt| onchange.emit(evt))}
-                    />
-                }
-            }
-            FormType::Bool => {
-                html! {
-                    <Toggle
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}

@@ -86,15 +86,15 @@ pub struct UserSettings {
 }
 
 impl UserSettings {
-    fn default_data_dir() -> PathBuf {
+    pub fn default_data_dir() -> PathBuf {
         Config::default_data_dir()
     }
 
-    fn default_shortcut() -> String {
+    pub fn default_shortcut() -> String {
         "CmdOrCtrl+Shift+/".to_string()
     }
 
-    fn default_port() -> u16 {
+    pub fn default_port() -> u16 {
         4664
     }
 
@@ -137,6 +137,12 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 value: settings.disable_autolaunch.to_string(),
                 form_type: FormType::Bool,
                 help_text: Some("Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.".into())
+            }),
+            ("_.port".into(), SettingOpts {
+                label: "Spyglass Daemon Port".into(),
+                value: settings.port.to_string(),
+                form_type: FormType::Number,
+                help_text: Some("Port number used by the Spyglass background services. Only change this if you already have another serive running on this port.".into())
             }),
         ]
     }
