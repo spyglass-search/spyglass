@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -9,12 +8,7 @@ use yew_router::hooks::use_history;
 
 use crate::components::icons;
 use crate::{listen, pages, Route};
-use shared::event::ClientEvent;
-
-#[derive(Debug, Deserialize)]
-struct ListenPayload {
-    payload: String,
-}
+use shared::event::{ClientEvent, ListenPayload};
 
 #[derive(Clone, EnumString, Display, PartialEq, Eq)]
 pub enum Tab {
@@ -73,7 +67,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-            if let Ok(payload) = payload.into_serde::<ListenPayload>() {
+            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
                     "/settings/lenses" => history.push(Route::SettingsPage {
                         tab: pages::Tab::LensManager,
@@ -140,7 +134,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     </ul>
                 </div>
             </div>
-            <div class="flex-col flex-1">
+            <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
             {
                 match props.tab {
                     #[allow(clippy::let_unit_value)]

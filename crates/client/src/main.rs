@@ -45,6 +45,9 @@ extern "C" {
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
 
+    #[wasm_bindgen(catch)]
+    pub async fn open_folder_path(path: String) -> Result<(), JsValue>;
+
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;
 
@@ -95,6 +98,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "openResult", catch)]
     pub async fn open(url: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(catch)]
+    pub async fn open_folder_path(path: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(js_name = "resizeWindow", catch)]
     pub async fn resize_window(height: f64) -> Result<(), JsValue>;

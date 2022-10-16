@@ -22,7 +22,7 @@ pub struct LensProps {
 
 async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {
-        Ok(results) => match results.into_serde() {
+        Ok(results) => match serde_wasm_bindgen::from_value(results) {
             Ok(parsed) => Some(parsed),
             Err(e) => {
                 log::error!("Unable to deserialize results: {}", e.to_string());
@@ -38,7 +38,7 @@ async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
 
 async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
-        Ok(results) => match results.into_serde::<Vec<InstallableLens>>() {
+        Ok(results) => match serde_wasm_bindgen::from_value::<Vec<InstallableLens>>(results) {
             Ok(lenses) => {
                 let parsed: Vec<LensResult> = lenses
                     .iter()
@@ -209,12 +209,21 @@ impl LensManagerPage {
     }
 
     fn user_installed_tabview(&self) -> Html {
-        self.user_installed
-            .iter()
-            .map(|data| {
-                html! {<Lens result={data.clone()} is_installed={true} /> }
-            })
-            .collect::<Html>()
+        if self.user_installed.is_empty() {
+            html! {
+                <div class="grid place-content-center h-48 w-full text-neutral-500">
+                    <icons::EmojiSadIcon height="h-20" width="w-20" classes={classes!("mx-auto")}/>
+                    <div class="mt-4">{"Install some lenses to get started!"}</div>
+                </div>
+            }
+        } else {
+            self.user_installed
+                .iter()
+                .map(|data| {
+                    html! {<Lens result={data.clone()} is_installed={true} /> }
+                })
+                .collect::<Html>()
+        }
     }
 }
 
@@ -361,7 +370,7 @@ impl Component for LensManagerPage {
         };
 
         html! {
-            <div class="text-white bg-neutral-800 h-full relative">
+            <div>
                 <Header label="Lens Manager" tabs={tabs}>
                     <Btn onclick={link.callback(|_| Msg::RunOpenFolder)}>
                         <icons::FolderOpenIcon />

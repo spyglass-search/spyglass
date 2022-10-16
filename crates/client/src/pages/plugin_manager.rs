@@ -18,7 +18,7 @@ fn fetch_installed_plugins(
     spawn_local(async move {
         match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
             Ok(results) => {
-                plugins_handle.set(results.into_serde().unwrap());
+                plugins_handle.set(serde_wasm_bindgen::from_value(results).unwrap());
                 req_state.set(RequestState::Finished);
             }
             Err(e) => {
@@ -137,7 +137,7 @@ pub fn plugin_manager_page() -> Html {
     }
 
     html! {
-        <div class="text-white h-full bg-neutral-800">
+        <div>
             <Header label="Plugins" />
             <div>{contents}</div>
         </div>

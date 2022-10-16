@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
     let config = Config::new();
     #[cfg(not(debug_assertions))]
-    let _guard = if config.user_settings.disable_telementry {
+    let _guard = if config.user_settings.disable_telemetry {
         None
     } else {
         Some(sentry::init((
@@ -98,6 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
+            cmd::choose_folder,
             cmd::crawl_stats,
             cmd::delete_doc,
             cmd::delete_domain,
@@ -106,6 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::list_plugins,
             cmd::load_user_settings,
             cmd::network_change,
+            cmd::open_folder_path,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,

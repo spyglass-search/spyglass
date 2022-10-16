@@ -1,9 +1,16 @@
+use serde::Deserialize;
 use strum_macros::{AsRefStr, Display};
+
+#[derive(Debug, Deserialize)]
+pub struct ListenPayload {
+    pub payload: String,
+}
 
 #[derive(AsRefStr, Display)]
 pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
+    FolderChosen,
     Navigate,
     RefreshLensManager,
     RefreshPluginManager,
@@ -14,6 +21,8 @@ pub enum ClientEvent {
 
 #[derive(AsRefStr, Display)]
 pub enum ClientInvoke {
+    #[strum(serialize = "choose_folder")]
+    ChooseFolder,
     #[strum(serialize = "escape")]
     Escape,
     #[strum(serialize = "open_plugins_folder")]
@@ -32,6 +41,8 @@ pub enum ClientInvoke {
     LoadUserSettings,
     #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
+    #[strum(serialize = "open_folder_path")]
+    OpenFolder,
     #[strum(serialize = "open_lens_folder")]
     OpenLensFolder,
     #[strum(serialize = "open_settings_folder")]
