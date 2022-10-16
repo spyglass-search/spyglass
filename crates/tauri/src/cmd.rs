@@ -7,15 +7,9 @@ use tauri::Manager;
 use tauri::State;
 
 use crate::plugins::lens_updater::install_lens_to_path;
-use crate::window::alert;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
-use shared::{
-    config::Config,
-    event::ClientEvent,
-    form::{FormType, SettingOpts},
-    request, response,
-};
+use shared::{config::Config, event::ClientEvent, form::SettingOpts, request, response};
 use spyglass_rpc::RpcClient;
 
 #[tauri::command]
@@ -279,11 +273,15 @@ pub async fn save_user_settings(
     window: tauri::Window,
     config: State<'_, Config>,
     settings: HashMap<String, String>,
-) -> Result<(), String> {
-    let mut user_settings = config.user_settings.clone();
+) -> Result<(), HashMap<String, String>> {
+    let mut current_settings = config.user_settings.clone();
+
+    let config_list: Vec<(String, SettingOpts)> = config.user_settings.clone().into();
+    let setting_configs: HashMap<String, SettingOpts> = config_list.into_iter().collect();
+    let mut errors: HashMap<String, String> = HashMap::new();
+
     let plugin_configs = config.load_plugin_config();
 
-    let mut received_error = false;
     let mut fields_updated: usize = 0;
 
     // Loop through each updated settings value sent from the front-end and
@@ -294,20 +292,27 @@ pub async fn save_user_settings(
             match parent {
                 // Hacky way to update user settings directly.
                 "_" => {
-                    if field == "data_directory" {
-                        match FormType::Path.validate(value) {
+                    if let Some(opt) = setting_configs.get(key) {
+                        match opt.form_type.validate(value) {
                             Ok(val) => {
                                 fields_updated += 1;
-                                user_settings.data_directory = PathBuf::from(val);
+                                match field {
+                                    "data_directory" => {
+                                        current_settings.data_directory = PathBuf::from(val);
+                                    }
+                                    "disable_autolaunch" => {
+                                        current_settings.disable_autolaunch =
+                                            serde_json::from_str(value).unwrap_or_default();
+                                    }
+                                    "disable_telemetry" => {
+                                        current_settings.disable_telementry =
+                                            serde_json::from_str(value).unwrap_or_default();
+                                    }
+                                    _ => {}
+                                }
                             }
-                            Err(error) => {
-                                // Show an alert
-                                received_error = true;
-                                alert(
-                                    &window,
-                                    "Error",
-                                    &format!("Unable to save data directory due to: {}", error),
-                                );
+                            Err(err) => {
+                                errors.insert(key.to_string(), err);
                             }
                         }
                     }
@@ -318,7 +323,7 @@ pub async fn save_user_settings(
                         .get(plugin_name)
                         .expect("Unable to find plugin");
 
-                    if let Some(to_update) = user_settings.plugin_settings.get_mut(plugin_name) {
+                    if let Some(to_update) = current_settings.plugin_settings.get_mut(plugin_name) {
                         if let Some(field_opts) = plugin_config.user_settings.get(field) {
                             // Validate & serialize value into something we can save.
                             match field_opts.form_type.validate(value) {
@@ -326,17 +331,8 @@ pub async fn save_user_settings(
                                     fields_updated += 1;
                                     to_update.insert(field.into(), val);
                                 }
-                                Err(error) => {
-                                    // Show an alert
-                                    received_error = true;
-                                    alert(
-                                        &window,
-                                        "Error",
-                                        &format!(
-                                            "Unable to save {} due to: {}",
-                                            field_opts.label, error
-                                        ),
-                                    );
+                                Err(err) => {
+                                    errors.insert(key.to_string(), err);
                                 }
                             }
                         }
@@ -347,13 +343,14 @@ pub async fn save_user_settings(
     }
 
     // Only save settings if everything is valid.
-    if !received_error && fields_updated > 0 {
-        let _ = config.save_user_settings(&user_settings);
+    if errors.is_empty() && fields_updated > 0 {
+        let _ = config.save_user_settings(&current_settings);
         let app = window.app_handle();
         app.restart();
+        Ok(())
+    } else {
+        Err(errors)
     }
-
-    Ok(())
 }
 
 #[tauri::command]
@@ -363,15 +360,8 @@ pub async fn load_user_settings(
 ) -> Result<Vec<(String, SettingOpts)>, String> {
     let current_settings = Config::load_user_settings().expect("Unable to read user settings");
 
-    let serialized: HashMap<String, String> = current_settings.clone().into();
     let plugin_configs = config.load_plugin_config();
-
-    let mut list = vec![("_.data_directory".into(), SettingOpts {
-        label: "Data Directory".into(),
-        value: serialized.get("_.data_directory").unwrap_or(&"".to_string()).to_string(),
-        form_type: FormType::Text,
-        help_text: Some("The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.".into())
-    })];
+    let mut list: Vec<(String, SettingOpts)> = current_settings.clone().into();
 
     let current_plug_settings = current_settings.plugin_settings;
     for (pname, pconfig) in plugin_configs {

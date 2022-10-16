@@ -19,10 +19,12 @@ pub enum Msg {
     HandleSave,
     HandleShowFolder,
     SetCurrentSettings(Vec<(String, SettingOpts)>),
+    SetErrors(HashMap<String, String>),
 }
 
 pub struct UserSettingsPage {
     current_settings: Vec<(String, SettingOpts)>,
+    errors: HashMap<String, String>,
     changes: HashMap<String, String>,
     has_changes: bool,
     req_settings: RequestState,
@@ -57,6 +59,7 @@ impl Component for UserSettingsPage {
         Self {
             current_settings: Vec::new(),
             changes: HashMap::new(),
+            errors: HashMap::new(),
             has_changes: false,
             req_settings: RequestState::NotStarted,
         }
@@ -80,14 +83,21 @@ impl Component for UserSettingsPage {
             }
             Msg::HandleSave => {
                 let changes = self.changes.clone();
-                spawn_local(async move {
-                    // Send changes to backend to be validated & saved.
-                    if let Ok(ser) = serde_wasm_bindgen::to_value(&changes) {
-                        // TODO: Handle any validation errors from backend and show
-                        // them to user.
-                        let _ = save_user_settings(ser).await;
-                    }
-                });
+                // Send changes to backend to be validated & saved.
+                if let Ok(ser) = serde_wasm_bindgen::to_value(&changes) {
+                    link.send_future(async move {
+                        if let Err(res) = save_user_settings(ser).await {
+                            if let Ok(errors) =
+                                serde_wasm_bindgen::from_value::<HashMap<String, String>>(res)
+                            {
+                                log::debug!("save_user_settings: {:?}", errors);
+                                return Msg::SetErrors(errors);
+                            }
+                        }
+
+                        Msg::SetErrors(HashMap::new())
+                    });
+                }
 
                 self.changes.clear();
                 self.has_changes = false;
@@ -104,6 +114,10 @@ impl Component for UserSettingsPage {
                 self.current_settings = settings;
                 true
             }
+            Msg::SetErrors(errors) => {
+                self.errors = errors;
+                true
+            }
         }
     }
 
@@ -114,11 +128,14 @@ impl Component for UserSettingsPage {
             .current_settings
             .iter()
             .map(|(setting_ref, setting)| {
+                let error_msg = self.errors.get(setting_ref).map(|msg| msg.to_owned());
+
                 html! {
                     <FormElement
+                        error_msg={error_msg}
                         onchange={link.callback(Msg::HandleOnChange)}
-                        setting_name={setting_ref.clone()}
                         opts={setting.clone()}
+                        setting_name={setting_ref.clone()}
                     />
                 }
             })

@@ -24,6 +24,8 @@ pub struct FormProps {
     pub onchange: Callback<SettingChangeEvent>,
     pub setting_name: String,
     pub opts: SettingOpts,
+    #[prop_or_default]
+    pub error_msg: Option<String>,
 }
 
 pub struct FormElement {
@@ -137,6 +139,14 @@ impl Component for FormElement {
                             html! { }
                         }
                     }
+                    {if let Some(msg) = props.error_msg.clone() {
+                        html! {
+                            <div class="text-red-500 text-xs py-2">{msg}</div>
+                        }
+                    } else {
+                        html! {}
+                    }}
+
                 </div>
                 {self.element(ctx)}
             </div>
