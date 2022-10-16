@@ -6,7 +6,10 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 pub use spyglass_lens::{LensConfig, LensRule, PipelineConfiguration};
 
-use crate::plugin::PluginConfig;
+use crate::{
+    form::{FormType, SettingOpts},
+    plugin::PluginConfig,
+};
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
@@ -113,19 +116,29 @@ impl UserSettings {
     }
 }
 
-impl From<UserSettings> for HashMap<String, String> {
+// TODO: Turn this into procedural macro that we can use to tag attributes in the UserSetting struct
+impl From<UserSettings> for Vec<(String, SettingOpts)> {
     fn from(settings: UserSettings) -> Self {
-        let mut map: HashMap<String, String> = HashMap::new();
-        map.insert(
-            "_.data_directory".to_string(),
-            settings
-                .data_directory
-                .to_str()
-                .expect("Unable to convert to string")
-                .to_string(),
-        );
-
-        map
+        vec![
+            ("_.data_directory".into(), SettingOpts {
+                label: "Data Directory".into(),
+                value: settings.data_directory.to_str().map_or(String::new(), |s| s.to_string()),
+                form_type: FormType::Path,
+                help_text: Some("The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.".into())
+            }),
+            ("_.disable_autolaunch".into(), SettingOpts {
+                label: "Disable Autolaunch".into(),
+                value: settings.disable_autolaunch.to_string(),
+                form_type: FormType::Bool,
+                help_text: Some("Prevents Spyglass from automatically launching when your computer first starts up.".into())
+            }),
+            ("_.disable_telemetry".into(), SettingOpts {
+                label: "Disable Telemtry".into(),
+                value: settings.disable_autolaunch.to_string(),
+                form_type: FormType::Bool,
+                help_text: Some("Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.".into())
+            }),
+        ]
     }
 }
 

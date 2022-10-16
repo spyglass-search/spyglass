@@ -32,11 +32,17 @@ impl Component for Text {
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let props = ctx.props();
+
         match msg {
             Msg::HandleInput => {
                 if let Some(el) = self.node_ref.cast::<HtmlInputElement>() {
                     self.value = el.value();
+                    props.onchange.emit(SettingChangeEvent {
+                        setting_name: props.name.clone(),
+                        new_value: self.value.clone()
+                    });
                 }
 
                 true

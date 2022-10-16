@@ -88,13 +88,13 @@ export let invoke = async (func_name, params) => {
                 label: "Disable Autolaunch",
                 value: "false",
                 form_type: "Bool",
-                help_text: "Disables launching Spyglass when your computer starts.",
+                help_text: "Prevents Spyglass from automatically launching when your computer first starts up.",
             }],
             ["_.disable_telemetry", {
                 label: "Disable Telemetry",
                 value: "false",
                 form_type: "Bool",
-                help_text: "Disable any telemetry sent by the application.",
+                help_text: "Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.",
             }],
             ["chrome-importer.CHROME_DATA_FOLDER", {
                 label: "Chrome Data Folder",
