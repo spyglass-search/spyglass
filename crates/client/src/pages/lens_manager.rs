@@ -112,15 +112,7 @@ pub fn install_btn(props: &InstallBtnProps) -> Html {
 
 #[function_component(Lens)]
 pub fn lens_component(props: &LensProps) -> Html {
-    let component_styles: Vec<String> = vec![
-        "border-t".into(),
-        "border-neutral-600".into(),
-        "px-8".into(),
-        "py-4".into(),
-        "pr-0".into(),
-        "text-white".into(),
-        "bg-netural-800".into(),
-    ];
+    let component_styles = classes!("px-8", "py-4", "pr-0");
     let result = &props.result;
 
     let installed_el = if props.is_installed {
@@ -366,7 +358,7 @@ impl Component for LensManagerPage {
         let lens_update_icon = if self.lens_updater.in_progress() {
             html! { <icons::RefreshIcon animate_spin={true} /> }
         } else {
-            html! { <icons::DocumentArrowDown /> }
+            html! { <icons::ArrowDownOnSquares /> }
         };
 
         html! {
@@ -376,7 +368,7 @@ impl Component for LensManagerPage {
                         <icons::FolderOpenIcon />
                         <div class="ml-2">{"Lens folder"}</div>
                     </Btn>
-                    <Btn onclick={link.callback(|_| Msg::RunLensUpdate)}>
+                    <Btn onclick={link.callback(|_| Msg::RunLensUpdate)} disabled={self.lens_updater.in_progress()}>
                         {lens_update_icon}
                         <div class="ml-2">{"Update"}</div>
                     </Btn>

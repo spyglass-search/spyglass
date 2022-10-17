@@ -57,6 +57,13 @@ export let invoke = async (func_name, params) => {
             sha: "fake-sha",
             html_url: "https://example.com",
             download_url: "https://example.com",
+        }, {
+            author: "a5huynh",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            name: "installable-two",
+            sha: "fake-sha-1",
+            html_url: "https://example.com",
+            download_url: "https://example.com",
         }];
     } else if (func_name == "install_lens") {
         window.setTimeout(() => {
@@ -68,6 +75,11 @@ export let invoke = async (func_name, params) => {
             title: "chrome-exporter",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             is_enabled: true,
+        }, {
+            author: "a5huynh",
+            title: "local-file-indexer",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            is_enabled: false,
         }];
     } else if (func_name == "crawl_stats") {
         return {
