@@ -18,6 +18,12 @@ use shared::config::Config;
 
 mod api;
 
+#[cfg(not(debug_assertions))]
+const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
+
+#[cfg(debug_assertions)]
+const LOG_LEVEL: tracing::Level = tracing::Level::DEBUG;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
 
@@ -40,8 +46,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscriber = tracing_subscriber::registry()
         .with(
             EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into())
+                .add_directive(LOG_LEVEL.into())
                 .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive("regalloc=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive("cranelift_codegen=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive("wasmer_wasi=WARN".parse().expect("Invalid EnvFilter"))
                 .add_directive(
                     "wasmer_compiler_cranelift=WARN"
                         .parse()

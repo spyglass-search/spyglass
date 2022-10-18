@@ -232,6 +232,8 @@ impl Crawler {
         }
 
         let crawl = crawl.expect("Invalid crawl model");
+        log::debug!("handling job: {}", crawl.url);
+
         let url = Url::parse(&crawl.url).expect("Invalid fetch URL");
 
         // Have we crawled this recently?

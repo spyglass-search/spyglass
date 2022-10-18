@@ -10,6 +10,7 @@ pub enum Msg {
 pub struct ToggleProps {
     pub name: String,
     pub value: String,
+    #[prop_or_default]
     pub onchange: Callback<SettingChangeEvent>,
 }
 
