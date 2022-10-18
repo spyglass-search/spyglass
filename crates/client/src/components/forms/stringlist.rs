@@ -114,6 +114,7 @@ impl Component for StringList {
                         type="text"
                         class="form-input text-sm rounded bg-stone-700 border-stone-800"
                         placeholder="html"
+                        spellcheck="false"
                     />
                     <btn::Btn onclick={link.callback(|_| Msg::HandleAdd)}>
                         <icons::PlusIcon classes="mr-1" />
