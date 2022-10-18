@@ -48,21 +48,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             EnvFilter::from_default_env()
                 .add_directive(LOG_LEVEL.into())
                 .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
-                .add_directive(
-                    "regalloc=WARN"
-                        .parse()
-                        .expect("Invalid EnvFilter"),
-                )
-                .add_directive(
-                    "cranelift_codegen=WARN"
-                        .parse()
-                        .expect("Invalid EnvFilter"),
-                )
-                .add_directive(
-                    "wasmer_wasi=WARN"
-                        .parse()
-                        .expect("Invalid EnvFilter"),
-                )
+                .add_directive("regalloc=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive("cranelift_codegen=WARN".parse().expect("Invalid EnvFilter"))
+                .add_directive("wasmer_wasi=WARN".parse().expect("Invalid EnvFilter"))
                 .add_directive(
                     "wasmer_compiler_cranelift=WARN"
                         .parse()
