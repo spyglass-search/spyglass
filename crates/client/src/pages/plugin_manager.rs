@@ -48,7 +48,7 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
                     {plugin.description.clone()}
                 </div>
             </div>
-            <div class="pl-8">
+            <div class="ml-auto grow">
                 <Toggle
                     name={format!("{}-toggle", plugin.title)}
                     value={serde_json::to_string(&plugin.is_enabled).expect("Unable to serialize")}
