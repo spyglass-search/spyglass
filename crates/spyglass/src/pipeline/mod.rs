@@ -126,7 +126,7 @@ pub async fn initialize_pipelines(
                             }
                         }
                         None => {
-                            log::error!("No pipeline configuration found for pipeline {:?}, failing crawl id: {}", &pipeline, task.id);
+                            log::warn!("No pipeline configuration found for pipeline {:?}, failing crawl id: {}", &pipeline, task.id);
                             fail_crawl_cmd(&app_state, task.id).await;
                         }
                     }

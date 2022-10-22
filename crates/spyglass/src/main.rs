@@ -55,7 +55,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "wasmer_compiler_cranelift=WARN"
                         .parse()
                         .expect("Invalid EnvFilter"),
-                ),
+                )
+                .add_directive("docx=WARN".parse().expect("Invalid EnvFilter")),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
         .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));

@@ -15,6 +15,7 @@ use shared::url_to_file_path;
 
 use crate::crawler::bootstrap::create_archive_url;
 use crate::fetch::HTTPClient;
+use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 
 pub mod bootstrap;
@@ -298,7 +299,10 @@ impl Crawler {
             .expect("Unable to convert path file name to string");
 
         // Attempt to read file
-        let contents = std::fs::read_to_string(&path)?;
+        let contents = match path.extension() {
+            Some(ext) if parser::supports_filetype(ext) => parser::parse_file(ext, path)?,
+            _ => std::fs::read_to_string(&path)?,
+        };
 
         let mut hasher = Sha256::new();
         hasher.update(&contents.as_bytes());
