@@ -42,6 +42,7 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-log = "0.1.3"
 docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
+calamine = "0.19.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
 url = "2.2"
 uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
