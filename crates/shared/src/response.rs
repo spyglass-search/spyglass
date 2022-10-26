@@ -20,7 +20,7 @@ pub struct AppStatus {
     pub num_docs: u64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConnectionResult {
     pub name: String,
     pub is_connected: bool,

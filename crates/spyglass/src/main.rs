@@ -20,9 +20,14 @@ mod api;
 
 const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
 #[cfg(not(debug_assertions))]
-const SPYGLASS_LEVEL: &str = "libspyglass=INFO";
+const SPYGLASS_LEVEL: &str = "spyglass=INFO";
+#[cfg(not(debug_assertions))]
+const LIBSPYGLASS_LEVEL: &str = "libspyglass=INFO";
+
 #[cfg(debug_assertions)]
-const SPYGLASS_LEVEL: &str = "libspyglass=DEBUG";
+const SPYGLASS_LEVEL: &str = "spyglass=DEBUG";
+#[cfg(debug_assertions)]
+const LIBSPYGLASS_LEVEL: &str = "libspyglass=DEBUG";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
@@ -48,6 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             EnvFilter::from_default_env()
                 .add_directive(LOG_LEVEL.into())
                 .add_directive(SPYGLASS_LEVEL.parse().expect("Invalid EnvFilter"))
+                .add_directive(LIBSPYGLASS_LEVEL.parse().expect("Invalid EnvFilter"))
                 // Don't need debug/info level logging for these
                 .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
                 .add_directive("regalloc=WARN".parse().expect("Invalid EnvFilter"))

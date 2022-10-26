@@ -55,7 +55,7 @@ pub async fn add_queue(
 pub async fn authorize_connection(_state: AppState, name: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", name);
 
-    if name.as_str() == "google" {
+    if name.as_str() == "Google" {
         let mut listener = create_auth_listener().await;
         let client = GoogClient::new(
             "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
@@ -71,9 +71,14 @@ pub async fn authorize_connection(_state: AppState, name: String) -> Result<(), 
         if let Some(auth) = listener.listen(60 * 5).await {
             log::debug!("received oauth credentials: {:?}", auth);
         }
-    }
 
-    Ok(())
+        Ok(())
+    } else {
+        Err(Error::Custom(format!(
+            "Connection <{}> not supported",
+            name
+        )))
+    }
 }
 
 /// Fun stats about index size, etc.
