@@ -22,6 +22,7 @@ use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::Command;
 
+use super::auth::create_auth_listener;
 use super::response;
 
 /// Add url to queue
@@ -50,20 +51,26 @@ pub async fn add_queue(
     Ok("ok".to_string())
 }
 
-#[instrument(skip(state))]
-pub async fn authorize_connection(state: AppState, name: String) -> Result<(), Error> {
+#[instrument(skip(_state))]
+pub async fn authorize_connection(_state: AppState, name: String) -> Result<(), Error> {
+    log::debug!("authorizing <{}>", name);
+
     if name.as_str() == "google" {
-        let port = state.user_settings.port;
+        let mut listener = create_auth_listener().await;
         let client = GoogClient::new(
             "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
             "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",
-            &format!("http://127.0.0.1:{}/authorize", port),
+            &format!("http://127.0.0.1:{}", listener.port()),
             Default::default(),
         )?;
 
-        log::info!("AUTHORIZING CONNECTION BOOM");
         let request = client.authorize();
         let _ = open::that(request.url.to_string());
+
+        log::debug!("listening for auth code");
+        if let Some(auth) = listener.listen(60 * 5).await {
+            log::debug!("received oauth credentials: {:?}", auth);
+        }
     }
 
     Ok(())

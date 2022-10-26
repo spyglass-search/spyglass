@@ -8,6 +8,7 @@ use shared::request::{SearchLensesParam, SearchParam};
 use shared::response as resp;
 use spyglass_rpc::RpcServer;
 
+mod auth;
 mod response;
 mod route;
 
