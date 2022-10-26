@@ -54,14 +54,16 @@ pub async fn add_queue(
 pub async fn authorize_connection(state: AppState, name: String) -> Result<(), Error> {
     if name.as_str() == "google" {
         let port = state.user_settings.port;
-        let _client = GoogClient::new(
+        let client = GoogClient::new(
             "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
             "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",
-            &format!("http://127.0.0.1:{}", port),
+            &format!("http://127.0.0.1:{}/authorize", port),
             Default::default(),
-        );
+        )?;
 
-        log::info!("AUTHORIZING CONNECTION");
+        log::info!("AUTHORIZING CONNECTION BOOM");
+        let request = client.authorize();
+        let _ = open::that(request.url.to_string());
     }
 
     Ok(())

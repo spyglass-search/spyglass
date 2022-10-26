@@ -28,6 +28,7 @@ google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "5
 log = "0.4"
 migration = { path = "../migrations" }
 notify = "5.0.0-pre.16"
+open = "3.0"
 regex = "1"
 reqwest = "0.11"
 ron = "0.8"

@@ -5513,6 +5513,7 @@ dependencies = [
  "log",
  "migration",
  "notify",
+ "open",
  "regex",
  "reqwest",
  "ron",
