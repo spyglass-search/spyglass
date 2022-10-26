@@ -17,7 +17,7 @@ pub struct Model {
     pub granted_at: DateTimeUtc,
     // When this connection was created/updated
     pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc
+    pub updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -41,7 +41,12 @@ impl ActiveModelBehavior for ActiveModel {
 }
 
 impl ActiveModel {
-    pub fn new(name: String, access_token: String, refresh_token: String, expires_in: Duration) -> Self {
+    pub fn new(
+        name: String,
+        access_token: String,
+        refresh_token: String,
+        expires_in: Duration,
+    ) -> Self {
         Self {
             name: Set(name),
             access_token: Set(access_token),

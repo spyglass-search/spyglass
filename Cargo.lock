@@ -2268,13 +2268,14 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=924a6b01b1f5e78c1c378db634ef75c6db4f3b2e#924a6b01b1f5e78c1c378db634ef75c6db4f3b2e"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=57ab525ad4de2d0c039a6c22bafb616858fe56fe#57ab525ad4de2d0c039a6c22bafb616858fe56fe"
 dependencies = [
  "anyhow",
  "bytes",
  "chrono",
  "dotenv",
  "dotenv_codegen",
+ "log",
  "oauth2",
  "reqwest",
  "serde",
@@ -5506,6 +5507,7 @@ dependencies = [
  "hostname",
  "html5ever",
  "http",
+ "hyper",
  "ignore",
  "jsonrpsee",
  "log",

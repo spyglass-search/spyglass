@@ -16,9 +16,9 @@ use shared::response::{
 };
 use spyglass_plugin::SearchFilter;
 
+use libgoog::GoogClient;
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::lens::lens_to_filters;
-use libspyglass::search::Searcher;
+use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::Command;
 
@@ -50,7 +50,26 @@ pub async fn add_queue(
     Ok("ok".to_string())
 }
 
-async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
+#[instrument(skip(state))]
+pub async fn authorize_connection(state: AppState, name: String) -> Result<(), Error> {
+    if name.as_str() == "google" {
+        let port = state.user_settings.port;
+        let _client = GoogClient::new(
+            "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
+            "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",
+            &format!("http://127.0.0.1:{}", port),
+            Default::default(),
+        );
+
+        log::info!("AUTHORIZING CONNECTION");
+    }
+
+    Ok(())
+}
+
+/// Fun stats about index size, etc.
+#[instrument(skip(state))]
+pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
     // Grab details about index
     let index = state.index;
     let reader = index.reader.searcher();
@@ -58,12 +77,6 @@ async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
     Ok(AppStatus {
         num_docs: reader.num_docs(),
     })
-}
-
-/// Fun stats about index size, etc.
-#[instrument(skip(state))]
-pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
-    _get_current_status(state).await
 }
 
 #[instrument(skip(state))]

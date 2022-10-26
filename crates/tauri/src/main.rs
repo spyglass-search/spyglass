@@ -98,12 +98,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
+            cmd::authorize_connection,
             cmd::choose_folder,
             cmd::crawl_stats,
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
             cmd::install_lens,
+            cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
             cmd::network_change,

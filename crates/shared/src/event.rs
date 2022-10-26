@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
 
 #[derive(Debug, Deserialize)]
@@ -12,6 +12,7 @@ pub enum ClientEvent {
     FocusWindow,
     FolderChosen,
     Navigate,
+    RefreshConnections,
     RefreshLensManager,
     RefreshPluginManager,
     RefreshSearchResults,
@@ -21,6 +22,8 @@ pub enum ClientEvent {
 
 #[derive(AsRefStr, Display)]
 pub enum ClientInvoke {
+    #[strum(serialize = "authorize_connection")]
+    AuthorizeConnection,
     #[strum(serialize = "choose_folder")]
     ChooseFolder,
     #[strum(serialize = "escape")]
@@ -31,6 +34,8 @@ pub enum ClientInvoke {
     GetCrawlStats,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
+    #[strum(serialize = "list_connections")]
+    ListConnections,
     #[strum(serialize = "plugin:lens-updater|list_installed_lenses")]
     ListInstalledLenses,
     #[strum(serialize = "plugin:lens-updater|list_installable_lenses")]
@@ -49,4 +54,9 @@ pub enum ClientInvoke {
     OpenSettingsFolder,
     #[strum(serialize = "update_and_restart")]
     UpdateAndRestart,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct AuthorizeConnectionParams {
+    pub name: String,
 }

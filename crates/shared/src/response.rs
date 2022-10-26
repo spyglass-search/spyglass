@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct QueueStatus {
@@ -19,6 +18,12 @@ impl QueueStatus {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ConnectionResult {
+    pub name: String,
+    pub is_connected: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

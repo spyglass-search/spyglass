@@ -35,6 +35,14 @@ export let invoke = async (func_name, params) => {
             html_url: null,
             download_url: null,
         }];
+    } else if (func_name == "list_connections") {
+        return [{
+            name: "GitHub",
+            is_connected: true,
+        }, {
+            name: "Google",
+            is_connected: false,
+        }]
     } else if (func_name == "list_installed_lenses") {
         return [{
             author: "a5huynh",

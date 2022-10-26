@@ -21,9 +21,10 @@ hex = "0.4"
 hostname = "^0.3"
 html5ever = "0.25"
 http = "0.2"
+hyper = "0.14"
 ignore = "0.4"
 jsonrpsee = { version = "0.15", features = ["http-server"] }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "924a6b01b1f5e78c1c378db634ef75c6db4f3b2e" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "57ab525ad4de2d0c039a6c22bafb616858fe56fe" }
 log = "0.4"
 migration = { path = "../migrations" }
 notify = "5.0.0-pre.16"
