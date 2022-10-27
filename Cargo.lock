@@ -1502,6 +1502,7 @@ dependencies = [
  "ron",
  "sea-orm",
  "serde",
+ "serde_json",
  "shared",
  "tantivy",
  "tokio",
@@ -2278,7 +2279,7 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=57ab525ad4de2d0c039a6c22bafb616858fe56fe#57ab525ad4de2d0c039a6c22bafb616858fe56fe"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=d5052cd535a7ffc72f7d836b7b856ed350abd610#d5052cd535a7ffc72f7d836b7b856ed350abd610"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4251,6 +4252,8 @@ dependencies = [
  "chrono",
  "fallible-iterator",
  "postgres-protocol",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4921,6 +4924,7 @@ dependencies = [
  "sea-query",
  "sea-strum",
  "serde",
+ "serde_json",
  "sqlx",
  "tracing",
  "url",
@@ -4982,6 +4986,7 @@ dependencies = [
  "postgres-types",
  "sea-query-derive",
  "sea-query-driver",
+ "serde_json",
 ]
 
 [[package]]
@@ -5768,6 +5773,8 @@ dependencies = [
  "percent-encoding",
  "rustls",
  "rustls-pemfile 1.0.1",
+ "serde",
+ "serde_json",
  "sha2",
  "smallvec",
  "sqlformat",
@@ -5791,6 +5798,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
+ "serde_json",
  "sha2",
  "sqlx-core",
  "sqlx-rt",

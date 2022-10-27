@@ -6,7 +6,9 @@ use url::Url;
 
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
-use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
+use entities::models::{
+    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens,
+};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
@@ -16,7 +18,7 @@ use shared::response::{
 };
 use spyglass_plugin::SearchFilter;
 
-use libgoog::GoogClient;
+use libgoog::{Credentials, GoogClient};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
@@ -51,8 +53,8 @@ pub async fn add_queue(
     Ok("ok".to_string())
 }
 
-#[instrument(skip(_state))]
-pub async fn authorize_connection(_state: AppState, name: String) -> Result<(), Error> {
+#[instrument(skip(state))]
+pub async fn authorize_connection(state: AppState, name: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", name);
 
     if name.as_str() == "Google" {
@@ -70,6 +72,26 @@ pub async fn authorize_connection(_state: AppState, name: String) -> Result<(), 
         log::debug!("listening for auth code");
         if let Some(auth) = listener.listen(60 * 5).await {
             log::debug!("received oauth credentials: {:?}", auth);
+            match client
+                .token_exchange(&auth.code, &request.pkce_verifier)
+                .await
+            {
+                Ok(token) => {
+                    let mut creds = Credentials::default();
+                    creds.refresh_token(&token);
+
+                    let new_conn = connection::ActiveModel::new(
+                        name,
+                        creds.access_token.secret().to_string(),
+                        creds.refresh_token.map_or_else(|| "".to_string(), |t| t.secret().to_string()),
+                        creds.expires_in.map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
+                        auth.scopes,
+                    );
+                    let res = new_conn.insert(&state.db).await;
+                    log::debug!("saved conn: {:?}", res);
+                }
+                Err(err) => log::error!("unable to exchange token: {}", err)
+            }
         }
 
         Ok(())

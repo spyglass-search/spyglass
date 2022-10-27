@@ -1,7 +1,11 @@
-use chrono::Duration;
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct Scopes {
+    scopes: Vec<String>,
+}
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "connections")]
@@ -9,10 +13,14 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     pub name: String,
+    // access/refresh token used for authentication.
     pub access_token: String,
     pub refresh_token: String,
+    // Authorized scopes for this token
+    pub scopes: Scopes,
     // Number of seconds til the access token is expired.
-    pub expires_in: i64,
+    // NULL if it never expires.
+    pub expires_in: Option<i64>,
     // When the access token was granted (updated on refresh)
     pub granted_at: DateTimeUtc,
     // When this connection was created/updated
@@ -45,13 +53,16 @@ impl ActiveModel {
         name: String,
         access_token: String,
         refresh_token: String,
-        expires_in: Duration,
+        expires_in: Option<i64>,
+        scopes: Vec<String>,
     ) -> Self {
         Self {
             name: Set(name),
             access_token: Set(access_token),
             refresh_token: Set(refresh_token),
-            expires_in: Set(expires_in.num_seconds()),
+            scopes: Set(Scopes { scopes }),
+            expires_in: Set(expires_in),
+            granted_at: Set(chrono::Utc::now()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
             ..ActiveModelTrait::default()

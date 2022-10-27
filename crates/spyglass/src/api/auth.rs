@@ -8,9 +8,9 @@ type ShutdownChannel = broadcast::Sender<()>;
 
 #[derive(Clone, Debug, Default)]
 pub struct AuthCode {
-    scope: Vec<String>,
-    code: String,
-    state: String,
+    pub scopes: Vec<String>,
+    pub code: String,
+    pub state: String,
 }
 
 pub struct AuthListener {
@@ -47,7 +47,7 @@ pub async fn handle_request(
 
     let mut auth = AuthCode::default();
     if let Some(scope) = p.get("scope") {
-        auth.scope = scope.split(' ').map(|s| s.to_string()).collect();
+        auth.scopes = scope.split(' ').map(|s| s.to_string()).collect();
     }
 
     if let Some(state) = p.get("state") {

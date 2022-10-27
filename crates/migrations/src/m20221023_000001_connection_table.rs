@@ -19,7 +19,8 @@ impl MigrationTrait for Migration {
                 "name" text NOT NULL UNIQUE,
                 "access_token" text NOT NULL,
                 "refresh_token" text NOT NULL,
-                "expires_in" integer NOT NULL DEFAULT 0,
+                "scopes" text NOT NULL,
+                "expires_in" integer,
                 "granted_at" text NOT NULL,
                 "created_at" text NOT NULL,
                 "updated_at" text NOT NULL);"#;
