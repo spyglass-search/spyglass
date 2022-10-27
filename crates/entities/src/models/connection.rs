@@ -64,7 +64,6 @@ impl ActiveModel {
             granted_at: Set(chrono::Utc::now()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
-            ..ActiveModelTrait::default()
         }
     }
 }
