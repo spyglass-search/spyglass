@@ -135,6 +135,7 @@ impl Component for ConnectionsManagerPage {
                 false
             }
             Msg::FetchError(error) => {
+                log::error!("Error fetching: {}", error);
                 self.fetch_connection_state = RequestState::Error;
                 self.fetch_error = error;
                 true
@@ -146,7 +147,7 @@ impl Component for ConnectionsManagerPage {
                     .iter()
                     .map(|conn| {
                         (
-                            conn.name.clone(),
+                            conn.id.clone(),
                             ConnectionStatus {
                                 is_authorizing: RequestState::NotStarted,
                                 error: String::new(),
@@ -165,7 +166,7 @@ impl Component for ConnectionsManagerPage {
         let link = ctx.link();
         let conns = self.connections.values()
             .map(|status| {
-                let auth_msg = Msg::AuthorizeConnection(status.metadata.name.clone());
+                let auth_msg = Msg::AuthorizeConnection(status.metadata.id.clone());
                 let connect_btn = if status.metadata.is_connected {
                     html! {
                         <btn::Btn onclick={link.callback(|_| Msg::RevokeConnection)}>
@@ -201,11 +202,11 @@ impl Component for ConnectionsManagerPage {
                 };
 
                 html! {
-                    <div class="pb-8 flex flex-row items-center">
+                    <div class="pb-8 flex flex-row items-center gap-4">
                         <div class="flex-1">
-                            <div><h2 class="text-lg">{status.metadata.name.clone()}</h2></div>
-                            <div class="text-xs truncate text-neutral-400">{"Description of the integration"}</div>
-                            <div class="text-xs truncate text-red-400">{status.error.clone()}</div>
+                            <div><h2 class="text-lg">{status.metadata.label.clone()}</h2></div>
+                            <div class="text-xs text-neutral-400">{status.metadata.description.clone()}</div>
+                            <div class="text-xs text-red-400">{status.error.clone()}</div>
                         </div>
                         <div class="flex-none">{connect_btn}</div>
                     </div>

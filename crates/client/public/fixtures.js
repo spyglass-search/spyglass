@@ -37,26 +37,37 @@ export let invoke = async (func_name, params) => {
         }];
     } else if (func_name == "list_connections") {
         return [{
-            name: "GitHub",
+            id: "api.github.com",
+            label: "GitHub",
+            description: "Search through your GitHub repositories, starred repositories, and follows",
+            scopes: [],
             is_connected: true,
         }, {
-            name: "Google",
+            id: "api.google.com",
+            label: "Google Services",
+            description: "Adds indexing support for Google services. This includes Gmail, Google Drive documents, and Google Calendar events",
+            scopes: [],
             is_connected: false,
         }, {
-            name: "Error Test",
+            id: "api.examples.com",
+            label: "Error Test",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            scopes: [],
             is_connected: false,
         }];
-    } else if (func_name == "list_installed_lenses") {
+    } else if (func_name == "plugin:lens-updater|list_installed_lenses") {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense",
+            hash: "",
             html_url: null,
             download_url: null,
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense_2_boogaloo",
+            hash: "",
             html_url: null,
             download_url: null,
         }];

@@ -43,10 +43,7 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn list_connections(&self) -> Result<Vec<resp::ConnectionResult>, Error> {
-        Ok(vec![resp::ConnectionResult {
-            name: "Google".to_string(),
-            is_connected: false,
-        }])
+        route::list_connections(self.state.clone()).await
     }
 
     async fn list_installed_lenses(&self) -> Result<Vec<resp::LensResult>, Error> {

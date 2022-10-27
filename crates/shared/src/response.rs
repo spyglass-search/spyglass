@@ -22,7 +22,10 @@ pub struct AppStatus {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConnectionResult {
-    pub name: String,
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub scopes: Vec<String>,
     pub is_connected: bool,
 }
 

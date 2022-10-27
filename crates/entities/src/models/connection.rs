@@ -4,15 +4,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct Scopes {
-    scopes: Vec<String>,
+    pub scopes: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "connections")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i64,
-    pub name: String,
+    pub id: String,
+    // Human friendly label
+    #[sea_orm(unique)]
+    pub label: String,
     // access/refresh token used for authentication.
     pub access_token: String,
     pub refresh_token: String,
@@ -50,14 +52,14 @@ impl ActiveModelBehavior for ActiveModel {
 
 impl ActiveModel {
     pub fn new(
-        name: String,
+        id: String,
         access_token: String,
         refresh_token: String,
         expires_in: Option<i64>,
         scopes: Vec<String>,
     ) -> Self {
         Self {
-            name: Set(name),
+            id: Set(id),
             access_token: Set(access_token),
             refresh_token: Set(refresh_token),
             scopes: Set(Scopes { scopes }),

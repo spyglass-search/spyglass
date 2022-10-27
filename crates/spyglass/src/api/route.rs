@@ -13,8 +13,8 @@ use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
-    SearchResult, SearchResults,
+    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, QueueStatus,
+    SearchLensesResp, SearchMeta, SearchResult, SearchResults,
 };
 use spyglass_plugin::SearchFilter;
 
@@ -83,14 +83,18 @@ pub async fn authorize_connection(state: AppState, name: String) -> Result<(), E
                     let new_conn = connection::ActiveModel::new(
                         name,
                         creds.access_token.secret().to_string(),
-                        creds.refresh_token.map_or_else(|| "".to_string(), |t| t.secret().to_string()),
-                        creds.expires_in.map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
+                        creds
+                            .refresh_token
+                            .map_or_else(|| "".to_string(), |t| t.secret().to_string()),
+                        creds
+                            .expires_in
+                            .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
                         auth.scopes,
                     );
                     let res = new_conn.insert(&state.db).await;
                     log::debug!("saved conn: {:?}", res);
                 }
-                Err(err) => log::error!("unable to exchange token: {}", err)
+                Err(err) => log::error!("unable to exchange token: {}", err),
             }
         }
 
@@ -203,6 +207,38 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
     }
 
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
+    if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
+        // TODO: Move this into a config / db table?
+        let mut all_conns: HashMap<String, ConnectionResult> = HashMap::from([(
+            "api.google.com".to_string(),
+            ConnectionResult {
+                id: "api.google.com".to_string(),
+                label: "Google Services".to_string(),
+                description: r#"Adds indexing support for Google services. This
+                    includes Gmail, Google Drive documents, and Google Calendar
+                    events"#
+                    .to_string(),
+                scopes: Vec::new(),
+                is_connected: false,
+            },
+        )]);
+
+        // Get list of enabled connections
+        enabled.iter().for_each(|conn| {
+            if let Some(res) = all_conns.get_mut(&conn.id) {
+                res.is_connected = true;
+                res.scopes = conn.scopes.scopes.clone();
+            }
+        });
+
+        return Ok(all_conns.values().cloned().collect());
+    }
+
+    Ok(Vec::new())
 }
 
 /// List of installed lenses
