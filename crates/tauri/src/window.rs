@@ -103,6 +103,10 @@ fn _show_tab(app: &AppHandle, tab_url: &str) {
     let _ = window.set_always_on_top(false);
 }
 
+pub fn show_connection_manager_window(app: &AppHandle) {
+    _show_tab(app, "/settings/connections");
+}
+
 pub fn show_crawl_stats_window(app: &AppHandle) {
     _show_tab(app, "/settings/stats");
 }

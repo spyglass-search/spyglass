@@ -12,6 +12,8 @@ use shared::event::{ClientEvent, ListenPayload};
 
 #[derive(Clone, EnumString, Display, PartialEq, Eq)]
 pub enum Tab {
+    #[strum(serialize = "connections")]
+    ConnectionsManager,
     #[strum(serialize = "lenses")]
     LensManager,
     #[strum(serialize = "plugins")]
@@ -69,6 +71,9 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
             if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
+                    "/settings/connections" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::ConnectionsManager,
+                    }),
                     "/settings/lenses" => history.push(Route::SettingsPage {
                         tab: pages::Tab::LensManager,
                     }),
@@ -114,6 +119,12 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     </div>
                     <ul>
                         <li class="mb-2">
+                            <NavLink tab={Tab::ConnectionsManager} current={props.tab.clone()}>
+                                <icons::ShareIcon classes="mr-2" height="h-4" width="h-4" />
+                                {"Connections"}
+                            </NavLink>
+                        </li>
+                        <li class="mb-2">
                             <NavLink tab={Tab::LensManager} current={props.tab.clone()}>
                                 <icons::FilterIcon classes="mr-2" height="h-4" width="h-4" />
                                 {"Lenses"}
@@ -137,6 +148,8 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
             <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
             {
                 match props.tab {
+                    #[allow(clippy::let_unit_value)]
+                    Tab::ConnectionsManager => html! { <pages::ConnectionsManagerPage /> },
                     #[allow(clippy::let_unit_value)]
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
                     #[allow(clippy::let_unit_value)]

@@ -128,6 +128,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         "p-2",
         "rounded-lg",
         "text-sm",
+        "items-center",
         if props.disabled {
             classes!("text-stone-700")
         } else {

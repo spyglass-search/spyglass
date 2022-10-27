@@ -3,7 +3,8 @@ use jsonrpsee::proc_macros::rpc;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, PluginResult, SearchLensesResp, SearchResults,
+    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, SearchLensesResp,
+    SearchResults,
 };
 
 /// Rpc trait
@@ -12,6 +13,9 @@ pub trait Rpc {
     /// Returns a protocol version
     #[method(name = "protocol_version")]
     fn protocol_version(&self) -> Result<String, Error>;
+
+    #[method(name = "authorize_connection")]
+    async fn authorize_connection(&self, id: String) -> Result<(), Error>;
 
     #[method(name = "app_status")]
     async fn app_status(&self) -> Result<AppStatus, Error>;
@@ -24,6 +28,9 @@ pub trait Rpc {
 
     #[method(name = "delete_domain")]
     async fn delete_domain(&self, domain: String) -> Result<(), Error>;
+
+    #[method(name = "list_connections")]
+    async fn list_connections(&self) -> Result<Vec<ConnectionResult>, Error>;
 
     #[method(name = "list_installed_lenses")]
     async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error>;

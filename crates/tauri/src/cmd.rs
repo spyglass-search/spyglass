@@ -14,6 +14,18 @@ use shared::{event::ClientEvent, form::SettingOpts, request, response};
 use spyglass_rpc::RpcClient;
 
 #[tauri::command]
+pub async fn authorize_connection(win: tauri::Window, id: String) -> Result<(), String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc.client.authorize_connection(id).await {
+            return Err(err.to_string());
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn choose_folder(win: tauri::Window) -> Result<(), String> {
     FileDialogBuilder::new().pick_folder(move |folder_path| {
         if let Some(folder_path) = folder_path {
@@ -240,6 +252,24 @@ pub async fn recrawl_domain(win: tauri::Window, domain: &str) -> Result<(), Stri
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn list_connections(
+    win: tauri::Window,
+) -> Result<Vec<response::ConnectionResult>, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.list_connections().await {
+            Ok(connections) => Ok(connections),
+            Err(err) => {
+                log::error!("list_connections err: {}", err.to_string());
+                Ok(Vec::new())
+            }
+        }
+    } else {
+        Ok(Vec::new())
+    }
 }
 
 #[tauri::command]

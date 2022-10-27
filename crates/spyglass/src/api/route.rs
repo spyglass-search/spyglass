@@ -6,22 +6,25 @@ use url::Url;
 
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
-use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
+use entities::models::{
+    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens,
+};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
-    SearchResult, SearchResults,
+    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, QueueStatus,
+    SearchLensesResp, SearchMeta, SearchResult, SearchResults,
 };
 use spyglass_plugin::SearchFilter;
 
+use libgoog::{Credentials, GoogClient};
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::lens::lens_to_filters;
-use libspyglass::search::Searcher;
+use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::Command;
 
+use super::auth::create_auth_listener;
 use super::response;
 
 /// Add url to queue
@@ -50,7 +53,60 @@ pub async fn add_queue(
     Ok("ok".to_string())
 }
 
-async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
+#[instrument(skip(state))]
+pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
+    log::debug!("authorizing <{}>", id);
+
+    if id.as_str() == "api.google.com" {
+        let mut listener = create_auth_listener().await;
+        let client = GoogClient::new(
+            "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
+            "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",
+            &format!("http://127.0.0.1:{}", listener.port()),
+            Default::default(),
+        )?;
+
+        let request = client.authorize();
+        let _ = open::that(request.url.to_string());
+
+        log::debug!("listening for auth code");
+        if let Some(auth) = listener.listen(60 * 5).await {
+            log::debug!("received oauth credentials: {:?}", auth);
+            match client
+                .token_exchange(&auth.code, &request.pkce_verifier)
+                .await
+            {
+                Ok(token) => {
+                    let mut creds = Credentials::default();
+                    creds.refresh_token(&token);
+
+                    let new_conn = connection::ActiveModel::new(
+                        id,
+                        creds.access_token.secret().to_string(),
+                        creds
+                            .refresh_token
+                            .map_or_else(|| "".to_string(), |t| t.secret().to_string()),
+                        creds
+                            .expires_in
+                            .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
+                        auth.scopes,
+                    );
+                    let res = new_conn.insert(&state.db).await;
+                    log::debug!("saved conn: {:?}", res);
+                }
+                Err(err) => log::error!("unable to exchange token: {}", err),
+            }
+        }
+
+        Ok(())
+    } else {
+        Err(Error::Custom(format!("Connection <{}> not supported", id)))
+    }
+}
+
+/// Fun stats about index size, etc.
+#[instrument(skip(state))]
+pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
     // Grab details about index
     let index = state.index;
     let reader = index.reader.searcher();
@@ -58,12 +114,6 @@ async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
     Ok(AppStatus {
         num_docs: reader.num_docs(),
     })
-}
-
-/// Fun stats about index size, etc.
-#[instrument(skip(state))]
-pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
-    _get_current_status(state).await
 }
 
 #[instrument(skip(state))]
@@ -154,6 +204,38 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
     }
 
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
+    if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
+        // TODO: Move this into a config / db table?
+        let mut all_conns: HashMap<String, ConnectionResult> = HashMap::from([(
+            "api.google.com".to_string(),
+            ConnectionResult {
+                id: "api.google.com".to_string(),
+                label: "Google Services".to_string(),
+                description: r#"Adds indexing support for Google services. This
+                    includes Gmail, Google Drive documents, and Google Calendar
+                    events"#
+                    .to_string(),
+                scopes: Vec::new(),
+                is_connected: false,
+            },
+        )]);
+
+        // Get list of enabled connections
+        enabled.iter().for_each(|conn| {
+            if let Some(res) = all_conns.get_mut(&conn.id) {
+                res.is_connected = true;
+                res.scopes = conn.scopes.scopes.clone();
+            }
+        });
+
+        return Ok(all_conns.values().cloned().collect());
+    }
+
+    Ok(Vec::new())
 }
 
 /// List of installed lenses
