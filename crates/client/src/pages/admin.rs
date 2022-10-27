@@ -71,6 +71,9 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
             if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
+                    "/settings/connections" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::ConnectionsManager,
+                    }),
                     "/settings/lenses" => history.push(Route::SettingsPage {
                         tab: pages::Tab::LensManager,
                     }),

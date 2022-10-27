@@ -152,7 +152,7 @@ export let invoke = async (func_name, params) => {
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
         return "Reticulating splines...";
     } else if (func_name == "authorize_connection") {
-        if (params.name == "Google") {
+        if (params.name == "api.google.com") {
             await new Promise(r => setTimeout(r, 5000));
         } else if (params.name == "Error Test") {
             await new Promise(r => setTimeout(r, 5000));

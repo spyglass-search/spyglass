@@ -15,7 +15,7 @@ pub trait Rpc {
     fn protocol_version(&self) -> Result<String, Error>;
 
     #[method(name = "authorize_connection")]
-    async fn authorize_connection(&self, name: String) -> Result<(), Error>;
+    async fn authorize_connection(&self, id: String) -> Result<(), Error>;
 
     #[method(name = "app_status")]
     async fn app_status(&self) -> Result<AppStatus, Error>;

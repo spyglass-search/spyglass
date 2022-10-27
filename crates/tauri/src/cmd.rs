@@ -14,10 +14,10 @@ use shared::{event::ClientEvent, form::SettingOpts, request, response};
 use spyglass_rpc::RpcClient;
 
 #[tauri::command]
-pub async fn authorize_connection(win: tauri::Window, name: String) -> Result<(), String> {
+pub async fn authorize_connection(win: tauri::Window, id: String) -> Result<(), String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
-        if let Err(err) = rpc.client.authorize_connection(name).await {
+        if let Err(err) = rpc.client.authorize_connection(id).await {
             return Err(err.to_string());
         }
     }

@@ -12,6 +12,7 @@ pub enum MenuID {
     DEV_SHOW_CONSOLE,
     JOIN_DISCORD,
     NUM_DOCS,
+    OPEN_CONNECTION_MANAGER,
     OPEN_LENS_MANAGER,
     OPEN_LOGS_FOLDER,
     OPEN_PLUGIN_MANAGER,
@@ -43,6 +44,10 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
 
     let settings_menu = SystemTrayMenu::new()
         .add_item(CustomMenuItem::new(
+            MenuID::OPEN_CONNECTION_MANAGER.to_string(),
+            "Manage connections",
+        ))
+        .add_item(CustomMenuItem::new(
             MenuID::OPEN_LENS_MANAGER.to_string(),
             "Manage lenses",
         ))
@@ -52,7 +57,7 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_SETTINGS_MANAGER.to_string(),
-            "User Settings",
+            "Manage user settings",
         ));
 
     tray = tray

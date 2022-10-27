@@ -10,11 +10,8 @@ pub struct Scopes {
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "connections")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    // Human friendly label
-    #[sea_orm(unique)]
-    pub label: String,
     // access/refresh token used for authentication.
     pub access_token: String,
     pub refresh_token: String,

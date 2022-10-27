@@ -22,8 +22,8 @@ impl RpcServer for SpyglassRpc {
         Ok("version1".into())
     }
 
-    async fn authorize_connection(&self, name: String) -> Result<(), Error> {
-        route::authorize_connection(self.state.clone(), name).await
+    async fn authorize_connection(&self, id: String) -> Result<(), Error> {
+        route::authorize_connection(self.state.clone(), id).await
     }
 
     async fn app_status(&self) -> Result<resp::AppStatus, Error> {

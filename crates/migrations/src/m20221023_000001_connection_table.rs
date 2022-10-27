@@ -16,7 +16,6 @@ impl MigrationTrait for Migration {
         let new_table = r#"
             CREATE TABLE IF NOT EXISTS "connections" (
                 "id" text NOT NULL PRIMARY KEY,
-                "label" text NOT NULL UNIQUE,
                 "access_token" text NOT NULL,
                 "refresh_token" text NOT NULL,
                 "scopes" text NOT NULL,
