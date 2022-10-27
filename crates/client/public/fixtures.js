@@ -42,7 +42,10 @@ export let invoke = async (func_name, params) => {
         }, {
             name: "Google",
             is_connected: false,
-        }]
+        }, {
+            name: "Error Test",
+            is_connected: false,
+        }];
     } else if (func_name == "list_installed_lenses") {
         return [{
             author: "a5huynh",
@@ -137,6 +140,15 @@ export let invoke = async (func_name, params) => {
         ];
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
         return "Reticulating splines...";
+    } else if (func_name == "authorize_connection") {
+        if (params.name == "Google") {
+            await new Promise(r => setTimeout(r, 5000));
+        } else if (params.name == "Error Test") {
+            await new Promise(r => setTimeout(r, 5000));
+            throw 'Unable to connect';
+        }
+
+        return [];
     }
 
     return [];

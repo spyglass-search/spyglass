@@ -14,6 +14,7 @@ use shared::{
 
 struct ConnectionStatus {
     is_authorizing: RequestState,
+    error: String,
     metadata: ConnectionResult,
 }
 
@@ -26,6 +27,10 @@ pub struct ConnectionsManagerPage {
 #[derive(Clone)]
 pub enum Msg {
     AuthorizeConnection(String),
+    // Received an error authorizing connection
+    AuthError(String, String),
+    // Authorization finished!
+    AuthFinished(String),
     FetchConnections,
     FetchError(String),
     RevokeConnection,
@@ -80,17 +85,47 @@ impl Component for ConnectionsManagerPage {
                     status.is_authorizing = RequestState::InProgress;
                 }
 
-                spawn_local(async move {
-                    if let Ok(ser) = serde_wasm_bindgen::to_value(&AuthorizeConnectionParams {
+                link.send_future(async move {
+                    let name = name.clone();
+
+                    let ser = serde_wasm_bindgen::to_value(&AuthorizeConnectionParams {
                         name: name.clone(),
-                    }) {
-                        let _ = invoke(ClientInvoke::AuthorizeConnection.as_ref(), ser).await;
+                    })
+                    .expect("Unable to serialize authorize connection params");
+
+                    if let Err(err) = invoke(ClientInvoke::AuthorizeConnection.as_ref(), ser).await
+                    {
+                        let msg = err
+                            .as_string()
+                            .unwrap_or_else(|| "Unable to connect. Please try again.".to_string());
+                        Msg::AuthError(name.clone(), msg)
+                    } else {
+                        Msg::AuthFinished(name.clone())
                     }
                 });
 
                 true
             }
+            Msg::AuthError(name, error) => {
+                if let Some(status) = self.connections.get_mut(&name) {
+                    status.is_authorizing = RequestState::Error;
+                    status.error = error;
+                }
+                true
+            }
+            Msg::AuthFinished(name) => {
+                if let Some(status) = self.connections.get_mut(&name) {
+                    status.is_authorizing = RequestState::Finished;
+                    status.metadata.is_connected = true;
+                }
+                true
+            }
             Msg::FetchConnections => {
+                if self.fetch_connection_state.in_progress() {
+                    return false;
+                }
+
+                self.fetch_connection_state = RequestState::InProgress;
                 link.send_future(async {
                     match Self::fetch_connections().await {
                         Ok(conns) => Msg::UpdateConnections(conns),
@@ -114,6 +149,7 @@ impl Component for ConnectionsManagerPage {
                             conn.name.clone(),
                             ConnectionStatus {
                                 is_authorizing: RequestState::NotStarted,
+                                error: String::new(),
                                 metadata: conn.clone(),
                             },
                         )
@@ -130,44 +166,48 @@ impl Component for ConnectionsManagerPage {
         let conns = self.connections.values()
             .map(|status| {
                 let auth_msg = Msg::AuthorizeConnection(status.metadata.name.clone());
+                let connect_btn = if status.metadata.is_connected {
+                    html! {
+                        <btn::Btn onclick={link.callback(|_| Msg::RevokeConnection)}>
+                            <icons::XCircle classes="mr-2" width="w-4" height="h-4" />
+                            {"Revoke"}
+                        </btn::Btn>
+                    }
+                } else {
+                    html! {
+                        <btn::Btn
+                            disabled={status.is_authorizing.in_progress()}
+                            onclick={link.callback(move |_| auth_msg.clone())}
+                        >
+                            {
+                                if status.is_authorizing.in_progress() {
+                                    html! {
+                                        <>
+                                            <icons::RefreshIcon animate_spin={true} classes="mr-2" width="w-4" height="h-4" />
+                                            {"Connecting"}
+                                        </>
+                                    }
+                                } else {
+                                    html! {
+                                        <>
+                                            <icons::LightningBoltIcon classes="mr-2" width="w-4" height="h-4" />
+                                            {"Connect"}
+                                        </>
+                                    }
+                                }
+                            }
+                        </btn::Btn>
+                    }
+                };
+
                 html! {
                     <div class="pb-8 flex flex-row items-center">
                         <div class="flex-1">
                             <div><h2 class="text-lg">{status.metadata.name.clone()}</h2></div>
                             <div class="text-xs truncate text-neutral-400">{"Description of the integration"}</div>
+                            <div class="text-xs truncate text-red-400">{status.error.clone()}</div>
                         </div>
-                        <div class="flex-none">
-                            {
-                                if status.metadata.is_connected {
-                                    html! {
-                                        <btn::Btn onclick={link.callback(|_| Msg::RevokeConnection)}>
-                                            <icons::XCircle classes="mr-2" width="w-4" height="h-4" />
-                                            {"Revoke"}
-                                        </btn::Btn>
-                                    }
-                                } else {
-                                    html! {
-                                        <btn::Btn
-                                            disabled={status.is_authorizing.in_progress()}
-                                            onclick={link.callback(move |_| auth_msg.clone())}
-                                        >
-                                            {
-                                                if status.is_authorizing.in_progress() {
-                                                    html! {
-                                                        <icons::RefreshIcon animate_spin={true} classes="mr-2" width="w-4" height="h-4" />
-                                                    }
-                                                } else {
-                                                    html! {
-                                                        <icons::LightningBoltIcon classes="mr-2" width="w-4" height="h-4" />
-                                                    }
-                                                }
-                                            }
-                                            {"Connect"}
-                                        </btn::Btn>
-                                    }
-                                }
-                            }
-                        </div>
+                        <div class="flex-none">{connect_btn}</div>
                     </div>
                 }
             })
@@ -176,9 +216,6 @@ impl Component for ConnectionsManagerPage {
         html! {
             <div>
                 <Header label="Connections">
-                    <button>
-                        {"Save & Restart"}
-                    </button>
                 </Header>
                 <div class="p-8 bg-neutral-800">
                     {conns}
