@@ -58,5 +58,5 @@ pub enum ClientInvoke {
 
 #[derive(Deserialize, Serialize)]
 pub struct AuthorizeConnectionParams {
-    pub name: String,
+    pub id: String,
 }

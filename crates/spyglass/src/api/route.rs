@@ -54,10 +54,10 @@ pub async fn add_queue(
 }
 
 #[instrument(skip(state))]
-pub async fn authorize_connection(state: AppState, name: String) -> Result<(), Error> {
-    log::debug!("authorizing <{}>", name);
+pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
+    log::debug!("authorizing <{}>", id);
 
-    if name.as_str() == "Google" {
+    if id.as_str() == "api.google.com" {
         let mut listener = create_auth_listener().await;
         let client = GoogClient::new(
             "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
@@ -81,7 +81,7 @@ pub async fn authorize_connection(state: AppState, name: String) -> Result<(), E
                     creds.refresh_token(&token);
 
                     let new_conn = connection::ActiveModel::new(
-                        name,
+                        id,
                         creds.access_token.secret().to_string(),
                         creds
                             .refresh_token
@@ -100,10 +100,7 @@ pub async fn authorize_connection(state: AppState, name: String) -> Result<(), E
 
         Ok(())
     } else {
-        Err(Error::Custom(format!(
-            "Connection <{}> not supported",
-            name
-        )))
+        Err(Error::Custom(format!("Connection <{}> not supported", id)))
     }
 }
 

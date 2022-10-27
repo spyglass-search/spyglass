@@ -80,41 +80,40 @@ impl Component for ConnectionsManagerPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AuthorizeConnection(name) => {
-                if let Some(status) = self.connections.get_mut(&name) {
+            Msg::AuthorizeConnection(id) => {
+                if let Some(status) = self.connections.get_mut(&id) {
                     status.is_authorizing = RequestState::InProgress;
                 }
 
                 link.send_future(async move {
-                    let name = name.clone();
+                    let id = id.clone();
 
-                    let ser = serde_wasm_bindgen::to_value(&AuthorizeConnectionParams {
-                        name: name.clone(),
-                    })
-                    .expect("Unable to serialize authorize connection params");
+                    let ser =
+                        serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
+                            .expect("Unable to serialize authorize connection params");
 
                     if let Err(err) = invoke(ClientInvoke::AuthorizeConnection.as_ref(), ser).await
                     {
                         let msg = err
                             .as_string()
                             .unwrap_or_else(|| "Unable to connect. Please try again.".to_string());
-                        Msg::AuthError(name.clone(), msg)
+                        Msg::AuthError(id.clone(), msg)
                     } else {
-                        Msg::AuthFinished(name.clone())
+                        Msg::AuthFinished(id.clone())
                     }
                 });
 
                 true
             }
-            Msg::AuthError(name, error) => {
-                if let Some(status) = self.connections.get_mut(&name) {
+            Msg::AuthError(id, error) => {
+                if let Some(status) = self.connections.get_mut(&id) {
                     status.is_authorizing = RequestState::Error;
                     status.error = error;
                 }
                 true
             }
-            Msg::AuthFinished(name) => {
-                if let Some(status) = self.connections.get_mut(&name) {
+            Msg::AuthFinished(id) => {
+                if let Some(status) = self.connections.get_mut(&id) {
                     status.is_authorizing = RequestState::Finished;
                     status.metadata.is_connected = true;
                 }
