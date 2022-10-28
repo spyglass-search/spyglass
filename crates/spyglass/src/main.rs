@@ -182,7 +182,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
         crawl_queue_tx,
-        crawler_tx.subscribe(),
         shutdown_tx.subscribe(),
     ));
 

@@ -17,13 +17,21 @@ use crate::search::{
 use crate::state::AppState;
 
 #[derive(Debug, Clone)]
+pub enum TaskType {
+    Initialize,
+    Crawl { id: i64 },
+    Tag,
+}
+
+#[derive(Debug, Clone)]
 pub struct CrawlTask {
     pub id: i64,
 }
 
+/// Used to control the scheduler
 #[derive(Clone, Debug)]
 pub enum Command {
-    Fetch(CrawlTask),
+    Execute(TaskType),
     PauseCrawler,
     RunCrawler,
 }
@@ -38,46 +46,22 @@ pub enum AppShutdown {
 pub async fn manager_task(
     state: AppState,
     queue: mpsc::Sender<Command>,
-    mut crawler_cmd: broadcast::Receiver<Command>,
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
-    let mut is_paused = false;
 
     loop {
-        if is_paused {
-            tokio::select! {
-                res = crawler_cmd.recv() => {
-                    match res {
-                        Ok(Command::PauseCrawler) => is_paused = true,
-                        Ok(Command::RunCrawler) => is_paused = false,
-                        _ => {}
-                    }
-                }
-                _ = shutdown_rx.recv() => {
-                    log::info!("🛑 Shutting down manager");
-                    return;
-                }
-            }
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-
         let mut prioritized_domains: Vec<String> = Vec::new();
         let mut prioritized_prefixes: Vec<String> = Vec::new();
 
         for entry in state.lenses.iter() {
             let value = entry.value();
-
             if value.pipeline.is_none() {
                 prioritized_domains.extend(value.domains.clone());
                 prioritized_prefixes.extend(value.urls.clone());
             }
         }
 
-        // tokio::select allows us to listen to a shutdown message while
-        // also processing queue tasks.
         let next_url = tokio::select! {
             res = crawl_queue::dequeue(
                 &state.db,
@@ -89,15 +73,6 @@ pub async fn manager_task(
                 log::info!("🛑 Shutting down manager");
                 return;
             }
-            res = crawler_cmd.recv() => {
-                match res {
-                    Ok(Command::PauseCrawler) => is_paused = true,
-                    Ok(Command::RunCrawler) => is_paused = false,
-                    _ => {}
-                }
-
-                Ok(None)
-            }
         };
 
         match next_url {
@@ -108,25 +83,27 @@ pub async fn manager_task(
                         let mut pipeline_tx = state.pipeline_cmd_tx.lock().await;
                         match &mut *pipeline_tx {
                             Some(pipeline_tx) => {
-                                println!("Sending crawl task to pipeline");
+                                log::debug!("Sending crawl task to pipeline");
                                 let cmd = PipelineCommand::ProcessUrl(
                                     pipeline.clone(),
                                     CrawlTask { id: task.id },
                                 );
                                 if let Err(err) = pipeline_tx.send(cmd).await {
-                                    eprintln!("Unable to send crawl task to pipeline {:?}", err);
+                                    log::error!("Unable to send crawl task to pipeline {:?}", err);
                                 }
                             }
                             None => {
-                                eprintln!("Unable to send crawl task to pipeline, no queue found");
+                                log::error!(
+                                    "Unable to send crawl task to pipeline, no queue found"
+                                );
                             }
                         }
                     }
                     None => {
                         // Send to worker
-                        let cmd = Command::Fetch(CrawlTask { id: task.id });
+                        let cmd = Command::Execute(TaskType::Crawl { id: task.id });
                         if queue.send(cmd).await.is_err() {
-                            eprintln!("unable to send command to worker");
+                            log::error!("unable to send command to worker");
                         }
                     }
                 }
@@ -285,10 +262,8 @@ pub async fn worker_task(
         if is_paused {
             tokio::select! {
                 res = crawler_cmd.recv() => {
-                    match res {
-                        Ok(Command::PauseCrawler) => is_paused = true,
-                        Ok(Command::RunCrawler) => is_paused = false,
-                        _ => {}
+                    if let Ok(Command::RunCrawler) = res {
+                        is_paused = false;
                     }
                 },
                 _ = shutdown_rx.recv() => {
@@ -311,12 +286,21 @@ pub async fn worker_task(
         };
 
         if let Some(cmd) = next_cmd {
+            log::debug!("handling command: {:?}", cmd);
             match cmd {
                 Command::PauseCrawler => is_paused = true,
                 Command::RunCrawler => is_paused = false,
-                Command::Fetch(task) => {
-                    tokio::spawn(_handle_fetch(state.clone(), crawler.clone(), task.clone()));
-                }
+                Command::Execute(task) => match task {
+                    TaskType::Initialize => {}
+                    TaskType::Crawl { id } => {
+                        tokio::spawn(_handle_fetch(
+                            state.clone(),
+                            crawler.clone(),
+                            CrawlTask { id },
+                        ));
+                    }
+                    TaskType::Tag => {}
+                },
             }
         }
     }
@@ -388,10 +372,8 @@ pub async fn lens_watcher(
                     if updated_lens {
                         match event.kind {
                             EventKind::Create(_)
-                            | EventKind::Any
                             | EventKind::Modify(ModifyKind::Data(_))
-                            | EventKind::Modify(ModifyKind::Name(_))
-                            | EventKind::Modify(ModifyKind::Other) => {
+                            | EventKind::Modify(ModifyKind::Name(_)) => {
                                 let _ = read_lenses(&state, &config).await;
                                 load_lenses(state.clone()).await;
                             }

@@ -3,11 +3,10 @@ use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::task::AppShutdown;
-use crate::task::CrawlTask;
+use crate::task::{AppShutdown, CrawlTask};
+
 use entities::models::{crawl_queue, indexed_document};
-use shared::config::LensConfig;
-use shared::config::{Config, PipelineConfiguration};
+use shared::config::{Config, LensConfig, PipelineConfiguration};
 use tokio::sync::{broadcast, mpsc};
 
 use super::parser::DefaultParser;
