@@ -19,6 +19,7 @@ use shared::response::{
 use spyglass_plugin::SearchFilter;
 
 use libgoog::{Credentials, GoogClient};
+use libspyglass::oauth;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
@@ -57,11 +58,12 @@ pub async fn add_queue(
 pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", id);
 
-    if id.as_str() == "api.google.com" {
+    if id.ends_with("google.com") {
         let mut listener = create_auth_listener().await;
+        let (client_id, client_secret) = oauth::connection_secret(&id);
         let client = GoogClient::new(
-            "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
-            "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",
+            &client_id,
+            &client_secret,
             &format!("http://127.0.0.1:{}", listener.port()),
             Default::default(),
         )?;
@@ -210,19 +212,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
     if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
         // TODO: Move this into a config / db table?
-        let mut all_conns: HashMap<String, ConnectionResult> = HashMap::from([(
-            "api.google.com".to_string(),
-            ConnectionResult {
-                id: "api.google.com".to_string(),
-                label: "Google Services".to_string(),
-                description: r#"Adds indexing support for Google services. This
-                    includes Gmail, Google Drive documents, and Google Calendar
-                    events"#
-                    .to_string(),
-                scopes: Vec::new(),
-                is_connected: false,
-            },
-        )]);
+        let mut all_conns = oauth::supported_connections();
 
         // Get list of enabled connections
         enabled.iter().for_each(|conn| {
