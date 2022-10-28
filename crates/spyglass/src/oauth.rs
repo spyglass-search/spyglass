@@ -15,7 +15,7 @@ pub fn supported_connections() -> HashMap<String, ConnectionResult> {
             id: "drive.google.com".to_string(),
             label: "Google Drive".to_string(),
             description: r#"Adds indexing support for Google drive. This will allow you
-            to search for through documents, spreadsheets, & presentations."#
+            to search for through documents, spreadsheets, and presentations."#
                 .to_string(),
             scopes: Vec::new(),
             is_connected: false,
@@ -31,7 +31,7 @@ pub fn supported_connections() -> HashMap<String, ConnectionResult> {
 
     conns
         .into_iter()
-        .map(|conn| (conn.id.clone(), conn.clone()))
+        .map(|conn| (conn.id.clone(), conn))
         .collect()
 }
 
