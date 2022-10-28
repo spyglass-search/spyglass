@@ -148,7 +148,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
 
     {
         state
-            .crawler_cmd_tx
+            .worker_cmd_tx
             .lock()
             .await
             .replace(crawler_tx.clone());

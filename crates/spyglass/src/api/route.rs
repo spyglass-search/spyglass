@@ -444,7 +444,7 @@ pub async fn search_lenses(
 #[instrument(skip(state))]
 pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error> {
     // Scope so that the app_state mutex is correctly released.
-    if let Some(sender) = state.crawler_cmd_tx.lock().await.as_ref() {
+    if let Some(sender) = state.worker_cmd_tx.lock().await.as_ref() {
         let _ = sender.send(if is_paused {
             Command::PauseCrawler
         } else {
