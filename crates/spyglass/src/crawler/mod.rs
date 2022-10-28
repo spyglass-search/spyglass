@@ -14,12 +14,14 @@ use entities::sea_orm::DatabaseConnection;
 use shared::url_to_file_path;
 
 use crate::crawler::bootstrap::create_archive_url;
-use crate::fetch::HTTPClient;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 
 pub mod bootstrap;
+pub mod client;
 pub mod robots;
+
+use client::HTTPClient;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
