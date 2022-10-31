@@ -2279,7 +2279,7 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=d5052cd535a7ffc72f7d836b7b856ed350abd610#d5052cd535a7ffc72f7d836b7b856ed350abd610"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=c9646ea75312029377b0378b9a239eff0348aafa#c9646ea75312029377b0378b9a239eff0348aafa"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2291,6 +2291,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "tokio",
  "url",
 ]
