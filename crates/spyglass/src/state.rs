@@ -10,7 +10,7 @@ use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
     search::{IndexPath, Searcher},
-    task::Command,
+    task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 
@@ -22,12 +22,15 @@ pub struct AppState {
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
     pub user_settings: UserSettings,
     pub index: Searcher,
-    // Send commands to the worker pool
-    pub worker_cmd_tx: Arc<Mutex<Option<broadcast::Sender<Command>>>>,
+    // Task scheduler command/control
+    pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
+    // Pause/unpause worker pool.
+    pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
     // Plugin command/control
     pub plugin_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PluginCommand>>>>,
-    pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
     pub plugin_manager: Arc<Mutex<PluginManager>>,
+    // Pipeline command/control
+    pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
 }
 
 impl AppState {
@@ -61,10 +64,11 @@ impl AppState {
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             index,
-            worker_cmd_tx: Arc::new(Mutex::new(None)),
+            pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
+            manager_cmd_tx: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -109,10 +113,11 @@ impl AppStateBuilder {
             index: self.index.as_ref().expect("Must set index").to_owned(),
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
-            worker_cmd_tx: Arc::new(Mutex::new(None)),
+            pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
+            manager_cmd_tx: Arc::new(Mutex::new(None)),
         }
     }
 

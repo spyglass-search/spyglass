@@ -23,7 +23,7 @@ use libspyglass::oauth;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
-use libspyglass::task::Command;
+use libspyglass::task::AppPause;
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -449,11 +449,11 @@ pub async fn search_lenses(
 #[instrument(skip(state))]
 pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error> {
     // Scope so that the app_state mutex is correctly released.
-    if let Some(sender) = state.worker_cmd_tx.lock().await.as_ref() {
+    if let Some(sender) = state.pause_cmd_tx.lock().await.as_ref() {
         let _ = sender.send(if is_paused {
-            Command::PauseCrawler
+            AppPause::Pause
         } else {
-            Command::RunCrawler
+            AppPause::Run
         });
     }
 
