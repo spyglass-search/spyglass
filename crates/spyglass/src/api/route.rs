@@ -18,7 +18,7 @@ use shared::response::{
 };
 use spyglass_plugin::SearchFilter;
 
-use libgoog::{Credentials, GoogClient, types::AuthScope};
+use libgoog::{types::AuthScope, Credentials, GoogClient};
 use libspyglass::oauth;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
@@ -68,7 +68,11 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
             Default::default(),
         )?;
 
-        let scopes = vec![AuthScope::Drive, AuthScope::DriveActivity, AuthScope::DriveMetadata];
+        let scopes = vec![
+            AuthScope::Drive,
+            AuthScope::DriveActivity,
+            AuthScope::DriveMetadata,
+        ];
         let request = client.authorize(&scopes);
         let _ = open::that(request.url.to_string());
 
