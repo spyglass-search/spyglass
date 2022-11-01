@@ -4,6 +4,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
 
+use crate::crawler::bootstrap;
 use crate::crawler::Crawler;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
@@ -16,15 +17,27 @@ pub struct CrawlTask {
     pub id: i64,
 }
 
+#[derive(Clone, Debug)]
+pub enum CollectTask {
+    // Pull URLs from a CDX server
+    Bootstrap {
+        lens: String,
+        seed_url: String,
+        pipeline: Option<String>,
+    },
+}
+
 /// Tell the manager to schedule some tasks
+#[derive(Clone, Debug)]
 pub enum ManagerCommand {
-    Collect,
+    Collect(CollectTask),
     CheckForJobs,
 }
 
 /// Send tasks to the worker
 #[derive(Clone, Debug)]
 pub enum WorkerCommand {
+    Collect(CollectTask),
     // Fetch, parses, & indexes a URI
     // TODO: Split this up so that this work can be spread out.
     Crawl { id: i64 },
@@ -59,8 +72,11 @@ pub async fn manager_task(
             cmd = manager_cmd_rx.recv() => {
                 if let Some(cmd) = cmd {
                     match cmd {
-                        ManagerCommand::Collect => {
-                            log::debug!("collecting uris for crawl queue");
+                        ManagerCommand::Collect(task) => {
+                            log::debug!("collecting URIs");
+                            if let Err(err) = queue.send(WorkerCommand::Collect(task)).await {
+                                log::error!("Unable to send worker cmd: {}", err.to_string());
+                            }
                         }
                         ManagerCommand::CheckForJobs => {
                             log::debug!("checking for new jobs");
@@ -132,6 +148,21 @@ pub async fn worker_task(
         if let Some(cmd) = next_cmd {
             log::debug!("handling command: {:?}", cmd);
             match cmd {
+                WorkerCommand::Collect(task) => match task {
+                    CollectTask::Bootstrap {
+                        lens,
+                        seed_url,
+                        pipeline,
+                    } => {
+                        let state = state.clone();
+                        tokio::spawn(async move {
+                            if let Some(lens_config) = &state.lenses.get(&lens) {
+                                worker::handle_bootstrap(&state, lens_config, &seed_url, pipeline)
+                                    .await;
+                            }
+                        });
+                    }
+                },
                 WorkerCommand::Crawl { id } => {
                     tokio::spawn(worker::handle_fetch(
                         state.clone(),

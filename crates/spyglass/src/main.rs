@@ -142,14 +142,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     // Channel for pipeline commands
     let (pipeline_cmd_tx, pipeline_cmd_rx) = mpsc::channel(16);
 
-    // Loads and processes pipeline commands
-    let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
-        state.clone(),
-        config.clone(),
-        pipeline_cmd_rx,
-        shutdown_tx.clone(),
-    ));
-
     {
         state
             .manager_cmd_tx
@@ -178,14 +170,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
             .replace(pipeline_cmd_tx.clone());
     }
 
-    // Check lenses for updates & add any bootstrapped URLs to crawler.
-    let lens_watcher_handle = tokio::spawn(task::lens_watcher(
-        state.clone(),
-        config.clone(),
-        pause_tx.subscribe(),
-        shutdown_tx.subscribe(),
-    ));
-
     // Work scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
@@ -203,7 +187,24 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         shutdown_tx.subscribe(),
     ));
 
+    // Check lenses for updates & add any bootstrapped URLs to crawler.
+    let lens_watcher_handle = tokio::spawn(task::lens_watcher(
+        state.clone(),
+        config.clone(),
+        pause_tx.subscribe(),
+        shutdown_tx.subscribe(),
+    ));
+
+    // Loads and processes pipeline commands
+    let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
+        state.clone(),
+        config.clone(),
+        pipeline_cmd_rx,
+        shutdown_tx.clone(),
+    ));
+
     // Clean up crew. Commit anything added to the index in the last 10s
+    // TODO: Make this smarter...
     {
         let state = state.clone();
         let _ = tokio::spawn(async move {

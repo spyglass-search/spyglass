@@ -5,6 +5,8 @@ use super::{CrawlTask, WorkerCommand};
 use crate::pipeline::PipelineCommand;
 use crate::state::AppState;
 
+// Check for new jobs in the crawl queue and add them to the worker queue.
+#[tracing::instrument(skip(state, queue))]
 pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand>) {
     let mut prioritized_domains: Vec<String> = Vec::new();
     let mut prioritized_prefixes: Vec<String> = Vec::new();

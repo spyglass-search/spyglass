@@ -1,51 +1,17 @@
-use core::option::Option;
 use std::fs;
 
 use entities::models::crawl_queue::EnqueueSettings;
-use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens};
+use entities::models::{crawl_queue, indexed_document, lens};
 use entities::sea_orm::{ColumnTrait, EntityTrait, ModelTrait, QueryFilter};
-use migration::sea_orm::DatabaseConnection;
 use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
-use shared::config::{Config, LensConfig, LensRule, UserSettings};
+use shared::config::{Config, LensConfig, LensRule};
 use spyglass_plugin::SearchFilter;
 
-use crate::crawler::bootstrap;
 use crate::search::Searcher;
 use crate::state::AppState;
-
-/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
-async fn check_and_bootstrap(
-    lens: &LensConfig,
-    db: &DatabaseConnection,
-    user_settings: &UserSettings,
-    seed_url: &str,
-    pipeline: Option<String>,
-) -> bool {
-    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
-        log::info!("bootstrapping {}", seed_url);
-
-        match bootstrap::bootstrap(lens, db, user_settings, seed_url, pipeline).await {
-            Err(e) => {
-                log::error!("bootstrap {}", e);
-                return false;
-            }
-            Ok(cnt) => {
-                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
-                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
-                return true;
-            }
-        }
-    } else {
-        log::info!(
-            "bootstrap queue already contains seed url: {}, skipping",
-            seed_url
-        );
-    }
-
-    false
-}
+use crate::task::{CollectTask, ManagerCommand};
 
 /// Read lenses into the AppState
 pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()> {
@@ -94,15 +60,18 @@ pub async fn load_lenses(state: AppState) {
             let pipeline_kind = lens.pipeline.as_ref().cloned();
 
             let seed_url = format!("https://{}", domain);
-            check_and_bootstrap(
-                &lens,
-                &state.db,
-                &state.user_settings,
-                &seed_url,
-                pipeline_kind,
-            )
-            .await;
+
+            let cmd_tx = state.manager_cmd_tx.lock().await;
+            let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
+            let bs_cmd = CollectTask::Bootstrap {
+                lens: lens.name.clone(),
+                seed_url,
+                pipeline: pipeline_kind.clone(),
+            };
+
+            let _ = cmd_tx.send(ManagerCommand::Collect(bs_cmd));
         }
+
         process_urls(&lens, &state).await;
         process_lens_rules(lens, &state).await;
     }
@@ -134,14 +103,14 @@ pub async fn process_urls(lens: &LensConfig, state: &AppState) {
                 log::warn!("unable to enqueue <{}> due to {}", prefix, err)
             }
         } else {
-            check_and_bootstrap(
-                lens,
-                &state.db,
-                &state.user_settings,
-                prefix,
-                pipeline_kind.clone(),
-            )
-            .await;
+            let cmd_tx = state.manager_cmd_tx.lock().await;
+            let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
+            let bs_cmd = CollectTask::Bootstrap {
+                lens: lens.name.clone(),
+                seed_url: prefix.to_string(),
+                pipeline: pipeline_kind.clone(),
+            };
+            let _ = cmd_tx.send(ManagerCommand::Collect(bs_cmd));
         }
     }
 }

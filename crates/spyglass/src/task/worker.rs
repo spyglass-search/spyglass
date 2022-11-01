@@ -1,14 +1,50 @@
 use url::Url;
 
-use entities::models::{crawl_queue, indexed_document};
+use entities::models::{bootstrap_queue, crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::LensConfig;
 
+use super::bootstrap;
 use super::CrawlTask;
 use crate::crawler::Crawler;
 use crate::search::Searcher;
 use crate::state::AppState;
+
+/// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
+#[tracing::instrument(skip(state, lens))]
+pub async fn handle_bootstrap(
+    state: &AppState,
+    lens: &LensConfig,
+    seed_url: &str,
+    pipeline: Option<String>,
+) -> bool {
+    let db = &state.db;
+    let user_settings = &state.user_settings;
+
+    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
+        log::info!("bootstrapping {}", seed_url);
+
+        match bootstrap::bootstrap(lens, db, user_settings, seed_url, pipeline).await {
+            Err(e) => {
+                log::error!("bootstrap {}", e);
+                return false;
+            }
+            Ok(cnt) => {
+                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
+                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
+                return true;
+            }
+        }
+    } else {
+        log::info!(
+            "bootstrap queue already contains seed url: {}, skipping",
+            seed_url
+        );
+    }
+
+    false
+}
 
 #[tracing::instrument(skip(state, crawler))]
 pub async fn handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
