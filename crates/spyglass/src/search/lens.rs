@@ -60,16 +60,11 @@ pub async fn load_lenses(state: AppState) {
             let pipeline_kind = lens.pipeline.as_ref().cloned();
 
             let seed_url = format!("https://{}", domain);
-
-            let cmd_tx = state.manager_cmd_tx.lock().await;
-            let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
-            let bs_cmd = CollectTask::Bootstrap {
+            let _ = state.schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
                 lens: lens.name.clone(),
                 seed_url,
                 pipeline: pipeline_kind.clone(),
-            };
-
-            let _ = cmd_tx.send(ManagerCommand::Collect(bs_cmd));
+            }));
         }
 
         process_urls(&lens, &state).await;
@@ -103,14 +98,11 @@ pub async fn process_urls(lens: &LensConfig, state: &AppState) {
                 log::warn!("unable to enqueue <{}> due to {}", prefix, err)
             }
         } else {
-            let cmd_tx = state.manager_cmd_tx.lock().await;
-            let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
-            let bs_cmd = CollectTask::Bootstrap {
+            let _ = state.schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
                 lens: lens.name.clone(),
                 seed_url: prefix.to_string(),
                 pipeline: pipeline_kind.clone(),
-            };
-            let _ = cmd_tx.send(ManagerCommand::Collect(bs_cmd));
+            }));
         }
     }
 }
@@ -260,16 +252,22 @@ mod test {
     use shared::config::{LensConfig, UserSettings};
     use spyglass_plugin::SearchFilter;
 
-    use super::{check_and_bootstrap, lens_to_filters, AppState};
+    use crate::task::worker::handle_bootstrap;
+    use super::{lens_to_filters, AppState};
 
     #[tokio::test]
-    async fn test_check_and_bootstrap() {
+    async fn test_handle_bootstrap() {
         let db = setup_test_db().await;
-        let settings = UserSettings::default();
+        let state = AppState::builder()
+            .with_db(db)
+            .with_user_settings(&UserSettings::default())
+            .with_index(&IndexPath::Memory)
+            .build();
+
         let test = "https://example.com";
 
-        bootstrap_queue::enqueue(&db, test, 10).await.unwrap();
-        assert!(!check_and_bootstrap(&Default::default(), &db, &settings, &test, None).await);
+        bootstrap_queue::enqueue(&state.db, test, 10).await.unwrap();
+        assert!(!handle_bootstrap(&state, &Default::default(), &test, None).await);
     }
 
     #[tokio::test]

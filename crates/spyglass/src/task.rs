@@ -9,8 +9,8 @@ use crate::crawler::Crawler;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
 
-mod manager;
-mod worker;
+pub(crate) mod manager;
+pub(crate) mod worker;
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {

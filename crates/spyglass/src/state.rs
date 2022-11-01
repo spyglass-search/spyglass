@@ -3,6 +3,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
@@ -74,6 +75,15 @@ impl AppState {
 
     pub fn builder() -> AppStateBuilder {
         AppStateBuilder::new()
+    }
+
+    pub async fn schedule_work(
+        &self,
+        task: ManagerCommand,
+    ) -> Result<(), SendError<ManagerCommand>> {
+        let cmd_tx = self.manager_cmd_tx.lock().await;
+        let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
+        cmd_tx.send(task)
     }
 }
 
