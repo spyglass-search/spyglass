@@ -40,6 +40,7 @@ pub struct CrawlResult {
     pub status: u16,
     pub title: Option<String>,
     pub url: String,
+    pub open_url: Option<String>,
     /// Links found in the page to add to the queue.
     pub links: HashSet<String>,
     /// Raw HTML data.
@@ -47,7 +48,13 @@ pub struct CrawlResult {
 }
 
 impl CrawlResult {
-    pub fn new(url: &Url, content: &str, title: &str, desc: Option<String>) -> Self {
+    pub fn new(
+        url: &Url,
+        open_url: Option<String>,
+        content: &str,
+        title: &str,
+        desc: Option<String>,
+    ) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(&content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
@@ -66,6 +73,7 @@ impl CrawlResult {
             status: 200,
             title: Some(title.to_string()),
             url: url.to_string(),
+            open_url,
             links: HashSet::new(),
             raw: None,
         }
@@ -202,6 +210,7 @@ impl Crawler {
                         status: 200,
                         title: None,
                         url: end_url.to_string(),
+                        open_url: Some(end_url.to_string()),
                         links: HashSet::new(),
                         raw: Some(raw_body.to_string()),
                     };
@@ -237,7 +246,8 @@ impl Crawler {
             description: Some(parse_result.description),
             status: 200,
             title: parse_result.title,
-            url: canonical_url,
+            url: canonical_url.clone(),
+            open_url: Some(canonical_url),
             links: parse_result.links,
             // No need to store the raw HTML for now.
             raw: None, // Some(raw_body.to_string()),
@@ -370,6 +380,7 @@ impl Crawler {
             status: 200,
             title: Some(file_name),
             url: url.to_string(),
+            open_url: Some(url.to_string()),
             links: Default::default(),
             raw: None,
         }))

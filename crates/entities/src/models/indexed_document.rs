@@ -8,8 +8,10 @@ pub struct Model {
     pub id: i64,
     /// Domain for this document, used to implement per domain crawl limits.
     pub domain: String,
-    /// URL that was indexed
+    /// URL that was indexed.
     pub url: String,
+    /// URL used to open in a file/browser window.
+    pub open_url: Option<String>,
     /// Reference to the document in the index
     pub doc_id: String,
     /// When this was indexed

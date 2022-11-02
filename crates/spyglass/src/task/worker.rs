@@ -138,11 +138,13 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) {
                     let indexed = if let Some(doc) = existing {
                         let mut update: indexed_document::ActiveModel = doc.into();
                         update.doc_id = Set(doc_id);
+                        update.open_url = Set(crawl_result.open_url);
                         update
                     } else {
                         indexed_document::ActiveModel {
                             domain: Set(url_host.to_string()),
                             url: Set(url.as_str().to_string()),
+                            open_url: Set(crawl_result.open_url),
                             doc_id: Set(doc_id),
                             ..Default::default()
                         }

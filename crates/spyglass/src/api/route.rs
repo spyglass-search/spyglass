@@ -383,7 +383,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            let result = SearchResult {
+            let mut result = SearchResult {
                 doc_id: doc_id.as_text().unwrap_or_default().to_string(),
                 domain: domain.as_text().unwrap_or_default().to_string(),
                 title: title.as_text().unwrap_or_default().to_string(),
@@ -391,6 +391,17 @@ pub async fn search(
                 url: url.as_text().unwrap_or_default().to_string(),
                 score,
             };
+
+            let indexed = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
+                .one(&state.db)
+                .await;
+
+            if let Ok(Some(indexed)) = indexed {
+                if let Some(open_url) = indexed.open_url {
+                    result.url = open_url;
+                }
+            }
 
             results.push(result);
         }

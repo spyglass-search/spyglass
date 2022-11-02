@@ -100,7 +100,7 @@ impl Connection for DriveConnection {
             let enqueue_settings = EnqueueSettings {
                 crawl_type: CrawlType::Api,
                 force_allow: true,
-                ..Default::default()
+                is_recrawl: true,
             };
 
             if let Err(err) = crawl_queue::enqueue_all(
@@ -146,6 +146,12 @@ impl Connection for DriveConnection {
             "".to_string()
         };
 
-        Ok(Some(CrawlResult::new(uri, &content, &metadata.name, None)))
+        Ok(Some(CrawlResult::new(
+            uri,
+            Some(metadata.web_view_link),
+            &content,
+            &metadata.name,
+            None,
+        )))
     }
 }
