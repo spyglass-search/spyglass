@@ -157,14 +157,13 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                         }
                     };
 
-
                     return match indexed.save(&state.db).await {
                         Ok(_) => FetchResult::Updated,
                         Err(e) => {
                             log::error!("Unable to save document: {}", e);
                             FetchResult::Error
                         }
-                    }
+                    };
                 } else {
                     return FetchResult::New;
                 }

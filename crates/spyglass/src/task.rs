@@ -1,6 +1,6 @@
-use std::time::Duration;
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
+use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
@@ -209,14 +209,19 @@ pub async fn worker_task(
                                     let _ = writer.commit();
                                 }
                                 Err(err) => {
-                                    log::debug!("Unable to acquire lock on index writer: {}", err.to_string())
+                                    log::debug!(
+                                        "Unable to acquire lock on index writer: {}",
+                                        err.to_string()
+                                    )
                                 }
                             }
                         });
                     }
                 }
                 WorkerCommand::Crawl { id } => {
-                    if let Ok(fetch_result) = tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await {
+                    if let Ok(fetch_result) =
+                        tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                    {
                         match fetch_result {
                             FetchResult::New | FetchResult::Updated => updated_docs += 1,
                             _ => {}

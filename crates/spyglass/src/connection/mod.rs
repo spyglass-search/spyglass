@@ -64,7 +64,8 @@ impl DriveConnection {
                             update.access_token = Set(new_creds.access_token.secret().to_string());
                             // Refresh tokens are optionally sent
                             if let Some(refresh_token) = new_creds.refresh_token {
-                                update.refresh_token = Set(Some(refresh_token.secret().to_string()));
+                                update.refresh_token =
+                                    Set(Some(refresh_token.secret().to_string()));
                             }
                             update.expires_in = Set(new_creds
                                 .expires_in
