@@ -246,29 +246,13 @@ pub async fn lens_to_filters(state: AppState, trigger: &str) -> Vec<SearchFilter
 #[cfg(test)]
 mod test {
     use crate::search::IndexPath;
-    use entities::models::{bootstrap_queue, lens};
+    use entities::models::lens;
     use entities::sea_orm::EntityTrait;
     use entities::test::setup_test_db;
     use shared::config::{LensConfig, UserSettings};
     use spyglass_plugin::SearchFilter;
 
-    use crate::task::worker::handle_bootstrap;
     use super::{lens_to_filters, AppState};
-
-    #[tokio::test]
-    async fn test_handle_bootstrap() {
-        let db = setup_test_db().await;
-        let state = AppState::builder()
-            .with_db(db)
-            .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory)
-            .build();
-
-        let test = "https://example.com";
-
-        bootstrap_queue::enqueue(&state.db, test, 10).await.unwrap();
-        assert!(!handle_bootstrap(&state, &Default::default(), &test, None).await);
-    }
 
     #[tokio::test]
     async fn test_lens_to_filter() {

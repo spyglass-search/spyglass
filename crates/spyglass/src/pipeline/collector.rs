@@ -27,7 +27,10 @@ impl DefaultCollector {
     ) -> Result<CollectionResult, String> {
         // Yes this is oddly familiar, since it is stolen from the _handle_fetch method in tasks. We will
         // need to merge the two concepts at a later time.
-        let result = self.crawler.fetch_by_job(&context.db, task_id, false).await;
+        let result = self
+            .crawler
+            .fetch_by_job(&context.state, task_id, false)
+            .await;
 
         if let Ok(Some(crawl_result)) = result {
             return Result::Ok(CollectionResult {

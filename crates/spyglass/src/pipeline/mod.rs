@@ -7,7 +7,6 @@ use crate::state::AppState;
 use crate::task::AppShutdown;
 use crate::task::CrawlTask;
 use entities::models::crawl_queue;
-use entities::sea_orm::DatabaseConnection;
 use shared::config::Config;
 use shared::config::PipelineConfiguration;
 use std::collections::HashMap;
@@ -19,20 +18,20 @@ use tokio::sync::{broadcast, mpsc};
 // all stages of the pipeline. This allows later stages in the pipeline
 // to change behavior based on previous stages.
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PipelineContext {
     pipeline_name: String,
     metadata: HashMap<String, String>,
-    db: DatabaseConnection,
+    state: AppState,
 }
 
 impl PipelineContext {
     // Constructor for the pipeline context
-    fn new(name: &str, db: DatabaseConnection) -> Self {
+    fn new(name: &str, state: AppState) -> Self {
         Self {
             pipeline_name: name.to_owned(),
             metadata: HashMap::new(),
-            db,
+            state,
         }
     }
 }

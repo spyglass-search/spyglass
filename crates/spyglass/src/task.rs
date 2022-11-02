@@ -4,13 +4,13 @@ use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
 
+use crate::connection::{Connection, DriveConnection};
 use crate::crawler::bootstrap;
-use crate::crawler::Crawler;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
 
-pub(crate) mod manager;
-pub(crate) mod worker;
+mod manager;
+mod worker;
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -24,6 +24,10 @@ pub enum CollectTask {
         lens: String,
         seed_url: String,
         pipeline: Option<String>,
+    },
+    // Connects to an integration and discovers all the crawlable URIs
+    ConnectionSync {
+        connection_id: String,
     },
 }
 
@@ -69,6 +73,8 @@ pub async fn manager_task(
     let mut queue_check_interval = tokio::time::interval(std::time::Duration::from_millis(100));
     loop {
         tokio::select! {
+            // Listen for manager level commands. This can be sent internally (i.e. CheckForJobs) or
+            // externally (e.g. Collect)
             cmd = manager_cmd_rx.recv() => {
                 if let Some(cmd) = cmd {
                     match cmd {
@@ -79,12 +85,13 @@ pub async fn manager_task(
                             }
                         }
                         ManagerCommand::CheckForJobs => {
-                            log::debug!("checking for new jobs");
+                            // log::debug!("checking for new jobs");
                             manager::check_for_jobs(&state, &queue).await
                         }
                     }
                 }
             }
+            // If we're not handling anything, continually poll for jobs.
             _ = queue_check_interval.tick() => {
                 if let Err(err) = manager_cmd_tx.send(ManagerCommand::CheckForJobs) {
                     log::error!("Unable to send manager command: {}", err.to_string());
@@ -92,6 +99,7 @@ pub async fn manager_task(
             }
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
+                manager_cmd_rx.close();
                 return;
             }
         };
@@ -106,7 +114,6 @@ pub async fn worker_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("worker started");
-    let crawler = Crawler::new();
     let mut is_paused = false;
 
     loop {
@@ -121,6 +128,7 @@ pub async fn worker_task(
                 },
                 _ = shutdown_rx.recv() => {
                     log::info!("🛑 Shutting down worker");
+                    queue.close();
                     return;
                 }
             };
@@ -162,13 +170,26 @@ pub async fn worker_task(
                             }
                         });
                     }
+                    CollectTask::ConnectionSync { connection_id } => {
+                        log::debug!("handling ConnectionSync for {}", connection_id);
+                        let state = state.clone();
+                        tokio::spawn(async move {
+                            // TODO: dynamic dispatch based on connection id
+                            match DriveConnection::new(&state).await {
+                                Ok(mut conn) => {
+                                    conn.sync(&state).await;
+                                }
+                                Err(err) => log::error!(
+                                    "Unable to sync w/ connection: {} - {}",
+                                    connection_id,
+                                    err.to_string()
+                                ),
+                            }
+                        });
+                    }
                 },
                 WorkerCommand::Crawl { id } => {
-                    tokio::spawn(worker::handle_fetch(
-                        state.clone(),
-                        crawler.clone(),
-                        CrawlTask { id },
-                    ));
+                    tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id }));
                 }
                 WorkerCommand::Tag => {}
             }

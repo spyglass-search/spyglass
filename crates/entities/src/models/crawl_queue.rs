@@ -389,6 +389,7 @@ fn filter_urls(
                 if parsed.scheme() != "http"
                     && parsed.scheme() != "https"
                     && parsed.scheme() != "file"
+                    && parsed.scheme() != "api"
                 {
                     return None;
                 }

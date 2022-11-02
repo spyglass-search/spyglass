@@ -46,9 +46,10 @@ pub async fn handle_bootstrap(
     false
 }
 
-#[tracing::instrument(skip(state, crawler))]
-pub async fn handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
-    let result = crawler.fetch_by_job(&state.db, task.id, true).await;
+#[tracing::instrument(skip(state))]
+pub async fn handle_fetch(state: AppState, task: CrawlTask) {
+    let crawler = Crawler::new();
+    let result = crawler.fetch_by_job(&state, task.id, true).await;
 
     match result {
         Ok(Some(crawl_result)) => {
@@ -171,5 +172,30 @@ pub async fn handle_fetch(state: AppState, crawler: Crawler, task: CrawlTask) {
                 log::error!("Unable to mark task as failed: {}", e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use entities::models::bootstrap_queue;
+    use entities::test::setup_test_db;
+
+    use super::{handle_bootstrap, AppState};
+    use crate::search::IndexPath;
+    use shared::config::UserSettings;
+
+    #[tokio::test]
+    async fn test_handle_bootstrap() {
+        let db = setup_test_db().await;
+        let state = AppState::builder()
+            .with_db(db)
+            .with_user_settings(&UserSettings::default())
+            .with_index(&IndexPath::Memory)
+            .build();
+
+        let test = "https://example.com";
+
+        bootstrap_queue::enqueue(&state.db, test, 10).await.unwrap();
+        assert!(!handle_bootstrap(&state, &Default::default(), &test, None).await);
     }
 }

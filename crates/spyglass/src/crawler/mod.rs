@@ -10,12 +10,13 @@ use url::{Host, Url};
 
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
-use entities::sea_orm::DatabaseConnection;
 use shared::url_to_file_path;
 
+use crate::connection::{Connection, DriveConnection};
 use crate::crawler::bootstrap::create_archive_url;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
+use crate::state::AppState;
 
 pub mod bootstrap;
 pub mod client;
@@ -46,6 +47,30 @@ pub struct CrawlResult {
 }
 
 impl CrawlResult {
+    pub fn new(url: &Url, content: &str, title: &str, desc: Option<String>) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(&content.as_bytes());
+        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+        log::trace!("content hash: {:?}", content_hash);
+        // Use a portion of the content
+        let desc = if let Some(desc) = desc {
+            Some(desc)
+        } else {
+            Some(content.to_string())
+        };
+
+        Self {
+            content_hash,
+            content: Some(content.to_string()),
+            description: desc,
+            status: 200,
+            title: Some(title.to_string()),
+            url: url.to_string(),
+            links: HashSet::new(),
+            raw: None,
+        }
+    }
+
     pub fn is_success(&self) -> bool {
         // Success codes
         self.status >= 200 && self.status <= 299
@@ -225,11 +250,11 @@ impl Crawler {
     /// * Fetches & parses the page
     pub async fn fetch_by_job(
         &self,
-        db: &DatabaseConnection,
+        state: &AppState,
         id: i64,
         parse_results: bool,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?;
+        let crawl = crawl_queue::Entity::find_by_id(id).one(&state.db).await?;
         if crawl.is_none() {
             return Ok(None);
         }
@@ -240,7 +265,7 @@ impl Crawler {
         let url = Url::parse(&crawl.url).expect("Invalid fetch URL");
 
         // Have we crawled this recently?
-        if let Some(history) = fetch_history::find_by_url(db, &url).await? {
+        if let Some(history) = fetch_history::find_by_url(&state.db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
                 log::trace!("Recently fetched, skipping");
@@ -252,9 +277,10 @@ impl Crawler {
         // TODO: Have plugins register for a specific scheme and have the plugin
         // handle any fetching/parsing.
         match url.scheme() {
+            "api" => self.handle_api_fetch(state, &crawl, &url).await,
             "file" => self.handle_file_fetch(&crawl, &url).await,
             "http" | "https" => {
-                self.handle_http_fetch(db, &crawl, &url, parse_results)
+                self.handle_http_fetch(&state.db, &crawl, &url, parse_results)
                     .await
             }
             _ => {
@@ -263,6 +289,19 @@ impl Crawler {
                 Ok(None)
             }
         }
+    }
+
+    async fn handle_api_fetch(
+        &self,
+        state: &AppState,
+        _: &crawl_queue::Model,
+        uri: &Url,
+    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        let mut conn = DriveConnection::new(state)
+            .await
+            .expect("Unable to create connection");
+
+        conn.get(uri).await
     }
 
     async fn handle_file_fetch(

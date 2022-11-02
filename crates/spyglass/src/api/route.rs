@@ -23,7 +23,7 @@ use libspyglass::oauth;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
-use libspyglass::task::AppPause;
+use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -88,18 +88,21 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                     creds.refresh_token(&token);
 
                     let new_conn = connection::ActiveModel::new(
-                        id,
+                        id.clone(),
                         creds.access_token.secret().to_string(),
-                        creds
-                            .refresh_token
-                            .map_or_else(|| "".to_string(), |t| t.secret().to_string()),
+                        creds.refresh_token.map(|t| t.secret().to_string()),
                         creds
                             .expires_in
                             .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
                         auth.scopes,
                     );
                     let res = new_conn.insert(&state.db).await;
-                    log::debug!("saved conn: {:?}", res);
+                    log::debug!("saved connection: {:?}", res);
+                    let _ = state
+                        .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
+                            connection_id: id,
+                        }))
+                        .await;
                 }
                 Err(err) => log::error!("unable to exchange token: {}", err),
             }
@@ -227,7 +230,12 @@ pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, 
             }
         });
 
-        return Ok(all_conns.values().cloned().collect());
+        let mut sorted = all_conns
+            .values()
+            .cloned()
+            .collect::<Vec<ConnectionResult>>();
+        sorted.sort_by(|a, b| a.label.cmp(&b.label));
+        return Ok(sorted);
     }
 
     Ok(Vec::new())

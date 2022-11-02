@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate html5ever;
 
+pub mod connection;
 pub mod crawler;
 pub mod oauth;
 pub mod parser;

@@ -2279,7 +2279,7 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=c9646ea75312029377b0378b9a239eff0348aafa#c9646ea75312029377b0378b9a239eff0348aafa"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=fff75b43e81445c7c9173890a0ce77120e494238#fff75b43e81445c7c9173890a0ce77120e494238"
 dependencies = [
  "anyhow",
  "bytes",
