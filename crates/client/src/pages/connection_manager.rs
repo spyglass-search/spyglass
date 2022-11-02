@@ -1,5 +1,4 @@
-use shared::event::AuthorizeConnectionParams;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -8,7 +7,7 @@ use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen};
 use shared::{
-    event::{ClientEvent, ClientInvoke},
+    event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke},
     response::ConnectionResult,
 };
 
@@ -22,8 +21,10 @@ pub struct ConnectionsManagerPage {
     connections: HashMap<String, ConnectionStatus>,
     fetch_error: String,
     fetch_connection_state: RequestState,
+    resync_requested: HashSet<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub enum Msg {
     AuthorizeConnection(String),
@@ -33,7 +34,8 @@ pub enum Msg {
     AuthFinished(String),
     FetchConnections,
     FetchError(String),
-    RevokeConnection,
+    RevokeConnection(String),
+    ResyncConnection(String),
     UpdateConnections(Vec<ConnectionResult>),
 }
 
@@ -98,6 +100,7 @@ impl Component for ConnectionsManagerPage {
             connections: HashMap::new(),
             fetch_connection_state: RequestState::NotStarted,
             fetch_error: String::new(),
+            resync_requested: HashSet::new(),
         }
     }
 
@@ -163,7 +166,32 @@ impl Component for ConnectionsManagerPage {
                 self.fetch_error = error;
                 true
             }
-            Msg::RevokeConnection => false,
+            Msg::RevokeConnection(id) => {
+                let ser = serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id })
+                    .expect("Unable to serialize authorize connection params");
+
+                link.send_future(async {
+                    // Revoke & then refresh connections
+                    let _ = invoke(ClientInvoke::RevokeConnection.as_ref(), ser).await;
+                    Msg::FetchConnections
+                });
+
+                true
+            }
+            Msg::ResyncConnection(id) => {
+                let ser =
+                    serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
+                        .expect("Unable to serialize authorize connection params");
+
+                link.send_future(async {
+                    // Revoke & then refresh connections
+                    let _ = invoke(ClientInvoke::ResyncConnection.as_ref(), ser).await;
+                    Msg::FetchConnections
+                });
+
+                self.resync_requested.insert(id);
+                true
+            }
             Msg::UpdateConnections(conns) => {
                 self.fetch_connection_state = RequestState::Finished;
                 self.connections = conns
@@ -190,12 +218,22 @@ impl Component for ConnectionsManagerPage {
         let conns = self.connections.values()
             .map(|status| {
                 let auth_msg = Msg::AuthorizeConnection(status.metadata.id.clone());
+                // let revoke_msg = Msg::RevokeConnection(status.metadata.id.clone());
+                let resync_msg = Msg::ResyncConnection(status.metadata.id.clone());
+                let resynced = self.resync_requested.contains(&status.metadata.id.clone());
+
                 let connect_btn = if status.metadata.is_connected {
                     html! {
-                        <btn::Btn onclick={link.callback(|_| Msg::RevokeConnection)}>
-                            <icons::XCircle classes="mr-2" width="w-4" height="h-4" />
-                            {"Revoke"}
-                        </btn::Btn>
+                        <div class="flex flex-row gap-4">
+                            <btn::Btn onclick={link.callback(move |_| resync_msg.clone())} disabled={resynced}>
+                                <icons::RefreshIcon classes="mr-2" width="w-4" height="h-4" />
+                                {"Resync"}
+                            </btn::Btn>
+                            // <btn::Btn onclick={link.callback(move |_| revoke_msg.clone())}>
+                            //     <icons::XCircle classes="mr-2" width="w-4" height="h-4" />
+                            //     {"Revoke"}
+                            // </btn::Btn>
+                        </div>
                     }
                 } else {
                     html! {

@@ -116,6 +116,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
+            cmd::revoke_connection,
+            cmd::resync_connection,
             cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,

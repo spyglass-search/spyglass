@@ -445,3 +445,27 @@ pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn revoke_connection(win: tauri::Window, id: &str) -> Result<(), String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc.client.revoke_connection(id.to_string()).await {
+            return Err(err.to_string());
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn resync_connection(win: tauri::Window, id: &str) -> Result<(), String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc.client.resync_connection(id.to_string()).await {
+            return Err(err.to_string());
+        }
+    }
+
+    Ok(())
+}
