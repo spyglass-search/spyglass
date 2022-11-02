@@ -14,11 +14,11 @@ use shared::{
 struct ConnectionStatus {
     is_authorizing: RequestState,
     error: String,
-    metadata: ConnectionResult,
 }
 
 pub struct ConnectionsManagerPage {
-    connections: HashMap<String, ConnectionStatus>,
+    connections: Vec<ConnectionResult>,
+    conn_status: HashMap<String, ConnectionStatus>,
     fetch_error: String,
     fetch_connection_state: RequestState,
     resync_requested: HashSet<String>,
@@ -97,7 +97,8 @@ impl Component for ConnectionsManagerPage {
         }
 
         Self {
-            connections: HashMap::new(),
+            connections: Vec::new(),
+            conn_status: HashMap::new(),
             fetch_connection_state: RequestState::NotStarted,
             fetch_error: String::new(),
             resync_requested: HashSet::new(),
@@ -108,7 +109,7 @@ impl Component for ConnectionsManagerPage {
         let link = ctx.link();
         match msg {
             Msg::AuthorizeConnection(id) => {
-                if let Some(status) = self.connections.get_mut(&id) {
+                if let Some(status) = self.conn_status.get_mut(&id) {
                     status.is_authorizing = RequestState::InProgress;
                 }
 
@@ -133,18 +134,18 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::AuthError(id, error) => {
-                if let Some(status) = self.connections.get_mut(&id) {
+                if let Some(status) = self.conn_status.get_mut(&id) {
                     status.is_authorizing = RequestState::Error;
                     status.error = error;
                 }
                 true
             }
             Msg::AuthFinished(id) => {
-                if let Some(status) = self.connections.get_mut(&id) {
+                if let Some(status) = self.conn_status.get_mut(&id) {
                     status.is_authorizing = RequestState::Finished;
-                    status.metadata.is_connected = true;
+                    link.send_message(Msg::FetchConnections);
                 }
-                true
+                false
             }
             Msg::FetchConnections => {
                 if self.fetch_connection_state.in_progress() {
@@ -194,7 +195,8 @@ impl Component for ConnectionsManagerPage {
             }
             Msg::UpdateConnections(conns) => {
                 self.fetch_connection_state = RequestState::Finished;
-                self.connections = conns
+                self.connections = conns.clone();
+                self.conn_status = conns
                     .iter()
                     .map(|conn| {
                         (
@@ -202,7 +204,6 @@ impl Component for ConnectionsManagerPage {
                             ConnectionStatus {
                                 is_authorizing: RequestState::NotStarted,
                                 error: String::new(),
-                                metadata: conn.clone(),
                             },
                         )
                     })
@@ -215,14 +216,15 @@ impl Component for ConnectionsManagerPage {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
-        let conns = self.connections.values()
-            .map(|status| {
-                let auth_msg = Msg::AuthorizeConnection(status.metadata.id.clone());
+        let conns = self.connections.iter()
+            .map(|con| {
+                let status = self.conn_status.get(&con.id).expect("Unknown connection");
+                let auth_msg = Msg::AuthorizeConnection(con.id.clone());
                 // let revoke_msg = Msg::RevokeConnection(status.metadata.id.clone());
-                let resync_msg = Msg::ResyncConnection(status.metadata.id.clone());
-                let resynced = self.resync_requested.contains(&status.metadata.id.clone());
+                let resync_msg = Msg::ResyncConnection(con.id.clone());
+                let resynced = self.resync_requested.contains(&con.id.clone());
 
-                let connect_btn = if status.metadata.is_connected {
+                let connect_btn = if con.is_connected {
                     html! {
                         <div class="flex flex-row gap-4">
                             <btn::Btn onclick={link.callback(move |_| resync_msg.clone())} disabled={resynced}>
@@ -265,11 +267,11 @@ impl Component for ConnectionsManagerPage {
                 html! {
                     <div class="pb-8 flex flex-row items-center gap-8">
                         <div class="flex-none">
-                            {self.connection_icon(&status.metadata.id)}
+                            {self.connection_icon(&con.id)}
                         </div>
                         <div class="flex-1">
-                            <div><h2 class="text-lg">{status.metadata.label.clone()}</h2></div>
-                            <div class="text-xs text-neutral-400">{status.metadata.description.clone()}</div>
+                            <div><h2 class="text-lg">{con.label.clone()}</h2></div>
+                            <div class="text-xs text-neutral-400">{con.description.clone()}</div>
                             <div class="text-xs text-red-400">{status.error.clone()}</div>
                         </div>
                         <div class="flex-none">{connect_btn}</div>
