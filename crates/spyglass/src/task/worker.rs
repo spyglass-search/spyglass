@@ -46,8 +46,15 @@ pub async fn handle_bootstrap(
     false
 }
 
+pub enum FetchResult {
+    New,
+    Error,
+    Ignore,
+    Updated,
+}
+
 #[tracing::instrument(skip(state))]
-pub async fn handle_fetch(state: AppState, task: CrawlTask) {
+pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
     let crawler = Crawler::new();
     let result = crawler.fetch_by_job(&state, task.id, true).await;
 
@@ -150,11 +157,20 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) {
                         }
                     };
 
-                    if let Err(e) = indexed.save(&state.db).await {
-                        log::error!("Unable to save document: {}", e);
+
+                    return match indexed.save(&state.db).await {
+                        Ok(_) => FetchResult::Updated,
+                        Err(e) => {
+                            log::error!("Unable to save document: {}", e);
+                            FetchResult::Error
+                        }
                     }
+                } else {
+                    return FetchResult::New;
                 }
             }
+
+            FetchResult::Ignore
         }
         Ok(None) => {
             // Failed to grab robots.txt or crawling is not allowed
@@ -164,6 +180,8 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) {
             {
                 log::error!("Unable to mark task as finished: {}", e);
             }
+
+            FetchResult::Ignore
         }
         Err(err) => {
             log::error!("Unable to crawl id: {} - {:?}", task.id, err);
@@ -173,6 +191,8 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) {
             {
                 log::error!("Unable to mark task as failed: {}", e);
             }
+
+            FetchResult::Error
         }
     }
 }

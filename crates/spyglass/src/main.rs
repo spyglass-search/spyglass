@@ -1,7 +1,5 @@
 extern crate notify;
-//use crate::importer::FirefoxImporter;
 use std::io;
-use std::time::Duration;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
@@ -202,28 +200,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         pipeline_cmd_rx,
         shutdown_tx.clone(),
     ));
-
-    // Clean up crew. Commit anything added to the index in the last 10s
-    // TODO: Make this smarter...
-    {
-        let state = state.clone();
-        let _ = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(10));
-
-            loop {
-                interval.tick().await;
-                if let Err(err) = state
-                    .index
-                    .writer
-                    .lock()
-                    .expect("Unable to get index lock")
-                    .commit()
-                {
-                    log::error!("commit loop error: {:?}", err);
-                }
-            }
-        });
-    }
 
     // Plugin server
     let pm_handle = tokio::spawn(plugin::plugin_event_loop(
