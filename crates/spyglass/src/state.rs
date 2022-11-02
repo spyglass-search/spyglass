@@ -3,6 +3,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
@@ -10,7 +11,7 @@ use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
     search::{IndexPath, Searcher},
-    task::Command,
+    task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 
@@ -22,12 +23,15 @@ pub struct AppState {
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
     pub user_settings: UserSettings,
     pub index: Searcher,
-    // Crawler pause control
-    pub crawler_cmd_tx: Arc<Mutex<Option<broadcast::Sender<Command>>>>,
+    // Task scheduler command/control
+    pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
+    // Pause/unpause worker pool.
+    pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
     // Plugin command/control
     pub plugin_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PluginCommand>>>>,
-    pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
     pub plugin_manager: Arc<Mutex<PluginManager>>,
+    // Pipeline command/control
+    pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
 }
 
 impl AppState {
@@ -61,15 +65,25 @@ impl AppState {
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             index,
-            crawler_cmd_tx: Arc::new(Mutex::new(None)),
+            pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
+            manager_cmd_tx: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn builder() -> AppStateBuilder {
         AppStateBuilder::new()
+    }
+
+    pub async fn schedule_work(
+        &self,
+        task: ManagerCommand,
+    ) -> Result<(), SendError<ManagerCommand>> {
+        let cmd_tx = self.manager_cmd_tx.lock().await;
+        let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
+        cmd_tx.send(task)
     }
 }
 
@@ -98,21 +112,30 @@ impl AppStateBuilder {
             }
         }
 
+        let index = if let Some(index) = &self.index {
+            index.to_owned()
+        } else {
+            Searcher::with_index(&IndexPath::Memory).expect("Unable to open search index")
+        };
+
+        let user_settings = if let Some(settings) = &self.user_settings {
+            settings.to_owned()
+        } else {
+            UserSettings::default()
+        };
+
         AppState {
             app_state: Arc::new(DashMap::new()),
             db: self.db.as_ref().expect("Must set db").to_owned(),
-            user_settings: self
-                .user_settings
-                .as_ref()
-                .expect("Must set user settings")
-                .to_owned(),
-            index: self.index.as_ref().expect("Must set index").to_owned(),
+            user_settings,
+            index,
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
-            crawler_cmd_tx: Arc::new(Mutex::new(None)),
+            pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
+            manager_cmd_tx: Arc::new(Mutex::new(None)),
         }
     }
 

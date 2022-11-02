@@ -14,7 +14,7 @@ pub struct Model {
     pub id: String,
     // access/refresh token used for authentication.
     pub access_token: String,
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
     // Authorized scopes for this token
     pub scopes: Scopes,
     // Number of seconds til the access token is expired.
@@ -51,7 +51,7 @@ impl ActiveModel {
     pub fn new(
         id: String,
         access_token: String,
-        refresh_token: String,
+        refresh_token: Option<String>,
         expires_in: Option<i64>,
         scopes: Vec<String>,
     ) -> Self {
@@ -66,4 +66,8 @@ impl ActiveModel {
             updated_at: Set(chrono::Utc::now()),
         }
     }
+}
+
+pub async fn get_by_id(db: &DatabaseConnection, id: &str) -> Result<Option<Model>, sea_orm::DbErr> {
+    Entity::find_by_id(id.to_string()).one(db).await
 }

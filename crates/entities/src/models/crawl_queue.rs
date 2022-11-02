@@ -7,7 +7,7 @@ use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
 use sea_orm::{
     sea_query, ConnectionTrait, DbBackend, FromQueryResult, QuerySelect, QueryTrait, Set, Statement,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::indexed_document;
@@ -17,8 +17,27 @@ use shared::regex::{regex_for_domain, regex_for_prefix};
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 5_000;
 
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
+#[sea_orm(rs_type = "String", db_type = "String(None)")]
+pub enum TaskErrorType {
+    #[sea_orm(string_value = "Collect")]
+    Collect,
+    #[sea_orm(string_value = "Fetch")]
+    Fetch,
+    #[sea_orm(string_value = "Parse")]
+    Parse,
+    #[sea_orm(string_value = "Tag")]
+    Tag,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct TaskError {
+    error_type: TaskErrorType,
+    msg: String,
+}
+
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
-#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
+#[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum CrawlStatus {
     #[sea_orm(string_value = "Queued")]
     Queued,
@@ -42,7 +61,7 @@ impl fmt::Display for CrawlStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
-#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
+#[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum CrawlType {
     #[sea_orm(string_value = "API")]
     Api,
@@ -80,6 +99,8 @@ pub struct Model {
     pub url: String,
     /// Task status.
     pub status: CrawlStatus,
+    /// If this failed, the reason for the failure
+    pub error: Option<TaskError>,
     /// Number of retries for this task.
     #[sea_orm(default_value = 0)]
     pub num_retries: u8,
@@ -368,6 +389,7 @@ fn filter_urls(
                 if parsed.scheme() != "http"
                     && parsed.scheme() != "https"
                     && parsed.scheme() != "file"
+                    && parsed.scheme() != "api"
                 {
                     return None;
                 }

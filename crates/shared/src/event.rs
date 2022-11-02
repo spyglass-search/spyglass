@@ -44,6 +44,10 @@ pub enum ClientInvoke {
     ListPlugins,
     #[strum(serialize = "load_user_settings")]
     LoadUserSettings,
+    #[strum(serialize = "resync_connection")]
+    ResyncConnection,
+    #[strum(serialize = "revoke_connection")]
+    RevokeConnection,
     #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
     #[strum(serialize = "open_folder_path")]

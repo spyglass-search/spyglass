@@ -19,10 +19,11 @@ use shared::response::{
 use spyglass_plugin::SearchFilter;
 
 use libgoog::{Credentials, GoogClient};
+use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
-use libspyglass::task::Command;
+use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -57,16 +58,16 @@ pub async fn add_queue(
 pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", id);
 
-    if id.as_str() == "api.google.com" {
+    if let Some((client_id, client_secret, scopes)) = connection_secret(&id) {
         let mut listener = create_auth_listener().await;
         let client = GoogClient::new(
-            "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com",
-            "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",
+            &client_id,
+            &client_secret,
             &format!("http://127.0.0.1:{}", listener.port()),
             Default::default(),
         )?;
 
-        let request = client.authorize();
+        let request = client.authorize(&scopes);
         let _ = open::that(request.url.to_string());
 
         log::debug!("listening for auth code");
@@ -81,18 +82,21 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                     creds.refresh_token(&token);
 
                     let new_conn = connection::ActiveModel::new(
-                        id,
+                        id.clone(),
                         creds.access_token.secret().to_string(),
-                        creds
-                            .refresh_token
-                            .map_or_else(|| "".to_string(), |t| t.secret().to_string()),
+                        creds.refresh_token.map(|t| t.secret().to_string()),
                         creds
                             .expires_in
                             .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
                         auth.scopes,
                     );
                     let res = new_conn.insert(&state.db).await;
-                    log::debug!("saved conn: {:?}", res);
+                    log::debug!("saved connection: {:?}", res);
+                    let _ = state
+                        .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
+                            connection_id: id,
+                        }))
+                        .await;
                 }
                 Err(err) => log::error!("unable to exchange token: {}", err),
             }
@@ -210,19 +214,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
     if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
         // TODO: Move this into a config / db table?
-        let mut all_conns: HashMap<String, ConnectionResult> = HashMap::from([(
-            "api.google.com".to_string(),
-            ConnectionResult {
-                id: "api.google.com".to_string(),
-                label: "Google Services".to_string(),
-                description: r#"Adds indexing support for Google services. This
-                    includes Gmail, Google Drive documents, and Google Calendar
-                    events"#
-                    .to_string(),
-                scopes: Vec::new(),
-                is_connected: false,
-            },
-        )]);
+        let mut all_conns = oauth::supported_connections();
 
         // Get list of enabled connections
         enabled.iter().for_each(|conn| {
@@ -232,7 +224,12 @@ pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, 
             }
         });
 
-        return Ok(all_conns.values().cloned().collect());
+        let mut sorted = all_conns
+            .values()
+            .cloned()
+            .collect::<Vec<ConnectionResult>>();
+        sorted.sort_by(|a, b| a.label.cmp(&b.label));
+        return Ok(sorted);
     }
 
     Ok(Vec::new())
@@ -380,7 +377,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            let result = SearchResult {
+            let mut result = SearchResult {
                 doc_id: doc_id.as_text().unwrap_or_default().to_string(),
                 domain: domain.as_text().unwrap_or_default().to_string(),
                 title: title.as_text().unwrap_or_default().to_string(),
@@ -388,6 +385,17 @@ pub async fn search(
                 url: url.as_text().unwrap_or_default().to_string(),
                 score,
             };
+
+            let indexed = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
+                .one(&state.db)
+                .await;
+
+            if let Ok(Some(indexed)) = indexed {
+                if let Some(open_url) = indexed.open_url {
+                    result.url = open_url;
+                }
+            }
 
             results.push(result);
         }
@@ -454,11 +462,11 @@ pub async fn search_lenses(
 #[instrument(skip(state))]
 pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error> {
     // Scope so that the app_state mutex is correctly released.
-    if let Some(sender) = state.crawler_cmd_tx.lock().await.as_ref() {
+    if let Some(sender) = state.pause_cmd_tx.lock().await.as_ref() {
         let _ = sender.send(if is_paused {
-            Command::PauseCrawler
+            AppPause::Pause
         } else {
-            Command::RunCrawler
+            AppPause::Run
         });
     }
 

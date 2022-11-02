@@ -41,6 +41,12 @@ pub trait Rpc {
     #[method(name = "recrawl_domain")]
     async fn recrawl_domain(&self, domain: String) -> Result<(), Error>;
 
+    #[method(name = "resync_connection")]
+    async fn resync_connection(&self, id: String) -> Result<(), Error>;
+
+    #[method(name = "revoke_connection")]
+    async fn revoke_connection(&self, id: String) -> Result<(), Error>;
+
     #[method(name = "search_docs")]
     async fn search_docs(&self, query: SearchParam) -> Result<SearchResults, Error>;
 

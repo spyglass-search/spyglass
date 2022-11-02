@@ -11,7 +11,7 @@ use entities::models::{crawl_queue, lens};
 use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
-use libspyglass::task::{self, AppShutdown, Command};
+use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
 #[allow(unused_imports)]
 use migration::Migrator;
 use shared::config::Config;
@@ -120,7 +120,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     }
 
     // Create channels for scheduler / crawlers
-    let (crawl_queue_tx, crawl_queue_rx) = mpsc::channel(
+    let (worker_cmd_tx, worker_cmd_rx) = mpsc::channel(
         state
             .user_settings
             .inflight_crawl_limit
@@ -131,27 +131,27 @@ async fn start_backend(state: &mut AppState, config: &Config) {
 
     // Channel for shutdown listeners
     let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
-    // Channel for crawle cmds
-    let (crawler_tx, _) = broadcast::channel::<Command>(16);
+    // Channel for pause/unpause listeners
+    let (pause_tx, _) = broadcast::channel::<AppPause>(16);
+
+    // Channel for scheduler commands
+    let (manager_cmd_tx, manager_cmd_rx) = mpsc::unbounded_channel::<ManagerCommand>();
     // Channel for plugin commands
     let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
 
+    // Channel for pipeline commands
     let (pipeline_cmd_tx, pipeline_cmd_rx) = mpsc::channel(16);
-
-    // Loads and processes pipeline commands
-    let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
-        state.clone(),
-        config.clone(),
-        pipeline_cmd_rx,
-        shutdown_tx.clone(),
-    ));
 
     {
         state
-            .crawler_cmd_tx
+            .manager_cmd_tx
             .lock()
             .await
-            .replace(crawler_tx.clone());
+            .replace(manager_cmd_tx.clone());
+    }
+
+    {
+        state.pause_cmd_tx.lock().await.replace(pause_tx.clone());
     }
 
     {
@@ -170,31 +170,41 @@ async fn start_backend(state: &mut AppState, config: &Config) {
             .replace(pipeline_cmd_tx.clone());
     }
 
-    // Check lenses for updates & add any bootstrapped URLs to crawler.
-    let lens_watcher_handle = tokio::spawn(task::lens_watcher(
-        state.clone(),
-        config.clone(),
-        crawler_tx.subscribe(),
-        shutdown_tx.subscribe(),
-    ));
-
-    // Crawl scheduler
+    // Work scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
-        crawl_queue_tx,
-        crawler_tx.subscribe(),
+        worker_cmd_tx,
+        manager_cmd_tx.clone(),
+        manager_cmd_rx,
         shutdown_tx.subscribe(),
     ));
 
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
-        crawl_queue_rx,
-        crawler_tx.subscribe(),
+        worker_cmd_rx,
+        pause_tx.subscribe(),
         shutdown_tx.subscribe(),
     ));
 
+    // Check lenses for updates & add any bootstrapped URLs to crawler.
+    let lens_watcher_handle = tokio::spawn(task::lens_watcher(
+        state.clone(),
+        config.clone(),
+        pause_tx.subscribe(),
+        shutdown_tx.subscribe(),
+    ));
+
+    // Loads and processes pipeline commands
+    let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
+        state.clone(),
+        config.clone(),
+        pipeline_cmd_rx,
+        shutdown_tx.clone(),
+    ));
+
     // Clean up crew. Commit anything added to the index in the last 10s
+    // TODO: Make this smarter...
     {
         let state = state.clone();
         let _ = tokio::spawn(async move {

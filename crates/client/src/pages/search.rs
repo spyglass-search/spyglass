@@ -2,7 +2,7 @@ use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, Element, HtmlElement, HtmlInputElement};
+use web_sys::{window, HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 use shared::{event::ClientEvent, response};
@@ -116,9 +116,9 @@ pub fn search_page() -> Html {
                 let el = query_ref.cast::<HtmlInputElement>().unwrap();
                 el.set_value("");
 
-                let node = node_clone.cast::<Element>().unwrap();
+                let node = node_clone.cast::<HtmlElement>().unwrap();
                 spawn_local(async move {
-                    resize_window(node.client_height() as f64).await.unwrap();
+                    resize_window(node.offset_height() as f64).await.unwrap();
                 });
             }) as Box<dyn Fn(JsValue)>);
 
@@ -137,9 +137,9 @@ pub fn search_page() -> Html {
                     let _ = el.focus();
                 }
 
-                if let Some(node) = node_clone.cast::<Element>() {
+                if let Some(node) = node_clone.cast::<HtmlElement>() {
                     spawn_local(async move {
-                        resize_window(node.client_height() as f64).await.unwrap();
+                        resize_window(node.offset_height() as f64).await.unwrap();
                     });
                 }
             }) as Box<dyn Fn(JsValue)>);
@@ -198,7 +198,7 @@ pub fn search_page() -> Html {
     };
 
     html! {
-        <div ref={node_ref} class="relative overflow-hidden rounded-xl">
+        <div ref={node_ref} class="relative overflow-hidden rounded-xl border-neutral-600 border">
             <div class="flex flex-nowrap w-full">
                 <SelectedLens lens={(*lens).clone()} />
                 <input
@@ -218,16 +218,16 @@ pub fn search_page() -> Html {
     }
 }
 
-pub fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: Element) {
+pub fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: HtmlElement) {
     handle.set(Vec::new());
     spawn_local(async move {
-        resize_window(node.client_height() as f64).await.unwrap();
+        resize_window(node.offset_height() as f64).await.unwrap();
     });
 }
 
 pub fn show_lens_results(
     handle: UseStateHandle<Vec<ResultListData>>,
-    node: Element,
+    node: HtmlElement,
     selected_idx: UseStateHandle<usize>,
     query: String,
 ) {
@@ -249,7 +249,7 @@ pub fn show_lens_results(
 
                 handle.set(results);
                 spawn_local(async move {
-                    resize_window(node.client_height() as f64).await.unwrap();
+                    resize_window(node.offset_height() as f64).await.unwrap();
                 });
             }
             Err(e) => {
@@ -266,7 +266,7 @@ pub fn show_lens_results(
 pub fn show_doc_results(
     handle: UseStateHandle<Vec<ResultListData>>,
     lenses: &[String],
-    node: Element,
+    node: HtmlElement,
     selected_idx: UseStateHandle<usize>,
     query: String,
 ) {
@@ -288,7 +288,7 @@ pub fn show_doc_results(
 
                 handle.set(results);
                 spawn_local(async move {
-                    resize_window(node.client_height() as f64).await.unwrap();
+                    resize_window(node.offset_height() as f64).await.unwrap();
                 });
             }
             Err(e) => {
