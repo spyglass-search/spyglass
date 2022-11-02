@@ -478,6 +478,7 @@ mod test {
     use entities::test::setup_test_db;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
+    use crate::state::AppState;
 
     use url::Url;
 
@@ -506,8 +507,11 @@ mod test {
             ..Default::default()
         };
         let model = query.insert(&db).await.unwrap();
+        let state = AppState::builder()
+            .with_db(db)
+            .build();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -522,17 +526,20 @@ mod test {
     #[ignore]
     async fn test_fetch_redirect() {
         let crawler = Crawler::new();
-
         let db = setup_test_db().await;
+        let state = AppState::builder()
+            .with_db(db)
+            .build();
+
         let url = Url::parse("https://xkcd.com/1375").unwrap();
         let query = crawl_queue::ActiveModel {
             domain: Set(url.host_str().unwrap().to_owned()),
             url: Set(url.to_string()),
             ..Default::default()
         };
-        let model = query.insert(&db).await.unwrap();
+        let model = query.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -544,8 +551,11 @@ mod test {
     #[ignore]
     async fn test_fetch_bootstrap() {
         let crawler = Crawler::new();
-
         let db = setup_test_db().await;
+        let state = AppState::builder()
+            .with_db(db)
+            .build();
+
         let url = Url::parse("https://www.ign.com/wikis/luigis-mansion").unwrap();
         let query = crawl_queue::ActiveModel {
             domain: Set(url.host_str().unwrap().to_owned()),
@@ -553,9 +563,9 @@ mod test {
             crawl_type: Set(CrawlType::Bootstrap),
             ..Default::default()
         };
-        let model = query.insert(&db).await.unwrap();
+        let model = query.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -579,6 +589,9 @@ mod test {
         let crawler = Crawler::new();
 
         let db = setup_test_db().await;
+        let state = AppState::builder()
+            .with_db(db)
+            .build();
 
         // Should skip this URL
         let url =
@@ -589,7 +602,7 @@ mod test {
             crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
             ..Default::default()
         };
-        let model = query.insert(&db).await.unwrap();
+        let model = query.insert(&state.db).await.unwrap();
 
         // Add resource rule to stop the crawl above
         let rule = resource_rule::ActiveModel {
@@ -599,9 +612,9 @@ mod test {
             allow_crawl: Set(false),
             ..Default::default()
         };
-        let _ = rule.insert(&db).await.unwrap();
+        let _ = rule.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_none());
     }
 

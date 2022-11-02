@@ -112,15 +112,24 @@ impl AppStateBuilder {
             }
         }
 
+        let index = if let Some(index) = &self.index {
+            index.to_owned()
+        } else {
+            Searcher::with_index(&IndexPath::Memory)
+                .expect("Unable to open search index")
+        };
+
+        let user_settings = if let Some(settings) = &self.user_settings {
+            settings.to_owned()
+        } else {
+            UserSettings::default()
+        };
+
         AppState {
             app_state: Arc::new(DashMap::new()),
             db: self.db.as_ref().expect("Must set db").to_owned(),
-            user_settings: self
-                .user_settings
-                .as_ref()
-                .expect("Must set user settings")
-                .to_owned(),
-            index: self.index.as_ref().expect("Must set index").to_owned(),
+            user_settings,
+            index,
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             pause_cmd_tx: Arc::new(Mutex::new(None)),
