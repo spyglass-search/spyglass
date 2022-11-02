@@ -1,5 +1,6 @@
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
+use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
@@ -8,6 +9,7 @@ use crate::connection::{Connection, DriveConnection};
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
+use crate::task::worker::FetchResult;
 
 mod manager;
 mod worker;
@@ -42,6 +44,8 @@ pub enum ManagerCommand {
 #[derive(Clone, Debug)]
 pub enum WorkerCommand {
     Collect(CollectTask),
+    // Commit any changes that have been made to the index.
+    CommitIndex,
     // Fetch, parses, & indexes a URI
     // TODO: Split this up so that this work can be spread out.
     Crawl { id: i64 },
@@ -70,7 +74,10 @@ pub async fn manager_task(
     mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
-    let mut queue_check_interval = tokio::time::interval(std::time::Duration::from_millis(100));
+
+    let mut queue_check_interval = tokio::time::interval(Duration::from_millis(100));
+    let mut commit_check_interval = tokio::time::interval(Duration::from_secs(10));
+
     loop {
         tokio::select! {
             // Listen for manager level commands. This can be sent internally (i.e. CheckForJobs) or
@@ -79,17 +86,19 @@ pub async fn manager_task(
                 if let Some(cmd) = cmd {
                     match cmd {
                         ManagerCommand::Collect(task) => {
-                            log::debug!("collecting URIs");
                             if let Err(err) = queue.send(WorkerCommand::Collect(task)).await {
                                 log::error!("Unable to send worker cmd: {}", err.to_string());
                             }
                         }
                         ManagerCommand::CheckForJobs => {
-                            // log::debug!("checking for new jobs");
                             manager::check_for_jobs(&state, &queue).await
                         }
                     }
                 }
+            }
+            // Check for changes to the index & commit them
+            _ = commit_check_interval.tick() => {
+                let _ = queue.send(WorkerCommand::CommitIndex).await;
             }
             // If we're not handling anything, continually poll for jobs.
             _ = queue_check_interval.tick() => {
@@ -115,6 +124,7 @@ pub async fn worker_task(
 ) {
     log::info!("worker started");
     let mut is_paused = false;
+    let mut updated_docs = 0;
 
     loop {
         // Run w/ a select on the shutdown signal otherwise we're stuck in an
@@ -154,7 +164,6 @@ pub async fn worker_task(
         };
 
         if let Some(cmd) = next_cmd {
-            log::debug!("handling command: {:?}", cmd);
             match cmd {
                 WorkerCommand::Collect(task) => match task {
                     CollectTask::Bootstrap {
@@ -162,6 +171,7 @@ pub async fn worker_task(
                         seed_url,
                         pipeline,
                     } => {
+                        log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
                         let state = state.clone();
                         tokio::spawn(async move {
                             if let Some(lens_config) = &state.lenses.get(&lens) {
@@ -188,8 +198,35 @@ pub async fn worker_task(
                         });
                     }
                 },
+                WorkerCommand::CommitIndex => {
+                    let state = state.clone();
+                    if updated_docs > 0 {
+                        log::debug!("committing {} new/updated docs in index", updated_docs);
+                        updated_docs = 0;
+                        tokio::spawn(async move {
+                            match state.index.writer.lock() {
+                                Ok(mut writer) => {
+                                    let _ = writer.commit();
+                                }
+                                Err(err) => {
+                                    log::debug!(
+                                        "Unable to acquire lock on index writer: {}",
+                                        err.to_string()
+                                    )
+                                }
+                            }
+                        });
+                    }
+                }
                 WorkerCommand::Crawl { id } => {
-                    tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id }));
+                    if let Ok(fetch_result) =
+                        tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                    {
+                        match fetch_result {
+                            FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                            _ => {}
+                        }
+                    }
                 }
                 WorkerCommand::Tag => {}
             }
