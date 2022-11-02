@@ -5,13 +5,13 @@ use std::collections::HashMap;
 /// TODO: Move this into a configuration file?
 pub fn supported_connections() -> HashMap<String, ConnectionResult> {
     let conns = vec![
-        ConnectionResult {
-            id: "calendar.google.com".to_string(),
-            label: "Google Calendar".to_string(),
-            description: r#"Adds indexing support for Google calendar events."#.to_string(),
-            scopes: Vec::new(),
-            is_connected: false,
-        },
+        // ConnectionResult {
+        //     id: "calendar.google.com".to_string(),
+        //     label: "Google Calendar".to_string(),
+        //     description: r#"Adds indexing support for Google calendar events."#.to_string(),
+        //     scopes: Vec::new(),
+        //     is_connected: false,
+        // },
         ConnectionResult {
             id: "drive.google.com".to_string(),
             label: "Google Drive".to_string(),
@@ -21,13 +21,13 @@ pub fn supported_connections() -> HashMap<String, ConnectionResult> {
             scopes: Vec::new(),
             is_connected: false,
         },
-        ConnectionResult {
-            id: "mail.google.com".to_string(),
-            label: "Gmail".to_string(),
-            description: r#"Adds indexing support for Gmail."#.to_string(),
-            scopes: Vec::new(),
-            is_connected: false,
-        },
+        // ConnectionResult {
+        //     id: "mail.google.com".to_string(),
+        //     label: "Gmail".to_string(),
+        //     description: r#"Adds indexing support for Gmail."#.to_string(),
+        //     scopes: Vec::new(),
+        //     is_connected: false,
+        // },
     ];
 
     conns
