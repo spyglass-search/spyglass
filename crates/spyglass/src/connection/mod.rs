@@ -41,15 +41,18 @@ impl DriveConnection {
             expires_in: creds.expires_in.map(|d| Duration::from_secs(d as u64)),
         };
 
-        let (client_id, client_secret) = oauth::connection_secret(&Self::id());
-        let client = GoogClient::new(
-            &client_id,
-            &client_secret,
-            "http://localhost:0",
-            credentials,
-        )?;
+        if let Some((client_id, client_secret, _)) = oauth::connection_secret(&Self::id()) {
+            let client = GoogClient::new(
+                &client_id,
+                &client_secret,
+                "http://localhost:0",
+                credentials,
+            )?;
 
-        Ok(Self { client })
+            Ok(Self { client })
+        } else {
+            Err(anyhow::anyhow!("Connection not supported"))
+        }
     }
 
     pub fn is_indexable_mimetype(&self, mime_type: &str) -> bool {

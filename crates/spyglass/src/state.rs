@@ -115,8 +115,7 @@ impl AppStateBuilder {
         let index = if let Some(index) = &self.index {
             index.to_owned()
         } else {
-            Searcher::with_index(&IndexPath::Memory)
-                .expect("Unable to open search index")
+            Searcher::with_index(&IndexPath::Memory).expect("Unable to open search index")
         };
 
         let user_settings = if let Some(settings) = &self.user_settings {

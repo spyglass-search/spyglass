@@ -18,8 +18,8 @@ use shared::response::{
 };
 use spyglass_plugin::SearchFilter;
 
-use libgoog::{types::AuthScope, Credentials, GoogClient};
-use libspyglass::oauth;
+use libgoog::{Credentials, GoogClient};
+use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
@@ -58,9 +58,8 @@ pub async fn add_queue(
 pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", id);
 
-    if id.ends_with("google.com") {
+    if let Some((client_id, client_secret, scopes)) = connection_secret(&id) {
         let mut listener = create_auth_listener().await;
-        let (client_id, client_secret) = oauth::connection_secret(&id);
         let client = GoogClient::new(
             &client_id,
             &client_secret,
@@ -68,11 +67,6 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
             Default::default(),
         )?;
 
-        let scopes = vec![
-            AuthScope::Drive,
-            AuthScope::DriveActivity,
-            AuthScope::DriveMetadata,
-        ];
         let request = client.authorize(&scopes);
         let _ = open::that(request.url.to_string());
 

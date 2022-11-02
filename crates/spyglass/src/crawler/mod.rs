@@ -507,9 +507,7 @@ mod test {
             ..Default::default()
         };
         let model = query.insert(&db).await.unwrap();
-        let state = AppState::builder()
-            .with_db(db)
-            .build();
+        let state = AppState::builder().with_db(db).build();
 
         let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
@@ -527,9 +525,7 @@ mod test {
     async fn test_fetch_redirect() {
         let crawler = Crawler::new();
         let db = setup_test_db().await;
-        let state = AppState::builder()
-            .with_db(db)
-            .build();
+        let state = AppState::builder().with_db(db).build();
 
         let url = Url::parse("https://xkcd.com/1375").unwrap();
         let query = crawl_queue::ActiveModel {
@@ -552,9 +548,7 @@ mod test {
     async fn test_fetch_bootstrap() {
         let crawler = Crawler::new();
         let db = setup_test_db().await;
-        let state = AppState::builder()
-            .with_db(db)
-            .build();
+        let state = AppState::builder().with_db(db).build();
 
         let url = Url::parse("https://www.ign.com/wikis/luigis-mansion").unwrap();
         let query = crawl_queue::ActiveModel {
@@ -589,9 +583,7 @@ mod test {
         let crawler = Crawler::new();
 
         let db = setup_test_db().await;
-        let state = AppState::builder()
-            .with_db(db)
-            .build();
+        let state = AppState::builder().with_db(db).build();
 
         // Should skip this URL
         let url =

@@ -1,3 +1,4 @@
+use libgoog::types::AuthScope;
 use shared::response::ConnectionResult;
 use std::collections::HashMap;
 
@@ -36,13 +37,30 @@ pub fn supported_connections() -> HashMap<String, ConnectionResult> {
 }
 
 /// TODO: Return a client trait that can be used by the crawler to sync with any service.
-pub fn connection_secret(id: &str) -> (String, String) {
-    if id.ends_with("google.com") {
-        (
+pub fn connection_secret(id: &str) -> Option<(String, String, Vec<AuthScope>)> {
+    if id == "calendar.google.com" {
+        Some((
             "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com".to_string(),
             "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".to_string(),
-        )
+            vec![AuthScope::Calendar],
+        ))
+    } else if id == "drive.google.com" {
+        Some((
+            "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com".to_string(),
+            "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".to_string(),
+            vec![
+                AuthScope::Drive,
+                AuthScope::DriveActivity,
+                AuthScope::DriveMetadata,
+            ],
+        ))
+    } else if id == "mail.google.com" {
+        Some((
+            "621713166215-621sdvu6vhj4t03u536p3b2u08o72ndh.apps.googleusercontent.com".to_string(),
+            "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".to_string(),
+            vec![AuthScope::Gmail, AuthScope::GmailMetadata],
+        ))
     } else {
-        ("".to_string(), "".to_string())
+        None
     }
 }
