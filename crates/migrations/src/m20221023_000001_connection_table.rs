@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
             CREATE TABLE IF NOT EXISTS "connections" (
                 "id" text NOT NULL PRIMARY KEY,
                 "access_token" text NOT NULL,
-                "refresh_token" text NOT NULL,
+                "refresh_token" text,
                 "scopes" text NOT NULL,
                 "expires_in" integer,
                 "granted_at" text NOT NULL,
