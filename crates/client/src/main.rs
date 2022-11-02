@@ -6,7 +6,6 @@ use yew_router::prelude::*;
 
 mod components;
 mod constants;
-mod events;
 mod pages;
 mod utils;
 

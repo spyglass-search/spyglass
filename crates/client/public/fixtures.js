@@ -26,12 +26,14 @@ export let invoke = async (func_name, params) => {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense",
+            hash: "",
             html_url: null,
             download_url: null,
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense_2_boogaloo",
+            hash: "",
             html_url: null,
             download_url: null,
         }];
