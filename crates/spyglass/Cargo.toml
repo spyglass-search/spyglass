@@ -23,7 +23,7 @@ html5ever = "0.25"
 http = "0.2"
 ignore = "0.4"
 jsonrpsee = { version = "0.15", features = ["http-server"] }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "fff75b43e81445c7c9173890a0ce77120e494238" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "e605eac29dc9915cb0075d7df9e436a6498f9080" }
 log = "0.4"
 migration = { path = "../migrations" }
 notify = "5.0.0-pre.16"

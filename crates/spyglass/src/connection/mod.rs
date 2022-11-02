@@ -1,4 +1,5 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
 use libgoog::{Credentials, GoogClient};
@@ -42,12 +43,37 @@ impl DriveConnection {
         };
 
         if let Some((client_id, client_secret, _)) = oauth::connection_secret(&Self::id()) {
-            let client = GoogClient::new(
+            let mut client = GoogClient::new(
                 &client_id,
                 &client_secret,
                 "http://localhost:0",
                 credentials,
             )?;
+
+            // Update credentials in database whenever we refresh the token.
+            {
+                let state = state.clone();
+                client.set_on_refresh(move |new_creds| {
+                    log::debug!("received new credentials");
+                    let state = state.clone();
+                    let new_creds = new_creds.clone();
+                    tokio::spawn(async move {
+                        if let Ok(Some(conn)) = connection::get_by_id(&state.db, &Self::id()).await
+                        {
+                            let mut update: connection::ActiveModel = conn.into();
+                            update.access_token = Set(new_creds.access_token.secret().to_string());
+                            update.refresh_token =
+                                Set(new_creds.refresh_token.map(|t| t.secret().to_string()));
+                            update.expires_in = Set(new_creds
+                                .expires_in
+                                .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)));
+                            update.granted_at = Set(chrono::Utc::now());
+                            let res = update.save(&state.db).await;
+                            log::debug!("credentials updated: {:?}", res);
+                        }
+                    });
+                });
+            }
 
             Ok(Self { client })
         } else {
