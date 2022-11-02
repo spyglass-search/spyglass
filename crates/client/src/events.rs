@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Element, HtmlElement, HtmlInputElement};
+use web_sys::{HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 use super::{invoke, open};
@@ -58,7 +58,7 @@ pub fn handle_global_key_down(
             // Clear query string
             query.set("".to_string());
             // Clear results list
-            let el = node_ref.cast::<Element>().unwrap();
+            let el = node_ref.cast::<HtmlElement>().unwrap();
             clear_results(search_results, el);
 
             let el = query_ref.cast::<HtmlInputElement>().unwrap();
@@ -78,7 +78,7 @@ pub fn handle_global_key_down(
 
         if query.len() < crate::constants::MIN_CHARS {
             // Clear results list
-            let el = node_ref.cast::<Element>().unwrap();
+            let el = node_ref.cast::<HtmlElement>().unwrap();
             clear_results(search_results, el);
         }
     }
@@ -91,7 +91,7 @@ pub fn handle_query_change(
     search_results: UseStateHandle<Vec<ResultListData>>,
     selected_idx: UseStateHandle<usize>,
 ) {
-    let el = node_ref.cast::<Element>().unwrap();
+    let el = node_ref.cast::<HtmlElement>().unwrap();
     if query.starts_with(constants::LENS_SEARCH_PREFIX) {
         // show lens search
         return show_lens_results(search_results, el, selected_idx, query.to_string());
