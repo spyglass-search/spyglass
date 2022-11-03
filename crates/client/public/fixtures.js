@@ -23,16 +23,16 @@ export let invoke = async (func_name, params) => {
         }, {
             doc_id: "123",
             domain: "example.com",
-            title: "This is an example title",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            title: "This is an example super long title to demonstrate very long titles",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             url: "https://example.com/this/is/a/path",
             score: 1.0
         }, {
             doc_id: "123",
-            domain: "example.com",
-            title: "This is an example title",
+            domain: "localhost",
+            title: "README.md",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            url: "https://example.com/this/is/a/path",
+            url: "file://localhost/User/alice/Documents/Projects/README.md",
             score: 1.0
         }, {
             doc_id: "123",

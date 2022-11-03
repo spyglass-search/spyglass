@@ -9,7 +9,7 @@ use shared::{
     response,
 };
 
-use crate::components::{ResultListData, SearchResultItem, SelectedLens};
+use crate::components::{ResultListData, SelectedLens, result::SearchResultItem};
 use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
 
 #[wasm_bindgen]
