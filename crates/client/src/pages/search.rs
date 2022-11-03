@@ -101,20 +101,6 @@ impl Component for SearchPage {
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
 
-        // Attach a keydown event listener to the document.
-        // let document = gloo::utils::document();
-        // {
-        //     let link = link.clone();
-        //     let listener = EventListener::new(&document, "keydown", move |event: &Event| {
-        //         let kb = event
-        //             .clone()
-        //             .dyn_into::<KeyboardEvent>()
-        //             .expect("Expected KeyboardEvent");
-        //         link.send_message(Msg::KeyboardEvent(kb))
-        //     });
-        //     listener.forget();
-        // }
-
         {
             // Listen to refresh search results event
             let link = link.clone();
@@ -128,6 +114,7 @@ impl Component for SearchPage {
             });
         }
         {
+            // Listen to clear search events from backend
             let link = link.clone();
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |_| {

@@ -20,6 +20,27 @@ export let invoke = async (func_name, params) => {
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             url: "https://example.com/this/is/a/path",
             score: 1.0
+        }, {
+            doc_id: "123",
+            domain: "example.com",
+            title: "This is an example title",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            url: "https://example.com/this/is/a/path",
+            score: 1.0
+        }, {
+            doc_id: "123",
+            domain: "example.com",
+            title: "This is an example title",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            url: "https://example.com/this/is/a/path",
+            score: 1.0
+        }, {
+            doc_id: "123",
+            domain: "example.com",
+            title: "This is an example title",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            url: "https://example.com/this/is/a/path",
+            score: 1.0
         }];
     } else if (func_name == "search_lenses") {
         return [{
