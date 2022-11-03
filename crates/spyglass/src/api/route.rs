@@ -386,6 +386,8 @@ pub async fn search(
                 score,
             };
 
+            result.description.truncate(256);
+
             let indexed = indexed_document::Entity::find()
                 .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
                 .one(&state.db)
