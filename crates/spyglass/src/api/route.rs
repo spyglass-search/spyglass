@@ -445,7 +445,7 @@ pub async fn search_lenses(
                 results.push(LensResult {
                     author: lens.author,
                     title: label,
-                    description: lens.description.unwrap_or_else(|| "".to_string()),
+                    description: lens.description.unwrap_or_default(),
                     ..Default::default()
                 });
             }

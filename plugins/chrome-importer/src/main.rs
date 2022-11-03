@@ -10,6 +10,33 @@ struct Plugin;
 
 register_plugin!(Plugin);
 
+fn parse_children(children: &Value, to_add: &mut Vec<String>) {
+    if let Some(children) = children.as_array() {
+        for child in children {
+            let child_type = &child["type"];
+            if child_type.is_null() || !child_type.is_string() {
+                continue;
+            }
+
+            match child_type.as_str() {
+                Some("url") => {
+                    // Ignore invalid URLs
+                    if !child["url"].is_string() {
+                        continue;
+                    }
+
+                    if let Some(url) = child["url"].as_str() {
+                        to_add.push(url.into());
+                    }
+                }
+                // Recurse through folders to find more bookmarks
+                Some("folder") => parse_children(&child["children"], to_add),
+                _ => {}
+            }
+        }
+    }
+}
+
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
         // Let the host know we want to check for updates on a regular interval.
@@ -83,33 +110,6 @@ impl SpyglassPlugin for Plugin {
 }
 
 impl Plugin {
-    fn parse_children(&self, children: &Value, to_add: &mut Vec<String>) {
-        if let Some(children) = children.as_array() {
-            for child in children {
-                let child_type = &child["type"];
-                if child_type.is_null() || !child_type.is_string() {
-                    continue;
-                }
-
-                match child_type.as_str() {
-                    Some("url") => {
-                        // Ignore invalid URLs
-                        if !child["url"].is_string() {
-                            continue;
-                        }
-
-                        if let Some(url) = child["url"].as_str() {
-                            to_add.push(url.into());
-                        }
-                    }
-                    // Recurse through folders to find more bookmarks
-                    Some("folder") => self.parse_children(&child["children"], to_add),
-                    _ => {}
-                }
-            }
-        }
-    }
-
     // Attempt to parse bookmark json
     pub fn parse_and_queue_bookmarks(&self, blob: &str) -> Result<Vec<String>, serde_json::Error> {
         let v: Value = serde_json::from_str(blob)?;
@@ -140,9 +140,9 @@ impl Plugin {
         let mut to_add: Vec<String> = Vec::new();
 
         // Parse the different bookmark types
-        self.parse_children(&root["bookmark_bar"]["children"], &mut to_add);
-        self.parse_children(&root["other"]["children"], &mut to_add);
-        self.parse_children(&root["synced"]["children"], &mut to_add);
+        parse_children(&root["bookmark_bar"]["children"], &mut to_add);
+        parse_children(&root["other"]["children"], &mut to_add);
+        parse_children(&root["synced"]["children"], &mut to_add);
 
         Ok(to_add)
     }

@@ -56,7 +56,7 @@ impl CrawlResult {
         desc: Option<String>,
     ) -> Self {
         let mut hasher = Sha256::new();
-        hasher.update(&content.as_bytes());
+        hasher.update(content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
         // Use a portion of the content
@@ -231,7 +231,7 @@ impl Crawler {
 
         // Hash the body content, used to detect changes (eventually).
         let mut hasher = Sha256::new();
-        hasher.update(&parse_result.content.as_bytes());
+        hasher.update(parse_result.content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
 
@@ -352,11 +352,11 @@ impl Crawler {
         // Attempt to read file
         let contents = match path.extension() {
             Some(ext) if parser::supports_filetype(ext) => parser::parse_file(ext, path)?,
-            _ => std::fs::read_to_string(&path)?,
+            _ => std::fs::read_to_string(path)?,
         };
 
         let mut hasher = Sha256::new();
-        hasher.update(&contents.as_bytes());
+        hasher.update(contents.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
 
         // TODO: Better description building for text files?

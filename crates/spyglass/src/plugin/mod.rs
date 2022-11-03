@@ -381,7 +381,7 @@ pub async fn plugin_load(
             let user_override = user_settings
                 .entry(key.to_string())
                 .or_insert_with(|| value.value.to_string());
-            (*value).value = user_override.to_string();
+            value.value = user_override.to_string();
         }
 
         // Update the user settings file in case any new setting entries
@@ -451,7 +451,7 @@ pub async fn plugin_init(
     let input = Pipe::new();
 
     let store = Store::default();
-    let module = Module::from_file(&store, &path)?;
+    let module = Module::from_file(&store, path)?;
     let user_settings = &plugin.user_settings;
 
     // Detect base data dir and send that to the plugin
