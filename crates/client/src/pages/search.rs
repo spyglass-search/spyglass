@@ -153,11 +153,13 @@ impl Component for SearchPage {
         let link = ctx.link();
         match msg {
             Msg::ClearResults => {
+                self.selected_idx = 0;
                 self.search_results = Vec::new();
                 self.request_resize();
                 true
             }
             Msg::ClearQuery => {
+                self.selected_idx = 0;
                 self.search_results = Vec::new();
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
