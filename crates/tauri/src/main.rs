@@ -35,8 +35,8 @@ mod plugins;
 mod rpc;
 mod window;
 use window::{
-    show_crawl_stats_window, show_lens_manager_window, show_plugin_manager, show_user_settings,
-    show_wizard_window,
+    show_connection_manager_window, show_crawl_stats_window, show_lens_manager_window,
+    show_plugin_manager, show_user_settings, show_wizard_window,
 };
 
 use crate::window::show_update_window;
@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
     let config = Config::new();
     #[cfg(not(debug_assertions))]
-    let _guard = if config.user_settings.disable_telementry {
+    let _guard = if config.user_settings.disable_telemetry {
         None
     } else {
         Some(sentry::init((
@@ -98,20 +98,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
+            cmd::authorize_connection,
+            cmd::choose_folder,
             cmd::crawl_stats,
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
             cmd::install_lens,
+            cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
             cmd::network_change,
+            cmd::open_folder_path,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,
             cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
+            cmd::revoke_connection,
+            cmd::resync_connection,
             cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,
@@ -214,6 +220,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let _ = item_handle.set_enabled(false);
                             tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                         }
+                        MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
                         MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                         MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                         MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
@@ -234,8 +241,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
                         MenuID::JOIN_DISCORD => {
                             let _ = open::that(shared::constants::DISCORD_JOIN_URL);
-                        },
-                        _ => {}
+                        }
+                        // Just metainfo
+                        MenuID::NUM_DOCS => {},
+                        MenuID::VERSION => {},
                     }
                 }
             }

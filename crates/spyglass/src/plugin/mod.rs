@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -27,6 +27,7 @@ use crate::task::AppShutdown;
 mod exports;
 
 type PluginId = usize;
+#[derive(Debug)]
 pub enum PluginCommand {
     DisablePlugin(String),
     EnablePlugin(String),
@@ -112,7 +113,7 @@ impl PluginInstance {
 
 pub struct PluginManager {
     check_update_subs: HashSet<PluginId>,
-    file_watch_subs: DashMap<PluginId, String>,
+    file_watch_subs: DashMap<PluginId, PathBuf>,
     plugins: DashMap<PluginId, PluginInstance>,
     // For file watching subscribers
     file_events: Receiver<notify::Result<notify::Event>>,
@@ -189,7 +190,6 @@ pub async fn plugin_event_loop(
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
-    let mut event_loop_sleep = tokio::time::interval(Duration::from_millis(100));
     loop {
         let mut manager = state.plugin_manager.lock().await;
         // Wait for next command / handle shutdown responses
@@ -204,10 +204,6 @@ pub async fn plugin_event_loop(
                     None
                 }
             },
-            _ = event_loop_sleep.tick() => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                continue;
-            }
             // Handle interval checks
             _ = interval.tick() => Some(PluginCommand::QueueIntervalCheck),
             // SHUT IT DOWN
@@ -280,15 +276,14 @@ pub async fn plugin_event_loop(
                         .await;
                 }
                 PluginSubscription::WatchDirectory { path, recurse } => {
-                    let dir_path = Path::new(&path);
                     // Ignore invalid directory paths
-                    if !dir_path.exists() || !dir_path.is_dir() {
-                        log::warn!("Ignoring invalid path: {}", path);
+                    if !path.exists() || !path.is_dir() {
+                        log::warn!("Ignoring invalid path: {}", path.display());
                         return;
                     }
 
                     let _ = manager.file_watcher.watch(
-                        dir_path,
+                        &path,
                         if recurse {
                             RecursiveMode::Recursive
                         } else {
@@ -320,7 +315,11 @@ pub async fn plugin_event_loop(
                 }
 
                 for updated_path in file_event.paths {
-                    let updated_path = updated_path.display().to_string();
+                    log::trace!(
+                        "notifying plugins of file_event: {:?} for <{}>",
+                        file_event.kind,
+                        updated_path.display()
+                    );
 
                     let event = match &file_event.kind {
                         EventKind::Create(_) => {

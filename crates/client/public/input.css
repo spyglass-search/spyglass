@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+input:checked ~ .dot {
+    transform: translateX(100%);
+    background-color: #48bb78;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #404040 #171717;
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #171717;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #404040;
+    border-radius: 100vh;
+    border: 2px solid #171717;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #164e63;
+}

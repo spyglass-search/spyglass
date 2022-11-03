@@ -26,7 +26,7 @@ export async function recrawl_domain(domain) {
 }
 
 export async function save_user_settings(settings) {
-    return await invoke('save_user_settings', { settings });
+    return await invoke('save_user_settings', { settings: Object.fromEntries(settings) });
 }
 
 export async function searchDocs(lenses, query) {
@@ -35,6 +35,10 @@ export async function searchDocs(lenses, query) {
 
 export async function searchLenses(query) {
     return await invoke('search_lenses', { query });
+}
+
+export async function open_folder_path(path) {
+    return await invoke('open_folder_path', { path });
 }
 
 export async function openResult(url) {

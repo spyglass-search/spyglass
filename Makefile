@@ -48,6 +48,9 @@ clippy:
 fmt:
 	cargo fmt --all
 
+generate-icon:
+	cargo tauri icon assets/app-icon.png
+
 test:
 	cargo test --all
 

@@ -12,7 +12,7 @@ use entities::sea_orm::prelude::*;
 use entities::sea_orm::{DatabaseConnection, Set};
 use shared::regex::{regex_for_robots, WildcardType};
 
-use crate::fetch::HTTPClient;
+use super::client::HTTPClient;
 
 #[derive(Clone, Debug)]
 pub struct ParsedRule {

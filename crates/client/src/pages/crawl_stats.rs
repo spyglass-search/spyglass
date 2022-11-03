@@ -15,7 +15,7 @@ fn fetch_crawl_stats(
     spawn_local(async move {
         match invoke(ClientInvoke::GetCrawlStats.as_ref(), JsValue::NULL).await {
             Ok(results) => {
-                let results: CrawlStats = results.into_serde().unwrap();
+                let results: CrawlStats = serde_wasm_bindgen::from_value(results).unwrap();
                 let mut sorted = results.by_domain;
                 sorted.sort_by(|(_, a), (_, b)| b.num_completed.cmp(&a.num_completed));
                 stats_handle.set(sorted);

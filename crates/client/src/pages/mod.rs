@@ -1,4 +1,5 @@
 mod admin;
+mod connection_manager;
 mod crawl_stats;
 mod lens_manager;
 mod plugin_manager;
@@ -9,6 +10,7 @@ mod updater;
 mod wizard;
 
 pub use admin::*;
+pub use connection_manager::*;
 pub use crawl_stats::*;
 pub use lens_manager::*;
 pub use plugin_manager::*;

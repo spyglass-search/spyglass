@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use strum_macros::{Display, EnumString};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -9,15 +8,12 @@ use yew_router::hooks::use_history;
 
 use crate::components::icons;
 use crate::{listen, pages, Route};
-use shared::event::ClientEvent;
-
-#[derive(Debug, Deserialize)]
-struct ListenPayload {
-    payload: String,
-}
+use shared::event::{ClientEvent, ListenPayload};
 
 #[derive(Clone, EnumString, Display, PartialEq, Eq)]
 pub enum Tab {
+    #[strum(serialize = "connections")]
+    ConnectionsManager,
     #[strum(serialize = "lenses")]
     LensManager,
     #[strum(serialize = "plugins")]
@@ -73,8 +69,11 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-            if let Ok(payload) = payload.into_serde::<ListenPayload>() {
+            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
+                    "/settings/connections" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::ConnectionsManager,
+                    }),
                     "/settings/lenses" => history.push(Route::SettingsPage {
                         tab: pages::Tab::LensManager,
                     }),
@@ -120,6 +119,12 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     </div>
                     <ul>
                         <li class="mb-2">
+                            <NavLink tab={Tab::ConnectionsManager} current={props.tab.clone()}>
+                                <icons::ShareIcon classes="mr-2" height="h-4" width="h-4" />
+                                {"Connections"}
+                            </NavLink>
+                        </li>
+                        <li class="mb-2">
                             <NavLink tab={Tab::LensManager} current={props.tab.clone()}>
                                 <icons::FilterIcon classes="mr-2" height="h-4" width="h-4" />
                                 {"Lenses"}
@@ -140,9 +145,11 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     </ul>
                 </div>
             </div>
-            <div class="flex-col flex-1">
+            <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
             {
                 match props.tab {
+                    #[allow(clippy::let_unit_value)]
+                    Tab::ConnectionsManager => html! { <pages::ConnectionsManagerPage /> },
                     #[allow(clippy::let_unit_value)]
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
                     #[allow(clippy::let_unit_value)]

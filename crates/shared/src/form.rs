@@ -4,8 +4,12 @@ use strum_macros::{Display, EnumString};
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum FormType {
+    Bool,
+    /// Assumes non-negative number.
+    Number,
     Path,
     PathList,
+    StringList,
     Text,
 }
 
@@ -13,6 +17,25 @@ impl FormType {
     pub fn validate(&self, value: &str) -> Result<String, String> {
         let value = value.trim();
         match self {
+            FormType::Bool => match serde_json::from_str::<bool>(value) {
+                Ok(_) => Ok(value.to_string()),
+                Err(e) => Err(e.to_string()),
+            },
+            FormType::Number => match serde_json::from_str::<u64>(value) {
+                Ok(_) => Ok(value.to_string()),
+                Err(e) => Err(e.to_string()),
+            },
+            FormType::StringList => {
+                // Escape backslashes
+                let value = value.replace('\\', "\\\\");
+                // Validate the value by attempting to deserialize
+                match serde_json::from_str::<Vec<String>>(&value) {
+                    Ok(parsed) => {
+                        Ok(serde_json::to_string::<Vec<String>>(&parsed).expect("Invalid list"))
+                    }
+                    Err(e) => Err(e.to_string()),
+                }
+            }
             FormType::Path => {
                 // Escape backslashes
                 let value = value.replace('\\', "\\\\");

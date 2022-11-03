@@ -32,6 +32,16 @@ pub fn adjustments_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(ArrowDownOnSquares)]
+pub fn arrow_down_on_squares(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class={props.class()}>
+            <path fill-rule="evenodd" d="M9.75 6.75h-3a3 3 0 00-3 3v7.5a3 3 0 003 3h7.5a3 3 0 003-3v-7.5a3 3 0 00-3-3h-3V1.5a.75.75 0 00-1.5 0v5.25zm0 0h1.5v5.69l1.72-1.72a.75.75 0 111.06 1.06l-3 3a.75.75 0 01-1.06 0l-3-3a.75.75 0 111.06-1.06l1.72 1.72V6.75z" clip-rule="evenodd" />
+            <path d="M7.151 21.75a2.999 2.999 0 002.599 1.5h7.5a3 3 0 003-3v-7.5c0-1.11-.603-2.08-1.5-2.599v7.099a4.5 4.5 0 01-4.5 4.5H7.151z" />
+        </svg>
+    }
+}
+
 #[function_component(ChartBarIcon)]
 pub fn chart_bar_icon(props: &IconProps) -> Html {
     html! {
@@ -150,12 +160,29 @@ pub fn filter_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(FolderIcon)]
+pub fn folder_icon(props: &IconProps) -> Html {
+    html! {
+        <svg class={props.class()} fill="none" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+        </svg>
+    }
+}
+
 #[function_component(FolderOpenIcon)]
 pub fn folder_open_icon(props: &IconProps) -> Html {
     html! {
-        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clip-rule="evenodd" />
-            <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.906 9c.382 0 .749.057 1.094.162V9a3 3 0 00-3-3h-3.879a.75.75 0 01-.53-.22L11.47 3.66A2.25 2.25 0 009.879 3H6a3 3 0 00-3 3v3.162A3.756 3.756 0 014.094 9h15.812zM4.094 10.5a2.25 2.25 0 00-2.227 2.568l.857 6A2.25 2.25 0 004.951 21H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-2.227-2.568H4.094z" />
+        </svg>
+    }
+}
+
+#[function_component(FolderPlusIcon)]
+pub fn folder_plus_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" d="M19.5 21a3 3 0 003-3V9a3 3 0 00-3-3h-5.379a.75.75 0 01-.53-.22L11.47 3.66A2.25 2.25 0 009.879 3H4.5a3 3 0 00-3 3v12a3 3 0 003 3h15zm-6.75-10.5a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25v2.25a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V10.5z" clip-rule="evenodd" />
         </svg>
     }
 }
@@ -187,11 +214,30 @@ pub fn pencil_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(PlusIcon)]
+pub fn plus_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
+        </svg>
+
+    }
+}
+
 #[function_component(RefreshIcon)]
 pub fn refresh_icon(props: &IconProps) -> Html {
     html! {
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+    }
+}
+
+#[function_component(ShareIcon)]
+pub fn share_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" d="M15.75 4.5a3 3 0 11.825 2.066l-8.421 4.679a3.002 3.002 0 010 1.51l8.421 4.679a3 3 0 11-.729 1.31l-8.421-4.678a3 3 0 110-4.132l8.421-4.679a3 3 0 01-.096-.755z" clip-rule="evenodd" />
         </svg>
     }
 }
@@ -210,6 +256,15 @@ pub fn trash_icon(props: &IconProps) -> Html {
     html! {
         <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+    }
+}
+
+#[function_component(XCircle)]
+pub fn x_circle(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
     }
 }

@@ -6,22 +6,26 @@ use url::Url;
 
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
-use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens};
+use entities::models::{
+    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens,
+};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, PluginResult, QueueStatus, SearchLensesResp, SearchMeta,
-    SearchResult, SearchResults,
+    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, QueueStatus,
+    SearchLensesResp, SearchMeta, SearchResult, SearchResults,
 };
 use spyglass_plugin::SearchFilter;
 
+use libgoog::{Credentials, GoogClient};
+use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::lens::lens_to_filters;
-use libspyglass::search::Searcher;
+use libspyglass::search::{lens::lens_to_filters, Searcher};
 use libspyglass::state::AppState;
-use libspyglass::task::Command;
+use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
 
+use super::auth::create_auth_listener;
 use super::response;
 
 /// Add url to queue
@@ -50,7 +54,63 @@ pub async fn add_queue(
     Ok("ok".to_string())
 }
 
-async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
+#[instrument(skip(state))]
+pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
+    log::debug!("authorizing <{}>", id);
+
+    if let Some((client_id, client_secret, scopes)) = connection_secret(&id) {
+        let mut listener = create_auth_listener().await;
+        let client = GoogClient::new(
+            &client_id,
+            &client_secret,
+            &format!("http://127.0.0.1:{}", listener.port()),
+            Default::default(),
+        )?;
+
+        let request = client.authorize(&scopes);
+        let _ = open::that(request.url.to_string());
+
+        log::debug!("listening for auth code");
+        if let Some(auth) = listener.listen(60 * 5).await {
+            log::debug!("received oauth credentials: {:?}", auth);
+            match client
+                .token_exchange(&auth.code, &request.pkce_verifier)
+                .await
+            {
+                Ok(token) => {
+                    let mut creds = Credentials::default();
+                    creds.refresh_token(&token);
+
+                    let new_conn = connection::ActiveModel::new(
+                        id.clone(),
+                        creds.access_token.secret().to_string(),
+                        creds.refresh_token.map(|t| t.secret().to_string()),
+                        creds
+                            .expires_in
+                            .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
+                        auth.scopes,
+                    );
+                    let res = new_conn.insert(&state.db).await;
+                    log::debug!("saved connection: {:?}", res);
+                    let _ = state
+                        .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
+                            connection_id: id,
+                        }))
+                        .await;
+                }
+                Err(err) => log::error!("unable to exchange token: {}", err),
+            }
+        }
+
+        Ok(())
+    } else {
+        Err(Error::Custom(format!("Connection <{}> not supported", id)))
+    }
+}
+
+/// Fun stats about index size, etc.
+#[instrument(skip(state))]
+pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
     // Grab details about index
     let index = state.index;
     let reader = index.reader.searcher();
@@ -58,12 +118,6 @@ async fn _get_current_status(state: AppState) -> Result<AppStatus, Error> {
     Ok(AppStatus {
         num_docs: reader.num_docs(),
     })
-}
-
-/// Fun stats about index size, etc.
-#[instrument(skip(state))]
-pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
-    _get_current_status(state).await
 }
 
 #[instrument(skip(state))]
@@ -113,21 +167,9 @@ pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
-    if let Ok(mut writer) = state.index.writer.lock() {
-        if let Err(e) = Searcher::delete(&mut writer, &id) {
-            log::error!("Unable to delete doc {} due to {}", id, e);
-        } else {
-            let _ = writer.commit();
-        }
-    }
-
-    // Remove from indexed_doc table
-    if let Ok(Some(model)) = indexed_document::Entity::find()
-        .filter(indexed_document::Column::DocId.eq(id))
-        .one(&state.db)
-        .await
-    {
-        let _ = model.delete(&state.db).await;
+    if let Err(e) = Searcher::delete_by_id(&state, &id).await {
+        log::error!("Unable to delete doc {} due to {}", id, e);
+        return Err(Error::Custom(e.to_string()));
     }
 
     Ok(())
@@ -161,15 +203,36 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
     if let Ok(indexed) = indexed {
         for result in indexed {
-            if let Ok(mut writer) = state.index.writer.lock() {
-                let _ = Searcher::delete(&mut writer, &result.doc_id);
-                let _ = writer.commit();
-            }
-            let _ = result.delete(&state.db).await;
+            let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
         }
     }
 
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
+    if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
+        // TODO: Move this into a config / db table?
+        let mut all_conns = oauth::supported_connections();
+
+        // Get list of enabled connections
+        enabled.iter().for_each(|conn| {
+            if let Some(res) = all_conns.get_mut(&conn.id) {
+                res.is_connected = true;
+                res.scopes = conn.scopes.scopes.clone();
+            }
+        });
+
+        let mut sorted = all_conns
+            .values()
+            .cloned()
+            .collect::<Vec<ConnectionResult>>();
+        sorted.sort_by(|a, b| a.label.cmp(&b.label));
+        return Ok(sorted);
+    }
+
+    Ok(Vec::new())
 }
 
 /// List of installed lenses
@@ -314,7 +377,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            let result = SearchResult {
+            let mut result = SearchResult {
                 doc_id: doc_id.as_text().unwrap_or_default().to_string(),
                 domain: domain.as_text().unwrap_or_default().to_string(),
                 title: title.as_text().unwrap_or_default().to_string(),
@@ -322,6 +385,17 @@ pub async fn search(
                 url: url.as_text().unwrap_or_default().to_string(),
                 score,
             };
+
+            let indexed = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
+                .one(&state.db)
+                .await;
+
+            if let Ok(Some(indexed)) = indexed {
+                if let Some(open_url) = indexed.open_url {
+                    result.url = open_url;
+                }
+            }
 
             results.push(result);
         }
@@ -388,11 +462,11 @@ pub async fn search_lenses(
 #[instrument(skip(state))]
 pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error> {
     // Scope so that the app_state mutex is correctly released.
-    if let Some(sender) = state.crawler_cmd_tx.lock().await.as_ref() {
+    if let Some(sender) = state.pause_cmd_tx.lock().await.as_ref() {
         let _ = sender.send(if is_paused {
-            Command::PauseCrawler
+            AppPause::Pause
         } else {
-            Command::RunCrawler
+            AppPause::Run
         });
     }
 

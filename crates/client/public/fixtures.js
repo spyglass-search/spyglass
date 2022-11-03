@@ -35,17 +35,39 @@ export let invoke = async (func_name, params) => {
             html_url: null,
             download_url: null,
         }];
-    } else if (func_name == "list_installed_lenses") {
+    } else if (func_name == "list_connections") {
+        return [{
+            id: "api.github.com",
+            label: "GitHub",
+            description: "Search through your GitHub repositories, starred repositories, and follows",
+            scopes: [],
+            is_connected: true,
+        }, {
+            id: "api.google.com",
+            label: "Google Services",
+            description: "Adds indexing support for Google services. This includes Gmail, Google Drive documents, and Google Calendar events",
+            scopes: [],
+            is_connected: false,
+        }, {
+            id: "api.examples.com",
+            label: "Error Test",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            scopes: [],
+            is_connected: false,
+        }];
+    } else if (func_name == "plugin:lens-updater|list_installed_lenses") {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense",
+            hash: "",
             html_url: null,
             download_url: null,
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense_2_boogaloo",
+            hash: "",
             html_url: null,
             download_url: null,
         }];
@@ -55,6 +77,13 @@ export let invoke = async (func_name, params) => {
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             name: "installable",
             sha: "fake-sha",
+            html_url: "https://example.com",
+            download_url: "https://example.com",
+        }, {
+            author: "a5huynh",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            name: "installable-two",
+            sha: "fake-sha-1",
             html_url: "https://example.com",
             download_url: "https://example.com",
         }];
@@ -68,6 +97,11 @@ export let invoke = async (func_name, params) => {
             title: "chrome-exporter",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             is_enabled: true,
+        }, {
+            author: "a5huynh",
+            title: "local-file-indexer",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            is_enabled: false,
         }];
     } else if (func_name == "crawl_stats") {
         return {
@@ -84,6 +118,18 @@ export let invoke = async (func_name, params) => {
                 form_type: "Text",
                 help_text: "The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.",
             }],
+            ["_.autolaunch", {
+                label: "Disable Autolaunch",
+                value: "false",
+                form_type: "Bool",
+                help_text: "Prevents Spyglass from automatically launching when your computer first starts up.",
+            }],
+            ["_.disable_telemetry", {
+                label: "Disable Telemetry",
+                value: "false",
+                form_type: "Bool",
+                help_text: "Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.",
+            }],
             ["chrome-importer.CHROME_DATA_FOLDER", {
                 label: "Chrome Data Folder",
                 value: "",
@@ -92,13 +138,28 @@ export let invoke = async (func_name, params) => {
             }],
             ["local-file-indexer.FOLDERS_LIST", {
                 label: "Folders List",
-                value: "",
-                form_type: "List",
+                value: "[\"/Users/a5huynh/Documents\", \"/Users/a5huynh/Andrew's Vault\"]",
+                form_type: "PathList",
                 help_text: "List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specifiy the parent folder.",
+            }],
+            ["local-file-indexer.EXTS_LIST", {
+                label: "File Types",
+                value: "[\"md\", \"txt\"]",
+                form_type: "StringList",
+                help_text: "List of file types to index.",
             }]
         ];
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
         return "Reticulating splines...";
+    } else if (func_name == "authorize_connection") {
+        if (params.id == "api.google.com") {
+            await new Promise(r => setTimeout(r, 5000));
+        } else if (params.id == "api.examples.com") {
+            await new Promise(r => setTimeout(r, 5000));
+            throw 'Unable to connect';
+        }
+
+        return [];
     }
 
     return [];
@@ -140,6 +201,10 @@ export async function searchDocs(lenses, query) {
 
 export async function searchLenses(query) {
     return await invoke('search_lenses', { query });
+}
+
+export async function open_folder_path(path) {
+    return await invoke('open_folder_path', { path });
 }
 
 export async function openResult(url) {

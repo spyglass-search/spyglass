@@ -1,8 +1,13 @@
+use std::collections::HashSet;
+use std::fmt;
+use std::path::PathBuf;
+
 pub mod consts;
 mod shims;
+pub mod utils;
+
 use serde::{Deserialize, Serialize};
 pub use shims::*;
-use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SearchFilter {
@@ -58,12 +63,12 @@ pub trait SpyglassPlugin {
     }
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginSubscription {
     /// Check for updates at a fixed interval
     CheckUpdateInterval,
     WatchDirectory {
-        path: String,
+        path: PathBuf,
         recurse: bool,
     },
 }
@@ -77,7 +82,7 @@ impl fmt::Display for PluginSubscription {
             PluginSubscription::WatchDirectory { path, recurse } => write!(
                 f,
                 "<WatchDirectory {} - {}>",
-                path,
+                path.display(),
                 if *recurse {
                     "recursive"
                 } else {
@@ -92,25 +97,42 @@ impl fmt::Display for PluginSubscription {
 pub enum PluginEvent {
     IntervalUpdate,
     // File watcher updates
-    FileCreated(String),
-    FileUpdated(String),
-    FileDeleted(String),
+    FileCreated(PathBuf),
+    FileUpdated(PathBuf),
+    FileDeleted(PathBuf),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginCommandRequest {
-    DeleteDoc { url: String },
+    DeleteDoc {
+        url: String,
+    },
     // Enqueue a list of URLs into the crawl queue
-    Enqueue { urls: Vec<String> },
-    // List the contents of a directory
-    ListDir { path: String },
+    Enqueue {
+        urls: Vec<String>,
+    },
+    // Ask host to list the contents of a directory
+    ListDir {
+        path: String,
+    },
     // Subscribe to PluginEvents
     Subscribe(PluginSubscription),
     // Run a sqlite query on a db file. NOTE: This is a workaround due to the fact
     // that sqlite can not be easily compiled to wasm... yet!
-    SqliteQuery { path: String, query: String },
+    SqliteQuery {
+        path: String,
+        query: String,
+    },
     // Request mounting a file & its contents to the plugin VFS
-    SyncFile { dst: String, src: String },
+    SyncFile {
+        dst: String,
+        src: String,
+    },
+    // Walk & enqueue the contents of a directory
+    WalkAndEnqueue {
+        path: PathBuf,
+        extensions: HashSet<String>,
+    },
 }
 
 #[derive(Deserialize, Serialize)]

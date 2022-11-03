@@ -1,5 +1,6 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
+use std::{collections::HashSet, path::PathBuf};
 
 use crate::{ListDirEntry, PluginCommandRequest, PluginSubscription};
 
@@ -32,7 +33,7 @@ pub fn enqueue_all(urls: &[String]) {
     }
 }
 
-/// List dir
+/// List contents of a directory.
 pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::error::SpannedError> {
     if object_to_stdout(&PluginCommandRequest::ListDir {
         path: path.to_string(),
@@ -46,6 +47,25 @@ pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::error::SpannedErro
     }
 
     Ok(Vec::new())
+}
+
+/// Recursively walk & enqueue contents of a path.
+pub fn walk_and_enqueue_dir(
+    path: PathBuf,
+    extensions: &HashSet<String>,
+) -> Result<(), ron::error::SpannedError> {
+    if object_to_stdout(&PluginCommandRequest::WalkAndEnqueue {
+        path,
+        extensions: extensions.clone(),
+    })
+    .is_ok()
+    {
+        unsafe {
+            plugin_cmd();
+        }
+    }
+
+    Ok(())
 }
 
 /// Utility function to log to spyglass logs

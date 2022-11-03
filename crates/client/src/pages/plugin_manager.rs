@@ -7,27 +7,10 @@ use yew::prelude::*;
 use shared::event::ClientInvoke;
 use shared::response::PluginResult;
 
-use crate::components::{btn, icons, Header};
+use crate::components::forms::Toggle;
+use crate::components::{icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen, toggle_plugin};
-
-fn fetch_installed_plugins(
-    plugins_handle: UseStateHandle<Vec<PluginResult>>,
-    req_state: UseStateHandle<RequestState>,
-) {
-    spawn_local(async move {
-        match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
-            Ok(results) => {
-                plugins_handle.set(results.into_serde().unwrap());
-                req_state.set(RequestState::Finished);
-            }
-            Err(e) => {
-                log::info!("Error fetching plugins: {:?}", e);
-                req_state.set(RequestState::Error);
-            }
-        }
-    });
-}
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct PluginProps {
@@ -37,20 +20,7 @@ pub struct PluginProps {
 #[function_component(Plugin)]
 pub fn plugin_comp(props: &PluginProps) -> Html {
     let plugin = &props.plugin;
-    let component_styles: Classes = classes!(
-        "border-t",
-        "border-neutral-600",
-        "py-4",
-        "px-8",
-        "text-white",
-        "bg-netural-800",
-    );
-
-    let btn_label = if plugin.is_enabled {
-        "Disable"
-    } else {
-        "Enable"
-    };
+    let component_styles: Classes = classes!("py-4", "px-8", "flex", "flex-row", "items-center");
 
     let onclick = {
         let plugin_name = plugin.title.clone();
@@ -64,82 +34,132 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
         })
     };
 
-    let toggle_button = html! {
-        <btn::Btn
-            onclick={onclick}
-            classes={classes!("hover:text-white", if plugin.is_enabled { "text-red-400" } else { "text-green-400" })}
-        >
-            <icons::LightningBoltIcon />
-            <div class="ml-2">{btn_label}</div>
-        </btn::Btn>
-    };
-
     html! {
         <div class={component_styles}>
-            <h2 class="text-xl truncate p-0">
-                {plugin.title.clone()}
-            </h2>
-            <h2 class="text-xs truncate py-1 text-neutral-400">
-                {"Crafted By:"}
-                <span class="ml-2 text-cyan-400">{plugin.author.clone()}</span>
-            </h2>
-            <div class="leading-relaxed text-neutral-400">
-                {plugin.description.clone()}
+            <div>
+                <h2 class="text-xl truncate p-0">
+                    {plugin.title.clone()}
+                </h2>
+                <h2 class="text-xs truncate py-1 text-neutral-400">
+                    {"Crafted By:"}
+                    <span class="ml-2 text-cyan-400">{plugin.author.clone()}</span>
+                </h2>
+                <div class="text-sm leading-relaxed text-neutral-400">
+                    {plugin.description.clone()}
+                </div>
             </div>
-            <div class="pt-2 flex flex-row gap-8">
-                {toggle_button}
+            <div class="ml-auto grow">
+                <Toggle
+                    name={format!("{}-toggle", plugin.title)}
+                    value={serde_json::to_string(&plugin.is_enabled).expect("Unable to serialize")}
+                    onchange={onclick}
+                />
             </div>
         </div>
     }
 }
 
-#[function_component(PluginManagerPage)]
-pub fn plugin_manager_page() -> Html {
-    let req_state = use_state_eq(|| RequestState::NotStarted);
-    let plugins: UseStateHandle<Vec<PluginResult>> = use_state_eq(Vec::new);
+pub enum Msg {
+    FetchPlugins,
+    SetError(String),
+    SetPlugins(Vec<PluginResult>),
+}
 
-    if *req_state == RequestState::NotStarted {
-        req_state.set(RequestState::InProgress);
-        fetch_installed_plugins(plugins.clone(), req_state.clone());
+pub struct PluginManagerPage {
+    plugins: Vec<PluginResult>,
+    error_msg: Option<String>,
+    req_state: RequestState,
+}
+
+impl Component for PluginManagerPage {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let link = ctx.link();
+        link.send_message(Msg::FetchPlugins);
+
+        // Listen for updates from plugins
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::FetchPlugins);
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = listen(ClientEvent::RefreshPluginManager.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
+        Self {
+            error_msg: None,
+            plugins: Vec::new(),
+            req_state: RequestState::NotStarted,
+        }
     }
 
-    let contents = if req_state.is_done() {
-        html! {
-            <>
-            {
-                plugins.iter()
-                    .map(|plugin| html! { <Plugin plugin={plugin.clone()} /> })
-                    .collect::<Html>()
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let link = ctx.link();
+
+        match msg {
+            Msg::FetchPlugins => {
+                self.req_state = RequestState::InProgress;
+                link.send_future(async {
+                    match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
+                        Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                            Ok(plugins) => Msg::SetPlugins(plugins),
+                            Err(e) => Msg::SetError(format!("Error fetching plugins: {:?}", e)),
+                        },
+                        Err(e) => Msg::SetError(format!("Error fetching plugins: {:?}", e)),
+                    }
+                });
+                false
             }
-            </>
+            Msg::SetError(msg) => {
+                log::error!("SetError: {}", msg);
+                self.req_state = RequestState::Error;
+                self.error_msg = Some(msg);
+                true
+            }
+            Msg::SetPlugins(plugins) => {
+                self.req_state = RequestState::Finished;
+                self.plugins = plugins;
+                true
+            }
         }
-    } else {
-        html! {
-            <div class="flex justify-center">
-                <div class="p-16">
-                    <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+    }
+
+    fn view(&self, _ctx: &Context<Self>) -> Html {
+        let contents = if let Some(msg) = &self.error_msg {
+            html! {
+                <div class="flex justify-center">
+                    <div class="p-16">
+                        <icons::EmojiSadIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                        <div>{msg}</div>
+                    </div>
                 </div>
+            }
+        } else if self.req_state.is_done() {
+            self.plugins
+                .iter()
+                .map(|plugin| html! { <Plugin plugin={plugin.clone()} /> })
+                .collect::<Html>()
+        } else {
+            html! {
+                <div class="flex justify-center">
+                    <div class="p-16">
+                        <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                    </div>
+                </div>
+            }
+        };
+
+        html! {
+            <div>
+                <Header label="Plugins" />
+                <div>{contents}</div>
             </div>
         }
-    };
-
-    // Listen for updates from plugins
-    {
-        spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move |_| {
-                log::info!("refresh!");
-                req_state.set(RequestState::NotStarted);
-            }) as Box<dyn Fn(JsValue)>);
-
-            let _ = listen(ClientEvent::RefreshPluginManager.as_ref(), &cb).await;
-            cb.forget();
-        });
-    }
-
-    html! {
-        <div class="text-white h-full bg-neutral-800">
-            <Header label="Plugins" />
-            <div>{contents}</div>
-        </div>
     }
 }

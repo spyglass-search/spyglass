@@ -1,13 +1,16 @@
+use entities::sea_orm::EntityTrait;
 use jsonrpsee::core::{async_trait, Error};
 use libspyglass::state::AppState;
+use libspyglass::task::{CollectTask, ManagerCommand};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 
 use shared::request::{SearchLensesParam, SearchParam};
-use shared::response::{AppStatus, CrawlStats, LensResult, SearchLensesResp, SearchResults};
+use shared::response as resp;
 use spyglass_rpc::RpcServer;
 
+mod auth;
 mod response;
 mod route;
 
@@ -21,11 +24,15 @@ impl RpcServer for SpyglassRpc {
         Ok("version1".into())
     }
 
-    async fn app_status(&self) -> Result<AppStatus, Error> {
+    async fn authorize_connection(&self, id: String) -> Result<(), Error> {
+        route::authorize_connection(self.state.clone(), id).await
+    }
+
+    async fn app_status(&self) -> Result<resp::AppStatus, Error> {
         route::app_status(self.state.clone()).await
     }
 
-    async fn crawl_stats(&self) -> Result<CrawlStats, Error> {
+    async fn crawl_stats(&self) -> Result<resp::CrawlStats, Error> {
         route::crawl_stats(self.state.clone()).await
     }
 
@@ -37,11 +44,15 @@ impl RpcServer for SpyglassRpc {
         route::delete_domain(self.state.clone(), domain).await
     }
 
-    async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error> {
+    async fn list_connections(&self) -> Result<Vec<resp::ConnectionResult>, Error> {
+        route::list_connections(self.state.clone()).await
+    }
+
+    async fn list_installed_lenses(&self) -> Result<Vec<resp::LensResult>, Error> {
         route::list_installed_lenses(self.state.clone()).await
     }
 
-    async fn list_plugins(&self) -> Result<Vec<shared::response::PluginResult>, Error> {
+    async fn list_plugins(&self) -> Result<Vec<resp::PluginResult>, Error> {
         route::list_plugins(self.state.clone()).await
     }
 
@@ -49,11 +60,36 @@ impl RpcServer for SpyglassRpc {
         route::recrawl_domain(self.state.clone(), domain).await
     }
 
-    async fn search_docs(&self, query: SearchParam) -> Result<SearchResults, Error> {
+    async fn resync_connection(&self, id: String) -> Result<(), Error> {
+        let _ = self
+            .state
+            .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
+                connection_id: id,
+            }))
+            .await;
+
+        Ok(())
+    }
+
+    /// Remove connection from list of connections
+    async fn revoke_connection(&self, id: String) -> Result<(), Error> {
+        match entities::models::connection::Entity::delete_by_id(id)
+            .exec(&self.state.db)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(Error::Custom(err.to_string())),
+        }
+    }
+
+    async fn search_docs(&self, query: SearchParam) -> Result<resp::SearchResults, Error> {
         route::search(self.state.clone(), query).await
     }
 
-    async fn search_lenses(&self, query: SearchLensesParam) -> Result<SearchLensesResp, Error> {
+    async fn search_lenses(
+        &self,
+        query: SearchLensesParam,
+    ) -> Result<resp::SearchLensesResp, Error> {
         route::search_lenses(self.state.clone(), query).await
     }
 

@@ -1,38 +1,7 @@
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::icons;
-
-#[derive(Properties, PartialEq, Eq)]
-pub struct TooltipProps {
-    pub label: String,
-}
-
-#[function_component(Tooltip)]
-pub fn tooltip(props: &TooltipProps) -> Html {
-    let styles = vec![
-        "group-hover:block",
-        "group-hover:text-neutral-400",
-        "py-1",
-        "px-2",
-        // Positioning
-        "-ml-16",
-        "-mt-2",
-        "rounded",
-        "hidden",
-        "absolute",
-        "text-center",
-        "bg-neutral-900",
-        "text-sm",
-        "text-right",
-    ];
-
-    html! {
-        <div class={styles}>
-            {props.label.clone()}
-        </div>
-    }
-}
+use crate::components::{icons, tooltip::Tooltip};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct DeleteButtonProps {
@@ -159,6 +128,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         "p-2",
         "rounded-lg",
         "text-sm",
+        "items-center",
         if props.disabled {
             classes!("text-stone-700")
         } else {

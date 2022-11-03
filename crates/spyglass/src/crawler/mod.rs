@@ -10,15 +10,19 @@ use url::{Host, Url};
 
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
-use entities::sea_orm::DatabaseConnection;
 use shared::url_to_file_path;
 
+use crate::connection::{Connection, DriveConnection};
 use crate::crawler::bootstrap::create_archive_url;
-use crate::fetch::HTTPClient;
+use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
+use crate::state::AppState;
 
 pub mod bootstrap;
+pub mod client;
 pub mod robots;
+
+use client::HTTPClient;
 use robots::check_resource_rules;
 
 // TODO: Make this configurable by domain
@@ -36,6 +40,7 @@ pub struct CrawlResult {
     pub status: u16,
     pub title: Option<String>,
     pub url: String,
+    pub open_url: Option<String>,
     /// Links found in the page to add to the queue.
     pub links: HashSet<String>,
     /// Raw HTML data.
@@ -43,6 +48,37 @@ pub struct CrawlResult {
 }
 
 impl CrawlResult {
+    pub fn new(
+        url: &Url,
+        open_url: Option<String>,
+        content: &str,
+        title: &str,
+        desc: Option<String>,
+    ) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(&content.as_bytes());
+        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+        log::trace!("content hash: {:?}", content_hash);
+        // Use a portion of the content
+        let desc = if let Some(desc) = desc {
+            Some(desc)
+        } else {
+            Some(content.to_string())
+        };
+
+        Self {
+            content_hash,
+            content: Some(content.to_string()),
+            description: desc,
+            status: 200,
+            title: Some(title.to_string()),
+            url: url.to_string(),
+            open_url,
+            links: HashSet::new(),
+            raw: None,
+        }
+    }
+
     pub fn is_success(&self) -> bool {
         // Success codes
         self.status >= 200 && self.status <= 299
@@ -174,6 +210,7 @@ impl Crawler {
                         status: 200,
                         title: None,
                         url: end_url.to_string(),
+                        open_url: Some(end_url.to_string()),
                         links: HashSet::new(),
                         raw: Some(raw_body.to_string()),
                     };
@@ -209,7 +246,8 @@ impl Crawler {
             description: Some(parse_result.description),
             status: 200,
             title: parse_result.title,
-            url: canonical_url,
+            url: canonical_url.clone(),
+            open_url: Some(canonical_url),
             links: parse_result.links,
             // No need to store the raw HTML for now.
             raw: None, // Some(raw_body.to_string()),
@@ -222,20 +260,22 @@ impl Crawler {
     /// * Fetches & parses the page
     pub async fn fetch_by_job(
         &self,
-        db: &DatabaseConnection,
+        state: &AppState,
         id: i64,
         parse_results: bool,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let crawl = crawl_queue::Entity::find_by_id(id).one(db).await?;
+        let crawl = crawl_queue::Entity::find_by_id(id).one(&state.db).await?;
         if crawl.is_none() {
             return Ok(None);
         }
 
         let crawl = crawl.expect("Invalid crawl model");
+        log::debug!("handling job: {}", crawl.url);
+
         let url = Url::parse(&crawl.url).expect("Invalid fetch URL");
 
         // Have we crawled this recently?
-        if let Some(history) = fetch_history::find_by_url(db, &url).await? {
+        if let Some(history) = fetch_history::find_by_url(&state.db, &url).await? {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
                 log::trace!("Recently fetched, skipping");
@@ -247,9 +287,10 @@ impl Crawler {
         // TODO: Have plugins register for a specific scheme and have the plugin
         // handle any fetching/parsing.
         match url.scheme() {
+            "api" => self.handle_api_fetch(state, &crawl, &url).await,
             "file" => self.handle_file_fetch(&crawl, &url).await,
             "http" | "https" => {
-                self.handle_http_fetch(db, &crawl, &url, parse_results)
+                self.handle_http_fetch(&state.db, &crawl, &url, parse_results)
                     .await
             }
             _ => {
@@ -258,6 +299,19 @@ impl Crawler {
                 Ok(None)
             }
         }
+    }
+
+    async fn handle_api_fetch(
+        &self,
+        state: &AppState,
+        _: &crawl_queue::Model,
+        uri: &Url,
+    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+        let mut conn = DriveConnection::new(state)
+            .await
+            .expect("Unable to create connection");
+
+        conn.get(uri).await
     }
 
     async fn handle_file_fetch(
@@ -296,7 +350,10 @@ impl Crawler {
             .expect("Unable to convert path file name to string");
 
         // Attempt to read file
-        let contents = std::fs::read_to_string(&path)?;
+        let contents = match path.extension() {
+            Some(ext) if parser::supports_filetype(ext) => parser::parse_file(ext, path)?,
+            _ => std::fs::read_to_string(&path)?,
+        };
 
         let mut hasher = Sha256::new();
         hasher.update(&contents.as_bytes());
@@ -323,6 +380,7 @@ impl Crawler {
             status: 200,
             title: Some(file_name),
             url: url.to_string(),
+            open_url: Some(url.to_string()),
             links: Default::default(),
             raw: None,
         }))
@@ -420,6 +478,7 @@ mod test {
     use entities::test::setup_test_db;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
+    use crate::state::AppState;
 
     use url::Url;
 
@@ -448,8 +507,9 @@ mod test {
             ..Default::default()
         };
         let model = query.insert(&db).await.unwrap();
+        let state = AppState::builder().with_db(db).build();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -464,17 +524,18 @@ mod test {
     #[ignore]
     async fn test_fetch_redirect() {
         let crawler = Crawler::new();
-
         let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db).build();
+
         let url = Url::parse("https://xkcd.com/1375").unwrap();
         let query = crawl_queue::ActiveModel {
             domain: Set(url.host_str().unwrap().to_owned()),
             url: Set(url.to_string()),
             ..Default::default()
         };
-        let model = query.insert(&db).await.unwrap();
+        let model = query.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -486,8 +547,9 @@ mod test {
     #[ignore]
     async fn test_fetch_bootstrap() {
         let crawler = Crawler::new();
-
         let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db).build();
+
         let url = Url::parse("https://www.ign.com/wikis/luigis-mansion").unwrap();
         let query = crawl_queue::ActiveModel {
             domain: Set(url.host_str().unwrap().to_owned()),
@@ -495,9 +557,9 @@ mod test {
             crawl_type: Set(CrawlType::Bootstrap),
             ..Default::default()
         };
-        let model = query.insert(&db).await.unwrap();
+        let model = query.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_some());
 
         let result = crawl_result.unwrap();
@@ -521,6 +583,7 @@ mod test {
         let crawler = Crawler::new();
 
         let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db).build();
 
         // Should skip this URL
         let url =
@@ -531,7 +594,7 @@ mod test {
             crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
             ..Default::default()
         };
-        let model = query.insert(&db).await.unwrap();
+        let model = query.insert(&state.db).await.unwrap();
 
         // Add resource rule to stop the crawl above
         let rule = resource_rule::ActiveModel {
@@ -541,9 +604,9 @@ mod test {
             allow_crawl: Set(false),
             ..Default::default()
         };
-        let _ = rule.insert(&db).await.unwrap();
+        let _ = rule.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&db, model.id, true).await.unwrap();
+        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert!(crawl_result.is_none());
     }
 

@@ -22,7 +22,7 @@ pub struct LensProps {
 
 async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {
-        Ok(results) => match results.into_serde() {
+        Ok(results) => match serde_wasm_bindgen::from_value(results) {
             Ok(parsed) => Some(parsed),
             Err(e) => {
                 log::error!("Unable to deserialize results: {}", e.to_string());
@@ -38,7 +38,7 @@ async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
 
 async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
-        Ok(results) => match results.into_serde::<Vec<InstallableLens>>() {
+        Ok(results) => match serde_wasm_bindgen::from_value::<Vec<InstallableLens>>(results) {
             Ok(lenses) => {
                 let parsed: Vec<LensResult> = lenses
                     .iter()
@@ -112,15 +112,7 @@ pub fn install_btn(props: &InstallBtnProps) -> Html {
 
 #[function_component(Lens)]
 pub fn lens_component(props: &LensProps) -> Html {
-    let component_styles: Vec<String> = vec![
-        "border-t".into(),
-        "border-neutral-600".into(),
-        "px-8".into(),
-        "py-4".into(),
-        "pr-0".into(),
-        "text-white".into(),
-        "bg-netural-800".into(),
-    ];
+    let component_styles = classes!("px-8", "py-4", "pr-0");
     let result = &props.result;
 
     let installed_el = if props.is_installed {
@@ -209,12 +201,21 @@ impl LensManagerPage {
     }
 
     fn user_installed_tabview(&self) -> Html {
-        self.user_installed
-            .iter()
-            .map(|data| {
-                html! {<Lens result={data.clone()} is_installed={true} /> }
-            })
-            .collect::<Html>()
+        if self.user_installed.is_empty() {
+            html! {
+                <div class="grid place-content-center h-48 w-full text-neutral-500">
+                    <icons::EmojiSadIcon height="h-20" width="w-20" classes={classes!("mx-auto")}/>
+                    <div class="mt-4">{"Install some lenses to get started!"}</div>
+                </div>
+            }
+        } else {
+            self.user_installed
+                .iter()
+                .map(|data| {
+                    html! {<Lens result={data.clone()} is_installed={true} /> }
+                })
+                .collect::<Html>()
+        }
     }
 }
 
@@ -357,17 +358,17 @@ impl Component for LensManagerPage {
         let lens_update_icon = if self.lens_updater.in_progress() {
             html! { <icons::RefreshIcon animate_spin={true} /> }
         } else {
-            html! { <icons::DocumentArrowDown /> }
+            html! { <icons::ArrowDownOnSquares /> }
         };
 
         html! {
-            <div class="text-white bg-neutral-800 h-full relative">
+            <div>
                 <Header label="Lens Manager" tabs={tabs}>
                     <Btn onclick={link.callback(|_| Msg::RunOpenFolder)}>
                         <icons::FolderOpenIcon />
                         <div class="ml-2">{"Lens folder"}</div>
                     </Btn>
-                    <Btn onclick={link.callback(|_| Msg::RunLensUpdate)}>
+                    <Btn onclick={link.callback(|_| Msg::RunLensUpdate)} disabled={self.lens_updater.in_progress()}>
                         {lens_update_icon}
                         <div class="ml-2">{"Update"}</div>
                     </Btn>

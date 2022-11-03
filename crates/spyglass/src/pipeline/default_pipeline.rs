@@ -1,13 +1,11 @@
-use crate::crawler::Crawler;
 use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::task::AppShutdown;
-use crate::task::CrawlTask;
+use crate::task::{AppShutdown, CrawlTask};
+
 use entities::models::{crawl_queue, indexed_document};
-use shared::config::LensConfig;
-use shared::config::{Config, PipelineConfiguration};
+use shared::config::{Config, LensConfig, PipelineConfiguration};
 use tokio::sync::{broadcast, mpsc};
 
 use super::parser::DefaultParser;
@@ -30,7 +28,6 @@ pub async fn pipeline_loop(
 ) {
     log::debug!("Default Pipeline Loop Started for Pipeline: {:?}", pipeline);
 
-    let crawler = Crawler::new();
     let collector = DefaultCollector::new();
     let parser = DefaultParser::new();
     loop {
@@ -54,21 +51,12 @@ pub async fn pipeline_loop(
                         "Processing pipeline crawl command for pipeline {}",
                         pipeline
                     );
-                    start_crawl(
-                        state.clone(),
-                        crawler.clone(),
-                        &pipeline,
-                        &collector,
-                        &parser,
-                        crawl_task,
-                    )
-                    .await;
+                    start_crawl(state.clone(), &pipeline, &collector, &parser, crawl_task).await;
                 }
             }
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        continue;
     }
 }
 
@@ -76,7 +64,6 @@ pub async fn pipeline_loop(
 // contents of the requested link
 async fn start_crawl(
     state: AppState,
-    _crawler: Crawler,
     pipeline_name: &str,
     collector: &DefaultCollector,
     parser: &DefaultParser,
@@ -84,7 +71,7 @@ async fn start_crawl(
 ) {
     log::debug!("Processing start crawl");
 
-    let mut context = PipelineContext::new(pipeline_name, state.db.clone());
+    let mut context = PipelineContext::new(pipeline_name, state.clone());
 
     let collection_result = collector.collect(&mut context, task.id).await;
 
@@ -144,9 +131,7 @@ async fn start_crawl(
 
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
-                            if let Ok(mut index_writer) = state.index.writer.lock() {
-                                let _ = Searcher::delete(&mut index_writer, &doc.doc_id);
-                            }
+                            let _ = Searcher::delete_by_id(&state, &doc.doc_id).await;
                         }
 
                         // Add document to index

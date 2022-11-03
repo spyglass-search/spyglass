@@ -13,8 +13,10 @@ use uuid::Uuid;
 
 use crate::search::query::build_query;
 use crate::search::utils::ff_to_string;
+use crate::state::AppState;
+use entities::models::indexed_document;
 use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::DatabaseConnection;
+use entities::sea_orm::{prelude::*, DatabaseConnection};
 use spyglass_plugin::SearchFilter;
 
 pub mod grouping;
@@ -48,8 +50,40 @@ impl Debug for Searcher {
 }
 
 impl Searcher {
-    /// Delete document w/ `doc_id` from index
-    pub fn delete(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
+    pub async fn delete_by_id(state: &AppState, doc_id: &str) -> anyhow::Result<()> {
+        // Remove from search index, immediately.
+        if let Ok(mut writer) = state.index.writer.lock() {
+            Searcher::remove_from_index(&mut writer, doc_id)?;
+            let _ = writer.commit();
+        };
+
+        // Remove from indexed_doc table
+        if let Some(model) = indexed_document::Entity::find()
+            .filter(indexed_document::Column::DocId.eq(doc_id))
+            .one(&state.db)
+            .await?
+        {
+            let _ = model.delete(&state.db).await;
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_by_url(state: &AppState, url: &str) -> anyhow::Result<()> {
+        if let Some(model) = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.eq(url))
+            .one(&state.db)
+            .await?
+        {
+            Self::delete_by_id(state, &model.doc_id).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove document w/ `doc_id` from the search index but will still have a
+    /// reference in the database.
+    pub fn remove_from_index(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
         let fields = DocFields::as_fields();
         writer.delete_term(Term::from_field_text(fields.id, doc_id));
         Ok(())
