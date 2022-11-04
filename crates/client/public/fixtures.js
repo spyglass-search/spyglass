@@ -35,8 +35,8 @@ export let invoke = async (func_name, params) => {
             domain: "localhost",
             title: "README.md",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            crawl_uri: "file://localhost/User/alice/Documents/Projects/README.md",
-            url: "file://localhost/User/alice/Documents/Projects/README.md",
+            crawl_uri: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
+            url: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
             score: 1.0
         }, {
             doc_id: "123",

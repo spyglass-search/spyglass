@@ -69,8 +69,11 @@ fn render_metadata(result: &SearchResult) -> Html {
                         .into_iter()
                         .map(|f| f.to_string())
                         .collect::<Vec<String>>();
+
+                    // TODO: Only show last X path segments
+                    let _num_segs = segs.len();
                     segs.pop();
-                    segs.join("/")
+                    segs.join(" › ")
                 } else {
                     url.path().to_string()
                 };
