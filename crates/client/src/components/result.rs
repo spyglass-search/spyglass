@@ -13,18 +13,32 @@ pub struct SearchResultProps {
 }
 
 fn render_icon(result: &SearchResult) -> Html {
-    let url = Url::parse(&result.url);
+    let url = Url::parse(&result.crawl_uri);
     let icon_size = classes!("w-8", "h-8", "m-auto");
 
     let icon = if let Ok(url) = &url {
         let domain = url.domain().unwrap_or("example.com").to_owned();
-        if url.scheme() == "file" {
-            html! {
-                <icons::DesktopComputerIcon classes="m-auto" height="h-8" width="w-8" />
+        match url.scheme() {
+            "api" => {
+                html! {
+                    <svg class={icon_size} role="img" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z"/>
+                    </svg>
+                }
             }
-        } else {
-            html! {
-                <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+            "file" => {
+                if let Some((_, ext)) = result.title.rsplit_once('.') {
+                    html! { <icons::FileExtIcon ext={ext.to_string()} class={icon_size} /> }
+                } else {
+                    html! {
+                        <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+                    }
+                }
+            },
+            _ => {
+                html! {
+                    <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+                }
             }
         }
     } else {
@@ -34,31 +48,41 @@ fn render_icon(result: &SearchResult) -> Html {
     icon
 }
 
+// TODO: Pull this special metadata from tags provided by the backend.
 fn render_metadata(result: &SearchResult) -> Html {
     let mut meta = Vec::new();
 
     let url = Url::parse(&result.crawl_uri);
     if let Ok(url) = url {
-        if url.scheme() == "file" {
-            // Attempt to grab the folder this file resides
-            let path = if let Some(segments) = url.path_segments() {
-                let mut segs = segments
-                    .into_iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<String>>();
-                segs.pop();
-                segs.join("/")
-            } else {
-                url.path().to_string()
-            };
+        match url.scheme() {
+            "api" => {
+                // Show friendly API name
+                if result.domain == "drive.google.com" {
+                    meta.push(html! { <span>{"Google Drive"}</span> });
+                }
+            }
+            "file" => {
+                // Attempt to grab the folder this file resides
+                let path = if let Some(segments) = url.path_segments() {
+                    let mut segs = segments
+                        .into_iter()
+                        .map(|f| f.to_string())
+                        .collect::<Vec<String>>();
+                    segs.pop();
+                    segs.join("/")
+                } else {
+                    url.path().to_string()
+                };
 
-            meta.push(html! { <span>{path}</span> });
-        } else {
-            meta.push(html! {
-                <a href={result.url.clone()} target="_blank">
-                    <span class="align-middle">{format!(" {}", result.domain.clone())}</span>
-                </a>
-            });
+                meta.push(html! { <span>{path}</span> });
+            }
+            _ => {
+                meta.push(html! {
+                    <a href={result.url.clone()} target="_blank">
+                        <span class="align-middle">{format!(" {}", result.domain.clone())}</span>
+                    </a>
+                });
+            }
         }
     }
 
