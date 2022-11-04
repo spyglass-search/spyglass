@@ -9,7 +9,10 @@ use shared::{
     response,
 };
 
-use crate::components::{ResultListData, SelectedLens, result::SearchResultItem};
+use crate::components::{
+    result::{LensResultItem, SearchResultItem},
+    SelectedLens,
+};
 use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
 
 #[wasm_bindgen]
@@ -20,6 +23,13 @@ extern "C" {
 
 const QUERY_DEBOUNCE_MS: u32 = 256;
 
+#[derive(Clone, PartialEq, Eq)]
+pub enum ResultDisplay {
+    None,
+    Docs,
+    Lens,
+}
+
 #[derive(Debug)]
 pub enum Msg {
     ClearQuery,
@@ -29,12 +39,15 @@ pub enum Msg {
     HandleError(String),
     SearchDocs,
     SearchLenses,
+    UpdateLensResults(Vec<response::LensResult>),
     UpdateQuery(String),
-    UpdateResults(Vec<ResultListData>),
+    UpdateDocsResults(Vec<response::SearchResult>),
 }
 pub struct SearchPage {
     lens: Vec<String>,
-    search_results: Vec<ResultListData>,
+    docs_results: Vec<response::SearchResult>,
+    lens_results: Vec<response::LensResult>,
+    result_display: ResultDisplay,
     search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
     selected_idx: usize,
@@ -45,27 +58,27 @@ pub struct SearchPage {
 impl SearchPage {
     fn handle_selection(&mut self, link: &Scope<Self>) {
         // Grab the currently selected item
-        if let Some(selected) = self.search_results.get(self.selected_idx) {
-            if let Some(url) = selected.url.clone() {
+        if !self.docs_results.is_empty() {
+            if let Some(selected) = self.docs_results.get(self.selected_idx) {
+                let url = selected.url.clone();
                 log::info!("open url: {}", url);
                 spawn_local(async move {
                     let _ = open(url).await;
                 });
-            // Otherwise we're dealing w/ a lens, add to lens vec
-            } else {
-                // Add lens to list
-                self.lens.push(selected.title.to_string());
-                // Clear query string
-                link.send_message(Msg::ClearQuery);
             }
+        } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
+            // Add lens to list
+            self.lens.push(selected.title.to_string());
+            // Clear query string
+            link.send_message(Msg::ClearQuery);
         }
     }
 
     fn move_selection_down(&mut self) {
-        let max_len = if self.search_results.is_empty() {
+        let max_len = if self.docs_results.is_empty() {
             0
         } else {
-            self.search_results.len() - 1
+            self.docs_results.len() - 1
         };
         self.selected_idx = (self.selected_idx + 1).min(max_len);
         self.scroll_to_result(self.selected_idx);
@@ -140,7 +153,9 @@ impl Component for SearchPage {
 
         Self {
             lens: Vec::new(),
-            search_results: Vec::new(),
+            docs_results: Vec::new(),
+            lens_results: Vec::new(),
+            result_display: ResultDisplay::None,
             search_wrapper_ref: NodeRef::default(),
             search_input_ref: NodeRef::default(),
             selected_idx: 0,
@@ -154,13 +169,14 @@ impl Component for SearchPage {
         match msg {
             Msg::ClearResults => {
                 self.selected_idx = 0;
-                self.search_results = Vec::new();
+                self.docs_results = Vec::new();
+                self.result_display = ResultDisplay::None;
                 self.request_resize();
                 true
             }
             Msg::ClearQuery => {
                 self.selected_idx = 0;
-                self.search_results = Vec::new();
+                self.docs_results = Vec::new();
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
                     el.set_value("");
@@ -253,17 +269,9 @@ impl Component for SearchPage {
                 let query = self.query.trim_start_matches('/').to_string();
                 link.send_future(async move {
                     match search_lenses(query).await {
-                        Ok(results) => {
-                            let results: Vec<response::LensResult> =
-                                serde_wasm_bindgen::from_value(results).unwrap_or_default();
-
-                            let results = results
-                                .iter()
-                                .map(|x| x.into())
-                                .collect::<Vec<ResultListData>>();
-
-                            Msg::UpdateResults(results)
-                        }
+                        Ok(results) => Msg::UpdateLensResults(
+                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
+                        ),
                         Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                     }
                 });
@@ -275,25 +283,26 @@ impl Component for SearchPage {
 
                 link.send_future(async move {
                     match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
-                        Ok(results) => {
-                            let results: Vec<response::SearchResult> =
-                                serde_wasm_bindgen::from_value(results).unwrap_or_default();
-
-                            let results = results
-                                .iter()
-                                .map(|x| x.into())
-                                .collect::<Vec<ResultListData>>();
-
-                            Msg::UpdateResults(results)
-                        }
+                        Ok(results) => Msg::UpdateDocsResults(
+                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
+                        ),
                         Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                     }
                 });
 
                 false
             }
-            Msg::UpdateResults(results) => {
-                self.search_results = results;
+            Msg::UpdateLensResults(results) => {
+                self.lens_results = results;
+                self.docs_results.clear();
+                self.result_display = ResultDisplay::Lens;
+                self.request_resize();
+                true
+            }
+            Msg::UpdateDocsResults(results) => {
+                self.docs_results = results;
+                self.lens_results.clear();
+                self.result_display = ResultDisplay::Docs;
                 self.request_resize();
                 true
             }
@@ -326,16 +335,33 @@ impl Component for SearchPage {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
 
-        let results = self.search_results
-            .iter()
-            .enumerate()
-            .map(|(idx, res)| {
-                let is_selected = idx == self.selected_idx;
-                html! {
-                    <SearchResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
-                }
-            })
-            .collect::<Html>();
+        let results = match self.result_display {
+            ResultDisplay::None => html! { },
+            ResultDisplay::Docs => {
+                self.docs_results
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, res)| {
+                        let is_selected = idx == self.selected_idx;
+                        html! {
+                            <SearchResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                        }
+                    })
+                    .collect::<Html>()
+            },
+            ResultDisplay::Lens => {
+                self.lens_results
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, res)| {
+                        let is_selected = idx == self.selected_idx;
+                        html! {
+                            <LensResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                        }
+                    })
+                    .collect::<Html>()
+            }
+        };
 
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative overflow-hidden rounded-xl border-neutral-600 border">
@@ -353,7 +379,9 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                <div class="overflow-y-auto overflow-x-hidden h-full">{ results }</div>
+                <div class="overflow-y-auto overflow-x-hidden h-full">
+                    {results}
+                </div>
             </div>
         }
     }

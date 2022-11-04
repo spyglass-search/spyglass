@@ -1,58 +1,10 @@
 pub mod btn;
 pub mod forms;
 pub mod icons;
-pub mod tooltip;
 pub mod result;
+pub mod tooltip;
 
 use yew::prelude::*;
-
-use shared::response::{LensResult, SearchResult};
-
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ResultListType {
-    DocSearch,
-    LensSearch,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ResultListData {
-    pub id: String,
-    pub domain: Option<String>,
-    pub title: String,
-    pub description: String,
-    pub url: Option<String>,
-    pub score: f32,
-    pub result_type: ResultListType,
-}
-
-impl From<&LensResult> for ResultListData {
-    fn from(x: &LensResult) -> Self {
-        ResultListData {
-            id: x.title.clone(),
-            description: x.description.clone(),
-            domain: None,
-            result_type: ResultListType::LensSearch,
-            score: 1.0,
-            title: x.title.clone(),
-            url: None,
-        }
-    }
-}
-
-impl From<&SearchResult> for ResultListData {
-    fn from(x: &SearchResult) -> Self {
-        ResultListData {
-            id: x.doc_id.clone(),
-            description: x.description.clone(),
-            domain: Some(x.domain.clone()),
-            result_type: ResultListType::DocSearch,
-            score: x.score,
-            title: x.title.clone(),
-            url: Some(x.url.clone()),
-        }
-    }
-}
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct SelectLensProps {

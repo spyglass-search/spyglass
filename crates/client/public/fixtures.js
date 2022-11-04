@@ -11,6 +11,7 @@ export let invoke = async (func_name, params) => {
             domain: "google.com",
             title: "This is an example title",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            crawl_uri: "https://google.com/this/is/a/path",
             url: "https://google.com/this/is/a/path",
             score: 1.0
         }, {
@@ -18,6 +19,7 @@ export let invoke = async (func_name, params) => {
             domain: "example.com",
             title: "This is an example title",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            crawl_uri: "https://example.com/this/is/a/path",
             url: "https://example.com/this/is/a/path",
             score: 1.0
         }, {
@@ -25,6 +27,7 @@ export let invoke = async (func_name, params) => {
             domain: "example.com",
             title: "This is an example super long title to demonstrate very long titles",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            crawl_uri: "https://example.com/this/is/a/path",
             url: "https://example.com/this/is/a/path",
             score: 1.0
         }, {
@@ -32,13 +35,15 @@ export let invoke = async (func_name, params) => {
             domain: "localhost",
             title: "README.md",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            crawl_uri: "file://localhost/User/alice/Documents/Projects/README.md",
             url: "file://localhost/User/alice/Documents/Projects/README.md",
             score: 1.0
         }, {
             doc_id: "123",
-            domain: "example.com",
-            title: "This is an example title",
+            domain: "drive.google.com",
+            title: "API Example Doc",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            crawl_uri: "api://drive.google.com/24938aslkdj-313-19384",
             url: "https://example.com/this/is/a/path",
             score: 1.0
         }];

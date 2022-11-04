@@ -377,29 +377,29 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            let mut result = SearchResult {
-                doc_id: doc_id.as_text().unwrap_or_default().to_string(),
-                domain: domain.as_text().unwrap_or_default().to_string(),
-                title: title.as_text().unwrap_or_default().to_string(),
-                description: description.as_text().unwrap_or_default().to_string(),
-                url: url.as_text().unwrap_or_default().to_string(),
-                score,
-            };
+            if let Some(doc_id) = doc_id.as_text() {
+                let indexed = indexed_document::Entity::find()
+                    .filter(indexed_document::Column::DocId.eq(doc_id))
+                    .one(&state.db)
+                    .await;
 
-            result.description.truncate(256);
+                let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
-                .one(&state.db)
-                .await;
+                if let Ok(Some(indexed)) = indexed {
+                    let mut result = SearchResult {
+                        doc_id: doc_id.to_string(),
+                        domain: domain.as_text().unwrap_or_default().to_string(),
+                        title: title.as_text().unwrap_or_default().to_string(),
+                        crawl_uri: crawl_uri.clone(),
+                        description: description.as_text().unwrap_or_default().to_string(),
+                        url: indexed.open_url.unwrap_or(crawl_uri),
+                        score,
+                    };
 
-            if let Ok(Some(indexed)) = indexed {
-                if let Some(open_url) = indexed.open_url {
-                    result.url = open_url;
+                    result.description.truncate(256);
+                    results.push(result);
                 }
             }
-
-            results.push(result);
         }
     }
 
