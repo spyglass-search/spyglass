@@ -230,6 +230,7 @@ impl Component for SearchPage {
                         }
 
                         match key.as_str() {
+                            "ArrowDown" | "ArrowUp" => {}
                             "Enter" => self.handle_selection(link),
                             "Escape" => {
                                 link.send_future(async move {

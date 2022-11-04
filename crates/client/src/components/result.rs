@@ -35,7 +35,7 @@ fn render_icon(result: &SearchResult) -> Html {
                         <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
                     }
                 }
-            },
+            }
             _ => {
                 html! {
                     <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
