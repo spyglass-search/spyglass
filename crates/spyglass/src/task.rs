@@ -91,7 +91,13 @@ pub async fn manager_task(
                             }
                         }
                         ManagerCommand::CheckForJobs => {
-                            manager::check_for_jobs(&state, &queue).await
+                            if !manager::check_for_jobs(&state, &queue).await {
+                                // If no jobs were queue, sleep longer. This will keep
+                                // CPU usage low when there is nothing going on and
+                                // let the manager process jobs as quickly as possible
+                                // if there are a lot of them.
+                                tokio::time::sleep(Duration::from_secs(5)).await;
+                            }
                         }
                     }
                 }
