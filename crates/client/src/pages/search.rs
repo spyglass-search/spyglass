@@ -1,5 +1,5 @@
-use num_format::{Buffer, Locale};
 use gloo::timers::callback::Timeout;
+use num_format::{Buffer, Locale};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlElement, HtmlInputElement};
@@ -7,7 +7,7 @@ use yew::{html::Scope, prelude::*};
 
 use shared::{
     event::{ClientEvent, ClientInvoke},
-    response::{self, SearchResults, SearchMeta},
+    response::{self, SearchMeta, SearchResults},
 };
 
 use crate::components::{
@@ -289,11 +289,9 @@ impl Component for SearchPage {
 
                 link.send_future(async move {
                     match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
-                        Ok(results) => {
-                            match serde_wasm_bindgen::from_value(results) {
-                                Ok(deser) => Msg::UpdateDocsResults(deser),
-                                Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
-                            }
+                        Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                            Ok(deser) => Msg::UpdateDocsResults(deser),
+                            Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                         },
                         Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                     }
