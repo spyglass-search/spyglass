@@ -97,8 +97,12 @@ pub async fn manager_task(
                                 // let the manager process jobs as quickly as possible
                                 // if there are a lot of them.
                                 queue_check_interval = tokio::time::interval(Duration::from_secs(5));
+                                // first tick always completes immediately.
+                                queue_check_interval.tick().await;
                             } else {
                                 queue_check_interval = tokio::time::interval(Duration::from_millis(100));
+                                // first tick always completes immediately.
+                                queue_check_interval.tick().await;
                             }
                         }
                     }
