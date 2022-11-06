@@ -381,11 +381,32 @@ impl Component for SearchPage {
             wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
 
             html! {
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2">
-                    {"Searched "}
-                    <span class="text-cyan-600">{num_docs}</span>
-                    {" documents in "}
-                    <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2 flex flex-row items-center">
+                    <div>
+                        {"Searched "}
+                        <span class="text-cyan-600">{num_docs}</span>
+                        {" documents in "}
+                        <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                    </div>
+                    <div class="ml-auto flex flex-row align-middle items-center">
+                        {"Use"}
+                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                            </svg>
+                        </div>
+                        {"and"}
+                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+                            </svg>
+                        </div>
+                        {"to select."}
+                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 mx-1 text-[8px]">
+                            {"Enter"}
+                        </div>
+                        {"to open."}
+                    </div>
                 </div>
             }
         } else {
