@@ -237,6 +237,27 @@ impl Component for ConnectionsManagerPage {
                             // </btn::Btn>
                         </div>
                     }
+                // Annoyingly we need to use Google branded icons for the connection
+                // button.
+                } else if con.id.ends_with("google.com") {
+                    html! {
+                        <button
+                            disabled={status.is_authorizing.in_progress()}
+                            onclick={link.callback(move |_| auth_msg.clone())}
+                        >
+                            {
+                                if status.is_authorizing.in_progress() {
+                                    html! {
+                                        <icons::GoogleSignInDisabled width="w-auto" height="h-10" />
+                                    }
+                                } else {
+                                    html! {
+                                        <icons::GoogleSignIn width="w-auto" height="h-10" />
+                                    }
+                                }
+                            }
+                        </button>
+                    }
                 } else {
                     html! {
                         <btn::Btn
@@ -272,9 +293,26 @@ impl Component for ConnectionsManagerPage {
                         <div class="flex-1">
                             <div><h2 class="text-lg">{con.label.clone()}</h2></div>
                             <div class="text-xs text-neutral-400">{con.description.clone()}</div>
-                            <div class="text-xs text-red-400">{status.error.clone()}</div>
+                            <div class="mt-1 text-xs">
+                            {
+                                match status.is_authorizing {
+                                    RequestState::Error => html! {
+                                        <span class="text-red-400">{status.error.clone()}</span>
+                                    },
+                                    RequestState::InProgress => html! {
+                                        <span class="text-cyan-500">
+                                            <div>{"Sign-in has opened in a new window."}</div>
+                                            <div>{"Please authorize to complete connection."}</div>
+                                        </span>
+                                    },
+                                    _ => html! {}
+                                }
+                            }
+                            </div>
                         </div>
-                        <div class="flex-none">{connect_btn}</div>
+                        <div class="flex-none flex flex-col">
+                            <div class="ml-auto">{connect_btn}</div>
+                        </div>
                     </div>
                 }
             })
