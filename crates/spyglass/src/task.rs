@@ -96,7 +96,9 @@ pub async fn manager_task(
                                 // CPU usage low when there is nothing going on and
                                 // let the manager process jobs as quickly as possible
                                 // if there are a lot of them.
-                                tokio::time::sleep(Duration::from_secs(5)).await;
+                                queue_check_interval = tokio::time::interval(Duration::from_secs(5));
+                            } else {
+                                queue_check_interval = tokio::time::interval(Duration::from_millis(100));
                             }
                         }
                     }
