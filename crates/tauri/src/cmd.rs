@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
+use shared::response::SearchResults;
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
@@ -120,7 +121,7 @@ pub async fn search_docs<'r>(
     win: tauri::Window,
     lenses: Vec<String>,
     query: &str,
-) -> Result<Vec<response::SearchResult>, String> {
+) -> Result<SearchResults, String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let data = request::SearchParam {
             lenses,
@@ -129,14 +130,14 @@ pub async fn search_docs<'r>(
 
         let rpc = rpc.lock().await;
         match rpc.client.search_docs(data).await {
-            Ok(resp) => Ok(resp.results.to_vec()),
+            Ok(resp) => Ok(resp),
             Err(err) => {
                 log::error!("search_docs err: {}", err);
-                Ok(Vec::new())
+                Err(err.to_string())
             }
         }
     } else {
-        Ok(Vec::new())
+        Err("Unable to reach backend".to_string())
     }
 }
 

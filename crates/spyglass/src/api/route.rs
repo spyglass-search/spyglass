@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use jsonrpsee::core::Error;
 use std::collections::HashMap;
+use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
 
@@ -332,6 +333,7 @@ pub async fn search(
     state: AppState,
     search_req: request::SearchParam,
 ) -> Result<SearchResults, Error> {
+    let start = SystemTime::now();
     let fields = DocFields::as_fields();
 
     let index = &state.index;
@@ -377,34 +379,40 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            let mut result = SearchResult {
-                doc_id: doc_id.as_text().unwrap_or_default().to_string(),
-                domain: domain.as_text().unwrap_or_default().to_string(),
-                title: title.as_text().unwrap_or_default().to_string(),
-                description: description.as_text().unwrap_or_default().to_string(),
-                url: url.as_text().unwrap_or_default().to_string(),
-                score,
-            };
+            if let Some(doc_id) = doc_id.as_text() {
+                let indexed = indexed_document::Entity::find()
+                    .filter(indexed_document::Column::DocId.eq(doc_id))
+                    .one(&state.db)
+                    .await;
 
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
-                .one(&state.db)
-                .await;
+                let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
-            if let Ok(Some(indexed)) = indexed {
-                if let Some(open_url) = indexed.open_url {
-                    result.url = open_url;
+                if let Ok(Some(indexed)) = indexed {
+                    let mut result = SearchResult {
+                        doc_id: doc_id.to_string(),
+                        domain: domain.as_text().unwrap_or_default().to_string(),
+                        title: title.as_text().unwrap_or_default().to_string(),
+                        crawl_uri: crawl_uri.clone(),
+                        description: description.as_text().unwrap_or_default().to_string(),
+                        url: indexed.open_url.unwrap_or(crawl_uri),
+                        score,
+                    };
+
+                    result.description.truncate(256);
+                    results.push(result);
                 }
             }
-
-            results.push(result);
         }
     }
+
+    let wall_time_ms = SystemTime::now()
+        .duration_since(start)
+        .map_or_else(|_| 0, |duration| duration.as_millis() as u64);
 
     let meta = SearchMeta {
         query: search_req.query,
         num_docs: searcher.num_docs(),
-        wall_time_ms: 1000,
+        wall_time_ms,
     };
 
     Ok(SearchResults { results, meta })

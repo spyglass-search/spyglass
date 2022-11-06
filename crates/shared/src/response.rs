@@ -73,9 +73,12 @@ pub struct SearchMeta {
     pub wall_time_ms: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct SearchResult {
+    /// Document ID
     pub doc_id: String,
+    /// URI used to crawl this result
+    pub crawl_uri: String,
     pub domain: String,
     pub title: String,
     pub description: String,
