@@ -143,7 +143,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     <a href={result.url.clone()}>{result.title.clone()}</a>
                 </h2>
                 {metadata}
-                <div class="text-sm leading-relaxed text-neutral-400">
+                <div class="text-sm leading-relaxed text-neutral-400 max-h-16 overflow-hidden">
                     {result.description.clone()}
                 </div>
             </div>
