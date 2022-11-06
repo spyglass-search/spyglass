@@ -125,7 +125,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "items-center",
         "border-t",
         "border-neutral-600",
-        "px-8",
+        "pl-8",
         "py-4",
         "text-white",
         "w-screen",
@@ -151,7 +151,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     {result.description.clone()}
                 </div>
             </div>
-            <div class="flex-none flex flex-col justify-self-end self-start">
+            <div class="flex-none flex flex-col justify-self-end self-start pl-4 pr-4">
                 <DeleteButton doc_id={result.doc_id.clone()} />
             </div>
         </div>
