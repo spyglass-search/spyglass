@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use jsonrpsee::core::Error;
 use std::collections::HashMap;
+use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
 
@@ -332,6 +333,7 @@ pub async fn search(
     state: AppState,
     search_req: request::SearchParam,
 ) -> Result<SearchResults, Error> {
+    let start = SystemTime::now();
     let fields = DocFields::as_fields();
 
     let index = &state.index;
@@ -403,10 +405,14 @@ pub async fn search(
         }
     }
 
+    let wall_time_ms = SystemTime::now()
+        .duration_since(start)
+        .map_or_else(|_| 0, |duration| duration.as_millis() as u64);
+
     let meta = SearchMeta {
         query: search_req.query,
         num_docs: searcher.num_docs(),
-        wall_time_ms: 1000,
+        wall_time_ms,
     };
 
     Ok(SearchResults { results, meta })

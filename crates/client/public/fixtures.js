@@ -6,47 +6,54 @@ export let invoke = async (func_name, params) => {
     console.log(`calling: ${func_name} w/`, params);
 
     if  (func_name == "search_docs") {
-        return [{
-            doc_id: "123",
-            domain: "google.com",
-            title: "This is an example title",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            crawl_uri: "https://google.com/this/is/a/path",
-            url: "https://google.com/this/is/a/path",
-            score: 1.0
-        }, {
-            doc_id: "123",
-            domain: "example.com",
-            title: "This is an example title",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            crawl_uri: "https://example.com/this/is/a/path",
-            url: "https://example.com/this/is/a/path",
-            score: 1.0
-        }, {
-            doc_id: "123",
-            domain: "example.com",
-            title: "This is an example super long title to demonstrate very long titles that go on for a very long time and then some.",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            crawl_uri: "https://example.com/this/is/a/path",
-            url: "https://example.com/this/is/a/path",
-            score: 1.0
-        }, {
-            doc_id: "123",
-            domain: "localhost",
-            title: "README.md",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            crawl_uri: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
-            url: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
-            score: 1.0
-        }, {
-            doc_id: "123",
-            domain: "drive.google.com",
-            title: "API Example Doc",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            crawl_uri: "api://drive.google.com/24938aslkdj-313-19384",
-            url: "https://example.com/this/is/a/path",
-            score: 1.0
-        }];
+        return {
+            meta: {
+                query: params.query,
+                num_docs: 426552,
+                wall_time_ms: 1234,
+            },
+            results: [{
+                doc_id: "123",
+                domain: "google.com",
+                title: "This is an example title",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "https://google.com/this/is/a/path",
+                url: "https://google.com/this/is/a/path",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "example.com",
+                title: "This is an example title",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "https://example.com/this/is/a/path",
+                url: "https://example.com/this/is/a/path",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "example.com",
+                title: "This is an example super long title to demonstrate very long titles that go on for a very long time and then some.",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "https://example.com/this/is/a/path",
+                url: "https://example.com/this/is/a/path",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "localhost",
+                title: "README.md",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
+                url: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "drive.google.com",
+                title: "API Example Doc",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "api://drive.google.com/24938aslkdj-313-19384",
+                url: "https://example.com/this/is/a/path",
+                score: 1.0
+            }]
+        };
     } else if (func_name == "search_lenses") {
         return [{
             author: "a5huynh",

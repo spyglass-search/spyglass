@@ -1,3 +1,4 @@
+use num_format::{Buffer, Locale};
 use gloo::timers::callback::Timeout;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
@@ -6,7 +7,7 @@ use yew::{html::Scope, prelude::*};
 
 use shared::{
     event::{ClientEvent, ClientInvoke},
-    response,
+    response::{self, SearchResults, SearchMeta},
 };
 
 use crate::components::{
@@ -41,13 +42,14 @@ pub enum Msg {
     SearchLenses,
     UpdateLensResults(Vec<response::LensResult>),
     UpdateQuery(String),
-    UpdateDocsResults(Vec<response::SearchResult>),
+    UpdateDocsResults(SearchResults),
 }
 pub struct SearchPage {
     lens: Vec<String>,
     docs_results: Vec<response::SearchResult>,
     lens_results: Vec<response::LensResult>,
     result_display: ResultDisplay,
+    search_meta: Option<SearchMeta>,
     search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
     selected_idx: usize,
@@ -156,6 +158,7 @@ impl Component for SearchPage {
             docs_results: Vec::new(),
             lens_results: Vec::new(),
             result_display: ResultDisplay::None,
+            search_meta: None,
             search_wrapper_ref: NodeRef::default(),
             search_input_ref: NodeRef::default(),
             selected_idx: 0,
@@ -170,6 +173,7 @@ impl Component for SearchPage {
             Msg::ClearResults => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
+                self.search_meta = None;
                 self.result_display = ResultDisplay::None;
                 self.request_resize();
                 true
@@ -177,6 +181,7 @@ impl Component for SearchPage {
             Msg::ClearQuery => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
+                self.search_meta = None;
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
                     el.set_value("");
@@ -284,9 +289,12 @@ impl Component for SearchPage {
 
                 link.send_future(async move {
                     match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
-                        Ok(results) => Msg::UpdateDocsResults(
-                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
-                        ),
+                        Ok(results) => {
+                            match serde_wasm_bindgen::from_value(results) {
+                                Ok(deser) => Msg::UpdateDocsResults(deser),
+                                Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                            }
+                        },
                         Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                     }
                 });
@@ -301,7 +309,8 @@ impl Component for SearchPage {
                 true
             }
             Msg::UpdateDocsResults(results) => {
-                self.docs_results = results;
+                self.docs_results = results.results;
+                self.search_meta = Some(results.meta);
                 self.lens_results.clear();
                 self.result_display = ResultDisplay::Docs;
                 self.request_resize();
@@ -364,6 +373,25 @@ impl Component for SearchPage {
             }
         };
 
+        let search_meta = if let Some(meta) = &self.search_meta {
+            let mut num_docs = Buffer::default();
+            num_docs.write_formatted(&meta.num_docs, &Locale::en);
+
+            let mut wall_time = Buffer::default();
+            wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
+
+            html! {
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2">
+                    {"Searched "}
+                    <span class="text-cyan-600">{num_docs}</span>
+                    {" documents in "}
+                    <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                </div>
+            }
+        } else {
+            html! {}
+        };
+
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative overflow-hidden rounded-xl border-neutral-600 border">
                 <div class="flex flex-nowrap w-full">
@@ -383,6 +411,7 @@ impl Component for SearchPage {
                 <div class="overflow-y-auto overflow-x-hidden h-full">
                     {results}
                 </div>
+                {search_meta}
             </div>
         }
     }
