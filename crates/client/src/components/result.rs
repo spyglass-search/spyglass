@@ -70,8 +70,12 @@ fn render_metadata(result: &SearchResult) -> Html {
                         .map(|f| f.to_string())
                         .collect::<Vec<String>>();
 
-                    // TODO: Only show last X path segments
-                    let _num_segs = segs.len();
+                    let num_segs = segs.len();
+                    if num_segs > 3 {
+                        segs = segs[(num_segs - 1 - 3)..].to_vec();
+                        segs.insert(0, "...".to_string());
+                    }
+
                     segs.pop();
                     segs.join(" › ")
                 } else {
