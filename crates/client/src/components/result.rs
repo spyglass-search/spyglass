@@ -139,7 +139,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         <div id={props.id.clone()} class={component_styles}>
             <div class="flex flex-none bg-neutral-700 rounded h-12 w-12 items-center">{icon}</div>
             <div class="grow">
-                <h2 class="text-lg truncate font-bold w-96">
+                <h2 class="text-lg truncate font-bold w-[30rem]">
                     <a href={result.url.clone()}>{result.title.clone()}</a>
                 </h2>
                 {metadata}
