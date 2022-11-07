@@ -243,7 +243,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let _ = open::that(shared::constants::DISCORD_JOIN_URL);
                         }
                         // Just metainfo
-                        MenuID::NUM_DOCS => {},
                         MenuID::VERSION => {},
                     }
                 }
