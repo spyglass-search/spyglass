@@ -194,13 +194,12 @@ export let invoke = async (func_name, params) => {
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
         return "Reticulating splines...";
     } else if (func_name == "authorize_connection") {
-        if (params.id == "api.google.com") {
-            await new Promise(r => setTimeout(r, 5000));
-        } else if (params.id == "api.examples.com") {
+        if (params.id == "api.examples.com") {
             await new Promise(r => setTimeout(r, 5000));
             throw 'Unable to connect';
+        } else {
+            await new Promise(r => setTimeout(r, 5000));
         }
-
         return [];
     }
 

@@ -15,11 +15,13 @@ struct ConnectionStatus {
 }
 
 pub struct ConnectionsManagerPage {
+    supported_map: HashMap<String, SupportedConnection>,
     supported_connections: Vec<SupportedConnection>,
     user_connections: Vec<UserConnection>,
     conn_status: ConnectionStatus,
     fetch_error: String,
     fetch_connection_state: RequestState,
+    is_add_view: bool,
     resync_requested: HashSet<String>,
 }
 
@@ -28,11 +30,13 @@ pub struct ConnectionsManagerPage {
 pub enum Msg {
     AuthorizeConnection(String),
     // Received an error authorizing connection
-    AuthError(String, String),
+    AuthError(String),
     // Authorization finished!
-    AuthFinished(String),
+    AuthFinished,
     FetchConnections,
     FetchError(String),
+    StartAdd,
+    CancelAdd,
     RevokeConnection(String),
     ResyncConnection(String),
     UpdateConnections(ListConnectionResult),
@@ -72,6 +76,87 @@ impl ConnectionsManagerPage {
             html! { <icons::ShareIcon height="h-6" width="w-6" /> }
         }
     }
+
+    fn add_view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+
+        let conns = self
+            .supported_connections
+            .iter()
+            .map(|con| {
+                let auth_msg = Msg::AuthorizeConnection(con.id.clone());
+                // Annoyingly we need to use Google branded icons for the connection
+                // button.
+                let connect_btn = if con.id.ends_with("google.com") {
+                    html! {
+                        <button
+                            disabled={self.conn_status.is_authorizing.in_progress()}
+                            onclick={link.callback(move |_| auth_msg.clone())}
+                        >
+                            {
+                                if self.conn_status.is_authorizing.in_progress() {
+                                    html!{ <icons::GoogleSignInDisabled width="w-auto" height="h-10" /> }
+                                } else {
+                                    html!{ <icons::GoogleSignIn width="w-auto" height="h-10" /> }
+                                }
+                            }
+                        </button>
+                    }
+                } else {
+                    html! {
+                        <btn::Btn
+                            disabled={self.conn_status.is_authorizing.in_progress()}
+                            onclick={link.callback(move |_| auth_msg.clone())}
+                        >
+                            <icons::LightningBoltIcon classes="mr-2" width="w-4" height="h-4" />
+                            {"Connect"}
+                        </btn::Btn>
+                    }
+                };
+
+                html! {
+                    <div class="pb-8 flex flex-row items-center gap-8">
+                        <div class="flex-none">
+                            {self.connection_icon(&con.id)}
+                        </div>
+                        <div class="flex-1">
+                            <div><h2 class="text-lg">{con.label.clone()}</h2></div>
+                            <div class="text-xs text-neutral-400">{con.description.clone()}</div>
+                        </div>
+                        <div class="flex-none flex flex-col">
+                            <div class="ml-auto">{connect_btn}</div>
+                        </div>
+                    </div>
+                }
+            })
+            .collect::<Html>();
+
+        html! {
+            <div>
+                <Header label="Connections">
+                    <btn::Btn onclick={link.callback(|_| Msg::CancelAdd)}>{"Cancel"}</btn::Btn>
+                </Header>
+                <div class="px-8 py-4 bg-neutral-800">
+                    <div class="mb-4 text">
+                    {
+                        match self.conn_status.is_authorizing {
+                            RequestState::Error => html! {
+                                <span class="text-red-400">{self.conn_status.error.clone()}</span>
+                            },
+                            RequestState::InProgress => html! {
+                                <span class="text-cyan-500">
+                                    <div>{"Sign-in has opened in a new window. Please authorize to complete connection."}</div>
+                                </span>
+                            },
+                            _ => { html! {} }
+                        }
+                    }
+                    </div>
+                    {conns}
+                </div>
+            </div>
+        }
+    }
 }
 
 impl Component for ConnectionsManagerPage {
@@ -96,12 +181,17 @@ impl Component for ConnectionsManagerPage {
         }
 
         Self {
-            conn_status: ConnectionStatus { is_authorizing: RequestState::NotStarted, error: "".to_string() },
+            conn_status: ConnectionStatus {
+                is_authorizing: RequestState::NotStarted,
+                error: "".to_string(),
+            },
             fetch_connection_state: RequestState::NotStarted,
             fetch_error: String::new(),
             resync_requested: HashSet::new(),
             supported_connections: Vec::new(),
+            supported_map: HashMap::new(),
             user_connections: Vec::new(),
+            is_add_view: false,
         }
     }
 
@@ -109,13 +199,10 @@ impl Component for ConnectionsManagerPage {
         let link = ctx.link();
         match msg {
             Msg::AuthorizeConnection(id) => {
-                if let Some(status) = self.conn_status.get_mut(&id) {
-                    status.is_authorizing = RequestState::InProgress;
-                }
+                self.conn_status.is_authorizing = RequestState::InProgress;
 
                 link.send_future(async move {
                     let id = id.clone();
-
                     let ser =
                         serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
                             .expect("Unable to serialize authorize connection params");
@@ -125,26 +212,23 @@ impl Component for ConnectionsManagerPage {
                         let msg = err
                             .as_string()
                             .unwrap_or_else(|| "Unable to connect. Please try again.".to_string());
-                        Msg::AuthError(id.clone(), msg)
+                        Msg::AuthError(msg)
                     } else {
-                        Msg::AuthFinished(id.clone())
+                        Msg::AuthFinished
                     }
                 });
 
                 true
             }
-            Msg::AuthError(id, error) => {
-                if let Some(status) = self.conn_status.get_mut(&id) {
-                    status.is_authorizing = RequestState::Error;
-                    status.error = error;
-                }
+            Msg::AuthError(error) => {
+                self.conn_status.is_authorizing = RequestState::Error;
+                self.conn_status.error = error;
                 true
             }
-            Msg::AuthFinished(id) => {
-                if let Some(status) = self.conn_status.get_mut(&id) {
-                    status.is_authorizing = RequestState::Finished;
-                    link.send_message(Msg::FetchConnections);
-                }
+            Msg::AuthFinished => {
+                self.conn_status.is_authorizing = RequestState::Finished;
+                self.is_add_view = false;
+                link.send_message(Msg::FetchConnections);
                 false
             }
             Msg::FetchConnections => {
@@ -196,113 +280,50 @@ impl Component for ConnectionsManagerPage {
             Msg::UpdateConnections(conns) => {
                 self.fetch_connection_state = RequestState::Finished;
                 self.supported_connections = conns.supported.clone();
-                self.user_connections = conns.user_connections.clone();
+                self.supported_map.clear();
+                for conn in &self.supported_connections {
+                    self.supported_map.insert(conn.id.clone(), conn.clone());
+                }
 
+                self.user_connections = conns.user_connections;
+
+                true
+            }
+            Msg::StartAdd => {
+                self.is_add_view = true;
+                true
+            }
+            Msg::CancelAdd => {
+                self.is_add_view = false;
                 true
             }
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
-        let conns = self.user_connections.iter()
-            .map(|con| {
-                let status = self.conn_status.get(&con.id).expect("Unknown connection");
-                let auth_msg = Msg::AuthorizeConnection(con.id.clone());
-                // let revoke_msg = Msg::RevokeConnection(status.metadata.id.clone());
-                let resync_msg = Msg::ResyncConnection(con.id.clone());
-                let resynced = self.resync_requested.contains(&con.id.clone());
+        if self.is_add_view {
+            return self.add_view(ctx);
+        }
 
-                let connect_btn = if con.is_connected {
-                    html! {
-                        <div class="flex flex-row gap-4">
-                            <btn::Btn onclick={link.callback(move |_| resync_msg.clone())} disabled={resynced}>
-                                <icons::RefreshIcon classes="mr-2" width="w-4" height="h-4" />
-                                {"Resync"}
-                            </btn::Btn>
-                            // <btn::Btn onclick={link.callback(move |_| revoke_msg.clone())}>
-                            //     <icons::XCircle classes="mr-2" width="w-4" height="h-4" />
-                            //     {"Revoke"}
-                            // </btn::Btn>
-                        </div>
-                    }
-                // Annoyingly we need to use Google branded icons for the connection
-                // button.
-                } else if con.id.ends_with("google.com") {
-                    html! {
-                        <button
-                            disabled={status.is_authorizing.in_progress()}
-                            onclick={link.callback(move |_| auth_msg.clone())}
-                        >
-                            {
-                                if status.is_authorizing.in_progress() {
-                                    html! {
-                                        <icons::GoogleSignInDisabled width="w-auto" height="h-10" />
-                                    }
-                                } else {
-                                    html! {
-                                        <icons::GoogleSignIn width="w-auto" height="h-10" />
-                                    }
-                                }
-                            }
-                        </button>
-                    }
-                } else {
-                    html! {
-                        <btn::Btn
-                            disabled={status.is_authorizing.in_progress()}
-                            onclick={link.callback(move |_| auth_msg.clone())}
-                        >
-                            {
-                                if status.is_authorizing.in_progress() {
-                                    html! {
-                                        <>
-                                            <icons::RefreshIcon animate_spin={true} classes="mr-2" width="w-4" height="h-4" />
-                                            {"Connecting"}
-                                        </>
-                                    }
-                                } else {
-                                    html! {
-                                        <>
-                                            <icons::LightningBoltIcon classes="mr-2" width="w-4" height="h-4" />
-                                            {"Connect"}
-                                        </>
-                                    }
-                                }
-                            }
-                        </btn::Btn>
-                    }
-                };
+        let link = ctx.link();
+        let conns = self
+            .user_connections
+            .iter()
+            .map(|conn| {
+                let label = self
+                    .supported_map
+                    .get(&conn.id)
+                    .map(|m| m.label.clone())
+                    .unwrap_or_else(|| conn.id.clone());
 
                 html! {
-                    <div class="pb-8 flex flex-row items-center gap-8">
-                        <div class="flex-none">
-                            {self.connection_icon(&con.id)}
+                    <>
+                        <div>{label}</div>
+                        <div>{conn.account.clone()}</div>
+                        <div class="place-self-end">
+                            <icons::TrashIcon width="w-4" height="h-4" />
                         </div>
-                        <div class="flex-1">
-                            <div><h2 class="text-lg">{con.label.clone()}</h2></div>
-                            <div class="text-xs text-neutral-400">{con.description.clone()}</div>
-                            <div class="mt-1 text-xs">
-                            {
-                                match status.is_authorizing {
-                                    RequestState::Error => html! {
-                                        <span class="text-red-400">{status.error.clone()}</span>
-                                    },
-                                    RequestState::InProgress => html! {
-                                        <span class="text-cyan-500">
-                                            <div>{"Sign-in has opened in a new window."}</div>
-                                            <div>{"Please authorize to complete connection."}</div>
-                                        </span>
-                                    },
-                                    _ => html! {}
-                                }
-                            }
-                            </div>
-                        </div>
-                        <div class="flex-none flex flex-col">
-                            <div class="ml-auto">{connect_btn}</div>
-                        </div>
-                    </div>
+                    </>
                 }
             })
             .collect::<Html>();
@@ -310,9 +331,13 @@ impl Component for ConnectionsManagerPage {
         html! {
             <div>
                 <Header label="Connections">
+                    <btn::Btn onclick={link.callback(|_| Msg::StartAdd)}>{"Add Connection"}</btn::Btn>
                 </Header>
-                <div class="p-8 bg-neutral-800">
-                    {conns}
+                <div class="px-8 py-4 bg-neutral-800">
+                    <div class="font-bold mb-2">{"Connected Accounts"}</div>
+                    <div class="grid grid-cols-3 gap-4 content-center text-xs border-1 rounded-md bg-stone-700 p-2">
+                        {conns}
+                    </div>
                 </div>
             </div>
         }

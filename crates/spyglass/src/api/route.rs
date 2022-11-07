@@ -14,8 +14,8 @@ use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
 use shared::response::{
-    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, QueueStatus,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults,
+    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
+    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 use spyglass_plugin::SearchFilter;
 
@@ -226,28 +226,33 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 }
 
 #[instrument(skip(state))]
-pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
-    if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
-        // TODO: Move this into a config / db table?
-        let mut all_conns = oauth::supported_connections();
+pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, Error> {
+    match connection::Entity::find().all(&state.db).await {
+        Ok(enabled) => {
+            // TODO: Move this into a config / db table?
+            let all_conns = oauth::supported_connections();
+            let mut sorted = all_conns
+                .values()
+                .cloned()
+                .collect::<Vec<SupportedConnection>>();
+            sorted.sort_by(|a, b| a.label.cmp(&b.label));
 
-        // Get list of enabled connections
-        enabled.iter().for_each(|conn| {
-            if let Some(res) = all_conns.get_mut(&conn.id) {
-                res.is_connected = true;
-                res.scopes = conn.scopes.scopes.clone();
-            }
-        });
+            // Get list of enabled connections
+            let user_conns = enabled
+                .iter()
+                .map(|conn| UserConnection {
+                    id: conn.id.clone(),
+                    account: conn.account.clone(),
+                })
+                .collect();
 
-        let mut sorted = all_conns
-            .values()
-            .cloned()
-            .collect::<Vec<ConnectionResult>>();
-        sorted.sort_by(|a, b| a.label.cmp(&b.label));
-        return Ok(sorted);
+            Ok(ListConnectionResult {
+                supported: sorted,
+                user_connections: user_conns,
+            })
+        }
+        Err(err) => Err(Error::Custom(err.to_string())),
     }
-
-    Ok(Vec::new())
 }
 
 /// List of installed lenses

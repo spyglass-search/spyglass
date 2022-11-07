@@ -44,7 +44,7 @@ impl RpcServer for SpyglassRpc {
         route::delete_domain(self.state.clone(), domain).await
     }
 
-    async fn list_connections(&self) -> Result<Vec<resp::ConnectionResult>, Error> {
+    async fn list_connections(&self) -> Result<resp::ListConnectionResult, Error> {
         route::list_connections(self.state.clone()).await
     }
 

@@ -265,11 +265,11 @@ pub async fn list_connections(
             Ok(connections) => Ok(connections),
             Err(err) => {
                 log::error!("list_connections err: {}", err.to_string());
-                return Err(err.to_string());
+                Err(err.to_string())
             }
         }
     } else {
-        return Err("Unable to communicate w/ backend".to_string());
+        Err("Unable to communicate w/ backend".to_string())
     }
 }
 
