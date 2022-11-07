@@ -60,11 +60,12 @@ impl RpcServer for SpyglassRpc {
         route::recrawl_domain(self.state.clone(), domain).await
     }
 
-    async fn resync_connection(&self, id: String) -> Result<(), Error> {
+    async fn resync_connection(&self, id: String, account: String) -> Result<(), Error> {
         let _ = self
             .state
             .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
                 connection_id: id,
+                account,
             }))
             .await;
 

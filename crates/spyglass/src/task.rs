@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
 
-use crate::connection::{Connection, DriveConnection};
+use crate::connection::{gdrive::DriveConnection, Connection};
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
@@ -30,6 +30,7 @@ pub enum CollectTask {
     // Connects to an integration and discovers all the crawlable URIs
     ConnectionSync {
         connection_id: String,
+        account: String,
     },
 }
 
@@ -192,12 +193,15 @@ pub async fn worker_task(
                             }
                         });
                     }
-                    CollectTask::ConnectionSync { connection_id } => {
+                    CollectTask::ConnectionSync {
+                        connection_id,
+                        account,
+                    } => {
                         log::debug!("handling ConnectionSync for {}", connection_id);
                         let state = state.clone();
                         tokio::spawn(async move {
                             // TODO: dynamic dispatch based on connection id
-                            match DriveConnection::new(&state).await {
+                            match DriveConnection::new(&state, &account).await {
                                 Ok(mut conn) => {
                                     conn.sync(&state).await;
                                 }

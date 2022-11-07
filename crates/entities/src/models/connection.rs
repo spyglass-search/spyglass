@@ -12,6 +12,8 @@ pub struct Scopes {
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
+    // Account email/id associated w/ this credential.
+    pub account: String,
     // access/refresh token used for authentication.
     pub access_token: String,
     pub refresh_token: Option<String>,
@@ -50,6 +52,7 @@ impl ActiveModelBehavior for ActiveModel {
 impl ActiveModel {
     pub fn new(
         id: String,
+        account: String,
         access_token: String,
         refresh_token: Option<String>,
         expires_in: Option<i64>,
@@ -57,6 +60,7 @@ impl ActiveModel {
     ) -> Self {
         Self {
             id: Set(id),
+            account: Set(account),
             access_token: Set(access_token),
             refresh_token: Set(refresh_token),
             scopes: Set(Scopes { scopes }),
@@ -68,6 +72,14 @@ impl ActiveModel {
     }
 }
 
-pub async fn get_by_id(db: &DatabaseConnection, id: &str) -> Result<Option<Model>, sea_orm::DbErr> {
-    Entity::find_by_id(id.to_string()).one(db).await
+pub async fn get_by_id(
+    db: &DatabaseConnection,
+    id: &str,
+    account: &str,
+) -> Result<Option<Model>, sea_orm::DbErr> {
+    Entity::find()
+        .filter(Column::Id.eq(id))
+        .filter(Column::Account.eq(account))
+        .one(db)
+        .await
 }

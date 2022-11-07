@@ -71,25 +71,32 @@ export let invoke = async (func_name, params) => {
             download_url: null,
         }];
     } else if (func_name == "list_connections") {
-        return [{
-            id: "api.github.com",
-            label: "GitHub",
-            description: "Search through your GitHub repositories, starred repositories, and follows",
-            scopes: [],
-            is_connected: true,
-        }, {
-            id: "api.google.com",
-            label: "Google Services",
-            description: "Adds indexing support for Google services. This includes Gmail, Google Drive documents, and Google Calendar events",
-            scopes: [],
-            is_connected: false,
-        }, {
-            id: "api.examples.com",
-            label: "Error Test",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            scopes: [],
-            is_connected: false,
-        }];
+        return {
+            supported: [{
+                id: "api.github.com",
+                label: "GitHub",
+                description: "Search through your GitHub repositories, starred repositories, and follows",
+            }, {
+                id: "calendar.google.com",
+                label: "Google Calendar",
+                description: "Adds indexing support for Google Calendar events.",
+            }, {
+                id: "drive.google.com",
+                label: "Google Drive",
+                description: "Adds indexing support for Google Drive documents.",
+            }, {
+                id: "api.examples.com",
+                label: "Error Test",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            }],
+            user_connections: [{
+                id: "drive.google.com",
+                account: "a5.t.huynh@gmail.com"
+            }, {
+                id: "drive.google.com",
+                account: "andrew@spyglass.fyi"
+            }]
+        };
     } else if (func_name == "plugin:lens-updater|list_installed_lenses") {
         return [{
             author: "a5huynh",

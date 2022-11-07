@@ -1,3 +1,5 @@
+use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke};
+use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
 use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -6,10 +8,6 @@ use yew::prelude::*;
 use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
 use crate::{invoke, listen};
-use shared::{
-    event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke},
-    response::ConnectionResult,
-};
 
 struct ConnectionStatus {
     is_authorizing: RequestState,
@@ -17,8 +15,9 @@ struct ConnectionStatus {
 }
 
 pub struct ConnectionsManagerPage {
-    connections: Vec<ConnectionResult>,
-    conn_status: HashMap<String, ConnectionStatus>,
+    supported_connections: Vec<SupportedConnection>,
+    user_connections: Vec<UserConnection>,
+    conn_status: ConnectionStatus,
     fetch_error: String,
     fetch_connection_state: RequestState,
     resync_requested: HashSet<String>,
@@ -36,11 +35,11 @@ pub enum Msg {
     FetchError(String),
     RevokeConnection(String),
     ResyncConnection(String),
-    UpdateConnections(Vec<ConnectionResult>),
+    UpdateConnections(ListConnectionResult),
 }
 
 impl ConnectionsManagerPage {
-    pub async fn fetch_connections() -> Result<Vec<ConnectionResult>, String> {
+    pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
         match invoke(ClientInvoke::ListConnections.as_ref(), JsValue::NULL).await {
             Ok(results) => match serde_wasm_bindgen::from_value(results) {
                 Ok(parsed) => Ok(parsed),
@@ -97,11 +96,12 @@ impl Component for ConnectionsManagerPage {
         }
 
         Self {
-            connections: Vec::new(),
-            conn_status: HashMap::new(),
+            conn_status: ConnectionStatus { is_authorizing: RequestState::NotStarted, error: "".to_string() },
             fetch_connection_state: RequestState::NotStarted,
             fetch_error: String::new(),
             resync_requested: HashSet::new(),
+            supported_connections: Vec::new(),
+            user_connections: Vec::new(),
         }
     }
 
@@ -195,19 +195,8 @@ impl Component for ConnectionsManagerPage {
             }
             Msg::UpdateConnections(conns) => {
                 self.fetch_connection_state = RequestState::Finished;
-                self.connections = conns.clone();
-                self.conn_status = conns
-                    .iter()
-                    .map(|conn| {
-                        (
-                            conn.id.clone(),
-                            ConnectionStatus {
-                                is_authorizing: RequestState::NotStarted,
-                                error: String::new(),
-                            },
-                        )
-                    })
-                    .collect::<HashMap<String, ConnectionStatus>>();
+                self.supported_connections = conns.supported.clone();
+                self.user_connections = conns.user_connections.clone();
 
                 true
             }
@@ -216,7 +205,7 @@ impl Component for ConnectionsManagerPage {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
-        let conns = self.connections.iter()
+        let conns = self.user_connections.iter()
             .map(|con| {
                 let status = self.conn_status.get(&con.id).expect("Unknown connection");
                 let auth_msg = Msg::AuthorizeConnection(con.id.clone());

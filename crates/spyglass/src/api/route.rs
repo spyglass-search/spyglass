@@ -19,7 +19,7 @@ use shared::response::{
 };
 use spyglass_plugin::SearchFilter;
 
-use libgoog::{Credentials, GoogClient};
+use libgoog::{ClientType, Credentials, GoogClient};
 use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
@@ -61,7 +61,13 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
 
     if let Some((client_id, client_secret, scopes)) = connection_secret(&id) {
         let mut listener = create_auth_listener().await;
-        let client = GoogClient::new(
+        let client_type = match id.as_str() {
+            "calendar.google.com" => ClientType::Calendar,
+            "drive.google.com" => ClientType::Drive,
+            _ => ClientType::Drive,
+        };
+        let mut client = GoogClient::new(
+            client_type,
             &client_id,
             &client_secret,
             &format!("http://127.0.0.1:{}", listener.port()),
@@ -81,9 +87,16 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                 Ok(token) => {
                     let mut creds = Credentials::default();
                     creds.refresh_token(&token);
+                    let _ = client.set_credentials(&creds);
+
+                    let user = client
+                        .get_user()
+                        .await
+                        .expect("Unable to get account information");
 
                     let new_conn = connection::ActiveModel::new(
                         id.clone(),
+                        user.email.clone(),
                         creds.access_token.secret().to_string(),
                         creds.refresh_token.map(|t| t.secret().to_string()),
                         creds
@@ -96,6 +109,7 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                     let _ = state
                         .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
                             connection_id: id,
+                            account: user.email,
                         }))
                         .await;
                 }
