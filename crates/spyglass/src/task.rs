@@ -5,6 +5,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
 
+use crate::connection::gcal::GCalConnection;
 use crate::connection::{gdrive::DriveConnection, Connection};
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
@@ -29,7 +30,7 @@ pub enum CollectTask {
     },
     // Connects to an integration and discovers all the crawlable URIs
     ConnectionSync {
-        connection_id: String,
+        api_id: String,
         account: String,
     },
 }
@@ -193,21 +194,29 @@ pub async fn worker_task(
                             }
                         });
                     }
-                    CollectTask::ConnectionSync {
-                        connection_id,
-                        account,
-                    } => {
-                        log::debug!("handling ConnectionSync for {}", connection_id);
+                    CollectTask::ConnectionSync { api_id, account } => {
+                        log::debug!("handling ConnectionSync for {}", api_id);
                         let state = state.clone();
                         tokio::spawn(async move {
                             // TODO: dynamic dispatch based on connection id
-                            match DriveConnection::new(&state, &account).await {
+                            let conn: Result<Box<dyn Connection + Send>, _> = match api_id.as_str()
+                            {
+                                "calendar.google.com" => Ok(Box::new(
+                                    GCalConnection::new(&state, &account).await.unwrap(),
+                                )),
+                                "drive.google.com" => Ok(Box::new(
+                                    DriveConnection::new(&state, &account).await.unwrap(),
+                                )),
+                                _ => Err(anyhow::anyhow!("Not suppported connection")),
+                            };
+
+                            match conn {
                                 Ok(mut conn) => {
-                                    conn.sync(&state).await;
+                                    conn.as_mut().sync(&state).await;
                                 }
                                 Err(err) => log::error!(
                                     "Unable to sync w/ connection: {} - {}",
-                                    connection_id,
+                                    api_id,
                                     err.to_string()
                                 ),
                             }

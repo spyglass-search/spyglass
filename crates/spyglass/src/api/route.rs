@@ -56,12 +56,12 @@ pub async fn add_queue(
 }
 
 #[instrument(skip(state))]
-pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
-    log::debug!("authorizing <{}>", id);
+pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(), Error> {
+    log::debug!("authorizing <{}>", api_id);
 
-    if let Some((client_id, client_secret, scopes)) = connection_secret(&id) {
+    if let Some((client_id, client_secret, scopes)) = connection_secret(&api_id) {
         let mut listener = create_auth_listener().await;
-        let client_type = match id.as_str() {
+        let client_type = match api_id.as_str() {
             "calendar.google.com" => ClientType::Calendar,
             "drive.google.com" => ClientType::Drive,
             _ => ClientType::Drive,
@@ -95,7 +95,7 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                         .expect("Unable to get account information");
 
                     let new_conn = connection::ActiveModel::new(
-                        id.clone(),
+                        api_id.clone(),
                         user.email.clone(),
                         creds.access_token.secret().to_string(),
                         creds.refresh_token.map(|t| t.secret().to_string()),
@@ -108,7 +108,7 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                     log::debug!("saved connection: {:?}", res);
                     let _ = state
                         .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
-                            connection_id: id,
+                            api_id,
                             account: user.email,
                         }))
                         .await;
@@ -119,7 +119,10 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
 
         Ok(())
     } else {
-        Err(Error::Custom(format!("Connection <{}> not supported", id)))
+        Err(Error::Custom(format!(
+            "Connection <{}> not supported",
+            api_id
+        )))
     }
 }
 
@@ -241,7 +244,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
             let user_conns = enabled
                 .iter()
                 .map(|conn| UserConnection {
-                    id: conn.id.clone(),
+                    id: conn.api_id.clone(),
                     account: conn.account.clone(),
                 })
                 .collect();

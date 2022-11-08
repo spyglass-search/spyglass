@@ -11,7 +11,7 @@ pub mod gdrive;
 pub trait Connection {
     fn id() -> String
     where
-        Self: Sized;
+        Self: Sized + Send;
 
     /// Identifying user/account that this connection is for.
     fn user(&self) -> String;

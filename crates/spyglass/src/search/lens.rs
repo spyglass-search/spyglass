@@ -60,11 +60,13 @@ pub async fn load_lenses(state: AppState) {
             let pipeline_kind = lens.pipeline.as_ref().cloned();
 
             let seed_url = format!("https://{}", domain);
-            let _ = state.schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
-                lens: lens.name.clone(),
-                seed_url,
-                pipeline: pipeline_kind.clone(),
-            })).await;
+            let _ = state
+                .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
+                    lens: lens.name.clone(),
+                    seed_url,
+                    pipeline: pipeline_kind.clone(),
+                }))
+                .await;
         }
 
         process_urls(&lens, &state).await;
@@ -99,11 +101,13 @@ pub async fn process_urls(lens: &LensConfig, state: &AppState) {
             }
         } else {
             // Otherwise, bootstrap using this as a prefix.
-            let _ = state.schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
-                lens: lens.name.clone(),
-                seed_url: prefix.to_string(),
-                pipeline: pipeline_kind.clone(),
-            })).await;
+            let _ = state
+                .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
+                    lens: lens.name.clone(),
+                    seed_url: prefix.to_string(),
+                    pipeline: pipeline_kind.clone(),
+                }))
+                .await;
         }
     }
 }

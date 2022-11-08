@@ -1,4 +1,4 @@
-use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke};
+use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
 use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
 use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
@@ -7,7 +7,7 @@ use yew::prelude::*;
 
 use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
-use crate::{invoke, listen};
+use crate::{listen, tauri_invoke};
 
 struct ConnectionStatus {
     is_authorizing: RequestState,
@@ -37,19 +37,16 @@ pub enum Msg {
     FetchError(String),
     StartAdd,
     CancelAdd,
-    RevokeConnection(String),
-    ResyncConnection(String),
+    RevokeConnection(String, String),
+    ResyncConnection(String, String),
     UpdateConnections(ListConnectionResult),
 }
 
 impl ConnectionsManagerPage {
     pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
-        match invoke(ClientInvoke::ListConnections.as_ref(), JsValue::NULL).await {
-            Ok(results) => match serde_wasm_bindgen::from_value(results) {
-                Ok(parsed) => Ok(parsed),
-                Err(err) => Err(err.to_string()),
-            },
-            Err(e) => Err(format!("Error fetching connections: {:?}", e.as_string())),
+        match tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await {
+            Ok(results) => Ok(results),
+            Err(e) => Err(format!("Error fetching connections: {:?}", e)),
         }
     }
 
@@ -203,16 +200,13 @@ impl Component for ConnectionsManagerPage {
 
                 link.send_future(async move {
                     let id = id.clone();
-                    let ser =
-                        serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
-                            .expect("Unable to serialize authorize connection params");
-
-                    if let Err(err) = invoke(ClientInvoke::AuthorizeConnection.as_ref(), ser).await
+                    if let Err(err) = tauri_invoke::<_, String>(
+                        ClientInvoke::AuthorizeConnection,
+                        &AuthorizeConnectionParams { id: id.clone() },
+                    )
+                    .await
                     {
-                        let msg = err
-                            .as_string()
-                            .unwrap_or_else(|| "Unable to connect. Please try again.".to_string());
-                        Msg::AuthError(msg)
+                        Msg::AuthError(err)
                     } else {
                         Msg::AuthFinished
                     }
@@ -251,30 +245,37 @@ impl Component for ConnectionsManagerPage {
                 self.fetch_error = error;
                 true
             }
-            Msg::RevokeConnection(id) => {
-                let ser = serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id })
-                    .expect("Unable to serialize authorize connection params");
-
-                link.send_future(async {
+            Msg::RevokeConnection(id, account) => {
+                link.send_future(async move {
                     // Revoke & then refresh connections
-                    let _ = invoke(ClientInvoke::RevokeConnection.as_ref(), ser).await;
+                    let _ = tauri_invoke::<_, String>(
+                        ClientInvoke::RevokeConnection,
+                        &ResyncConnectionParams {
+                            id: id.clone(),
+                            account: account.clone(),
+                        },
+                    )
+                    .await;
                     Msg::FetchConnections
                 });
 
                 true
             }
-            Msg::ResyncConnection(id) => {
-                let ser =
-                    serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
-                        .expect("Unable to serialize authorize connection params");
-
-                link.send_future(async {
+            Msg::ResyncConnection(id, account) => {
+                self.resync_requested.insert(format!("{}/{}", id, account));
+                link.send_future(async move {
                     // Revoke & then refresh connections
-                    let _ = invoke(ClientInvoke::ResyncConnection.as_ref(), ser).await;
+                    let _ = tauri_invoke::<_, String>(
+                        ClientInvoke::ResyncConnection,
+                        &ResyncConnectionParams {
+                            id: id.clone(),
+                            account: account.clone(),
+                        },
+                    )
+                    .await;
                     Msg::FetchConnections
                 });
 
-                self.resync_requested.insert(id);
                 true
             }
             Msg::UpdateConnections(conns) => {
@@ -306,27 +307,59 @@ impl Component for ConnectionsManagerPage {
         }
 
         let link = ctx.link();
-        let conns = self
-            .user_connections
-            .iter()
-            .map(|conn| {
-                let label = self
-                    .supported_map
-                    .get(&conn.id)
-                    .map(|m| m.label.clone())
-                    .unwrap_or_else(|| conn.id.clone());
 
-                html! {
-                    <>
-                        <div>{label}</div>
-                        <div>{conn.account.clone()}</div>
-                        <div class="place-self-end">
-                            <icons::TrashIcon width="w-4" height="h-4" />
-                        </div>
-                    </>
-                }
-            })
-            .collect::<Html>();
+        let conns = if self.user_connections.is_empty() {
+            html! {
+                <div class="col-span-3 text-neutral-300">{"Add a connection to get started!"}</div>
+            }
+        } else {
+            self
+                .user_connections
+                .iter()
+                .map(|conn| {
+                    let label = self
+                        .supported_map
+                        .get(&conn.id)
+                        .map(|m| m.label.clone())
+                        .unwrap_or_else(|| conn.id.clone());
+
+                    let resync_id = format!("{}/{}", conn.id, conn.account);
+                    let resync_msg = Msg::ResyncConnection(conn.id.clone(), conn.account.clone());
+
+                    html! {
+                        <>
+                            <div>{label}</div>
+                            <div>{conn.account.clone()}</div>
+                            <div class="place-self-end flex flex-row gap-8">
+                                {
+                                    if self.resync_requested.contains(&resync_id) {
+                                        html! {
+                                            <div class="text-xs text-cyan-500">
+                                                {"Resync Requested"}
+                                            </div>
+                                        }
+                                    } else {
+                                        html! {
+                                            <button
+                                                onclick={link.callback(move |_| resync_msg.clone())}
+                                                class="text-xs flex flex-row gap-2 hover:text-cyan-500"
+                                            >
+                                                <icons::RefreshIcon width="w-4" height="h-4" />
+                                                {"Resync"}
+                                            </button>
+                                        }
+                                    }
+                                }
+                                <button class="text-xs flex flex-row gap-2 hover:text-red-500">
+                                    <icons::TrashIcon width="w-4" height="h-4" />
+                                    {"Delete"}
+                                </button>
+                            </div>
+                        </>
+                    }
+                })
+                .collect::<Html>()
+        };
 
         html! {
             <div>

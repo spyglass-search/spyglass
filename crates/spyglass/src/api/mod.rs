@@ -1,4 +1,4 @@
-use entities::sea_orm::EntityTrait;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
@@ -60,11 +60,11 @@ impl RpcServer for SpyglassRpc {
         route::recrawl_domain(self.state.clone(), domain).await
     }
 
-    async fn resync_connection(&self, id: String, account: String) -> Result<(), Error> {
+    async fn resync_connection(&self, api_id: String, account: String) -> Result<(), Error> {
         let _ = self
             .state
             .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
-                connection_id: id,
+                api_id,
                 account,
             }))
             .await;
@@ -73,8 +73,12 @@ impl RpcServer for SpyglassRpc {
     }
 
     /// Remove connection from list of connections
-    async fn revoke_connection(&self, id: String) -> Result<(), Error> {
-        match entities::models::connection::Entity::delete_by_id(id)
+    async fn revoke_connection(&self, api_id: String, account: String) -> Result<(), Error> {
+        use entities::models::connection;
+
+        match connection::Entity::delete_many()
+            .filter(connection::Column::ApiId.eq(api_id))
+            .filter(connection::Column::Account.eq(account))
             .exec(&self.state.db)
             .await
         {

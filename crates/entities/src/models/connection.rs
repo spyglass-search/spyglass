@@ -10,8 +10,10 @@ pub struct Scopes {
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "connections")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,
+    #[sea_orm(primary_key)]
+    pub id: i64,
+    // Connection ID
+    pub api_id: String,
     // Account email/id associated w/ this credential.
     pub account: String,
     // access/refresh token used for authentication.
@@ -59,7 +61,7 @@ impl ActiveModel {
         scopes: Vec<String>,
     ) -> Self {
         Self {
-            id: Set(id),
+            api_id: Set(id),
             account: Set(account),
             access_token: Set(access_token),
             refresh_token: Set(refresh_token),
@@ -68,6 +70,7 @@ impl ActiveModel {
             granted_at: Set(chrono::Utc::now()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
         }
     }
 }
@@ -78,7 +81,7 @@ pub async fn get_by_id(
     account: &str,
 ) -> Result<Option<Model>, sea_orm::DbErr> {
     Entity::find()
-        .filter(Column::Id.eq(id))
+        .filter(Column::ApiId.eq(id))
         .filter(Column::Account.eq(account))
         .one(db)
         .await

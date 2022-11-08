@@ -45,7 +45,7 @@ pub trait Rpc {
     async fn resync_connection(&self, id: String, account: String) -> Result<(), Error>;
 
     #[method(name = "revoke_connection")]
-    async fn revoke_connection(&self, id: String) -> Result<(), Error>;
+    async fn revoke_connection(&self, id: String, account: String) -> Result<(), Error>;
 
     #[method(name = "search_docs")]
     async fn search_docs(&self, query: SearchParam) -> Result<SearchResults, Error>;
