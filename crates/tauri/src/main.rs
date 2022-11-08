@@ -147,8 +147,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not found");
             window::center_search_bar(&window);
-            // Hide on start.
-            let _ = window.hide();
 
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
@@ -194,6 +192,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
 
+            // Hide searchbar on start.
+            let _ = window.hide();
             Ok(())
         })
         .on_window_event(|event| {
