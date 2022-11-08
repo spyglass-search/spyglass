@@ -234,24 +234,23 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
         Ok(enabled) => {
             // TODO: Move this into a config / db table?
             let all_conns = oauth::supported_connections();
-            let mut sorted = all_conns
+            let supported = all_conns
                 .values()
                 .cloned()
                 .collect::<Vec<SupportedConnection>>();
-            sorted.sort_by(|a, b| a.label.cmp(&b.label));
 
             // Get list of enabled connections
-            let user_conns = enabled
+            let user_connections = enabled
                 .iter()
                 .map(|conn| UserConnection {
                     id: conn.api_id.clone(),
                     account: conn.account.clone(),
                 })
-                .collect();
+                .collect::<Vec<UserConnection>>();
 
             Ok(ListConnectionResult {
-                supported: sorted,
-                user_connections: user_conns,
+                supported,
+                user_connections,
             })
         }
         Err(err) => Err(Error::Custom(err.to_string())),

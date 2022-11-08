@@ -1,6 +1,9 @@
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+
 use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
 use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
-use std::collections::{HashMap, HashSet};
+
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -280,13 +283,21 @@ impl Component for ConnectionsManagerPage {
             }
             Msg::UpdateConnections(conns) => {
                 self.fetch_connection_state = RequestState::Finished;
+
                 self.supported_connections = conns.supported.clone();
+                self.supported_connections
+                    .sort_by(|a, b| a.label.cmp(&b.label));
+
                 self.supported_map.clear();
                 for conn in &self.supported_connections {
                     self.supported_map.insert(conn.id.clone(), conn.clone());
                 }
 
                 self.user_connections = conns.user_connections;
+                self.user_connections.sort_by(|a, b| match a.id.cmp(&b.id) {
+                    Ordering::Equal => a.account.cmp(&b.account),
+                    ord => ord,
+                });
 
                 true
             }
