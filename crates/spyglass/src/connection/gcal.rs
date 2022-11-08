@@ -160,13 +160,32 @@ impl Connection for GCalConnection {
                 .get_calendar_event(&calendar_id, &event_id)
                 .await
             {
-                Ok(event) => Ok(Some(CrawlResult::new(
-                    uri,
-                    Some(event.html_link),
-                    &event.description.unwrap_or_default(),
-                    &event.summary,
-                    None,
-                ))),
+                Ok(event) => {
+                    let content = if event.attendees.is_empty() {
+                        event.description.unwrap_or_default()
+                    } else {
+                        let attendees = event
+                            .attendees
+                            .iter()
+                            .map(|item| format!("{} <{}>", item.email, item.display_name))
+                            .collect::<Vec<String>>()
+                            .join(";");
+
+                        format!(
+                            "Attendees: {}\n{}",
+                            attendees,
+                            &event.description.unwrap_or_default()
+                        )
+                    };
+                    let title = format!("{} ({})", &event.summary, event.start.date);
+                    Ok(Some(CrawlResult::new(
+                        uri,
+                        Some(event.html_link),
+                        &content,
+                        &title,
+                        None,
+                    )))
+                }
                 Err(err) => Err(anyhow::anyhow!(err.to_string())),
             };
         }
