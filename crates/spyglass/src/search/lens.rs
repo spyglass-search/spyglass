@@ -64,7 +64,7 @@ pub async fn load_lenses(state: AppState) {
                 lens: lens.name.clone(),
                 seed_url,
                 pipeline: pipeline_kind.clone(),
-            }));
+            })).await;
         }
 
         process_urls(&lens, &state).await;
@@ -78,7 +78,7 @@ pub async fn process_urls(lens: &LensConfig, state: &AppState) {
     let pipeline_kind = lens.pipeline.as_ref().cloned();
 
     for prefix in lens.urls.iter() {
-        // Handle singular URL matches
+        // Handle singular URL matches. Simply add these to the crawl queue.
         if prefix.ends_with('$') {
             // Remove the '$' suffix and add to the crawl queue
             let url = prefix.strip_suffix('$').expect("No $ at end of prefix");
@@ -98,11 +98,12 @@ pub async fn process_urls(lens: &LensConfig, state: &AppState) {
                 log::warn!("unable to enqueue <{}> due to {}", prefix, err)
             }
         } else {
+            // Otherwise, bootstrap using this as a prefix.
             let _ = state.schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
                 lens: lens.name.clone(),
                 seed_url: prefix.to_string(),
                 pipeline: pipeline_kind.clone(),
-            }));
+            })).await;
         }
     }
 }
