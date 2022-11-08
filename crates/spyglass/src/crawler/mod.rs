@@ -313,7 +313,7 @@ impl Crawler {
 
         match load_connection(state, api_id, &account).await {
             Ok(mut conn) => conn.as_mut().get(uri).await,
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
