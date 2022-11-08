@@ -137,7 +137,7 @@ impl ConnectionsManagerPage {
                     <btn::Btn onclick={link.callback(|_| Msg::CancelAdd)}>{"Cancel"}</btn::Btn>
                 </Header>
                 <div class="px-8 py-4 bg-neutral-800">
-                    <div class="mb-4 text">
+                    <div class="mb-4 text-sm">
                     {
                         match self.conn_status.is_authorizing {
                             RequestState::Error => html! {
@@ -336,7 +336,19 @@ impl Component for ConnectionsManagerPage {
                 <div class="px-8 py-4 bg-neutral-800">
                     <div class="font-bold mb-2">{"Connected Accounts"}</div>
                     <div class="grid grid-cols-3 gap-4 content-center text-xs border-1 rounded-md bg-stone-700 p-2">
-                        {conns}
+                        {
+                            if self.fetch_connection_state.in_progress() {
+                                html! {
+                                    <div class="flex justify-center">
+                                        <div class="p-16">
+                                            <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                                        </div>
+                                    </div>
+                                }
+                            } else {
+                                conns
+                            }
+                        }
                     </div>
                 </div>
             </div>
