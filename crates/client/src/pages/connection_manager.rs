@@ -375,7 +375,7 @@ impl Component for ConnectionsManagerPage {
         html! {
             <div>
                 <Header label="Connections">
-                    <btn::Btn onclick={link.callback(|_| Msg::StartAdd)}>{"Add Connection"}</btn::Btn>
+                    <btn::Btn onclick={link.callback(|_| Msg::StartAdd)}>{"Add"}</btn::Btn>
                 </Header>
                 <div class="px-8 py-4 bg-neutral-800">
                     <div class="font-bold mb-2">{"Connected Accounts"}</div>
