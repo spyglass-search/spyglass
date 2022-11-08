@@ -173,6 +173,7 @@ impl Component for SearchPage {
             Msg::ClearResults => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
+                self.lens_results = Vec::new();
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
                 self.request_resize();
@@ -181,6 +182,7 @@ impl Component for SearchPage {
             Msg::ClearQuery => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
+                self.lens_results = Vec::new();
                 self.search_meta = None;
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
@@ -258,6 +260,12 @@ impl Component for SearchPage {
                                 }
 
                                 return true;
+                            }
+                            "Tab" => {
+                                // Tab completion for len results only
+                                if self.result_display == ResultDisplay::Lens {
+                                    self.handle_selection(link);
+                                }
                             }
                             // everything else
                             _ => {
