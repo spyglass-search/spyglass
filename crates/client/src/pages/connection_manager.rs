@@ -345,8 +345,8 @@ impl Component for ConnectionsManagerPage {
                                 {
                                     if self.resync_requested.contains(&resync_id) {
                                         html! {
-                                            <div class="text-xs text-cyan-500">
-                                                {"Resync Requested"}
+                                            <div class="text-xs text-neutral-500">
+                                                {"Resyncing"}
                                             </div>
                                         }
                                     } else {
