@@ -315,3 +315,17 @@ pub fn file_ext_icon(props: &FileExtIconProps) -> Html {
         }
     }
 }
+
+#[function_component(GoogleSignIn)]
+pub fn google_signin_btn(props: &IconProps) -> Html {
+    html! {
+        <img src="/google_signin.png" class={props.class()} />
+    }
+}
+
+#[function_component(GoogleSignInDisabled)]
+pub fn google_signin_disabled(props: &IconProps) -> Html {
+    html! {
+        <img src="/google_signin_disabled.png" class={props.class()} />
+    }
+}

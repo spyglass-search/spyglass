@@ -4,6 +4,7 @@ use std::path::Path;
 use addr::parse_domain_name;
 use chrono::prelude::*;
 use chrono::Duration;
+use percent_encoding::percent_decode_str;
 use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
 use url::{Host, Url};
@@ -12,7 +13,7 @@ use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use shared::url_to_file_path;
 
-use crate::connection::{Connection, DriveConnection};
+use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
@@ -307,11 +308,13 @@ impl Crawler {
         _: &crawl_queue::Model,
         uri: &Url,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let mut conn = DriveConnection::new(state)
-            .await
-            .expect("Unable to create connection");
+        let account = percent_decode_str(uri.username()).decode_utf8_lossy();
+        let api_id = uri.host_str().unwrap_or_default();
 
-        conn.get(uri).await
+        match load_connection(state, api_id, &account).await {
+            Ok(mut conn) => conn.as_mut().get(uri).await,
+            Err(err) => Err(err),
+        }
     }
 
     async fn handle_file_fetch(

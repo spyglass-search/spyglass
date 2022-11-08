@@ -71,25 +71,35 @@ export let invoke = async (func_name, params) => {
             download_url: null,
         }];
     } else if (func_name == "list_connections") {
-        return [{
-            id: "api.github.com",
-            label: "GitHub",
-            description: "Search through your GitHub repositories, starred repositories, and follows",
-            scopes: [],
-            is_connected: true,
-        }, {
-            id: "api.google.com",
-            label: "Google Services",
-            description: "Adds indexing support for Google services. This includes Gmail, Google Drive documents, and Google Calendar events",
-            scopes: [],
-            is_connected: false,
-        }, {
-            id: "api.examples.com",
-            label: "Error Test",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            scopes: [],
-            is_connected: false,
-        }];
+        return {
+            supported: [{
+                id: "api.github.com",
+                label: "GitHub",
+                description: "Search through your GitHub repositories, starred repositories, and follows",
+            }, {
+                id: "calendar.google.com",
+                label: "Google Calendar",
+                description: "Adds indexing support for Google Calendar events.",
+            }, {
+                id: "drive.google.com",
+                label: "Google Drive",
+                description: "Adds indexing support for Google Drive documents.",
+            }, {
+                id: "api.examples.com",
+                label: "Error Test",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            }],
+            user_connections: [{
+                id: "calendar.google.com",
+                account: "a5.t.huynh@gmail.com"
+            }, {
+                id: "drive.google.com",
+                account: "a5.t.huynh@gmail.com"
+            }, {
+                id: "drive.google.com",
+                account: "andrew@spyglass.fyi"
+            }]
+        };
     } else if (func_name == "plugin:lens-updater|list_installed_lenses") {
         return [{
             author: "a5huynh",
@@ -187,13 +197,12 @@ export let invoke = async (func_name, params) => {
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
         return "Reticulating splines...";
     } else if (func_name == "authorize_connection") {
-        if (params.id == "api.google.com") {
-            await new Promise(r => setTimeout(r, 5000));
-        } else if (params.id == "api.examples.com") {
+        if (params.id == "api.examples.com") {
             await new Promise(r => setTimeout(r, 5000));
             throw 'Unable to connect';
+        } else {
+            await new Promise(r => setTimeout(r, 5000));
         }
-
         return [];
     }
 

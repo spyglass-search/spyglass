@@ -21,12 +21,22 @@ pub struct AppStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ConnectionResult {
+pub struct SupportedConnection {
     pub id: String,
     pub label: String,
     pub description: String,
-    pub scopes: Vec<String>,
-    pub is_connected: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct UserConnection {
+    pub id: String,
+    pub account: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ListConnectionResult {
+    pub supported: Vec<SupportedConnection>,
+    pub user_connections: Vec<UserConnection>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

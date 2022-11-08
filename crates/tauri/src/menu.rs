@@ -11,7 +11,6 @@ pub enum MenuID {
     CRAWL_STATUS,
     DEV_SHOW_CONSOLE,
     JOIN_DISCORD,
-    NUM_DOCS,
     OPEN_CONNECTION_MANAGER,
     OPEN_LENS_MANAGER,
     OPEN_LOGS_FOLDER,
@@ -65,9 +64,6 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
-        .add_item(
-            CustomMenuItem::new(MenuID::NUM_DOCS.to_string(), "XX documents indexed").disabled(),
-        )
         .add_item(CustomMenuItem::new(
             MenuID::SHOW_CRAWL_STATUS.to_string(),
             "Crawl status",

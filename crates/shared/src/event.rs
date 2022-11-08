@@ -64,3 +64,9 @@ pub enum ClientInvoke {
 pub struct AuthorizeConnectionParams {
     pub id: String,
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct ResyncConnectionParams {
+    pub id: String,
+    pub account: String,
+}

@@ -3,7 +3,7 @@ use jsonrpsee::proc_macros::rpc;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, SearchLensesResp,
+    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
     SearchResults,
 };
 
@@ -30,7 +30,7 @@ pub trait Rpc {
     async fn delete_domain(&self, domain: String) -> Result<(), Error>;
 
     #[method(name = "list_connections")]
-    async fn list_connections(&self) -> Result<Vec<ConnectionResult>, Error>;
+    async fn list_connections(&self) -> Result<ListConnectionResult, Error>;
 
     #[method(name = "list_installed_lenses")]
     async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error>;
@@ -42,10 +42,10 @@ pub trait Rpc {
     async fn recrawl_domain(&self, domain: String) -> Result<(), Error>;
 
     #[method(name = "resync_connection")]
-    async fn resync_connection(&self, id: String) -> Result<(), Error>;
+    async fn resync_connection(&self, id: String, account: String) -> Result<(), Error>;
 
     #[method(name = "revoke_connection")]
-    async fn revoke_connection(&self, id: String) -> Result<(), Error>;
+    async fn revoke_connection(&self, id: String, account: String) -> Result<(), Error>;
 
     #[method(name = "search_docs")]
     async fn search_docs(&self, query: SearchParam) -> Result<SearchResults, Error>;

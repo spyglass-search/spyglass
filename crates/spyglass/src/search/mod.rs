@@ -254,7 +254,7 @@ impl Searcher {
             .search(&query, &collector)
             .expect("Unable to execute query");
 
-        log::info!(
+        log::debug!(
             "query `{}` returned {} results from {} docs in {} ms",
             query_string,
             top_docs.len(),
