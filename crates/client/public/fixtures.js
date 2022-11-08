@@ -90,6 +90,9 @@ export let invoke = async (func_name, params) => {
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             }],
             user_connections: [{
+                id: "calendar.google.com",
+                account: "a5.t.huynh@gmail.com"
+            }, {
                 id: "drive.google.com",
                 account: "a5.t.huynh@gmail.com"
             }, {
