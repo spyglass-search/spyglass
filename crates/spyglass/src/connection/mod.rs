@@ -1,3 +1,4 @@
+use anyhow::Result;
 use jsonrpsee::core::async_trait;
 
 use crate::crawler::CrawlResult;
@@ -22,4 +23,20 @@ pub trait Connection {
 
     /// Get raw data for a URI
     async fn get(&mut self, uri: &Url) -> anyhow::Result<Option<CrawlResult>>;
+}
+
+pub async fn load_connection(
+    state: &AppState,
+    api_id: &str,
+    account: &str,
+) -> Result<Box<dyn Connection + Send>> {
+    match api_id {
+        "calendar.google.com" => Ok(Box::new(
+            gcal::GCalConnection::new(state, account).await.unwrap(),
+        )),
+        "drive.google.com" => Ok(Box::new(
+            gdrive::DriveConnection::new(state, account).await.unwrap(),
+        )),
+        _ => Err(anyhow::anyhow!("Not suppported connection")),
+    }
 }

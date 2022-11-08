@@ -5,8 +5,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
 
-use crate::connection::gcal::GCalConnection;
-use crate::connection::{gdrive::DriveConnection, Connection};
+use crate::connection::load_connection;
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
@@ -198,19 +197,7 @@ pub async fn worker_task(
                         log::debug!("handling ConnectionSync for {}", api_id);
                         let state = state.clone();
                         tokio::spawn(async move {
-                            // TODO: dynamic dispatch based on connection id
-                            let conn: Result<Box<dyn Connection + Send>, _> = match api_id.as_str()
-                            {
-                                "calendar.google.com" => Ok(Box::new(
-                                    GCalConnection::new(&state, &account).await.unwrap(),
-                                )),
-                                "drive.google.com" => Ok(Box::new(
-                                    DriveConnection::new(&state, &account).await.unwrap(),
-                                )),
-                                _ => Err(anyhow::anyhow!("Not suppported connection")),
-                            };
-
-                            match conn {
+                            match load_connection(&state, &api_id, &account).await {
                                 Ok(mut conn) => {
                                     conn.as_mut().sync(&state).await;
                                 }

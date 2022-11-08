@@ -13,7 +13,7 @@ use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use shared::url_to_file_path;
 
-use crate::connection::{gdrive::DriveConnection, Connection};
+use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
@@ -309,12 +309,12 @@ impl Crawler {
         uri: &Url,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
         let account = percent_decode_str(uri.username()).decode_utf8_lossy();
+        let api_id = uri.host_str().unwrap_or_default();
 
-        let mut conn = DriveConnection::new(state, &account)
-            .await
-            .expect("Unable to create connection");
-
-        conn.get(uri).await
+        match load_connection(state, api_id, &account).await {
+            Ok(mut conn) => conn.as_mut().get(uri).await,
+            Err(err) => Err(err)
+        }
     }
 
     async fn handle_file_fetch(

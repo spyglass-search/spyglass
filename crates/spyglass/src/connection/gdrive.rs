@@ -72,10 +72,9 @@ impl DriveConnection {
                 });
             }
 
-            let user = client.get_user().await?;
             Ok(Self {
                 client,
-                user: user.email,
+                user: account.to_string(),
             })
         } else {
             Err(anyhow::anyhow!("Connection not supported"))
@@ -85,6 +84,14 @@ impl DriveConnection {
     pub fn is_indexable_mimetype(&self, mime_type: &str) -> bool {
         mime_type == "application/vnd.google-apps.document"
             || mime_type == "application/vnd.google-apps.presentation"
+    }
+
+    pub fn to_url(&self, file_id: &str) -> Url {
+        let mut url_base = Url::parse(&format!("api://{}/{}", &Self::id(), file_id))
+            .expect("Unable to create base URL");
+        let _ = url_base.set_username(&self.user);
+
+        url_base
     }
 }
 
@@ -108,9 +115,6 @@ impl Connection for DriveConnection {
         let mut next_page = None;
         let mut num_files = 0;
 
-        let url_base =
-            Url::parse(&format!("api://{}", &Self::id())).expect("Unable to create base URL");
-
         // Grab the next page of files
         while let Ok(files) = self
             .client
@@ -123,11 +127,7 @@ impl Connection for DriveConnection {
             let urls = files
                 .files
                 .iter()
-                .map(|file| {
-                    let mut crawl_url = url_base.clone();
-                    crawl_url.set_path(&file.id);
-                    crawl_url.to_string()
-                })
+                .map(|file| self.to_url(&file.id).to_string())
                 .collect::<Vec<String>>();
 
             // Enqueue URIs

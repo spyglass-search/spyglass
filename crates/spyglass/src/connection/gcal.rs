@@ -72,10 +72,9 @@ impl GCalConnection {
                 });
             }
 
-            let user = client.get_user().await?;
             Ok(Self {
                 client,
-                user: user.email,
+                user: account.to_string(),
             })
         } else {
             Err(anyhow::anyhow!("Connection not supported"))
@@ -108,9 +107,6 @@ impl Connection for GCalConnection {
         let mut next_page = None;
         let mut num_events = 0;
 
-        let url_base =
-            Url::parse(&format!("api://{}", &Self::id())).expect("Unable to create base URL");
-
         // Grab the next page of files
         while let Ok(events) = self.client.list_calendar_events("primary", next_page).await {
             next_page = events.next_page_token;
@@ -119,11 +115,7 @@ impl Connection for GCalConnection {
             let urls = events
                 .items
                 .iter()
-                .map(|event| {
-                    let mut crawl_url = url_base.clone();
-                    crawl_url.set_path(&event.id);
-                    crawl_url.to_string()
-                })
+                .map(|event| self.to_url("primary", &event.id).to_string())
                 .collect::<Vec<String>>();
 
             // Enqueue URIs
