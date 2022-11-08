@@ -4,6 +4,7 @@ use std::path::Path;
 use addr::parse_domain_name;
 use chrono::prelude::*;
 use chrono::Duration;
+use percent_encoding::percent_decode_str;
 use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
 use url::{Host, Url};
@@ -12,7 +13,7 @@ use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use shared::url_to_file_path;
 
-use crate::connection::{Connection, DriveConnection};
+use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
@@ -56,7 +57,7 @@ impl CrawlResult {
         desc: Option<String>,
     ) -> Self {
         let mut hasher = Sha256::new();
-        hasher.update(&content.as_bytes());
+        hasher.update(content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
         // Use a portion of the content
@@ -231,7 +232,7 @@ impl Crawler {
 
         // Hash the body content, used to detect changes (eventually).
         let mut hasher = Sha256::new();
-        hasher.update(&parse_result.content.as_bytes());
+        hasher.update(parse_result.content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
 
@@ -307,11 +308,13 @@ impl Crawler {
         _: &crawl_queue::Model,
         uri: &Url,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let mut conn = DriveConnection::new(state)
-            .await
-            .expect("Unable to create connection");
+        let account = percent_decode_str(uri.username()).decode_utf8_lossy();
+        let api_id = uri.host_str().unwrap_or_default();
 
-        conn.get(uri).await
+        match load_connection(state, api_id, &account).await {
+            Ok(mut conn) => conn.as_mut().get(uri).await,
+            Err(err) => Err(err),
+        }
     }
 
     async fn handle_file_fetch(
@@ -352,11 +355,11 @@ impl Crawler {
         // Attempt to read file
         let contents = match path.extension() {
             Some(ext) if parser::supports_filetype(ext) => parser::parse_file(ext, path)?,
-            _ => std::fs::read_to_string(&path)?,
+            _ => std::fs::read_to_string(path)?,
         };
 
         let mut hasher = Sha256::new();
-        hasher.update(&contents.as_bytes());
+        hasher.update(contents.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
 
         // TODO: Better description building for text files?

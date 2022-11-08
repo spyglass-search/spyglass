@@ -1,28 +1,17 @@
-use num_format::{Locale, ToFormattedString};
 use tauri::{
     api::dialog::blocking::message,
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
 use tokio::sync::{broadcast, Mutex};
-use tokio::time::{self, Duration};
 
 use migration::Migrator;
-use shared::response::AppStatus;
-use shared::{config::Config, response};
-use spyglass_rpc::RpcClient;
+use shared::config::Config;
 
 use crate::rpc::SpyglassServerClient;
 use crate::window::show_wizard_window;
 
-const TRAY_UPDATE_INTERVAL_S: u64 = 60;
-
-use crate::{
-    constants,
-    menu::MenuID,
-    rpc::{self, RpcMutex},
-    AppShutdown,
-};
+use crate::{constants, rpc::RpcMutex, AppShutdown};
 
 pub struct StartupProgressText(std::sync::Mutex<String>);
 
@@ -46,25 +35,6 @@ pub fn init() -> TauriPlugin<Wry> {
 
                     // Don't block the main thread
                     tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
-
-                    // Keep system tray stats updated
-                    let app_handle = app_handle.clone();
-                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
-                    let mut shutdown = shutdown_tx.subscribe();
-
-                    tauri::async_runtime::spawn(async move {
-                        let mut interval =
-                            time::interval(Duration::from_secs(TRAY_UPDATE_INTERVAL_S));
-                        loop {
-                            tokio::select! {
-                                _ = shutdown.recv() => {
-                                    log::info!("🛑 Shutting down system tray updater");
-                                    return;
-                                }
-                                _ = interval.tick() => update_tray_menu(&app_handle).await
-                            }
-                        }
-                    });
                 }
                 RunEvent::Exit => {
                     let app_handle = app_handle.clone();
@@ -151,33 +121,5 @@ async fn run_and_check_backend(app_handle: AppHandle) {
         let mut updated = config.user_settings.clone();
         updated.run_wizard = true;
         let _ = config.save_user_settings(&updated);
-    }
-}
-
-async fn update_tray_menu(app: &AppHandle) {
-    if let Some(rpc) = app.try_state::<RpcMutex>() {
-        let rpc = rpc.inner();
-        let app_status: Option<AppStatus> = app_status(rpc).await;
-        let handle = app.tray_handle();
-
-        if let Some(app_status) = app_status {
-            let _ = handle
-                .get_item(&MenuID::NUM_DOCS.to_string())
-                .set_title(format!(
-                    "{} documents indexed",
-                    app_status.num_docs.to_formatted_string(&Locale::en)
-                ));
-        }
-    }
-}
-
-async fn app_status(rpc: &rpc::RpcMutex) -> Option<response::AppStatus> {
-    let rpc = rpc.lock().await;
-    match rpc.client.app_status().await {
-        Ok(resp) => Some(resp),
-        Err(err) => {
-            log::error!("Error sending RPC: {}", err);
-            None
-        }
     }
 }

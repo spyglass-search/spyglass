@@ -1,15 +1,20 @@
-use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
+use num_format::{Buffer, Locale};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlElement, HtmlInputElement};
-use yew::prelude::*;
+use yew::{html::Scope, prelude::*};
 
-use shared::{event::ClientEvent, response};
+use shared::{
+    event::{ClientEvent, ClientInvoke},
+    response::{self, SearchMeta, SearchResults},
+};
 
-use crate::components::{ResultListData, SearchResultItem, SelectedLens};
-use crate::events;
-use crate::{listen, resize_window, search_docs, search_lenses};
+use crate::components::{
+    result::{LensResultItem, SearchResultItem},
+    SelectedLens,
+};
+use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
 
 #[wasm_bindgen]
 extern "C" {
@@ -17,287 +22,424 @@ extern "C" {
     fn clear_timeout(handle: i32);
 }
 
-type TimeoutId = i32;
 const QUERY_DEBOUNCE_MS: u32 = 256;
 
-#[function_component(SearchPage)]
-pub fn search_page() -> Html {
-    // Lens related data + results
-    let lens = use_state_eq(Vec::new);
-    // Current query string
-    let query = use_state_eq(|| "".to_string());
-    let query_ref = use_node_ref();
+#[derive(Clone, PartialEq, Eq)]
+pub enum ResultDisplay {
+    None,
+    Docs,
+    Lens,
+}
 
-    // Search results + selected index
-    let search_results = use_state_eq(Vec::new);
-    let selected_idx = use_state_eq(|| 0);
+#[derive(Debug)]
+pub enum Msg {
+    ClearQuery,
+    ClearResults,
+    Focus,
+    KeyboardEvent(KeyboardEvent),
+    HandleError(String),
+    SearchDocs,
+    SearchLenses,
+    UpdateLensResults(Vec<response::LensResult>),
+    UpdateQuery(String),
+    UpdateDocsResults(SearchResults),
+}
+pub struct SearchPage {
+    lens: Vec<String>,
+    docs_results: Vec<response::SearchResult>,
+    lens_results: Vec<response::LensResult>,
+    result_display: ResultDisplay,
+    search_meta: Option<SearchMeta>,
+    search_wrapper_ref: NodeRef,
+    search_input_ref: NodeRef,
+    selected_idx: usize,
+    query: String,
+    query_debounce: Option<i32>,
+}
 
-    let node_ref = use_node_ref();
-    let query_debounce: UseStateHandle<Option<TimeoutId>> = use_state(|| None);
-
-    // Handle key events
-    {
-        let selected_idx = selected_idx.clone();
-        let search_results = search_results.clone();
-        let lens = lens.clone();
-        let query = query.clone();
-        let query_ref = query_ref.clone();
-        let node_ref = node_ref.clone();
-
-        use_effect(move || {
-            // Attach a keydown event listener to the document.
-            let document = gloo::utils::document();
-            let listener = EventListener::new(&document, "keydown", move |event| {
-                events::handle_global_key_down(
-                    event,
-                    node_ref.clone(),
-                    lens.clone(),
-                    query.clone(),
-                    query_ref.clone(),
-                    search_results.clone(),
-                    selected_idx.clone(),
-                )
-            });
-            || drop(listener)
-        });
+impl SearchPage {
+    fn handle_selection(&mut self, link: &Scope<Self>) {
+        // Grab the currently selected item
+        if !self.docs_results.is_empty() {
+            if let Some(selected) = self.docs_results.get(self.selected_idx) {
+                let url = selected.url.clone();
+                log::info!("open url: {}", url);
+                spawn_local(async move {
+                    let _ = open(url).await;
+                });
+            }
+        } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
+            // Add lens to list
+            self.lens.push(selected.title.to_string());
+            // Clear query string
+            link.send_message(Msg::ClearQuery);
+        }
     }
 
-    // Handle changes to the query string
-    {
-        let lens = lens.clone();
-        let search_results = search_results.clone();
-        let selected_idx = selected_idx.clone();
-        let node_ref = node_ref.clone();
+    fn move_selection_down(&mut self) {
+        let max_len = if self.docs_results.is_empty() {
+            0
+        } else {
+            self.docs_results.len() - 1
+        };
+        self.selected_idx = (self.selected_idx + 1).min(max_len);
+        self.scroll_to_result(self.selected_idx);
+    }
 
-        use_effect_with_deps(
-            move |query| {
-                if let Some(timeout_id) = *query_debounce {
-                    clear_timeout(timeout_id);
-                    query_debounce.set(None);
+    fn move_selection_up(&mut self) {
+        self.selected_idx = self.selected_idx.max(1) - 1;
+        self.scroll_to_result(self.selected_idx);
+    }
+
+    fn scroll_to_result(&self, idx: usize) {
+        let document = gloo::utils::document();
+        if let Some(el) = document.get_element_by_id(&format!("result-{}", idx)) {
+            if let Ok(el) = el.dyn_into::<HtmlElement>() {
+                el.scroll_into_view();
+            }
+        }
+    }
+
+    fn request_resize(&self) {
+        if let Some(node) = self.search_wrapper_ref.cast::<HtmlElement>() {
+            spawn_local(async move {
+                resize_window(node.offset_height() as f64).await.unwrap();
+            });
+        }
+    }
+}
+
+impl Component for SearchPage {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let link = ctx.link();
+
+        {
+            // Listen to refresh search results event
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::ClearQuery);
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = listen(ClientEvent::RefreshSearchResults.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+        {
+            // Listen to clear search events from backend
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::ClearQuery);
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = listen(ClientEvent::ClearSearch.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+        {
+            // Focus on the search box when we receive an "focus_window" event from
+            // tauri
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::Focus);
+                }) as Box<dyn Fn(JsValue)>);
+                let _ = listen(ClientEvent::FocusWindow.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
+        Self {
+            lens: Vec::new(),
+            docs_results: Vec::new(),
+            lens_results: Vec::new(),
+            result_display: ResultDisplay::None,
+            search_meta: None,
+            search_wrapper_ref: NodeRef::default(),
+            search_input_ref: NodeRef::default(),
+            selected_idx: 0,
+            query: String::new(),
+            query_debounce: None,
+        }
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let link = ctx.link();
+        match msg {
+            Msg::ClearResults => {
+                self.selected_idx = 0;
+                self.docs_results = Vec::new();
+                self.lens_results = Vec::new();
+                self.search_meta = None;
+                self.result_display = ResultDisplay::None;
+                self.request_resize();
+                true
+            }
+            Msg::ClearQuery => {
+                self.selected_idx = 0;
+                self.docs_results = Vec::new();
+                self.lens_results = Vec::new();
+                self.search_meta = None;
+                self.query = "".to_string();
+                if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
+                    el.set_value("");
                 }
 
-                let query = query.clone();
-                let handle = Timeout::new(QUERY_DEBOUNCE_MS, move || {
-                    events::handle_query_change(
-                        &query,
-                        node_ref,
-                        lens,
-                        search_results,
-                        selected_idx,
-                    )
-                });
-
-                let id = handle.forget();
-                query_debounce.set(Some(id));
-                || ()
-            },
-            (*query).clone(),
-        );
-    }
-
-    // Handle callbacks to Tauri
-    // TODO: Is this the best way to handle calls from Tauri?
-    {
-        let node_clone = node_ref.clone();
-        let lens = lens.clone();
-        let query = query.clone();
-        let query_ref = query_ref.clone();
-        let results = search_results.clone();
-        let selected_idx = selected_idx.clone();
-        // Reset query string, results list, etc when we receive a "clear_search"
-        // event from tauri
-        spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move |_| {
-                query.set("".to_string());
-                results.set(Vec::new());
-                selected_idx.set(0);
-                lens.set(Vec::new());
-
-                let el = query_ref.cast::<HtmlInputElement>().unwrap();
-                el.set_value("");
-
-                let node = node_clone.cast::<HtmlElement>().unwrap();
-                spawn_local(async move {
-                    resize_window(node.offset_height() as f64).await.unwrap();
-                });
-            }) as Box<dyn Fn(JsValue)>);
-
-            let _ = listen(ClientEvent::ClearSearch.as_ref(), &cb).await;
-            cb.forget();
-        });
-
-        let node_clone = node_ref.clone();
-        // Focus on the search box when we receive an "focus_window" event from
-        // tauri
-        spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move |_| {
-                let document = gloo::utils::document();
-                if let Some(el) = document.get_element_by_id("searchbox") {
-                    let el: HtmlElement = el.unchecked_into();
+                self.request_resize();
+                true
+            }
+            Msg::Focus => {
+                if let Some(el) = self.search_input_ref.cast::<HtmlElement>() {
                     let _ = el.focus();
                 }
+                self.request_resize();
+                true
+            }
+            Msg::HandleError(msg) => {
+                let window = window().unwrap();
+                let _ = window.alert_with_message(&msg);
+                false
+            }
+            Msg::KeyboardEvent(e) => {
+                match e.type_().as_str() {
+                    "keydown" => {
+                        let key = e.key();
+                        match key.as_str() {
+                            // ArrowXX: Prevent cursor from moving around
+                            // Tab: Prevent search box from losing focus
+                            "ArrowUp" | "ArrowDown" | "Tab" => e.prevent_default(),
+                            _ => (),
+                        }
 
-                if let Some(node) = node_clone.cast::<HtmlElement>() {
-                    spawn_local(async move {
-                        resize_window(node.offset_height() as f64).await.unwrap();
+                        match key.as_str() {
+                            // Search result navigation
+                            "ArrowDown" => {
+                                self.move_selection_down();
+                                return true;
+                            }
+                            "ArrowUp" => {
+                                self.move_selection_up();
+                                return true;
+                            }
+                            _ => (),
+                        }
+                    }
+                    "keyup" => {
+                        let key = e.key();
+                        // Stop propagation on these keys
+                        match key.as_str() {
+                            "ArrowDown" | "ArrowUp" | "Backspace" => e.stop_propagation(),
+                            _ => {}
+                        }
+
+                        match key.as_str() {
+                            "ArrowDown" | "ArrowUp" => {}
+                            "Enter" => self.handle_selection(link),
+                            "Escape" => {
+                                link.send_future(async move {
+                                    let _ =
+                                        invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
+                                    Msg::ClearQuery
+                                });
+                            }
+                            "Backspace" => {
+                                if self.query.is_empty() && !self.lens.is_empty() {
+                                    log::info!("updating lenses");
+                                    self.lens.pop();
+                                }
+
+                                let input: HtmlInputElement = e.target_unchecked_into();
+                                link.send_message(Msg::UpdateQuery(input.value()));
+
+                                if input.value().len() < crate::constants::MIN_CHARS {
+                                    link.send_message(Msg::ClearResults);
+                                }
+
+                                return true;
+                            }
+                            "Tab" => {
+                                // Tab completion for len results only
+                                if self.result_display == ResultDisplay::Lens {
+                                    self.handle_selection(link);
+                                }
+                            }
+                            // everything else
+                            _ => {
+                                let input: HtmlInputElement = e.target_unchecked_into();
+                                link.send_message(Msg::UpdateQuery(input.value()));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                false
+            }
+            Msg::SearchLenses => {
+                let query = self.query.trim_start_matches('/').to_string();
+                link.send_future(async move {
+                    match search_lenses(query).await {
+                        Ok(results) => Msg::UpdateLensResults(
+                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
+                        ),
+                        Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                    }
+                });
+                false
+            }
+            Msg::SearchDocs => {
+                let lenses = self.lens.clone();
+                let query = self.query.clone();
+
+                link.send_future(async move {
+                    match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
+                        Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                            Ok(deser) => Msg::UpdateDocsResults(deser),
+                            Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                        },
+                        Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                    }
+                });
+
+                false
+            }
+            Msg::UpdateLensResults(results) => {
+                self.lens_results = results;
+                self.docs_results.clear();
+                self.result_display = ResultDisplay::Lens;
+                self.request_resize();
+                true
+            }
+            Msg::UpdateDocsResults(results) => {
+                self.docs_results = results.results;
+                self.search_meta = Some(results.meta);
+                self.lens_results.clear();
+                self.result_display = ResultDisplay::Docs;
+                self.request_resize();
+                true
+            }
+            Msg::UpdateQuery(query) => {
+                self.query = query.clone();
+                if let Some(timeout_id) = self.query_debounce {
+                    clear_timeout(timeout_id);
+                    self.query_debounce = None;
+                }
+
+                {
+                    let link = link.clone();
+                    let handle = Timeout::new(QUERY_DEBOUNCE_MS, move || {
+                        if query.starts_with(crate::constants::LENS_SEARCH_PREFIX) {
+                            link.send_message(Msg::SearchLenses);
+                        } else if query.len() >= crate::constants::MIN_CHARS {
+                            link.send_message(Msg::SearchDocs)
+                        }
                     });
+
+                    let id = handle.forget();
+                    self.query_debounce = Some(id);
                 }
-            }) as Box<dyn Fn(JsValue)>);
-            let _ = listen(ClientEvent::FocusWindow.as_ref(), &cb).await;
-            cb.forget();
-        });
+
+                false
+            }
+        }
     }
 
-    {
-        // Refresh search results
-        let query = query.clone();
-        spawn_local(async move {
-            let cb = Closure::wrap(Box::new(move |_| {
-                let document = gloo::utils::document();
-                if let Some(el) = document.get_element_by_id("searchbox") {
-                    let el: HtmlInputElement = el.unchecked_into();
-                    query.set("".into());
-                    query.set(el.value());
-                }
-            }) as Box<dyn Fn(JsValue)>);
-            let _ = listen(ClientEvent::RefreshSearchResults.as_ref(), &cb).await;
-            cb.forget();
-        });
-    }
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
 
-    let results = search_results
-        .iter()
-        .enumerate()
-        .map(|(idx, res)| {
-            let is_selected = idx == *selected_idx;
+        let results = match self.result_display {
+            ResultDisplay::None => html! { },
+            ResultDisplay::Docs => {
+                self.docs_results
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, res)| {
+                        let is_selected = idx == self.selected_idx;
+                        html! {
+                            <SearchResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                        }
+                    })
+                    .collect::<Html>()
+            },
+            ResultDisplay::Lens => {
+                self.lens_results
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, res)| {
+                        let is_selected = idx == self.selected_idx;
+                        html! {
+                            <LensResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                        }
+                    })
+                    .collect::<Html>()
+            }
+        };
+
+        let search_meta = if let Some(meta) = &self.search_meta {
+            let mut num_docs = Buffer::default();
+            num_docs.write_formatted(&meta.num_docs, &Locale::en);
+
+            let mut wall_time = Buffer::default();
+            wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
+
             html! {
-                <SearchResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2 flex flex-row items-center">
+                    <div>
+                        {"Searched "}
+                        <span class="text-cyan-600">{num_docs}</span>
+                        {" documents in "}
+                        <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                    </div>
+                    <div class="ml-auto flex flex-row align-middle items-center">
+                        {"Use"}
+                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                            </svg>
+                        </div>
+                        {"and"}
+                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+                            </svg>
+                        </div>
+                        {"to select."}
+                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 mx-1 text-[8px]">
+                            {"Enter"}
+                        </div>
+                        {"to open."}
+                    </div>
+                </div>
             }
-        })
-        .collect::<Html>();
+        } else {
+            html! {}
+        };
 
-    let onkeyup = {
-        Callback::from(move |e: KeyboardEvent| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            query.set(input.value());
-        })
-    };
-
-    let onkeydown = {
-        Callback::from(move |e: KeyboardEvent| {
-            let key = e.key();
-            match key.as_str() {
-                // Prevent cursor from moving around
-                "ArrowUp" => e.prevent_default(),
-                "ArrowDown" => e.prevent_default(),
-                // Prevent search box from losing focus
-                "Tab" => e.prevent_default(),
-                _ => (),
-            }
-        })
-    };
-
-    html! {
-        <div ref={node_ref} class="relative overflow-hidden rounded-xl border-neutral-600 border">
-            <div class="flex flex-nowrap w-full">
-                <SelectedLens lens={(*lens).clone()} />
-                <input
-                    ref={query_ref}
-                    id="searchbox"
-                    type="text"
-                    class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
-                    placeholder="Search"
-                    {onkeyup}
-                    {onkeydown}
-                    spellcheck="false"
-                    tabindex="-1"
-                />
+        html! {
+            <div ref={self.search_wrapper_ref.clone()} class="relative overflow-hidden rounded-xl border-neutral-600 border">
+                <div class="flex flex-nowrap w-full">
+                    <SelectedLens lens={self.lens.clone()} />
+                    <input
+                        ref={self.search_input_ref.clone()}
+                        id="searchbox"
+                        type="text"
+                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
+                        placeholder="Search"
+                        onkeyup={link.callback(Msg::KeyboardEvent)}
+                        onkeydown={link.callback(Msg::KeyboardEvent)}
+                        spellcheck="false"
+                        tabindex="-1"
+                    />
+                </div>
+                <div class="overflow-y-auto overflow-x-hidden h-full">
+                    {results}
+                </div>
+                {search_meta}
             </div>
-            <div class="overflow-y-auto overflow-x-hidden h-full">{ results }</div>
-        </div>
+        }
     }
-}
-
-pub fn clear_results(handle: UseStateHandle<Vec<ResultListData>>, node: HtmlElement) {
-    handle.set(Vec::new());
-    spawn_local(async move {
-        resize_window(node.offset_height() as f64).await.unwrap();
-    });
-}
-
-pub fn show_lens_results(
-    handle: UseStateHandle<Vec<ResultListData>>,
-    node: HtmlElement,
-    selected_idx: UseStateHandle<usize>,
-    query: String,
-) {
-    let query = query.strip_prefix('/').unwrap().to_string();
-    spawn_local(async move {
-        match search_lenses(query).await {
-            Ok(results) => {
-                let results: Vec<response::LensResult> =
-                    serde_wasm_bindgen::from_value(results).unwrap();
-                let results = results
-                    .iter()
-                    .map(|x| x.into())
-                    .collect::<Vec<ResultListData>>();
-
-                let max_idx = results.len().max(1) - 1;
-                if max_idx < *selected_idx {
-                    selected_idx.set(max_idx);
-                }
-
-                handle.set(results);
-                spawn_local(async move {
-                    resize_window(node.offset_height() as f64).await.unwrap();
-                });
-            }
-            Err(e) => {
-                let window = window().unwrap();
-                window
-                    .alert_with_message(&format!("Error: {:?}", e))
-                    .unwrap();
-                clear_results(handle, node);
-            }
-        }
-    })
-}
-
-pub fn show_doc_results(
-    handle: UseStateHandle<Vec<ResultListData>>,
-    lenses: &[String],
-    node: HtmlElement,
-    selected_idx: UseStateHandle<usize>,
-    query: String,
-) {
-    let lenses = lenses.to_owned();
-    spawn_local(async move {
-        match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
-            Ok(results) => {
-                let results: Vec<response::SearchResult> =
-                    serde_wasm_bindgen::from_value(results).unwrap();
-                let results = results
-                    .iter()
-                    .map(|x| x.into())
-                    .collect::<Vec<ResultListData>>();
-
-                let max_idx = results.len().max(1) - 1;
-                if max_idx < *selected_idx {
-                    selected_idx.set(max_idx);
-                }
-
-                handle.set(results);
-                spawn_local(async move {
-                    resize_window(node.offset_height() as f64).await.unwrap();
-                });
-            }
-            Err(e) => {
-                let window = window().unwrap();
-                window
-                    .alert_with_message(&format!("Error: {:?}", e))
-                    .unwrap();
-                clear_results(handle, node);
-            }
-        }
-    })
 }

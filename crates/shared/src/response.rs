@@ -21,12 +21,22 @@ pub struct AppStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ConnectionResult {
+pub struct SupportedConnection {
     pub id: String,
     pub label: String,
     pub description: String,
-    pub scopes: Vec<String>,
-    pub is_connected: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct UserConnection {
+    pub id: String,
+    pub account: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ListConnectionResult {
+    pub supported: Vec<SupportedConnection>,
+    pub user_connections: Vec<UserConnection>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -73,9 +83,12 @@ pub struct SearchMeta {
     pub wall_time_ms: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct SearchResult {
+    /// Document ID
     pub doc_id: String,
+    /// URI used to crawl this result
+    pub crawl_uri: String,
     pub domain: String,
     pub title: String,
     pub description: String,

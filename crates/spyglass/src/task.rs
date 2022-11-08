@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use shared::config::Config;
 
-use crate::connection::{Connection, DriveConnection};
+use crate::connection::load_connection;
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::state::AppState;
@@ -29,7 +29,8 @@ pub enum CollectTask {
     },
     // Connects to an integration and discovers all the crawlable URIs
     ConnectionSync {
-        connection_id: String,
+        api_id: String,
+        account: String,
     },
 }
 
@@ -91,7 +92,19 @@ pub async fn manager_task(
                             }
                         }
                         ManagerCommand::CheckForJobs => {
-                            manager::check_for_jobs(&state, &queue).await
+                            if !manager::check_for_jobs(&state, &queue).await {
+                                // If no jobs were queue, sleep longer. This will keep
+                                // CPU usage low when there is nothing going on and
+                                // let the manager process jobs as quickly as possible
+                                // if there are a lot of them.
+                                queue_check_interval = tokio::time::interval(Duration::from_secs(5));
+                                // first tick always completes immediately.
+                                queue_check_interval.tick().await;
+                            } else {
+                                queue_check_interval = tokio::time::interval(Duration::from_millis(100));
+                                // first tick always completes immediately.
+                                queue_check_interval.tick().await;
+                            }
                         }
                     }
                 }
@@ -180,18 +193,17 @@ pub async fn worker_task(
                             }
                         });
                     }
-                    CollectTask::ConnectionSync { connection_id } => {
-                        log::debug!("handling ConnectionSync for {}", connection_id);
+                    CollectTask::ConnectionSync { api_id, account } => {
+                        log::debug!("handling ConnectionSync for {}", api_id);
                         let state = state.clone();
                         tokio::spawn(async move {
-                            // TODO: dynamic dispatch based on connection id
-                            match DriveConnection::new(&state).await {
+                            match load_connection(&state, &api_id, &account).await {
                                 Ok(mut conn) => {
-                                    conn.sync(&state).await;
+                                    conn.as_mut().sync(&state).await;
                                 }
                                 Err(err) => log::error!(
                                     "Unable to sync w/ connection: {} - {}",
-                                    connection_id,
+                                    api_id,
                                     err.to_string()
                                 ),
                             }

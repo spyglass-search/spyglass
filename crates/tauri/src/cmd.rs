@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
+use shared::response::SearchResults;
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
@@ -120,7 +121,7 @@ pub async fn search_docs<'r>(
     win: tauri::Window,
     lenses: Vec<String>,
     query: &str,
-) -> Result<Vec<response::SearchResult>, String> {
+) -> Result<SearchResults, String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let data = request::SearchParam {
             lenses,
@@ -129,14 +130,14 @@ pub async fn search_docs<'r>(
 
         let rpc = rpc.lock().await;
         match rpc.client.search_docs(data).await {
-            Ok(resp) => Ok(resp.results.to_vec()),
+            Ok(resp) => Ok(resp),
             Err(err) => {
                 log::error!("search_docs err: {}", err);
-                Ok(Vec::new())
+                Err(err.to_string())
             }
         }
     } else {
-        Ok(Vec::new())
+        Err("Unable to reach backend".to_string())
     }
 }
 
@@ -257,18 +258,18 @@ pub async fn recrawl_domain(win: tauri::Window, domain: &str) -> Result<(), Stri
 #[tauri::command]
 pub async fn list_connections(
     win: tauri::Window,
-) -> Result<Vec<response::ConnectionResult>, String> {
+) -> Result<response::ListConnectionResult, String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
         match rpc.client.list_connections().await {
             Ok(connections) => Ok(connections),
             Err(err) => {
                 log::error!("list_connections err: {}", err.to_string());
-                Ok(Vec::new())
+                Err(err.to_string())
             }
         }
     } else {
-        Ok(Vec::new())
+        Err("Unable to communicate w/ backend".to_string())
     }
 }
 
@@ -447,10 +448,14 @@ pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn revoke_connection(win: tauri::Window, id: &str) -> Result<(), String> {
+pub async fn revoke_connection(win: tauri::Window, id: &str, account: &str) -> Result<(), String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
-        if let Err(err) = rpc.client.revoke_connection(id.to_string()).await {
+        if let Err(err) = rpc
+            .client
+            .revoke_connection(id.to_string(), account.to_string())
+            .await
+        {
             return Err(err.to_string());
         }
     }
@@ -459,10 +464,14 @@ pub async fn revoke_connection(win: tauri::Window, id: &str) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub async fn resync_connection(win: tauri::Window, id: &str) -> Result<(), String> {
+pub async fn resync_connection(win: tauri::Window, id: &str, account: &str) -> Result<(), String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
-        if let Err(err) = rpc.client.resync_connection(id.to_string()).await {
+        if let Err(err) = rpc
+            .client
+            .resync_connection(id.to_string(), account.to_string())
+            .await
+        {
             return Err(err.to_string());
         }
     }

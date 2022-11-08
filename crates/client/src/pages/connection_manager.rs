@@ -1,15 +1,16 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+
+use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
+use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
+
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::{btn, icons, Header};
 use crate::utils::RequestState;
-use crate::{invoke, listen};
-use shared::{
-    event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke},
-    response::ConnectionResult,
-};
+use crate::{listen, tauri_invoke};
 
 struct ConnectionStatus {
     is_authorizing: RequestState,
@@ -17,10 +18,13 @@ struct ConnectionStatus {
 }
 
 pub struct ConnectionsManagerPage {
-    connections: Vec<ConnectionResult>,
-    conn_status: HashMap<String, ConnectionStatus>,
+    supported_map: HashMap<String, SupportedConnection>,
+    supported_connections: Vec<SupportedConnection>,
+    user_connections: Vec<UserConnection>,
+    conn_status: ConnectionStatus,
     fetch_error: String,
     fetch_connection_state: RequestState,
+    is_add_view: bool,
     resync_requested: HashSet<String>,
 }
 
@@ -29,24 +33,23 @@ pub struct ConnectionsManagerPage {
 pub enum Msg {
     AuthorizeConnection(String),
     // Received an error authorizing connection
-    AuthError(String, String),
+    AuthError(String),
     // Authorization finished!
-    AuthFinished(String),
+    AuthFinished,
     FetchConnections,
     FetchError(String),
-    RevokeConnection(String),
-    ResyncConnection(String),
-    UpdateConnections(Vec<ConnectionResult>),
+    StartAdd,
+    CancelAdd,
+    RevokeConnection(String, String),
+    ResyncConnection(String, String),
+    UpdateConnections(ListConnectionResult),
 }
 
 impl ConnectionsManagerPage {
-    pub async fn fetch_connections() -> Result<Vec<ConnectionResult>, String> {
-        match invoke(ClientInvoke::ListConnections.as_ref(), JsValue::NULL).await {
-            Ok(results) => match serde_wasm_bindgen::from_value(results) {
-                Ok(parsed) => Ok(parsed),
-                Err(err) => Err(err.to_string()),
-            },
-            Err(e) => Err(format!("Error fetching connections: {:?}", e.as_string())),
+    pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
+        match tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await {
+            Ok(results) => Ok(results),
+            Err(e) => Err(format!("Error fetching connections: {:?}", e)),
         }
     }
 
@@ -73,6 +76,87 @@ impl ConnectionsManagerPage {
             html! { <icons::ShareIcon height="h-6" width="w-6" /> }
         }
     }
+
+    fn add_view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
+
+        let conns = self
+            .supported_connections
+            .iter()
+            .map(|con| {
+                let auth_msg = Msg::AuthorizeConnection(con.id.clone());
+                // Annoyingly we need to use Google branded icons for the connection
+                // button.
+                let connect_btn = if con.id.ends_with("google.com") {
+                    html! {
+                        <button
+                            disabled={self.conn_status.is_authorizing.in_progress()}
+                            onclick={link.callback(move |_| auth_msg.clone())}
+                        >
+                            {
+                                if self.conn_status.is_authorizing.in_progress() {
+                                    html!{ <icons::GoogleSignInDisabled width="w-auto" height="h-10" /> }
+                                } else {
+                                    html!{ <icons::GoogleSignIn width="w-auto" height="h-10" /> }
+                                }
+                            }
+                        </button>
+                    }
+                } else {
+                    html! {
+                        <btn::Btn
+                            disabled={self.conn_status.is_authorizing.in_progress()}
+                            onclick={link.callback(move |_| auth_msg.clone())}
+                        >
+                            <icons::LightningBoltIcon classes="mr-2" width="w-4" height="h-4" />
+                            {"Connect"}
+                        </btn::Btn>
+                    }
+                };
+
+                html! {
+                    <div class="pb-8 flex flex-row items-center gap-8">
+                        <div class="flex-none">
+                            {self.connection_icon(&con.id)}
+                        </div>
+                        <div class="flex-1">
+                            <div><h2 class="text-lg">{con.label.clone()}</h2></div>
+                            <div class="text-xs text-neutral-400">{con.description.clone()}</div>
+                        </div>
+                        <div class="flex-none flex flex-col">
+                            <div class="ml-auto">{connect_btn}</div>
+                        </div>
+                    </div>
+                }
+            })
+            .collect::<Html>();
+
+        html! {
+            <div>
+                <Header label="Connections">
+                    <btn::Btn onclick={link.callback(|_| Msg::CancelAdd)}>{"Cancel"}</btn::Btn>
+                </Header>
+                <div class="px-8 py-4 bg-neutral-800">
+                    <div class="mb-4 text-sm">
+                    {
+                        match self.conn_status.is_authorizing {
+                            RequestState::Error => html! {
+                                <span class="text-red-400">{self.conn_status.error.clone()}</span>
+                            },
+                            RequestState::InProgress => html! {
+                                <span class="text-cyan-500">
+                                    <div>{"Sign-in has opened in a new window. Please authorize to complete connection."}</div>
+                                </span>
+                            },
+                            _ => { html! {} }
+                        }
+                    }
+                    </div>
+                    {conns}
+                </div>
+            </div>
+        }
+    }
 }
 
 impl Component for ConnectionsManagerPage {
@@ -97,11 +181,17 @@ impl Component for ConnectionsManagerPage {
         }
 
         Self {
-            connections: Vec::new(),
-            conn_status: HashMap::new(),
+            conn_status: ConnectionStatus {
+                is_authorizing: RequestState::NotStarted,
+                error: "".to_string(),
+            },
             fetch_connection_state: RequestState::NotStarted,
             fetch_error: String::new(),
             resync_requested: HashSet::new(),
+            supported_connections: Vec::new(),
+            supported_map: HashMap::new(),
+            user_connections: Vec::new(),
+            is_add_view: false,
         }
     }
 
@@ -109,42 +199,33 @@ impl Component for ConnectionsManagerPage {
         let link = ctx.link();
         match msg {
             Msg::AuthorizeConnection(id) => {
-                if let Some(status) = self.conn_status.get_mut(&id) {
-                    status.is_authorizing = RequestState::InProgress;
-                }
+                self.conn_status.is_authorizing = RequestState::InProgress;
 
                 link.send_future(async move {
                     let id = id.clone();
-
-                    let ser =
-                        serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
-                            .expect("Unable to serialize authorize connection params");
-
-                    if let Err(err) = invoke(ClientInvoke::AuthorizeConnection.as_ref(), ser).await
+                    if let Err(err) = tauri_invoke::<_, ()>(
+                        ClientInvoke::AuthorizeConnection,
+                        &AuthorizeConnectionParams { id: id.clone() },
+                    )
+                    .await
                     {
-                        let msg = err
-                            .as_string()
-                            .unwrap_or_else(|| "Unable to connect. Please try again.".to_string());
-                        Msg::AuthError(id.clone(), msg)
+                        Msg::AuthError(err)
                     } else {
-                        Msg::AuthFinished(id.clone())
+                        Msg::AuthFinished
                     }
                 });
 
                 true
             }
-            Msg::AuthError(id, error) => {
-                if let Some(status) = self.conn_status.get_mut(&id) {
-                    status.is_authorizing = RequestState::Error;
-                    status.error = error;
-                }
+            Msg::AuthError(error) => {
+                self.conn_status.is_authorizing = RequestState::Error;
+                self.conn_status.error = error;
                 true
             }
-            Msg::AuthFinished(id) => {
-                if let Some(status) = self.conn_status.get_mut(&id) {
-                    status.is_authorizing = RequestState::Finished;
-                    link.send_message(Msg::FetchConnections);
-                }
+            Msg::AuthFinished => {
+                self.conn_status.is_authorizing = RequestState::Finished;
+                self.is_add_view = false;
+                link.send_message(Msg::FetchConnections);
                 false
             }
             Msg::FetchConnections => {
@@ -167,125 +248,152 @@ impl Component for ConnectionsManagerPage {
                 self.fetch_error = error;
                 true
             }
-            Msg::RevokeConnection(id) => {
-                let ser = serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id })
-                    .expect("Unable to serialize authorize connection params");
-
-                link.send_future(async {
+            Msg::RevokeConnection(id, account) => {
+                link.send_future(async move {
                     // Revoke & then refresh connections
-                    let _ = invoke(ClientInvoke::RevokeConnection.as_ref(), ser).await;
+                    let _ = tauri_invoke::<_, ()>(
+                        ClientInvoke::RevokeConnection,
+                        &ResyncConnectionParams {
+                            id: id.clone(),
+                            account: account.clone(),
+                        },
+                    )
+                    .await;
                     Msg::FetchConnections
                 });
 
                 true
             }
-            Msg::ResyncConnection(id) => {
-                let ser =
-                    serde_wasm_bindgen::to_value(&AuthorizeConnectionParams { id: id.clone() })
-                        .expect("Unable to serialize authorize connection params");
-
-                link.send_future(async {
+            Msg::ResyncConnection(id, account) => {
+                self.resync_requested.insert(format!("{}/{}", id, account));
+                link.send_future(async move {
                     // Revoke & then refresh connections
-                    let _ = invoke(ClientInvoke::ResyncConnection.as_ref(), ser).await;
+                    let _ = tauri_invoke::<_, ()>(
+                        ClientInvoke::ResyncConnection,
+                        &ResyncConnectionParams {
+                            id: id.clone(),
+                            account: account.clone(),
+                        },
+                    )
+                    .await;
                     Msg::FetchConnections
                 });
 
-                self.resync_requested.insert(id);
                 true
             }
             Msg::UpdateConnections(conns) => {
                 self.fetch_connection_state = RequestState::Finished;
-                self.connections = conns.clone();
-                self.conn_status = conns
-                    .iter()
-                    .map(|conn| {
-                        (
-                            conn.id.clone(),
-                            ConnectionStatus {
-                                is_authorizing: RequestState::NotStarted,
-                                error: String::new(),
-                            },
-                        )
-                    })
-                    .collect::<HashMap<String, ConnectionStatus>>();
 
+                self.supported_connections = conns.supported.clone();
+                self.supported_connections
+                    .sort_by(|a, b| a.label.cmp(&b.label));
+
+                self.supported_map.clear();
+                for conn in &self.supported_connections {
+                    self.supported_map.insert(conn.id.clone(), conn.clone());
+                }
+
+                self.user_connections = conns.user_connections;
+                self.user_connections.sort_by(|a, b| match a.id.cmp(&b.id) {
+                    Ordering::Equal => a.account.cmp(&b.account),
+                    ord => ord,
+                });
+
+                true
+            }
+            Msg::StartAdd => {
+                self.is_add_view = true;
+                true
+            }
+            Msg::CancelAdd => {
+                self.is_add_view = false;
                 true
             }
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
-        let conns = self.connections.iter()
-            .map(|con| {
-                let status = self.conn_status.get(&con.id).expect("Unknown connection");
-                let auth_msg = Msg::AuthorizeConnection(con.id.clone());
-                // let revoke_msg = Msg::RevokeConnection(status.metadata.id.clone());
-                let resync_msg = Msg::ResyncConnection(con.id.clone());
-                let resynced = self.resync_requested.contains(&con.id.clone());
+        if self.is_add_view {
+            return self.add_view(ctx);
+        }
 
-                let connect_btn = if con.is_connected {
+        let link = ctx.link();
+
+        let conns = if self.user_connections.is_empty() {
+            html! {
+                <div class="col-span-3 text-neutral-300">{"Add a connection to get started!"}</div>
+            }
+        } else {
+            self
+                .user_connections
+                .iter()
+                .map(|conn| {
+                    let label = self
+                        .supported_map
+                        .get(&conn.id)
+                        .map(|m| m.label.clone())
+                        .unwrap_or_else(|| conn.id.clone());
+
+                    let resync_id = format!("{}/{}", conn.id, conn.account);
+                    let resync_msg = Msg::ResyncConnection(conn.id.clone(), conn.account.clone());
+
                     html! {
-                        <div class="flex flex-row gap-4">
-                            <btn::Btn onclick={link.callback(move |_| resync_msg.clone())} disabled={resynced}>
-                                <icons::RefreshIcon classes="mr-2" width="w-4" height="h-4" />
-                                {"Resync"}
-                            </btn::Btn>
-                            // <btn::Btn onclick={link.callback(move |_| revoke_msg.clone())}>
-                            //     <icons::XCircle classes="mr-2" width="w-4" height="h-4" />
-                            //     {"Revoke"}
-                            // </btn::Btn>
-                        </div>
-                    }
-                } else {
-                    html! {
-                        <btn::Btn
-                            disabled={status.is_authorizing.in_progress()}
-                            onclick={link.callback(move |_| auth_msg.clone())}
-                        >
-                            {
-                                if status.is_authorizing.in_progress() {
-                                    html! {
-                                        <>
-                                            <icons::RefreshIcon animate_spin={true} classes="mr-2" width="w-4" height="h-4" />
-                                            {"Connecting"}
-                                        </>
-                                    }
-                                } else {
-                                    html! {
-                                        <>
-                                            <icons::LightningBoltIcon classes="mr-2" width="w-4" height="h-4" />
-                                            {"Connect"}
-                                        </>
+                        <>
+                            <div>{label}</div>
+                            <div>{conn.account.clone()}</div>
+                            <div class="place-self-end flex flex-row gap-8">
+                                {
+                                    if self.resync_requested.contains(&resync_id) {
+                                        html! {
+                                            <div class="text-xs text-neutral-500">
+                                                {"Resyncing"}
+                                            </div>
+                                        }
+                                    } else {
+                                        html! {
+                                            <button
+                                                onclick={link.callback(move |_| resync_msg.clone())}
+                                                class="text-xs flex flex-row gap-2 hover:text-cyan-500"
+                                            >
+                                                <icons::RefreshIcon width="w-4" height="h-4" />
+                                                {"Resync"}
+                                            </button>
+                                        }
                                     }
                                 }
-                            }
-                        </btn::Btn>
+                                <button class="text-xs flex flex-row gap-2 hover:text-red-500">
+                                    <icons::TrashIcon width="w-4" height="h-4" />
+                                    {"Delete"}
+                                </button>
+                            </div>
+                        </>
                     }
-                };
-
-                html! {
-                    <div class="pb-8 flex flex-row items-center gap-8">
-                        <div class="flex-none">
-                            {self.connection_icon(&con.id)}
-                        </div>
-                        <div class="flex-1">
-                            <div><h2 class="text-lg">{con.label.clone()}</h2></div>
-                            <div class="text-xs text-neutral-400">{con.description.clone()}</div>
-                            <div class="text-xs text-red-400">{status.error.clone()}</div>
-                        </div>
-                        <div class="flex-none">{connect_btn}</div>
-                    </div>
-                }
-            })
-            .collect::<Html>();
+                })
+                .collect::<Html>()
+        };
 
         html! {
             <div>
                 <Header label="Connections">
+                    <btn::Btn onclick={link.callback(|_| Msg::StartAdd)}>{"Add"}</btn::Btn>
                 </Header>
-                <div class="p-8 bg-neutral-800">
-                    {conns}
+                <div class="px-8 py-4 bg-neutral-800">
+                    <div class="font-bold mb-2">{"Connected Accounts"}</div>
+                    <div class="grid grid-cols-3 gap-4 content-center text-xs border-1 rounded-md bg-stone-700 p-2">
+                        {
+                            if self.fetch_connection_state.in_progress() {
+                                html! {
+                                    <div class="flex justify-center">
+                                        <div class="p-16">
+                                            <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
+                                        </div>
+                                    </div>
+                                }
+                            } else {
+                                conns
+                            }
+                        }
+                    </div>
                 </div>
             </div>
         }

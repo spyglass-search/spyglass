@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use jsonrpsee::core::Error;
 use std::collections::HashMap;
+use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
 
@@ -13,12 +14,12 @@ use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::request;
 use shared::response::{
-    AppStatus, ConnectionResult, CrawlStats, LensResult, PluginResult, QueueStatus,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults,
+    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
+    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 use spyglass_plugin::SearchFilter;
 
-use libgoog::{Credentials, GoogClient};
+use libgoog::{ClientType, Credentials, GoogClient};
 use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
@@ -55,12 +56,18 @@ pub async fn add_queue(
 }
 
 #[instrument(skip(state))]
-pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Error> {
-    log::debug!("authorizing <{}>", id);
+pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(), Error> {
+    log::debug!("authorizing <{}>", api_id);
 
-    if let Some((client_id, client_secret, scopes)) = connection_secret(&id) {
+    if let Some((client_id, client_secret, scopes)) = connection_secret(&api_id) {
         let mut listener = create_auth_listener().await;
-        let client = GoogClient::new(
+        let client_type = match api_id.as_str() {
+            "calendar.google.com" => ClientType::Calendar,
+            "drive.google.com" => ClientType::Drive,
+            _ => ClientType::Drive,
+        };
+        let mut client = GoogClient::new(
+            client_type,
             &client_id,
             &client_secret,
             &format!("http://127.0.0.1:{}", listener.port()),
@@ -80,9 +87,16 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                 Ok(token) => {
                     let mut creds = Credentials::default();
                     creds.refresh_token(&token);
+                    let _ = client.set_credentials(&creds);
+
+                    let user = client
+                        .get_user()
+                        .await
+                        .expect("Unable to get account information");
 
                     let new_conn = connection::ActiveModel::new(
-                        id.clone(),
+                        api_id.clone(),
+                        user.email.clone(),
                         creds.access_token.secret().to_string(),
                         creds.refresh_token.map(|t| t.secret().to_string()),
                         creds
@@ -94,7 +108,8 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
                     log::debug!("saved connection: {:?}", res);
                     let _ = state
                         .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
-                            connection_id: id,
+                            api_id,
+                            account: user.email,
                         }))
                         .await;
                 }
@@ -104,7 +119,10 @@ pub async fn authorize_connection(state: AppState, id: String) -> Result<(), Err
 
         Ok(())
     } else {
-        Err(Error::Custom(format!("Connection <{}> not supported", id)))
+        Err(Error::Custom(format!(
+            "Connection <{}> not supported",
+            api_id
+        )))
     }
 }
 
@@ -211,28 +229,32 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 }
 
 #[instrument(skip(state))]
-pub async fn list_connections(state: AppState) -> Result<Vec<ConnectionResult>, Error> {
-    if let Ok(enabled) = connection::Entity::find().all(&state.db).await {
-        // TODO: Move this into a config / db table?
-        let mut all_conns = oauth::supported_connections();
+pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, Error> {
+    match connection::Entity::find().all(&state.db).await {
+        Ok(enabled) => {
+            // TODO: Move this into a config / db table?
+            let all_conns = oauth::supported_connections();
+            let supported = all_conns
+                .values()
+                .cloned()
+                .collect::<Vec<SupportedConnection>>();
 
-        // Get list of enabled connections
-        enabled.iter().for_each(|conn| {
-            if let Some(res) = all_conns.get_mut(&conn.id) {
-                res.is_connected = true;
-                res.scopes = conn.scopes.scopes.clone();
-            }
-        });
+            // Get list of enabled connections
+            let user_connections = enabled
+                .iter()
+                .map(|conn| UserConnection {
+                    id: conn.api_id.clone(),
+                    account: conn.account.clone(),
+                })
+                .collect::<Vec<UserConnection>>();
 
-        let mut sorted = all_conns
-            .values()
-            .cloned()
-            .collect::<Vec<ConnectionResult>>();
-        sorted.sort_by(|a, b| a.label.cmp(&b.label));
-        return Ok(sorted);
+            Ok(ListConnectionResult {
+                supported,
+                user_connections,
+            })
+        }
+        Err(err) => Err(Error::Custom(err.to_string())),
     }
-
-    Ok(Vec::new())
 }
 
 /// List of installed lenses
@@ -332,6 +354,7 @@ pub async fn search(
     state: AppState,
     search_req: request::SearchParam,
 ) -> Result<SearchResults, Error> {
+    let start = SystemTime::now();
     let fields = DocFields::as_fields();
 
     let index = &state.index;
@@ -377,34 +400,40 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            let mut result = SearchResult {
-                doc_id: doc_id.as_text().unwrap_or_default().to_string(),
-                domain: domain.as_text().unwrap_or_default().to_string(),
-                title: title.as_text().unwrap_or_default().to_string(),
-                description: description.as_text().unwrap_or_default().to_string(),
-                url: url.as_text().unwrap_or_default().to_string(),
-                score,
-            };
+            if let Some(doc_id) = doc_id.as_text() {
+                let indexed = indexed_document::Entity::find()
+                    .filter(indexed_document::Column::DocId.eq(doc_id))
+                    .one(&state.db)
+                    .await;
 
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(result.doc_id.clone()))
-                .one(&state.db)
-                .await;
+                let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
-            if let Ok(Some(indexed)) = indexed {
-                if let Some(open_url) = indexed.open_url {
-                    result.url = open_url;
+                if let Ok(Some(indexed)) = indexed {
+                    let mut result = SearchResult {
+                        doc_id: doc_id.to_string(),
+                        domain: domain.as_text().unwrap_or_default().to_string(),
+                        title: title.as_text().unwrap_or_default().to_string(),
+                        crawl_uri: crawl_uri.clone(),
+                        description: description.as_text().unwrap_or_default().to_string(),
+                        url: indexed.open_url.unwrap_or(crawl_uri),
+                        score,
+                    };
+
+                    result.description.truncate(256);
+                    results.push(result);
                 }
             }
-
-            results.push(result);
         }
     }
+
+    let wall_time_ms = SystemTime::now()
+        .duration_since(start)
+        .map_or_else(|_| 0, |duration| duration.as_millis() as u64);
 
     let meta = SearchMeta {
         query: search_req.query,
         num_docs: searcher.num_docs(),
-        wall_time_ms: 1000,
+        wall_time_ms,
     };
 
     Ok(SearchResults { results, meta })
@@ -445,7 +474,7 @@ pub async fn search_lenses(
                 results.push(LensResult {
                     author: lens.author,
                     title: label,
-                    description: lens.description.unwrap_or_else(|| "".to_string()),
+                    description: lens.description.unwrap_or_default(),
                     ..Default::default()
                 });
             }

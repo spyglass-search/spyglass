@@ -6,55 +6,100 @@ export let invoke = async (func_name, params) => {
     console.log(`calling: ${func_name} w/`, params);
 
     if  (func_name == "search_docs") {
-        return [{
-            doc_id: "123",
-            domain: "google.com",
-            title: "This is an example title",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            url: "https://google.com/this/is/a/path",
-            score: 1.0
-        }, {
-            doc_id: "123",
-            domain: "example.com",
-            title: "This is an example title",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            url: "https://example.com/this/is/a/path",
-            score: 1.0
-        }];
+        return {
+            meta: {
+                query: params.query,
+                num_docs: 426552,
+                wall_time_ms: 1234,
+            },
+            results: [{
+                doc_id: "123",
+                domain: "google.com",
+                title: "This is an example title",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "https://google.com/this/is/a/path",
+                url: "https://google.com/this/is/a/path",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "example.com",
+                title: "This is an example title",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "https://example.com/this/is/a/path",
+                url: "https://example.com/this/is/a/path",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "example.com",
+                title: "This is an example super long title to demonstrate very long titles that go on for a very long time and then some.",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "https://example.com/this/is/a/path",
+                url: "https://example.com/this/is/a/path",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "localhost",
+                title: "README.md",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
+                url: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
+                score: 1.0
+            }, {
+                doc_id: "123",
+                domain: "drive.google.com",
+                title: "API Example Doc",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+                crawl_uri: "api://drive.google.com/24938aslkdj-313-19384",
+                url: "https://example.com/this/is/a/path",
+                score: 1.0
+            }]
+        };
     } else if (func_name == "search_lenses") {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense",
+            hash: "",
             html_url: null,
             download_url: null,
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
             title: "fake_lense_2_boogaloo",
+            hash: "",
             html_url: null,
             download_url: null,
         }];
     } else if (func_name == "list_connections") {
-        return [{
-            id: "api.github.com",
-            label: "GitHub",
-            description: "Search through your GitHub repositories, starred repositories, and follows",
-            scopes: [],
-            is_connected: true,
-        }, {
-            id: "api.google.com",
-            label: "Google Services",
-            description: "Adds indexing support for Google services. This includes Gmail, Google Drive documents, and Google Calendar events",
-            scopes: [],
-            is_connected: false,
-        }, {
-            id: "api.examples.com",
-            label: "Error Test",
-            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            scopes: [],
-            is_connected: false,
-        }];
+        return {
+            supported: [{
+                id: "api.github.com",
+                label: "GitHub",
+                description: "Search through your GitHub repositories, starred repositories, and follows",
+            }, {
+                id: "calendar.google.com",
+                label: "Google Calendar",
+                description: "Adds indexing support for Google Calendar events.",
+            }, {
+                id: "drive.google.com",
+                label: "Google Drive",
+                description: "Adds indexing support for Google Drive documents.",
+            }, {
+                id: "api.examples.com",
+                label: "Error Test",
+                description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            }],
+            user_connections: [{
+                id: "calendar.google.com",
+                account: "a5.t.huynh@gmail.com"
+            }, {
+                id: "drive.google.com",
+                account: "a5.t.huynh@gmail.com"
+            }, {
+                id: "drive.google.com",
+                account: "andrew@spyglass.fyi"
+            }]
+        };
     } else if (func_name == "plugin:lens-updater|list_installed_lenses") {
         return [{
             author: "a5huynh",
@@ -152,13 +197,12 @@ export let invoke = async (func_name, params) => {
     } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
         return "Reticulating splines...";
     } else if (func_name == "authorize_connection") {
-        if (params.id == "api.google.com") {
-            await new Promise(r => setTimeout(r, 5000));
-        } else if (params.id == "api.examples.com") {
+        if (params.id == "api.examples.com") {
             await new Promise(r => setTimeout(r, 5000));
             throw 'Unable to connect';
+        } else {
+            await new Promise(r => setTimeout(r, 5000));
         }
-
         return [];
     }
 

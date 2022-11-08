@@ -13,7 +13,7 @@ mod xlsx_parser;
  * parser available
  */
 pub fn supports_filetype(extension: &OsStr) -> bool {
-    print!("Extension {:?}", extension);
+    log::debug!("Extension {:?}", extension);
     if extension.eq_ignore_ascii_case("docx")
         || extension.eq_ignore_ascii_case("xlsx")
         || extension.eq_ignore_ascii_case("xls")

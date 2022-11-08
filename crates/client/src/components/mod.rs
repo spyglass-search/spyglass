@@ -1,59 +1,10 @@
 pub mod btn;
 pub mod forms;
 pub mod icons;
+pub mod result;
 pub mod tooltip;
 
 use yew::prelude::*;
-
-use btn::DeleteButton;
-use shared::response::{LensResult, SearchResult};
-use shared::url_to_file_path;
-use url::Url;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ResultListType {
-    DocSearch,
-    LensSearch,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ResultListData {
-    pub id: String,
-    pub domain: Option<String>,
-    pub title: String,
-    pub description: String,
-    pub url: Option<String>,
-    pub score: f32,
-    pub result_type: ResultListType,
-}
-
-impl From<&LensResult> for ResultListData {
-    fn from(x: &LensResult) -> Self {
-        ResultListData {
-            id: x.title.clone(),
-            description: x.description.clone(),
-            domain: None,
-            result_type: ResultListType::LensSearch,
-            score: 1.0,
-            title: x.title.clone(),
-            url: None,
-        }
-    }
-}
-
-impl From<&SearchResult> for ResultListData {
-    fn from(x: &SearchResult) -> Self {
-        ResultListData {
-            id: x.doc_id.clone(),
-            description: x.description.clone(),
-            domain: Some(x.domain.clone()),
-            result_type: ResultListType::DocSearch,
-            score: x.score,
-            title: x.title.clone(),
-            url: Some(x.url.clone()),
-        }
-    }
-}
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct SelectLensProps {
@@ -79,113 +30,6 @@ pub fn selected_lens_list(props: &SelectLensProps) -> Html {
         <ul class="flex bg-neutral-800">
             {items}
         </ul>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct SearchResultProps {
-    pub id: String,
-    pub result: ResultListData,
-    pub is_selected: bool,
-}
-
-/// Render search results
-#[function_component(SearchResultItem)]
-pub fn search_result_component(props: &SearchResultProps) -> Html {
-    let is_selected = props.is_selected;
-    let result = &props.result;
-
-    let component_styles = classes!(
-        "border-t",
-        "border-neutral-600",
-        "p-4",
-        "pr-0",
-        "text-white",
-        if is_selected {
-            "bg-cyan-900"
-        } else {
-            "bg-neutral-800"
-        }
-    );
-
-    match result.result_type {
-        ResultListType::DocSearch => {
-            let url_link = if let Some(url) = &result.url {
-                if let Ok(url) = Url::parse(url) {
-                    let domain = result
-                        .domain
-                        .clone()
-                        .unwrap_or_else(|| "example.com".to_string());
-
-                    let mut path = url.path().to_string();
-                    let uri_icon = if url.scheme() == "file" {
-                        path = url_to_file_path(&path, false);
-                        html! {
-                            <icons::DesktopComputerIcon
-                                classes={classes!("inline", "align-middle")}
-                            />
-                        }
-                    } else {
-                        if let Some(query) = url.query() {
-                            path = format!("{}?{}", path, query);
-                        }
-
-                        html! {
-                            <img class="w-3 inline align-middle"
-                                src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())}
-                            />
-                        }
-                    };
-
-                    html! {
-                        <div class="text-xs truncate">
-                            <a href={url.clone().to_string()} target="_blank">
-                                {uri_icon}
-                                {
-                                    if url.scheme() == "file" {
-                                        html!{}
-                                    } else {
-                                        html!{ <span class="align-middle text-cyan-400">{format!(" {}", domain.clone())}</span> }
-                                    }
-                                }
-                                <span class="align-middle">{format!(" → {}", path)}</span>
-                            </a>
-                        </div>
-                    }
-                } else {
-                    html! { <span></span> }
-                }
-            } else {
-                html! { <span></span> }
-            };
-
-            html! {
-                <div id={props.id.clone()} class={component_styles}>
-                    <div class="float-right pl-4 mr-2 h-28">
-                        <DeleteButton doc_id={result.id.clone()} />
-                    </div>
-                    {url_link}
-                    <h2 class="text-lg truncate py-1">
-                        {result.title.clone()}
-                    </h2>
-                    <div class="text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis">
-                        {result.description.clone()}
-                    </div>
-                </div>
-            }
-        }
-        ResultListType::LensSearch => {
-            html! {
-                <div id={props.id.clone()} class={component_styles}>
-                    <h2 class="text-2xl truncate py-1">
-                        {result.title.clone()}
-                    </h2>
-                    <div class="text-sm leading-relaxed text-neutral-400 h-16 overflow-hidden text-ellipsis">
-                        {result.description.clone()}
-                    </div>
-                </div>
-            }
-        }
     }
 }
 

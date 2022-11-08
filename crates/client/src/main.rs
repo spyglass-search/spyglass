@@ -1,4 +1,6 @@
 use gloo::events::EventListener;
+use serde::{de::DeserializeOwned, Serialize};
+use shared::event::ClientInvoke;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -6,7 +8,6 @@ use yew_router::prelude::*;
 
 mod components;
 mod constants;
-mod events;
 mod pages;
 mod utils;
 
@@ -131,6 +132,21 @@ pub enum Route {
     Updater,
     #[at("/wizard")]
     Wizard,
+}
+
+/// Utility invoke function to handle types & proper serialization/deserialization from JS
+pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
+    fn_name: ClientInvoke,
+    val: T,
+) -> Result<R, String> {
+    let ser = serde_wasm_bindgen::to_value(&val).expect("Unable to serialize invoke params");
+    match invoke(fn_name.as_ref(), ser).await {
+        Ok(results) => match serde_wasm_bindgen::from_value(results) {
+            Ok(parsed) => Ok(parsed),
+            Err(err) => Err(err.to_string()),
+        },
+        Err(e) => Err(format!("Error fetching connections: {:?}", e.as_string())),
+    }
 }
 
 fn main() {

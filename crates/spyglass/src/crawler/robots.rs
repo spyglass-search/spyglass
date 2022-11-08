@@ -191,7 +191,7 @@ pub async fn check_resource_rules(
                     .and_then(|header| header.to_str().ok());
 
                 if let Some(value) = value {
-                    if !value.to_string().contains(&"text/html") {
+                    if !value.to_string().contains("text/html") {
                         log::info!("Unable to crawl: content-type =/= text/html");
                         return Ok(false);
                     }
