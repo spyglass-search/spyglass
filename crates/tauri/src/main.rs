@@ -36,7 +36,7 @@ mod rpc;
 mod window;
 use window::{
     show_connection_manager_window, show_crawl_stats_window, show_lens_manager_window,
-    show_plugin_manager, show_user_settings, show_wizard_window,
+    show_plugin_manager, show_search_bar, show_user_settings, show_wizard_window,
 };
 
 use crate::window::show_update_window;
@@ -208,44 +208,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .on_system_tray_event(move |app, event| {
-            if let SystemTrayEvent::MenuItemClick { id, .. } = event {
-                let window = app.get_window("main").expect("Main window not initialized");
-
-                if let Ok(menu_id) = MenuID::from_str(&id) {
-                    match menu_id {
-                        MenuID::CRAWL_STATUS => {
-                            // Don't block main thread when pausing the crawler.
-                            let item_handle = app.tray_handle().get_item(&id);
-                            let _ = item_handle.set_title("Handling request...");
-                            let _ = item_handle.set_enabled(false);
-                            tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
-                        }
-                        MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
-                        MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
-                        MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
-                        MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
-                        MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
-                        MenuID::OPEN_WIZARD => { show_wizard_window(app); }
-                        MenuID::SHOW_CRAWL_STATUS => {
-                            show_crawl_stats_window(app);
-                        }
-                        MenuID::SHOW_SEARCHBAR => {
-                            let _ = window.is_visible()
-                                .map(|is_visible| {
-                                    if !is_visible {
-                                        window::hide_search_bar(&window);
-                                    }
-                                });
-                        }
-                        MenuID::QUIT => app.exit(0),
-                        MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
-                        MenuID::JOIN_DISCORD => {
-                            let _ = open::that(shared::constants::DISCORD_JOIN_URL);
-                        }
-                        // Just metainfo
-                        MenuID::VERSION => {},
-                    }
+            match event {
+                // Only occurs on Windows.
+                SystemTrayEvent::DoubleClick { .. } => {
+                    let window = app.get_window("main")
+                        .expect("Main window not initialized");
+                    show_search_bar(&window);
                 }
+                SystemTrayEvent::MenuItemClick { id, .. } => {
+                    let window = app.get_window("main").expect("Main window not initialized");
+
+                    if let Ok(menu_id) = MenuID::from_str(&id) {
+                        match menu_id {
+                            MenuID::CRAWL_STATUS => {
+                                // Don't block main thread when pausing the crawler.
+                                let item_handle = app.tray_handle().get_item(&id);
+                                let _ = item_handle.set_title("Handling request...");
+                                let _ = item_handle.set_enabled(false);
+                                tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
+                            }
+                            MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
+                            MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
+                            MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
+                            MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
+                            MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
+                            MenuID::OPEN_WIZARD => { show_wizard_window(app); }
+                            MenuID::SHOW_CRAWL_STATUS => {
+                                show_crawl_stats_window(app);
+                            }
+                            MenuID::SHOW_SEARCHBAR => {
+                                let _ = window.is_visible()
+                                    .map(|is_visible| {
+                                        if !is_visible {
+                                            window::hide_search_bar(&window);
+                                        }
+                                    });
+                            }
+                            MenuID::QUIT => app.exit(0),
+                            MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
+                            MenuID::JOIN_DISCORD => {
+                                let _ = open::that(shared::constants::DISCORD_JOIN_URL);
+                            }
+                            // Just metainfo
+                            MenuID::VERSION => {},
+                        }
+                    }
+                },
+                _ => ()
             }
         })
         .build(ctx)
