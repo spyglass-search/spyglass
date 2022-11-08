@@ -200,7 +200,7 @@ impl Component for ConnectionsManagerPage {
 
                 link.send_future(async move {
                     let id = id.clone();
-                    if let Err(err) = tauri_invoke::<_, String>(
+                    if let Err(err) = tauri_invoke::<_, ()>(
                         ClientInvoke::AuthorizeConnection,
                         &AuthorizeConnectionParams { id: id.clone() },
                     )
@@ -248,7 +248,7 @@ impl Component for ConnectionsManagerPage {
             Msg::RevokeConnection(id, account) => {
                 link.send_future(async move {
                     // Revoke & then refresh connections
-                    let _ = tauri_invoke::<_, String>(
+                    let _ = tauri_invoke::<_, ()>(
                         ClientInvoke::RevokeConnection,
                         &ResyncConnectionParams {
                             id: id.clone(),
@@ -265,7 +265,7 @@ impl Component for ConnectionsManagerPage {
                 self.resync_requested.insert(format!("{}/{}", id, account));
                 link.send_future(async move {
                     // Revoke & then refresh connections
-                    let _ = tauri_invoke::<_, String>(
+                    let _ = tauri_invoke::<_, ()>(
                         ClientInvoke::ResyncConnection,
                         &ResyncConnectionParams {
                             id: id.clone(),
