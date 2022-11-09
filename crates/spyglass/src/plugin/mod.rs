@@ -460,7 +460,7 @@ pub async fn plugin_init(
         .map_or_else(|| "".to_string(), |dir| dir);
 
     let base_data_dir: String = directories::BaseDirs::new()
-        .map(|base| base.data_local_dir().display().to_string())
+        .map(|base| base.data_dir().display().to_string())
         .map_or_else(|| "".to_string(), |dir| dir);
 
     let home_dir: String = directories::BaseDirs::new()
