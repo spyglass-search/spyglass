@@ -174,9 +174,7 @@ pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
         entry.num_indexed += stat.count as u64;
     }
 
-    let by_domain = by_domain
-        .into_iter()
-        .collect();
+    let by_domain = by_domain.into_iter().collect();
 
     Ok(CrawlStats { by_domain })
 }
