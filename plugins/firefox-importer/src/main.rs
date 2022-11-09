@@ -85,7 +85,7 @@ impl Plugin {
         let base_data_res = std::env::var(consts::env::BASE_DATA_DIR);
 
         let profiles_dir = if let (Ok(host_os), Ok(home_dir), Ok(data_dir)) =
-            (host_os_res, host_home_res, base_data_res)
+            (host_os_res.clone(), host_home_res, base_data_res)
         {
             // Determined from https://support.mozilla.org/en-US/kb/profiles-where-firefox-stores-user-data
             match host_os.as_str() {
@@ -93,7 +93,7 @@ impl Plugin {
                 "macos" => {
                     Some(Path::new(&home_dir).join("Library/Application Support/Firefox/Profiles"))
                 }
-                "windows" => Some(Path::new(&data_dir).join("Mozilla\\Firefox\\Profile\\")),
+                "windows" => Some(Path::new(&format!("{}\\Mozilla\\Firefox\\Profile\\", &data_dir)).to_path_buf()),
                 _ => None,
             }
         } else {
@@ -102,14 +102,17 @@ impl Plugin {
 
         // Loop through profiles in the profile directory & find the default one.
         // A little hacky since Firefox prepends a random string to the profile name.
-        if let Some(profiles_dir) = profiles_dir {
+        if let (Ok(host_os), Some(profiles_dir)) = (host_os_res, profiles_dir) {
             if let Ok(entries) = list_dir(&profiles_dir.display().to_string()) {
                 for entry in entries {
                     if entry.is_dir
                         && (entry.path.ends_with(".default")
                             || entry.path.ends_with(".default-release"))
                     {
-                        return Some(Path::new(&entry.path).join(DB_FILE));
+                        return match host_os.as_str() {
+                            "windows" => Some(Path::new(&format!("{}\\{}", &entry.path, DB_FILE)).to_path_buf()),
+                            _ => Some(Path::new(&entry.path).join(DB_FILE)),
+                        }
                     }
                 }
             }
