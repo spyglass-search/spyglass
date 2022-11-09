@@ -7,15 +7,7 @@ const DB_FILE: &str = "places.sqlite";
 // How often we want to sync w/ the firefox database
 const SYNC_INTERVAL_S: u64 = 60 * 5;
 // SQL query to find bookmarks
-const BOOKMARK_QUERY: &str = "
-    SELECT
-        DISTINCT url
-    FROM moz_bookmarks
-    JOIN moz_places on moz_places.id = moz_bookmarks.fk
-    WHERE
-        moz_places.hidden = 0
-        AND url like 'http%'
-";
+const BOOKMARK_QUERY: &str = "SELECT DISTINCT url FROM moz_bookmarks JOIN moz_places on moz_places.id = moz_bookmarks.fk WHERE moz_places.hidden = 0 AND url like 'http%'";
 
 struct Plugin {
     last_update: Instant,
@@ -70,9 +62,9 @@ impl SpyglassPlugin for Plugin {
         }
 
         if path.exists() {
-            enqueue_all(&self.read_bookmarks());
+            self.read_bookmarks();
         } else {
-            log("Unable to find places.sqlite file".to_string());
+            log(format!("Unable to find places.sqlite file @ {}", path.to_string_lossy()));
         }
     }
 }
@@ -121,12 +113,7 @@ impl Plugin {
         None
     }
 
-    fn read_bookmarks(&self) -> Vec<String> {
-        let urls = sqlite3_query("places.sqlite", BOOKMARK_QUERY);
-        if let Ok(urls) = urls {
-            return urls;
-        }
-
-        Vec::new()
+    fn read_bookmarks(&self) {
+        sqlite3_query("places.sqlite", BOOKMARK_QUERY);
     }
 }
