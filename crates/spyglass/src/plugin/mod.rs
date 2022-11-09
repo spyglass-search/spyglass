@@ -145,7 +145,7 @@ impl PluginManager {
         PluginManager {
             check_update_subs: Default::default(),
             file_watch_subs: Default::default(),
-            plugins: Default::default()
+            plugins: Default::default(),
         }
     }
 
@@ -182,7 +182,6 @@ pub async fn plugin_event_loop(
         })
     })
     .expect("Unable to watch lens directory");
-
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
