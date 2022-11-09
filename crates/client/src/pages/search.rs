@@ -173,6 +173,7 @@ impl Component for SearchPage {
             Msg::ClearResults => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
+                self.lens = Vec::new();
                 self.lens_results = Vec::new();
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
@@ -182,6 +183,7 @@ impl Component for SearchPage {
             Msg::ClearQuery => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
+                self.lens = Vec::new();
                 self.lens_results = Vec::new();
                 self.search_meta = None;
                 self.query = "".to_string();
