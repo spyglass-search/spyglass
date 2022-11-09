@@ -109,7 +109,7 @@ async fn handle_plugin_cmd_request(
             handle_sync_file(env, dst, src);
             // Sleep a little bit to let the copy complete.
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        },
+        }
         // Walk through a path & enqueue matching files for indexing.
         PluginCommandRequest::WalkAndEnqueue { path, extensions } => {
             let dir_path = Path::new(&path);

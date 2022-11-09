@@ -64,7 +64,10 @@ impl SpyglassPlugin for Plugin {
         if path.exists() {
             self.read_bookmarks();
         } else {
-            log(format!("Unable to find places.sqlite file @ {}", path.to_string_lossy()));
+            log(format!(
+                "Unable to find places.sqlite file @ {}",
+                path.to_string_lossy()
+            ));
         }
     }
 }
@@ -85,7 +88,9 @@ impl Plugin {
                 "macos" => {
                     Some(Path::new(&home_dir).join("Library/Application Support/Firefox/Profiles"))
                 }
-                "windows" => Some(Path::new(&format!("{}\\Mozilla\\Firefox\\Profile\\", &data_dir)).to_path_buf()),
+                "windows" => Some(
+                    Path::new(&format!("{}\\Mozilla\\Firefox\\Profile\\", &data_dir)).to_path_buf(),
+                ),
                 _ => None,
             }
         } else {
@@ -102,9 +107,11 @@ impl Plugin {
                             || entry.path.ends_with(".default-release"))
                     {
                         return match host_os.as_str() {
-                            "windows" => Some(Path::new(&format!("{}\\{}", &entry.path, DB_FILE)).to_path_buf()),
+                            "windows" => Some(
+                                Path::new(&format!("{}\\{}", &entry.path, DB_FILE)).to_path_buf(),
+                            ),
                             _ => Some(Path::new(&entry.path).join(DB_FILE)),
-                        }
+                        };
                     }
                 }
             }
