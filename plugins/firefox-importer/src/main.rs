@@ -7,15 +7,7 @@ const DB_FILE: &str = "places.sqlite";
 // How often we want to sync w/ the firefox database
 const SYNC_INTERVAL_S: u64 = 60 * 5;
 // SQL query to find bookmarks
-const BOOKMARK_QUERY: &str = "
-    SELECT
-        DISTINCT url
-    FROM moz_bookmarks
-    JOIN moz_places on moz_places.id = moz_bookmarks.fk
-    WHERE
-        moz_places.hidden = 0
-        AND url like 'http%'
-";
+const BOOKMARK_QUERY: &str = "SELECT DISTINCT url FROM moz_bookmarks JOIN moz_places on moz_places.id = moz_bookmarks.fk WHERE moz_places.hidden = 0 AND url like 'http%'";
 
 struct Plugin {
     last_update: Instant,
@@ -33,6 +25,14 @@ impl Default for Plugin {
 
 register_plugin!(Plugin);
 
+fn join_path(folder: &str, file: &str) -> PathBuf {
+    let host_os_res = std::env::var(consts::env::HOST_OS);
+    match host_os_res.unwrap_or_default().as_str() {
+        "windows" => Path::new(&format!("{}\\\\{}", folder, file)).to_path_buf(),
+        _ => Path::new(&folder).join(file),
+    }
+}
+
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
         // Let the host know we want to check for updates on a regular interval.
@@ -41,7 +41,7 @@ impl SpyglassPlugin for Plugin {
         let mut profile_path = None;
         if let Ok(folder) = std::env::var("FIREFOX_DATA_FOLDER") {
             if !folder.is_empty() {
-                profile_path = Some(Path::new(&folder).join(DB_FILE))
+                profile_path = Some(join_path(&folder, DB_FILE));
             }
         }
 
@@ -70,9 +70,12 @@ impl SpyglassPlugin for Plugin {
         }
 
         if path.exists() {
-            enqueue_all(&self.read_bookmarks());
+            self.read_bookmarks();
         } else {
-            log("Unable to find places.sqlite file".to_string());
+            log(format!(
+                "Unable to find places.sqlite file @ {}",
+                path.to_string_lossy()
+            ));
         }
     }
 }
@@ -89,11 +92,12 @@ impl Plugin {
         {
             // Determined from https://support.mozilla.org/en-US/kb/profiles-where-firefox-stores-user-data
             match host_os.as_str() {
-                "linux" => Some(Path::new(&home_dir).join(".mozilla/firefox")),
-                "macos" => {
-                    Some(Path::new(&home_dir).join("Library/Application Support/Firefox/Profiles"))
-                }
-                "windows" => Some(Path::new(&data_dir).join("Mozilla\\Firefox\\Profile\\")),
+                "linux" => Some(join_path(&home_dir, ".mozilla/firefox")),
+                "macos" => Some(join_path(
+                    &home_dir,
+                    "Library/Application Support/Firefox/Profiles",
+                )),
+                "windows" => Some(join_path(&data_dir, "Mozilla\\Firefox\\Profiles\\")),
                 _ => None,
             }
         } else {
@@ -109,7 +113,7 @@ impl Plugin {
                         && (entry.path.ends_with(".default")
                             || entry.path.ends_with(".default-release"))
                     {
-                        return Some(Path::new(&entry.path).join(DB_FILE));
+                        return Some(join_path(&entry.path, DB_FILE));
                     }
                 }
             }
@@ -118,12 +122,7 @@ impl Plugin {
         None
     }
 
-    fn read_bookmarks(&self) -> Vec<String> {
-        let urls = sqlite3_query("places.sqlite", BOOKMARK_QUERY);
-        if let Ok(urls) = urls {
-            return urls;
-        }
-
-        Vec::new()
+    fn read_bookmarks(&self) {
+        sqlite3_query("places.sqlite", BOOKMARK_QUERY);
     }
 }

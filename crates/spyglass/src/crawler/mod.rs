@@ -397,7 +397,6 @@ impl Crawler {
         url: &Url,
         parse_results: bool,
     ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        println!("Http fetch");
         // Modify bootstrapped URLs to pull from the Internet Archive
         let url: Url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
             Url::parse(&create_archive_url(url.as_ref())).expect("Unable to create archive URL")
