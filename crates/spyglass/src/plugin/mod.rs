@@ -6,11 +6,10 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use spyglass_plugin::SearchFilter;
-use tokio::sync::mpsc::Receiver;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use wasmer::{Instance, Module, Store, WasmerEnv};
@@ -115,9 +114,6 @@ pub struct PluginManager {
     check_update_subs: HashSet<PluginId>,
     file_watch_subs: DashMap<PluginId, PathBuf>,
     plugins: DashMap<PluginId, PluginInstance>,
-    // For file watching subscribers
-    file_events: Receiver<notify::Result<notify::Event>>,
-    file_watcher: RecommendedWatcher,
 }
 
 impl Default for PluginManager {
@@ -146,20 +142,10 @@ impl PluginManager {
     }
 
     pub fn new() -> Self {
-        let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let watcher = notify::recommended_watcher(move |res| {
-            futures::executor::block_on(async {
-                tx.send(res).await.expect("Unable to send FS event");
-            })
-        })
-        .expect("Unable to watch lens directory");
-
         PluginManager {
             check_update_subs: Default::default(),
             file_watch_subs: Default::default(),
-            plugins: Default::default(),
-            file_events: rx,
-            file_watcher: watcher,
+            plugins: Default::default()
         }
     }
 
@@ -188,16 +174,25 @@ pub async fn plugin_event_loop(
     let mut config = config.clone();
     plugin_load(&state, &mut config, &cmd_writer).await;
 
+    // For file watching subscribers
+    let (tx, mut file_events) = tokio::sync::mpsc::channel(1);
+    let mut watcher = notify::recommended_watcher(move |res| {
+        futures::executor::block_on(async {
+            tx.send(res).await.expect("Unable to send FS event");
+        })
+    })
+    .expect("Unable to watch lens directory");
+
+
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
     loop {
-        let mut manager = state.plugin_manager.lock().await;
         // Wait for next command / handle shutdown responses
         let next_cmd = tokio::select! {
             // Listen for plugin requests
             res = cmd_queue.recv() => res,
             // Listen for file change notifications
-            file_event = manager.file_events.recv() => {
+            file_event = file_events.recv() => {
                 if let Some(Ok(file_event)) = file_event {
                     Some(PluginCommand::QueueFileNotify(file_event))
                 } else {
@@ -218,6 +213,7 @@ pub async fn plugin_event_loop(
                 log::info!("disabling plugin <{}>", plugin_name);
 
                 let mut disabled = Vec::new();
+                let mut manager = state.plugin_manager.lock().await;
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = false;
@@ -231,6 +227,7 @@ pub async fn plugin_event_loop(
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
                 log::info!("enabling plugin <{}>", plugin_name);
+                let manager = state.plugin_manager.lock().await;
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = true;
@@ -242,13 +239,15 @@ pub async fn plugin_event_loop(
                 }
             }
             Some(PluginCommand::HandleUpdate { plugin_id, event }) => {
+                let manager = state.plugin_manager.lock().await;
                 if let Some(mut plugin) = manager.plugins.get_mut(&plugin_id) {
                     plugin.update(event);
                 } else {
                     log::error!("Unable to find plugin id: {}", plugin_id);
-                }
+                };
             }
             Some(PluginCommand::Initialize(plugin)) => {
+                let manager = state.plugin_manager.lock().await;
                 let plugin_id = manager.plugins.len();
                 match plugin_init(plugin_id, &state, &cmd_writer, &plugin).await {
                     Ok((instance, env)) => {
@@ -267,6 +266,7 @@ pub async fn plugin_event_loop(
             }
             Some(PluginCommand::Subscribe(plugin_id, event)) => match event {
                 PluginSubscription::CheckUpdateInterval => {
+                    let mut manager = state.plugin_manager.lock().await;
                     manager.check_update_subs.insert(plugin_id);
                     let _ = cmd_writer
                         .send(PluginCommand::HandleUpdate {
@@ -282,7 +282,7 @@ pub async fn plugin_event_loop(
                         return;
                     }
 
-                    let _ = manager.file_watcher.watch(
+                    let _ = watcher.watch(
                         &path,
                         if recurse {
                             RecursiveMode::Recursive
@@ -291,11 +291,13 @@ pub async fn plugin_event_loop(
                         },
                     );
 
+                    let manager = state.plugin_manager.lock().await;
                     manager.file_watch_subs.insert(plugin_id, path);
                 }
             },
             // Queue update checks for subscribed plugins
             Some(PluginCommand::QueueIntervalCheck) => {
+                let manager = state.plugin_manager.lock().await;
                 for plugin_id in &manager.check_update_subs {
                     let _ = cmd_writer
                         .send(PluginCommand::HandleUpdate {
@@ -341,6 +343,7 @@ pub async fn plugin_event_loop(
                     };
 
                     if let Some(event) = event {
+                        let manager = state.plugin_manager.lock().await;
                         for entry in &manager.file_watch_subs {
                             let watched_path = entry.value();
                             if updated_path.starts_with(watched_path) {
