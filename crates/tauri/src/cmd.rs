@@ -365,11 +365,12 @@ pub async fn save_user_settings(
                 }
                 plugin_name => {
                     // Load plugin settings configurations
-                    let plugin_config = plugin_configs
-                        .get(plugin_name)
-                        .expect("Unable to find plugin");
+                    if let Some(plugin_config) = plugin_configs.get(plugin_name) {
+                        let to_update = current_settings
+                            .plugin_settings
+                            .entry(plugin_name.to_string())
+                            .or_default();
 
-                    if let Some(to_update) = current_settings.plugin_settings.get_mut(plugin_name) {
                         if let Some(field_opts) = plugin_config.user_settings.get(field) {
                             // Validate & serialize value into something we can save.
                             match field_opts.form_type.validate(value) {
@@ -382,6 +383,8 @@ pub async fn save_user_settings(
                                 }
                             }
                         }
+                    } else {
+                        errors.insert(key.to_string(), format!("Config not found for {}", key));
                     }
                 }
             }

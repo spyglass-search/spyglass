@@ -93,7 +93,7 @@ impl Plugin {
                 "macos" => {
                     Some(Path::new(&home_dir).join("Library/Application Support/Firefox/Profiles"))
                 }
-                "windows" => Some(Path::new(&data_dir).join("Mozilla/Firefox/Profile/")),
+                "windows" => Some(Path::new(&data_dir).join("Mozilla\\Firefox\\Profile\\")),
                 _ => None,
             }
         } else {
