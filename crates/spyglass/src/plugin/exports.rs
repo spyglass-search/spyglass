@@ -58,7 +58,7 @@ async fn handle_plugin_cmd_request(
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
         PluginCommandRequest::ListDir { path } => {
-            log::info!("{} listing path: {}", env.name, path);
+            log::debug!("{} listing path: {}", env.name, path);
             let entries = std::fs::read_dir(path)?
                 .flatten()
                 .map(|entry| {
@@ -95,16 +95,21 @@ async fn handle_plugin_cmd_request(
                 Ok(row.get::<usize, String>(0).unwrap_or_default())
             })?;
 
-            let collected: Vec<String> = results
+            let urls: Vec<String> = results
                 .map(|x| x.unwrap_or_default())
                 .collect::<Vec<String>>()
                 .into_iter()
                 .filter(|x| !x.is_empty())
                 .collect();
 
-            wasi_write(&env.wasi_env, &collected)?;
+            log::debug!("PCR::SqliteQUery: found {} urls", urls.len());
+            handle_plugin_enqueue(env, &urls);
         }
-        PluginCommandRequest::SyncFile { dst, src } => handle_sync_file(env, dst, src),
+        PluginCommandRequest::SyncFile { dst, src } => {
+            handle_sync_file(env, dst, src);
+            // Sleep a little bit to let the copy complete.
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
         // Walk through a path & enqueue matching files for indexing.
         PluginCommandRequest::WalkAndEnqueue { path, extensions } => {
             let dir_path = Path::new(&path);
@@ -153,7 +158,7 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 /// Adds a file into the plugin data directory. Use this to copy files from elsewhere
 /// in the filesystem so that it can be processed by the plugin.
 fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
-    log::info!("<{}> requesting access to folder: {}", env.name, src);
+    log::info!("<{}> requesting access to file: {}", env.name, src);
     let dst = Path::new(dst.trim_start_matches('/'));
     let src = Path::new(&src);
 
