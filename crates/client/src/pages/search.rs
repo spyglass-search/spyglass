@@ -82,11 +82,12 @@ impl SearchPage {
     }
 
     fn move_selection_down(&mut self) {
-        let max_len = if self.docs_results.is_empty() {
-            0
-        } else {
-            self.docs_results.len() - 1
+        let max_len = match self.result_display {
+            ResultDisplay::Docs => (self.docs_results.len() - 1).max(0),
+            ResultDisplay::Lens => (self.lens_results.len() - 1).max(0),
+            _ => 0,
         };
+
         self.selected_idx = (self.selected_idx + 1).min(max_len);
         self.scroll_to_result(self.selected_idx);
     }
