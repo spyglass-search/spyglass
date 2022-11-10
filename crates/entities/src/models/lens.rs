@@ -3,7 +3,6 @@ use sea_orm::sea_query;
 use sea_orm::Set;
 use serde::Serialize;
 use shared::config::LensConfig;
-use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
@@ -15,15 +14,6 @@ pub enum LensType {
     // source is.
     #[sea_orm(string_value = "Plugin")]
     Plugin,
-}
-
-impl fmt::Display for LensType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            LensType::Simple => write!(f, "Simple"),
-            LensType::Plugin => write!(f, "Plugin"),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]

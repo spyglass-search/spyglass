@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fmt;
 
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
@@ -49,17 +48,6 @@ pub enum CrawlStatus {
     Failed,
 }
 
-impl fmt::Display for CrawlStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CrawlStatus::Queued => write!(f, "Queued"),
-            CrawlStatus::Processing => write!(f, "Processing"),
-            CrawlStatus::Completed => write!(f, "Completed"),
-            CrawlStatus::Failed => write!(f, "Failed"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum CrawlType {
@@ -74,16 +62,6 @@ pub enum CrawlType {
 impl Default for CrawlType {
     fn default() -> Self {
         CrawlType::Normal
-    }
-}
-
-impl fmt::Display for CrawlType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CrawlType::Api => write!(f, "Api"),
-            CrawlType::Bootstrap => write!(f, "Bootstrap"),
-            CrawlType::Normal => write!(f, "Normal"),
-        }
     }
 }
 
