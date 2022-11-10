@@ -136,7 +136,6 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "items-center",
         "border-t",
         "border-neutral-600",
-        "pl-8",
         "py-4",
         "text-white",
         "w-screen",
@@ -154,7 +153,11 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
 
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
-            <div class="flex flex-none bg-neutral-700 rounded h-12 w-12 items-center">{icon}</div>
+            <div class="flex flex-none pl-6 pr-2">
+                <div class="flex flex-none bg-neutral-700 rounded h-12 w-12 items-center">
+                    {icon}
+                </div>
+            </div>
             <div class="grow">
                 <h2 class="text-lg truncate font-bold w-[30rem]">
                     {result.title.clone()}
