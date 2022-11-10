@@ -5,7 +5,7 @@ use libgoog::auth::{AccessToken, RefreshToken};
 use libgoog::{Credentials, GoogClient};
 use std::time::Duration;
 
-use crate::crawler::CrawlResult;
+use crate::crawler::{CrawlError, CrawlResult};
 use crate::oauth;
 use crate::state::AppState;
 use entities::models::{connection, crawl_queue};
@@ -146,10 +146,10 @@ impl Connection for GCalConnection {
         log::debug!("synced {} events", num_events);
     }
 
-    async fn get(&mut self, uri: &Url) -> anyhow::Result<Option<CrawlResult>> {
+    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
         if let Some(segments) = uri.path_segments().map(|c| c.collect::<Vec<_>>()) {
             if segments.len() != 2 {
-                return Ok(None);
+                return Err(CrawlError::FetchError("Invalid GCal API URL".to_string()));
             }
 
             let calendar_id = segments.first().expect("Should be len 2").to_string();
@@ -178,18 +178,18 @@ impl Connection for GCalConnection {
                         )
                     };
                     let title = format!("{} ({})", &event.summary, event.start.date);
-                    Ok(Some(CrawlResult::new(
+                    Ok(CrawlResult::new(
                         uri,
                         Some(event.html_link),
                         &content,
                         &title,
                         None,
-                    )))
+                    ))
                 }
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
+                Err(err) => Err(CrawlError::FetchError(err.to_string())),
             };
         }
 
-        Ok(None)
+        Err(CrawlError::FetchError("Invalid URL".to_string()))
     }
 }

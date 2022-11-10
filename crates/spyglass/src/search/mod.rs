@@ -155,8 +155,6 @@ impl Searcher {
         domain: &str,
         url: &str,
         content: &str,
-        // Save to a cache?
-        _raw: &str,
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
@@ -293,7 +291,6 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            "",
         )
         .expect("Unable to add doc");
 
@@ -311,7 +308,6 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            "",
         )
         .expect("Unable to add doc");
 
@@ -328,7 +324,6 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-            "",
         )
         .expect("Unable to add doc");
 
@@ -342,7 +337,6 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-            "",
         )
         .expect("Unable to add doc");
 

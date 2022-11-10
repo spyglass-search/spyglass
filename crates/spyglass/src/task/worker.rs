@@ -7,7 +7,7 @@ use shared::config::LensConfig;
 
 use super::bootstrap;
 use super::CrawlTask;
-use crate::crawler::Crawler;
+use crate::crawler::{CrawlError, Crawler};
 use crate::search::Searcher;
 use crate::state::AppState;
 
@@ -59,17 +59,10 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
     let result = crawler.fetch_by_job(&state, task.id, true).await;
 
     match result {
-        Ok(Some(crawl_result)) => {
+        Ok(crawl_result) => {
             // Update job status
-            // We consider 400s complete in this case since we manage to hit the server
-            // successfully but nothing useful was returned.
-            let cq_status = if crawl_result.is_success() || crawl_result.is_bad_request() {
-                crawl_queue::CrawlStatus::Completed
-            } else {
-                crawl_queue::CrawlStatus::Failed
-            };
-
-            let _ = crawl_queue::mark_done(&state.db, task.id, cq_status).await;
+            let _ = crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Completed)
+                .await;
 
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
@@ -130,7 +123,6 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                             url_host,
                             url.as_str(),
                             &content,
-                            &crawl_result.raw.unwrap_or_default(),
                         ) {
                             Ok(new_doc_id) => Some(new_doc_id),
                             _ => None,
@@ -171,27 +163,30 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
 
             FetchResult::Ignore
         }
-        Ok(None) => {
-            // Failed to grab robots.txt or crawling is not allowed
-            if let Err(e) =
-                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Completed)
-                    .await
-            {
-                log::error!("Unable to mark task as finished: {}", e);
-            }
-
-            FetchResult::Ignore
-        }
         Err(err) => {
             log::error!("Unable to crawl id: {} - {:?}", task.id, err);
-            // mark crawl as failed
-            if let Err(e) =
-                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed).await
-            {
-                log::error!("Unable to mark task as failed: {}", e);
+            match err {
+                // Ignore skips, recently fetched crawls, or not found
+                CrawlError::Denied(_) | CrawlError::RecentlyFetched | CrawlError::NotFound => {
+                    let _ = crawl_queue::mark_done(
+                        &state.db,
+                        task.id,
+                        crawl_queue::CrawlStatus::Completed,
+                    )
+                    .await;
+                    FetchResult::Ignore
+                }
+                _ => {
+                    // mark crawl as failed
+                    let _ = crawl_queue::mark_done(
+                        &state.db,
+                        task.id,
+                        crawl_queue::CrawlStatus::Failed,
+                    )
+                    .await;
+                    FetchResult::Error
+                }
             }
-
-            FetchResult::Error
         }
     }
 }

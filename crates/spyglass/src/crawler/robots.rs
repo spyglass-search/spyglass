@@ -96,18 +96,15 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
 }
 
 // Checks whether we're allow to crawl this url
-pub async fn check_resource_rules(
-    db: &DatabaseConnection,
-    client: &HTTPClient,
-    url: &Url,
-) -> anyhow::Result<bool> {
+pub async fn check_resource_rules(db: &DatabaseConnection, client: &HTTPClient, url: &Url) -> bool {
     let domain = url.host_str().unwrap_or_default();
     let path = url[url::Position::BeforePath..].to_string();
 
     let rules = resource_rule::Entity::find()
         .filter(resource_rule::Column::Domain.eq(domain))
         .all(db)
-        .await?;
+        .await
+        .expect("Unable to add resource rules");
 
     if rules.is_empty() {
         log::info!("No rules found for <{}>, fetching robot.txt", domain);
@@ -131,7 +128,7 @@ pub async fn check_resource_rules(
                                     allow_crawl: Set(true),
                                     ..Default::default()
                                 };
-                                new_rule.insert(db).await?;
+                                let _ = new_rule.insert(db).await;
                             } else {
                                 for rule in parsed_rules.iter() {
                                     let new_rule = resource_rule::ActiveModel {
@@ -141,7 +138,7 @@ pub async fn check_resource_rules(
                                         allow_crawl: Set(rule.allow_crawl),
                                         ..Default::default()
                                     };
-                                    new_rule.insert(db).await?;
+                                    let _ = new_rule.insert(db).await;
                                 }
                             }
                         }
@@ -155,7 +152,7 @@ pub async fn check_resource_rules(
                             allow_crawl: Set(true),
                             ..Default::default()
                         };
-                        new_rule.insert(db).await?;
+                        let _ = new_rule.insert(db).await;
                     }
                     _ => {}
                 }
@@ -172,19 +169,19 @@ pub async fn check_resource_rules(
     if (allow_filter.is_empty() || !allow_filter.is_match(&path)) && disallow_filter.is_match(&path)
     {
         log::info!("Unable to crawl `{}` due to rule", url.as_str());
-        return Ok(false);
+        return false;
     }
 
     // Check the content-type of the URL, only crawl HTML pages for now
     match client.head(url).await {
         Err(err) => {
             log::info!("Unable to check content-type: {}", err.to_string());
-            return Ok(false);
+            return false;
         }
         Ok(res) => {
             let headers = res.headers();
             if !headers.contains_key(http::header::CONTENT_TYPE) {
-                return Ok(false);
+                return false;
             } else {
                 let value = headers
                     .get(http::header::CONTENT_TYPE)
@@ -193,14 +190,14 @@ pub async fn check_resource_rules(
                 if let Some(value) = value {
                     if !value.to_string().contains("text/html") {
                         log::info!("Unable to crawl: content-type =/= text/html");
-                        return Ok(false);
+                        return false;
                     }
                 }
             }
         }
     }
 
-    Ok(true)
+    true
 }
 
 #[cfg(test)]
@@ -308,9 +305,7 @@ mod test {
             .await
             .expect("Unable to insert allow rule");
 
-        let res = check_resource_rules(&db, &crawler.client, &url)
-            .await
-            .unwrap();
+        let res = check_resource_rules(&db, &crawler.client, &url).await;
 
         assert_eq!(res, true);
     }

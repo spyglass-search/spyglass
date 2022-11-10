@@ -5490,6 +5490,7 @@ dependencies = [
  "spyglass-rpc",
  "tantivy",
  "tendril",
+ "thiserror",
  "tokio",
  "tokio-retry",
  "tracing",

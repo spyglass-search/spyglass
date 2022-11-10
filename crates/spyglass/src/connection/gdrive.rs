@@ -5,7 +5,7 @@ use libgoog::auth::{AccessToken, RefreshToken};
 use libgoog::{Credentials, GoogClient};
 use std::time::Duration;
 
-use crate::crawler::CrawlResult;
+use crate::crawler::{CrawlError, CrawlResult};
 use crate::oauth;
 use crate::state::AppState;
 use entities::models::{connection, crawl_queue};
@@ -158,9 +158,13 @@ impl Connection for DriveConnection {
         log::debug!("synced {} files", num_files);
     }
 
-    async fn get(&mut self, uri: &Url) -> anyhow::Result<Option<CrawlResult>> {
+    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
         let file_id = uri.path().trim_start_matches('/');
-        let metadata = self.client.get_file_metadata(file_id).await?;
+        let metadata = match self.client.get_file_metadata(file_id).await {
+            Ok(file) => file,
+            Err(err) => return Err(CrawlError::FetchError(err.to_string())),
+        };
+
         log::debug!("fetching file {} - {:?}", file_id, metadata);
 
         // Grab text for supported mimetypes
@@ -180,12 +184,12 @@ impl Connection for DriveConnection {
             "".to_string()
         };
 
-        Ok(Some(CrawlResult::new(
+        Ok(CrawlResult::new(
             uri,
             Some(metadata.web_view_link),
             &content,
             &metadata.name,
             None,
-        )))
+        ))
     }
 }

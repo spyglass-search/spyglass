@@ -83,15 +83,12 @@ async fn start_crawl(
                 Ok(parse_result) => {
                     let crawl_result = parse_result.content;
                     // Update job status
-                    // We consider 400s complete in this case since we manage to hit the server
-                    // successfully but nothing useful was returned.
-                    let cq_status = if crawl_result.is_success() || crawl_result.is_bad_request() {
-                        crawl_queue::CrawlStatus::Completed
-                    } else {
-                        crawl_queue::CrawlStatus::Failed
-                    };
-
-                    let _ = crawl_queue::mark_done(&state.db, task.id, cq_status).await;
+                    let _ = crawl_queue::mark_done(
+                        &state.db,
+                        task.id,
+                        crawl_queue::CrawlStatus::Completed,
+                    )
+                    .await;
 
                     // Add all valid, non-duplicate, non-indexed links found to crawl queue
                     let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
@@ -144,7 +141,6 @@ async fn start_crawl(
                                     url_host,
                                     url.as_str(),
                                     &content,
-                                    &crawl_result.raw.unwrap_or_default(),
                                 ) {
                                     Ok(new_doc_id) => Some(new_doc_id),
                                     _ => None,

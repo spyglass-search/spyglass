@@ -19,7 +19,7 @@ impl DefaultParser {
         _task_id: i64,
         crawl_result: &CrawlResult,
     ) -> Result<ParseResult, String> {
-        if let Some(raw_content) = &crawl_result.raw {
+        if let Some(raw_content) = &crawl_result.content {
             let url = Url::parse(&crawl_result.url).expect("Invalid fetch URL");
             let scrape_result = self.crawler.scrape_page(&url, raw_content).await;
             return Result::Ok(ParseResult {
