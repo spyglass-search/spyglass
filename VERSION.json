@@ -1,23 +1,23 @@
 {
-  "version": "22.11.3",
-  "notes": "See full release notes here: https://github.com/a5huynh/spyglass/releases/tag/v2022.11.3",
-  "pub_date": "2022-11-09T06:02:07Z",
+  "version": "22.11.4",
+  "notes": "See full release notes here: https://github.com/a5huynh/spyglass/releases/tag/v2022.11.4",
+  "pub_date": "2022-11-10T00:14:07Z",
   "platforms": {
     "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYmxjRWRDcGFlbFBpcnRHNXpkbStENUx4Smc1bDloVWFYQ2wrQzlvZGZrOXgxaTVEZWprN2E5L0drT2VJZTl5clZTamtlQW9TcUlQNDZ1VFh4L3dLZ0FZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY3OTczMTQ1CWZpbGU6U3B5Z2xhc3MuYXBwLnRhci5negpsRW9TSHY2WnR1OXNHb1ZYMVFsUi9JWU9XbXN1c3pJaFVqM3BPNVd0SHhleHo2YktRUWZ1Rk1pa3ZtUGRLc1pManAxaVdSc2xVOWJmYjErWE52R3JEZz09Cg==",
-      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.3/Spyglass.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYm9wK1N0cWtLbFA1UHhxT2JrSGJXM2toTFlMa3B1UTNFV1BPN2hmUWtMQ2NuVHhlSTBENjBoTjM2dzRTSWtjOFFkRDRiQStoU3NBUU95aDdIOUpHcEFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY4MDM5MTg2CWZpbGU6U3B5Z2xhc3MuYXBwLnRhci5negppVm5nK2hybHBKZzl6UUtMUHFQcDZoSWFKaXZndlp3Y21oeWNOOE5YMHZvbFVwWDNOZEdTSUswZFRvMWV3MHppeXB2K1B4N3dDM2p2OVdYb1RWaWhCZz09Cg==",
+      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.4/Spyglass.app.tar.gz"
     },
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYmxjRWRDcGFlbFBpcnRHNXpkbStENUx4Smc1bDloVWFYQ2wrQzlvZGZrOXgxaTVEZWprN2E5L0drT2VJZTl5clZTamtlQW9TcUlQNDZ1VFh4L3dLZ0FZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY3OTczMTQ1CWZpbGU6U3B5Z2xhc3MuYXBwLnRhci5negpsRW9TSHY2WnR1OXNHb1ZYMVFsUi9JWU9XbXN1c3pJaFVqM3BPNVd0SHhleHo2YktRUWZ1Rk1pa3ZtUGRLc1pManAxaVdSc2xVOWJmYjErWE52R3JEZz09Cg==",
-      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.3/Spyglass.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYm9wK1N0cWtLbFA1UHhxT2JrSGJXM2toTFlMa3B1UTNFV1BPN2hmUWtMQ2NuVHhlSTBENjBoTjM2dzRTSWtjOFFkRDRiQStoU3NBUU95aDdIOUpHcEFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY4MDM5MTg2CWZpbGU6U3B5Z2xhc3MuYXBwLnRhci5negppVm5nK2hybHBKZzl6UUtMUHFQcDZoSWFKaXZndlp3Y21oeWNOOE5YMHZvbFVwWDNOZEdTSUswZFRvMWV3MHppeXB2K1B4N3dDM2p2OVdYb1RWaWhCZz09Cg==",
+      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.4/Spyglass.app.tar.gz"
     },
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYnVXVXpHS3ZCUWROK3d3WlNSN1BLdjdOZkJMdUViZ3puODlmdnBFVHpJczRxUG9UYjdsZjhTNkQ4dnJuN1FNSFlZdkxPMHpBblpLT3kxZ0JvaE9VK1E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY3OTcxODg3CWZpbGU6c3B5Z2xhc3NfMjIuMTEuM19hbWQ2NC5BcHBJbWFnZS50YXIuZ3oKSHcvTS9OdC9NSzdoM1hueHVNcHV3Wk0vWGNCVEY2QXpqRm5WQWUxR05Hc204RUNvc0FpcitPTkRQNVlDUjdTdk5mMVUzTGtVOThFWnZ1RW1JNmxDREE9PQo=",
-      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.3/spyglass_22.11.3_amd64.AppImage.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYnJJL3F5UWJZbldBQ3JSMUJXb3NDT1ErOEtnWmU0RDFWRFBkVjlLQ09seTc1anZLU09EMkVMNWFpMDMyY29EUEZzVmtPdTZON1F4dWpocDQrbklYdXdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY4MDM3NTY5CWZpbGU6c3B5Z2xhc3NfMjIuMTEuNF9hbWQ2NC5BcHBJbWFnZS50YXIuZ3oKTk1vdUlCY000TStkUWtKS2xXem1kUlcySGZGRVREYjN3M216ZnoyeDE3cXFOMUtTM1F1U3U4aG1yUThkcllKNjRqYy82Z0ozOWNHR3VkczdxNUw5REE9PQo=",
+      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.4/spyglass_22.11.4_amd64.AppImage.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYmhiZ1VKUHh4R2Vadm5aVWFJL2lZcVoxVllqd090cWc5M3F0SllMRmJ4bE9jajZNRlMyWGJsWENxQmFmLzMrQmNqdTNXUHNQWjEveVdXTFdnaWF0cXdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY3OTczNTIyCWZpbGU6U3B5Z2xhc3NfMjIuMTEuM194NjRfZW4tVVMubXNpLnppcApWWkRJZEpWRUNSUWx6Wldsd0xCMVpQRjZTUmc2Z3dRSHQvempuZkhBVmdlVTBxdDhvcTJlRzRSazd4b3ZJemFlM2lZVXZBaVlDY211ekQvNkkvMldDZz09Cg==",
-      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.3/Spyglass_22.11.3_x64_en-US.msi.zip"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYmozYklGUUxwR2NnRnJGQnh1T3RSUEdFWXlMMEwvNzVoQzIvcmk2ekJzbjU1NStJZHpkbHhFc1Z5SkFSdjBlcDVKSWU2Tk9nRk1WZUpMNmV6TEV5UlE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjY4MDM5MTUzCWZpbGU6U3B5Z2xhc3NfMjIuMTEuNF94NjRfZW4tVVMubXNpLnppcApRVUVGL21LS1dZZ3RiaVQyalpqdG03eWdmZkpaWVF1MWg2dUQ2QUdobnBBQjlQNm8vY3g1YTRzeXl6UXNIQVMzdkhmc1BhOTdFRUVjNFFrcFVNbjBCUT09Cg==",
+      "url": "https://github.com/a5huynh/spyglass/releases/download/v2022.11.4/Spyglass_22.11.4_x64_en-US.msi.zip"
     }
   }
 }
