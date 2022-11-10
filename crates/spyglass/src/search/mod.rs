@@ -50,11 +50,21 @@ impl Debug for Searcher {
 }
 
 impl Searcher {
+    pub async fn save(state: &AppState) -> anyhow::Result<()> {
+        if let Ok(mut writer) = state.index.writer.lock() {
+            match writer.commit() {
+                Ok(_) => Ok(()),
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
     pub async fn delete_by_id(state: &AppState, doc_id: &str) -> anyhow::Result<()> {
         // Remove from search index, immediately.
         if let Ok(mut writer) = state.index.writer.lock() {
             Searcher::remove_from_index(&mut writer, doc_id)?;
-            let _ = writer.commit();
         };
 
         // Remove from indexed_doc table

@@ -186,7 +186,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-
+    let _ = Searcher::save(&state);
     Ok(())
 }
 
@@ -212,14 +212,19 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
     // Remove items from index
     let indexed = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Domain.eq(domain))
+        .filter(indexed_document::Column::Domain.eq(domain.clone()))
         .all(&state.db)
         .await;
 
     if let Ok(indexed) = indexed {
+        log::debug!("removing docs from index");
+        let indexed_count = indexed.len();
         for result in indexed {
             let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
         }
+        let _ = Searcher::save(&state);
+
+        log::debug!("removed {} items from index", indexed_count);
     }
 
     Ok(())

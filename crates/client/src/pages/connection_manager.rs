@@ -40,8 +40,8 @@ pub enum Msg {
     FetchError(String),
     StartAdd,
     CancelAdd,
-    RevokeConnection(String, String),
-    ResyncConnection(String, String),
+    RevokeConnection { id: String, account: String },
+    ResyncConnection { id: String, account: String },
     UpdateConnections(ListConnectionResult),
 }
 
@@ -248,7 +248,7 @@ impl Component for ConnectionsManagerPage {
                 self.fetch_error = error;
                 true
             }
-            Msg::RevokeConnection(id, account) => {
+            Msg::RevokeConnection { id, account } => {
                 link.send_future(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
@@ -264,7 +264,7 @@ impl Component for ConnectionsManagerPage {
 
                 true
             }
-            Msg::ResyncConnection(id, account) => {
+            Msg::ResyncConnection { id, account } => {
                 self.resync_requested.insert(format!("{}/{}", id, account));
                 link.send_future(async move {
                     // Revoke & then refresh connections
@@ -335,7 +335,8 @@ impl Component for ConnectionsManagerPage {
                         .unwrap_or_else(|| conn.id.clone());
 
                     let resync_id = format!("{}/{}", conn.id, conn.account);
-                    let resync_msg = Msg::ResyncConnection(conn.id.clone(), conn.account.clone());
+                    let resync_msg = Msg::ResyncConnection { id: conn.id.clone(), account: conn.account.clone() };
+                    let delete_msg = Msg::RevokeConnection { id: conn.id.clone(), account: conn.account.clone() };
 
                     html! {
                         <>
@@ -361,7 +362,10 @@ impl Component for ConnectionsManagerPage {
                                         }
                                     }
                                 }
-                                <button class="text-xs flex flex-row gap-2 hover:text-red-500">
+                                <button
+                                    onclick={link.callback(move |_| delete_msg.clone())}
+                                    class="text-xs flex flex-row gap-2 hover:text-red-500"
+                                >
                                     <icons::TrashIcon width="w-4" height="h-4" />
                                     {"Delete"}
                                 </button>
