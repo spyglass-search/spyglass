@@ -76,7 +76,7 @@ pub struct PluginResult {
     pub is_enabled: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,
     pub num_docs: u64,
@@ -96,7 +96,7 @@ pub struct SearchResult {
     pub score: f32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchResults {
     pub results: Vec<SearchResult>,
     pub meta: SearchMeta,

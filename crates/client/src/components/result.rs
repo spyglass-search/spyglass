@@ -8,6 +8,7 @@ use shared::response::{LensResult, SearchResult};
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
     pub id: String,
+    pub onclick: Callback<MouseEvent>,
     pub result: SearchResult,
     pub is_selected: bool,
 }
@@ -98,9 +99,7 @@ fn render_metadata(result: &SearchResult) -> Html {
             }
             _ => {
                 meta.push(html! {
-                    <a href={result.url.clone()} target="_blank">
-                        <span class="align-middle">{format!(" {}", result.domain.clone())}</span>
-                    </a>
+                    <span class="align-middle">{format!(" {}", result.domain.clone())}</span>
                 });
             }
         }
@@ -141,6 +140,8 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "py-4",
         "text-white",
         "w-screen",
+        "cursor-pointer",
+        "hover:bg-cyan-900",
         if is_selected {
             "bg-cyan-900"
         } else {
@@ -152,11 +153,11 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     let metadata = render_metadata(result);
 
     html! {
-        <div id={props.id.clone()} class={component_styles}>
+        <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
             <div class="flex flex-none bg-neutral-700 rounded h-12 w-12 items-center">{icon}</div>
             <div class="grow">
                 <h2 class="text-lg truncate font-bold w-[30rem]">
-                    <a href={result.url.clone()}>{result.title.clone()}</a>
+                    {result.title.clone()}
                 </h2>
                 {metadata}
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-16 overflow-hidden">
@@ -166,7 +167,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             <div class="flex-none flex flex-col justify-self-end self-start pl-4 pr-4">
                 <DeleteButton doc_id={result.doc_id.clone()} />
             </div>
-        </div>
+        </a>
     }
 }
 
