@@ -353,6 +353,9 @@ pub async fn plugin_event_loop(
             }
             None => {}
         }
+
+        // Sleep a little at the end of each cmd
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 }
 
