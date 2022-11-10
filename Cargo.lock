@@ -1371,6 +1371,8 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "tantivy",
  "tokio",
  "url",

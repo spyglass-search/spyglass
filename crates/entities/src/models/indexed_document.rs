@@ -1,5 +1,6 @@
+use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{FromQueryResult, QuerySelect, Set};
+use sea_orm::{FromQueryResult, InsertResult, QuerySelect, Set};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "indexed_document")]
@@ -20,12 +21,27 @@ pub struct Model {
     pub updated_at: DateTimeUtc,
 }
 
+impl Related<super::tag::Entity> for Entity {
+    // The final relation is IndexedDocument -> DocumentTag -> Tag
+    fn to() -> RelationDef {
+        super::document_tag::Relation::Tag.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::document_tag::Relation::IndexedDocument.def().rev())
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
+pub enum Relation {
+    Tag,
+}
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
-        panic!("No RelationDef")
+        match self {
+            Self::Tag => Entity::has_many(tag::Entity).into(),
+        }
     }
 }
 
@@ -45,6 +61,28 @@ impl ActiveModelBehavior for ActiveModel {
         }
 
         Ok(self)
+    }
+}
+
+impl ActiveModel {
+    pub async fn insert_tags(
+        &self,
+        db: &DatabaseConnection,
+        tags: &[tag::ActiveModel],
+    ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+        // create connections for each tag
+        let doc_tags = tags
+            .iter()
+            .map(|t| document_tag::ActiveModel {
+                indexed_document_id: self.id.clone(),
+                tag_id: t.id.clone(),
+                created_at: Set(chrono::Utc::now()),
+                updated_at: Set(chrono::Utc::now()),
+                ..Default::default()
+            })
+            .collect::<Vec<document_tag::ActiveModel>>();
+        // Insert connections
+        document_tag::Entity::insert_many(doc_tags).exec(db).await
     }
 }
 
@@ -94,8 +132,9 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
 
 #[cfg(test)]
 mod test {
+    use crate::models::{document_tag, tag};
     use crate::test::setup_test_db;
-    use sea_orm::{ActiveModelTrait, Set};
+    use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, ModelTrait, Set};
 
     #[tokio::test]
     async fn test_remove_by_rule() {
@@ -120,5 +159,50 @@ mod test {
             .await
             .unwrap();
         assert_eq!(removed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_document_tag_support() -> Result<(), DbErr> {
+        let db = setup_test_db().await;
+
+        let doc = super::ActiveModel {
+            domain: Set("en.wikipedia.com".into()),
+            url: Set("https://en.wikipedia.org/wiki/Rust_(programming_language)".into()),
+            doc_id: Set("1".into()),
+            ..Default::default()
+        };
+        let doc = doc.save(&db).await.unwrap();
+
+        // Insert related tags
+        let source_tag = tag::ActiveModel {
+            label: Set(tag::TagType::Source),
+            value: Set("web".to_string()),
+            ..Default::default()
+        };
+
+        let mime_tag = tag::ActiveModel {
+            label: Set(tag::TagType::MimeType),
+            value: Set("text/html".to_string()),
+            ..Default::default()
+        };
+
+        let tags = vec![source_tag.save(&db).await?, mime_tag.save(&db).await?];
+
+        if let Err(res) = doc.insert_tags(&db, &tags).await {
+            dbg!(res);
+        }
+
+        let res = document_tag::Entity::find().all(&db).await?;
+        assert_eq!(res.len(), 2);
+
+        let doc_res = super::Entity::find_by_id(doc.id.clone().unwrap())
+            .one(&db)
+            .await?
+            .unwrap();
+
+        let doc_tags = doc_res.find_related(tag::Entity).all(&db).await?;
+        assert_eq!(doc_res.id, doc.id.unwrap());
+        assert_eq!(doc_tags.len(), 2);
+        Ok(())
     }
 }
