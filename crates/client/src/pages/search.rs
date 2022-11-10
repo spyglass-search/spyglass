@@ -7,7 +7,7 @@ use yew::{html::Scope, prelude::*};
 
 use shared::{
     event::{ClientEvent, ClientInvoke},
-    response::{self, SearchMeta, SearchResults},
+    response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
 use crate::components::{
@@ -31,13 +31,14 @@ pub enum ResultDisplay {
     Lens,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Msg {
     ClearQuery,
     ClearResults,
     Focus,
     KeyboardEvent(KeyboardEvent),
     HandleError(String),
+    OpenResult(SearchResult),
     SearchDocs,
     SearchLenses,
     UpdateLensResults(Vec<response::LensResult>),
@@ -62,11 +63,7 @@ impl SearchPage {
         // Grab the currently selected item
         if !self.docs_results.is_empty() {
             if let Some(selected) = self.docs_results.get(self.selected_idx) {
-                let url = selected.url.clone();
-                log::info!("open url: {}", url);
-                spawn_local(async move {
-                    let _ = open(url).await;
-                });
+                link.send_message(Msg::OpenResult(selected.to_owned()));
             }
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
@@ -76,12 +73,21 @@ impl SearchPage {
         }
     }
 
+    fn open_result(&mut self, selected: &SearchResult) {
+        let url = selected.url.clone();
+        log::info!("open url: {}", url);
+        spawn_local(async move {
+            let _ = open(url).await;
+        });
+    }
+
     fn move_selection_down(&mut self) {
-        let max_len = if self.docs_results.is_empty() {
-            0
-        } else {
-            self.docs_results.len() - 1
+        let max_len = match self.result_display {
+            ResultDisplay::Docs => (self.docs_results.len() - 1).max(0),
+            ResultDisplay::Lens => (self.lens_results.len() - 1).max(0),
+            _ => 0,
         };
+
         self.selected_idx = (self.selected_idx + 1).min(max_len);
         self.scroll_to_result(self.selected_idx);
     }
@@ -280,6 +286,10 @@ impl Component for SearchPage {
 
                 false
             }
+            Msg::OpenResult(result) => {
+                self.open_result(&result);
+                false
+            }
             Msg::SearchLenses => {
                 let query = self.query.trim_start_matches('/').to_string();
                 link.send_future(async move {
@@ -360,8 +370,14 @@ impl Component for SearchPage {
                     .enumerate()
                     .map(|(idx, res)| {
                         let is_selected = idx == self.selected_idx;
+                        let open_msg = Msg::OpenResult(res.to_owned());
                         html! {
-                            <SearchResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                            <SearchResultItem
+                                 id={format!("result-{}", idx)}
+                                 onclick={link.callback(move |_| open_msg.clone())}
+                                 result={res.clone()}
+                                 {is_selected}
+                            />
                         }
                     })
                     .collect::<Html>()
