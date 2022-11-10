@@ -18,14 +18,15 @@ struct ConnectionStatus {
 }
 
 pub struct ConnectionsManagerPage {
-    supported_map: HashMap<String, SupportedConnection>,
-    supported_connections: Vec<SupportedConnection>,
-    user_connections: Vec<UserConnection>,
     conn_status: ConnectionStatus,
-    fetch_error: String,
     fetch_connection_state: RequestState,
+    fetch_error: String,
     is_add_view: bool,
-    resync_requested: HashSet<String>,
+    resync_requested: HashSet<(String, String)>,
+    revoke_requested: HashSet<(String, String)>,
+    supported_connections: Vec<SupportedConnection>,
+    supported_map: HashMap<String, SupportedConnection>,
+    user_connections: Vec<UserConnection>,
 }
 
 #[allow(dead_code)]
@@ -187,11 +188,12 @@ impl Component for ConnectionsManagerPage {
             },
             fetch_connection_state: RequestState::NotStarted,
             fetch_error: String::new(),
+            is_add_view: false,
             resync_requested: HashSet::new(),
+            revoke_requested: HashSet::new(),
             supported_connections: Vec::new(),
             supported_map: HashMap::new(),
             user_connections: Vec::new(),
-            is_add_view: false,
         }
     }
 
@@ -249,6 +251,7 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::RevokeConnection { id, account } => {
+                self.revoke_requested.insert((id.clone(), account.clone()));
                 link.send_future(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
@@ -265,7 +268,7 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::ResyncConnection { id, account } => {
-                self.resync_requested.insert(format!("{}/{}", id, account));
+                self.resync_requested.insert((id.clone(), account.clone()));
                 link.send_future(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
@@ -334,7 +337,6 @@ impl Component for ConnectionsManagerPage {
                         .map(|m| m.label.clone())
                         .unwrap_or_else(|| conn.id.clone());
 
-                    let resync_id = format!("{}/{}", conn.id, conn.account);
                     let resync_msg = Msg::ResyncConnection { id: conn.id.clone(), account: conn.account.clone() };
                     let delete_msg = Msg::RevokeConnection { id: conn.id.clone(), account: conn.account.clone() };
 
@@ -344,7 +346,7 @@ impl Component for ConnectionsManagerPage {
                             <div>{conn.account.clone()}</div>
                             <div class="place-self-end flex flex-row gap-8">
                                 {
-                                    if self.resync_requested.contains(&resync_id) {
+                                    if self.resync_requested.contains(&(conn.id.clone(), conn.account.clone())) {
                                         html! {
                                             <div class="text-xs text-neutral-500">
                                                 {"Resyncing"}
@@ -362,13 +364,25 @@ impl Component for ConnectionsManagerPage {
                                         }
                                     }
                                 }
-                                <button
-                                    onclick={link.callback(move |_| delete_msg.clone())}
-                                    class="text-xs flex flex-row gap-2 hover:text-red-500"
-                                >
-                                    <icons::TrashIcon width="w-4" height="h-4" />
-                                    {"Delete"}
-                                </button>
+                                {
+                                    if self.revoke_requested.contains(&(conn.id.clone(), conn.account.clone())) {
+                                        html! {
+                                            <div class="text-xs text-neutral-500">
+                                                {"Revoking"}
+                                            </div>
+                                        }
+                                    } else {
+                                        html! {
+                                            <button
+                                                onclick={link.callback(move |_| delete_msg.clone())}
+                                                class="text-xs flex flex-row gap-2 hover:text-red-500"
+                                            >
+                                                <icons::TrashIcon width="w-4" height="h-4" />
+                                                {"Delete"}
+                                            </button>
+                                        }
+                                    }
+                                }
                             </div>
                         </>
                     }
