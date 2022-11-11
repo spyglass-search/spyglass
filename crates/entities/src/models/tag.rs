@@ -1,5 +1,5 @@
-use sea_orm::entity::prelude::*;
 use sea_orm::Set;
+use sea_orm::{entity::prelude::*, QueryTrait};
 use serde::Serialize;
 use strum_macros::{AsRefStr, EnumString};
 
@@ -70,11 +70,57 @@ impl Related<super::indexed_document::Entity> for Entity {
     }
 }
 
+pub async fn add_or_create(
+    db: &DatabaseConnection,
+    label: TagType,
+    value: &str,
+) -> Result<Model, DbErr> {
+    let tag = ActiveModel {
+        label: Set(label),
+        value: Set(value.to_string()),
+        created_at: Set(chrono::Utc::now()),
+        updated_at: Set(chrono::Utc::now()),
+        ..Default::default()
+    };
+
+    let result = Entity::insert(tag)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(db)
+        .await;
+
+    match result {
+        Ok(result) => match Entity::find_by_id(result.last_insert_id).one(db).await {
+            Ok(Some(model)) => Ok(model),
+            Err(err) => Err(err),
+            _ => Err(DbErr::RecordNotFound(format!(
+                "tag_id: {}",
+                result.last_insert_id
+            ))),
+        },
+        Err(err) => Err(err),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::models::tag;
     use crate::test::setup_test_db;
     use sea_orm::{DbErr, EntityTrait, Set};
+
+    #[tokio::test]
+    async fn test_add_or_create() -> Result<(), DbErr> {
+        let db = setup_test_db().await;
+        let new_tag = super::add_or_create(&db, tag::TagType::Source, "web").await?;
+        let expected_id = new_tag.id;
+
+        let new_tag = super::add_or_create(&db, tag::TagType::Source, "web").await?;
+        assert_eq!(expected_id, new_tag.id);
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_conflict() -> Result<(), DbErr> {

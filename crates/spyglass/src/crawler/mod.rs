@@ -100,8 +100,7 @@ impl CrawlResult {
             title: Some(title.to_string()),
             url: url.to_string(),
             open_url,
-            links: HashSet::new(),
-            tags: Vec::new(),
+            ..Default::default()
         }
     }
 }
