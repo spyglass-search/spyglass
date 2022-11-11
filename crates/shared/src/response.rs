@@ -102,7 +102,7 @@ pub struct SearchResults {
     pub meta: SearchMeta,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
 }
