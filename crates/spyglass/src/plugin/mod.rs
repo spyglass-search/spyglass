@@ -176,7 +176,11 @@ pub async fn plugin_event_loop(
     let (tx, mut file_events) = tokio::sync::mpsc::channel(1);
     let mut watcher = notify::recommended_watcher(move |res| {
         futures::executor::block_on(async {
-            tx.send(res).await.expect("Unable to send FS event");
+            if !tx.is_closed() {
+                if let Err(err) = tx.send(res).await {
+                    log::error!("fseventwatcher error: {}", err.to_string());
+                }
+            }
         })
     })
     .expect("Unable to watch lens directory");
@@ -202,6 +206,7 @@ pub async fn plugin_event_loop(
             // SHUT IT DOWN
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down plugin manager");
+                file_events.close();
                 cmd_queue.close();
                 return;
             }

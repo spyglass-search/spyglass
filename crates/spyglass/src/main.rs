@@ -216,8 +216,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
-            lens_watcher_handle.abort();
-            pm_handle.abort();
             log::warn!("Shutdown request received");
             shutdown_tx
                 .send(AppShutdown::Now)
@@ -231,5 +229,11 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         }
     }
 
-    let _ = tokio::join!(manager_handle, worker_handle, pm_handle, api_server);
+    let _ = tokio::join!(
+        manager_handle,
+        worker_handle,
+        pm_handle,
+        api_server,
+        lens_watcher_handle
+    );
 }
