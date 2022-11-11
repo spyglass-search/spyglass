@@ -1,5 +1,5 @@
+use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use sea_orm::{entity::prelude::*, QueryTrait};
 use serde::Serialize;
 use strum_macros::{AsRefStr, EnumString};
 
@@ -10,15 +10,28 @@ use super::indexed_document;
 )]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum TagType {
-    // File extension (if any).
-    #[sea_orm(string_value = "filetype")]
-    FileType,
-    // Mimetype of the document
+    // Marked as liked/starred/hearted/etc.
+    #[sea_orm(string_value = "favorited")]
+    Favorited,
+    // Mimetype of the document. TODO: Need to keep a mapping between file extension and
+    // mimetypes somewhere
     #[sea_orm(string_value = "mimetype")]
     MimeType,
     // where this document came from,
     #[sea_orm(string_value = "source")]
     Source,
+    // Owner of a doc/item, if relevant.
+    #[sea_orm(string_value = "owner")]
+    Owner,
+    // Shared/invited to a doc/event/etc.
+    #[sea_orm(string_value = "shared")]
+    SharedWith,
+}
+
+#[derive(AsRefStr)]
+pub enum TagValue {
+    #[strum(serialize = "favorited")]
+    Favorited,
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]

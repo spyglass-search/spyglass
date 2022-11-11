@@ -68,14 +68,14 @@ impl ActiveModel {
     pub async fn insert_tags(
         &self,
         db: &DatabaseConnection,
-        tags: &[tag::ActiveModel],
+        tags: &[tag::Model],
     ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
         // create connections for each tag
         let doc_tags = tags
             .iter()
             .map(|t| document_tag::ActiveModel {
                 indexed_document_id: self.id.clone(),
-                tag_id: t.id.clone(),
+                tag_id: Set(t.id),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
                 ..Default::default()
@@ -174,20 +174,10 @@ mod test {
         let doc = doc.save(&db).await.unwrap();
 
         // Insert related tags
-        let source_tag = tag::ActiveModel {
-            label: Set(tag::TagType::Source),
-            value: Set("web".to_string()),
-            ..Default::default()
-        };
+        let source_tag = tag::add_or_create(&db, tag::TagType::Source, "web").await?;
+        let mime_tag = tag::add_or_create(&db, tag::TagType::MimeType, "text/html").await?;
 
-        let mime_tag = tag::ActiveModel {
-            label: Set(tag::TagType::MimeType),
-            value: Set("text/html".to_string()),
-            ..Default::default()
-        };
-
-        let tags = vec![source_tag.save(&db).await?, mime_tag.save(&db).await?];
-
+        let tags = vec![source_tag, mime_tag];
         if let Err(res) = doc.insert_tags(&db, &tags).await {
             dbg!(res);
         }

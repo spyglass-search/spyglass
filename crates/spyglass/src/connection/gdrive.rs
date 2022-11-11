@@ -1,4 +1,5 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::tag::{self, TagType, TagValue};
 use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
@@ -14,6 +15,7 @@ use url::Url;
 use super::Connection;
 
 pub struct DriveConnection {
+    state: AppState,
     client: GoogClient,
     user: String,
 }
@@ -73,6 +75,7 @@ impl DriveConnection {
             }
 
             Ok(Self {
+                state: state.clone(),
                 client,
                 user: account.to_string(),
             })
@@ -184,12 +187,31 @@ impl Connection for DriveConnection {
             "".to_string()
         };
 
-        Ok(CrawlResult::new(
+        let mut tags = vec![
+            tag::add_or_create(&self.state.db, TagType::MimeType, &metadata.mime_type).await,
+            tag::add_or_create(&self.state.db, TagType::Source, &Self::id()).await,
+        ];
+
+        if metadata.starred {
+            tags.push(
+                tag::add_or_create(
+                    &self.state.db,
+                    TagType::Favorited,
+                    TagValue::Favorited.as_ref(),
+                )
+                .await,
+            );
+        }
+
+        let mut crawl = CrawlResult::new(
             uri,
             Some(metadata.web_view_link),
             &content,
             &metadata.name,
             None,
-        ))
+        );
+        crawl.tags = tags.into_iter().flatten().collect::<Vec<_>>();
+
+        Ok(crawl)
     }
 }
