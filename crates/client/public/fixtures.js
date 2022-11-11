@@ -19,6 +19,10 @@ export let invoke = async (func_name, params) => {
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
                 crawl_uri: "https://google.com/this/is/a/path",
                 url: "https://google.com/this/is/a/path",
+                tags: [
+                    ['mimetype', 'application/pdf'],
+                    ['source', ''],
+                ],
                 score: 1.0
             }, {
                 doc_id: "123",
@@ -27,6 +31,9 @@ export let invoke = async (func_name, params) => {
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
                 crawl_uri: "https://example.com/this/is/a/path",
                 url: "https://example.com/this/is/a/path",
+                tags: [
+                    ['source', 'drive.google.com'],
+                ],
                 score: 1.0
             }, {
                 doc_id: "123",
@@ -35,6 +42,10 @@ export let invoke = async (func_name, params) => {
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
                 crawl_uri: "https://example.com/this/is/a/path",
                 url: "https://example.com/this/is/a/path",
+                tags: [
+                    ['mimetype', 'application/pdf'],
+                    ['source', 'drive.google.com'],
+                ],
                 score: 1.0
             }, {
                 doc_id: "123",
@@ -43,6 +54,10 @@ export let invoke = async (func_name, params) => {
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
                 crawl_uri: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
                 url: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
+                tags: [
+                    ['mimetype', 'application/pdf'],
+                    ['source', 'localhost'],
+                ],
                 score: 1.0
             }, {
                 doc_id: "123",
@@ -51,6 +66,10 @@ export let invoke = async (func_name, params) => {
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
                 crawl_uri: "api://drive.google.com/24938aslkdj-313-19384",
                 url: "https://example.com/this/is/a/path",
+                tags: [
+                    ['mimetype', 'application/pdf'],
+                    ['source', 'drive.google.com'],
+                ],
                 score: 1.0
             }]
         };

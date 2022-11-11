@@ -1,7 +1,7 @@
 use anyhow::Result;
 use jsonrpsee::core::async_trait;
 
-use crate::crawler::CrawlResult;
+use crate::crawler::{CrawlError, CrawlResult};
 use crate::state::AppState;
 use url::Url;
 
@@ -22,7 +22,7 @@ pub trait Connection {
     async fn sync(&mut self, state: &AppState);
 
     /// Get raw data for a URI
-    async fn get(&mut self, uri: &Url) -> anyhow::Result<Option<CrawlResult>>;
+    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError>;
 }
 
 pub async fn load_connection(

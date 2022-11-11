@@ -3,11 +3,13 @@ use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 pub mod bootstrap_queue;
 pub mod connection;
 pub mod crawl_queue;
+pub mod document_tag;
 pub mod fetch_history;
 pub mod indexed_document;
 pub mod lens;
 pub mod link;
 pub mod resource_rule;
+pub mod tag;
 
 use shared::config::Config;
 

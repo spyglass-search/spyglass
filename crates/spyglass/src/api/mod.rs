@@ -75,16 +75,16 @@ impl RpcServer for SpyglassRpc {
     /// Remove connection from list of connections
     async fn revoke_connection(&self, api_id: String, account: String) -> Result<(), Error> {
         use entities::models::connection;
-
-        match connection::Entity::delete_many()
-            .filter(connection::Column::ApiId.eq(api_id))
+        // Remove from connections list
+        let _ = connection::Entity::delete_many()
+            .filter(connection::Column::ApiId.eq(api_id.clone()))
             .filter(connection::Column::Account.eq(account))
             .exec(&self.state.db)
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(Error::Custom(err.to_string())),
-        }
+            .await;
+
+        // Remove from index
+        let _ = self.delete_domain(api_id).await;
+        Ok(())
     }
 
     async fn search_docs(&self, query: SearchParam) -> Result<resp::SearchResults, Error> {
