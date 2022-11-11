@@ -1,4 +1,5 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::tag::{self, TagType};
 use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
@@ -15,6 +16,7 @@ use super::Connection;
 
 pub struct GCalConnection {
     client: GoogClient,
+    state: AppState,
     user: String,
 }
 
@@ -74,6 +76,7 @@ impl GCalConnection {
 
             Ok(Self {
                 client,
+                state: state.clone(),
                 user: account.to_string(),
             })
         } else {
@@ -161,6 +164,27 @@ impl Connection for GCalConnection {
                 .await
             {
                 Ok(event) => {
+                    let mut tags = vec![
+                        tag::add_or_create(&self.state.db, TagType::Source, &Self::id()).await,
+                    ];
+                    for attendee in &event.attendees {
+                        if attendee.is_organizer {
+                            tags.push(
+                                tag::add_or_create(&self.state.db, TagType::Owner, &attendee.email)
+                                    .await,
+                            );
+                        } else {
+                            tags.push(
+                                tag::add_or_create(
+                                    &self.state.db,
+                                    TagType::SharedWith,
+                                    &attendee.email,
+                                )
+                                .await,
+                            );
+                        }
+                    }
+
                     let content = if event.attendees.is_empty() {
                         event.description.unwrap_or_default()
                     } else {

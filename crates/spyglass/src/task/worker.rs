@@ -154,7 +154,7 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                             // attach tags to document once we're all done.
                             let _ = doc.insert_tags(&state.db, &crawl_result.tags).await;
                             FetchResult::Updated
-                        },
+                        }
                         Err(e) => {
                             log::error!("Unable to save document: {}", e);
                             FetchResult::Error
