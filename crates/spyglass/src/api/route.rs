@@ -8,7 +8,7 @@ use url::Url;
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
 use entities::models::{
-    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens,
+    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens, tag,
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
@@ -411,6 +411,15 @@ pub async fn search(
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
                 if let Ok(Some(indexed)) = indexed {
+                    let tags = indexed
+                        .find_related(tag::Entity)
+                        .all(&state.db)
+                        .await
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                        .collect::<Vec<(String, String)>>();
+
                     let mut result = SearchResult {
                         doc_id: doc_id.to_string(),
                         domain: domain.as_text().unwrap_or_default().to_string(),
@@ -418,6 +427,7 @@ pub async fn search(
                         crawl_uri: crawl_uri.clone(),
                         description: description.as_text().unwrap_or_default().to_string(),
                         url: indexed.open_url.unwrap_or(crawl_uri),
+                        tags,
                         score,
                     };
 

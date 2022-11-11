@@ -93,6 +93,7 @@ pub struct SearchResult {
     pub title: String,
     pub description: String,
     pub url: String,
+    pub tags: Vec<(String, String)>,
     pub score: f32,
 }
 
