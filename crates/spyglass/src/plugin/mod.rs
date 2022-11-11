@@ -112,7 +112,6 @@ impl PluginInstance {
 
 pub struct PluginManager {
     check_update_subs: HashSet<PluginId>,
-    file_watch_subs: DashMap<PluginId, PathBuf>,
     plugins: DashMap<PluginId, PluginInstance>,
 }
 
@@ -144,7 +143,6 @@ impl PluginManager {
     pub fn new() -> Self {
         PluginManager {
             check_update_subs: Default::default(),
-            file_watch_subs: Default::default(),
             plugins: Default::default(),
         }
     }
@@ -178,10 +176,15 @@ pub async fn plugin_event_loop(
     let (tx, mut file_events) = tokio::sync::mpsc::channel(1);
     let mut watcher = notify::recommended_watcher(move |res| {
         futures::executor::block_on(async {
-            tx.send(res).await.expect("Unable to send FS event");
+            if !tx.is_closed() {
+                if let Err(err) = tx.send(res).await {
+                    log::error!("fseventwatcher error: {}", err.to_string());
+                }
+            }
         })
     })
     .expect("Unable to watch lens directory");
+    let mut file_watch_subs: HashMap<PluginId, PathBuf> = HashMap::new();
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
@@ -203,10 +206,13 @@ pub async fn plugin_event_loop(
             // SHUT IT DOWN
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down plugin manager");
+                file_events.close();
+                cmd_queue.close();
                 return;
             }
         };
 
+        log::debug!("handling: {:?}", next_cmd);
         match next_cmd {
             Some(PluginCommand::DisablePlugin(plugin_name)) => {
                 log::info!("disabling plugin <{}>", plugin_name);
@@ -278,20 +284,18 @@ pub async fn plugin_event_loop(
                     // Ignore invalid directory paths
                     if !path.exists() || !path.is_dir() {
                         log::warn!("Ignoring invalid path: {}", path.display());
-                        return;
+                    } else {
+                        let _ = watcher.watch(
+                            &path,
+                            if recurse {
+                                RecursiveMode::Recursive
+                            } else {
+                                RecursiveMode::NonRecursive
+                            },
+                        );
+
+                        file_watch_subs.insert(plugin_id, path);
                     }
-
-                    let _ = watcher.watch(
-                        &path,
-                        if recurse {
-                            RecursiveMode::Recursive
-                        } else {
-                            RecursiveMode::NonRecursive
-                        },
-                    );
-
-                    let manager = state.plugin_manager.lock().await;
-                    manager.file_watch_subs.insert(plugin_id, path);
                 }
             },
             // Queue update checks for subscribed plugins
@@ -308,57 +312,55 @@ pub async fn plugin_event_loop(
             }
             // Notify subscribers of a new file event
             Some(PluginCommand::QueueFileNotify(file_event)) => {
-                if !matches!(
-                    file_event.kind,
-                    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-                ) {
-                    return;
-                }
+                let paths = file_event
+                    .paths
+                    .iter()
+                    .filter_map(|path| {
+                        log::trace!(
+                            "notifying plugins of file_event: {:?} for <{}>",
+                            file_event.kind,
+                            path.display()
+                        );
 
-                for updated_path in file_event.paths {
-                    log::trace!(
-                        "notifying plugins of file_event: {:?} for <{}>",
-                        file_event.kind,
-                        updated_path.display()
-                    );
-
-                    let event = match &file_event.kind {
-                        EventKind::Create(_) => {
-                            Some(PluginEvent::FileCreated(updated_path.clone()))
-                        }
-                        EventKind::Modify(modify_kind) => match modify_kind {
-                            ModifyKind::Any
-                            | ModifyKind::Data(_)
-                            | ModifyKind::Name(_)
-                            | ModifyKind::Other => {
-                                Some(PluginEvent::FileUpdated(updated_path.clone()))
+                        match &file_event.kind {
+                            EventKind::Create(_) => {
+                                Some((path.clone(), PluginEvent::FileCreated(path.clone())))
                             }
-                            ModifyKind::Metadata(_) => None,
-                        },
-                        EventKind::Remove(_) => {
-                            Some(PluginEvent::FileDeleted(updated_path.clone()))
-                        }
-                        _ => None,
-                    };
-
-                    if let Some(event) = event {
-                        let manager = state.plugin_manager.lock().await;
-                        for entry in &manager.file_watch_subs {
-                            let watched_path = entry.value();
-                            if updated_path.starts_with(watched_path) {
-                                let _ = cmd_writer
-                                    .send(PluginCommand::HandleUpdate {
-                                        plugin_id: *entry.key(),
-                                        event: event.clone(),
-                                    })
-                                    .await;
+                            EventKind::Modify(modify_kind) => match modify_kind {
+                                ModifyKind::Any
+                                | ModifyKind::Data(_)
+                                | ModifyKind::Name(_)
+                                | ModifyKind::Other => {
+                                    Some((path.clone(), PluginEvent::FileUpdated(path.clone())))
+                                }
+                                ModifyKind::Metadata(_) => None,
+                            },
+                            EventKind::Remove(_) => {
+                                Some((path.clone(), PluginEvent::FileDeleted(path.clone())))
                             }
+                            _ => None,
+                        }
+                    })
+                    .collect::<Vec<(PathBuf, PluginEvent)>>();
+
+                for (path, event) in paths {
+                    for (plugin_id, watched_path) in file_watch_subs.iter() {
+                        if path.starts_with(watched_path) {
+                            let _ = cmd_writer
+                                .send(PluginCommand::HandleUpdate {
+                                    plugin_id: *plugin_id,
+                                    event: event.clone(),
+                                })
+                                .await;
                         }
                     }
                 }
             }
             None => {}
         }
+
+        // Sleep a little at the end of each cmd
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 }
 
