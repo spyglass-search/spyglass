@@ -56,7 +56,7 @@ impl ActiveModelBehavior for ActiveModel {
 pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
         .col_expr(Column::IsEnabled, sea_query::Expr::value(false))
-        .filter(Column::LensType.contains(&LensType::Simple.to_string()))
+        .filter(Column::LensType.eq(LensType::Simple))
         .exec(db)
         .await?;
 

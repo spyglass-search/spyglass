@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
-use sea_orm::{
-    sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryTrait, Set, Statement,
-};
+use sea_orm::{sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryTrait, Set, Statement};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -145,7 +143,7 @@ pub async fn reset_processing(db: &DatabaseConnection) {
                 CrawlStatus::Queued.to_string(),
             )))),
         )
-        .filter(Column::Status.contains(&CrawlStatus::Processing.to_string()))
+        .filter(Column::Status.eq(CrawlStatus::Processing))
         .exec(db)
         .await
         .unwrap();
@@ -266,7 +264,7 @@ pub async fn dequeue(
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
         // How many do we have in progress?
         let num_in_progress = Entity::find()
-            .filter(Column::Status.eq(CrawlStatus::Processing.to_string()))
+            .filter(Column::Status.eq(CrawlStatus::Processing))
             .count(db)
             .await? as u32;
 
@@ -277,8 +275,8 @@ pub async fn dequeue(
 
     // Prioritize any bootstrapping tasks first.
     let entity = Entity::find()
-        .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
-        .filter(Column::CrawlType.eq(CrawlType::Bootstrap.to_string()))
+        .filter(Column::Status.eq(CrawlStatus::Queued))
+        .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
         .one(db)
         .await?;
 

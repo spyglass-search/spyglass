@@ -621,7 +621,6 @@ mod test {
 
         let res = crawler.fetch_by_job(&state, model.id, true).await;
         assert!(res.is_err());
-
     }
 
     #[test]
