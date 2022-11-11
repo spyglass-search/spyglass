@@ -4,7 +4,7 @@ use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
 use sea_orm::{
-    sea_query, ConnectionTrait, DbBackend, FromQueryResult, QuerySelect, QueryTrait, Set, Statement,
+    sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -151,11 +151,6 @@ pub async fn reset_processing(db: &DatabaseConnection) {
         .unwrap();
 }
 
-#[derive(FromQueryResult)]
-struct CrawlQueueCount {
-    count: i64,
-}
-
 #[derive(Debug, FromQueryResult)]
 pub struct QueueCountByStatus {
     pub count: i64,
@@ -168,13 +163,11 @@ pub async fn num_queued(
     status: CrawlStatus,
 ) -> anyhow::Result<u64, sea_orm::DbErr> {
     let res = Entity::find()
-        .column_as(Column::Id.count(), "count")
-        .filter(Column::Status.eq(status.to_string()))
-        .into_model::<CrawlQueueCount>()
-        .one(db)
+        .filter(Column::Status.eq(status))
+        .count(db)
         .await?;
 
-    Ok(res.unwrap().count as u64)
+    Ok(res)
 }
 
 fn gen_priority_values(items: &[String], is_prefix: bool) -> String {

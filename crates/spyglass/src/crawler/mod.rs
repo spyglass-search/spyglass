@@ -619,7 +619,9 @@ mod test {
         };
         let _ = rule.insert(&state.db).await.unwrap();
 
-        let _ = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
+        let res = crawler.fetch_by_job(&state, model.id, true).await;
+        assert!(res.is_err());
+
     }
 
     #[test]
