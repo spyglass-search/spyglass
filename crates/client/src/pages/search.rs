@@ -179,7 +179,6 @@ impl Component for SearchPage {
             Msg::ClearResults => {
                 self.selected_idx = 0;
                 self.docs_results = Vec::new();
-                self.lens = Vec::new();
                 self.lens_results = Vec::new();
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
@@ -254,14 +253,14 @@ impl Component for SearchPage {
                                 });
                             }
                             "Backspace" => {
+                                let input: HtmlInputElement = e.target_unchecked_into();
+
                                 if self.query.is_empty() && !self.lens.is_empty() {
                                     log::info!("updating lenses");
                                     self.lens.pop();
                                 }
 
-                                let input: HtmlInputElement = e.target_unchecked_into();
                                 link.send_message(Msg::UpdateQuery(input.value()));
-
                                 if input.value().len() < crate::constants::MIN_CHARS {
                                     link.send_message(Msg::ClearResults);
                                 }
