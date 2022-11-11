@@ -8,7 +8,7 @@ use url::Url;
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
 use entities::models::{
-    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens,
+    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens, tag,
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
@@ -186,7 +186,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-
+    let _ = Searcher::save(&state);
     Ok(())
 }
 
@@ -212,14 +212,19 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
     // Remove items from index
     let indexed = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Domain.eq(domain))
+        .filter(indexed_document::Column::Domain.eq(domain.clone()))
         .all(&state.db)
         .await;
 
     if let Ok(indexed) = indexed {
+        log::debug!("removing docs from index");
+        let indexed_count = indexed.len();
         for result in indexed {
             let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
         }
+        let _ = Searcher::save(&state);
+
+        log::debug!("removed {} items from index", indexed_count);
     }
 
     Ok(())
@@ -404,40 +409,29 @@ pub async fn search(
 
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
-                if let Ok(indexed_doc) = indexed {
-                    match indexed_doc {
-                        Some(indexed) => {
-                            let mut result = SearchResult {
-                                doc_id: doc_id.to_string(),
-                                domain: domain.as_text().unwrap_or_default().to_string(),
-                                title: title.as_text().unwrap_or_default().to_string(),
-                                crawl_uri: crawl_uri.clone(),
-                                description: description.as_text().unwrap_or_default().to_string(),
-                                url: indexed.open_url.unwrap_or(crawl_uri),
-                                score,
-                            };
+                if let Ok(Some(indexed)) = indexed {
+                    let tags = indexed
+                        .find_related(tag::Entity)
+                        .all(&state.db)
+                        .await
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                        .collect::<Vec<(String, String)>>();
 
-                            result.description.truncate(256);
-                            results.push(result);
-                        }
-                        None => {
-                            // When making changes to the system it is possible for the database
-                            // state to get out of sync with the index state. We want to still
-                            // include results that are in the index, but not in the database.
-                            let mut result = SearchResult {
-                                doc_id: doc_id.to_string(),
-                                domain: domain.as_text().unwrap_or_default().to_string(),
-                                title: title.as_text().unwrap_or_default().to_string(),
-                                crawl_uri: crawl_uri.clone(),
-                                description: description.as_text().unwrap_or_default().to_string(),
-                                url: String::from(""),
-                                score,
-                            };
+                    let mut result = SearchResult {
+                        doc_id: doc_id.to_string(),
+                        domain: domain.as_text().unwrap_or_default().to_string(),
+                        title: title.as_text().unwrap_or_default().to_string(),
+                        crawl_uri: crawl_uri.clone(),
+                        description: description.as_text().unwrap_or_default().to_string(),
+                        url: indexed.open_url.unwrap_or(crawl_uri),
+                        tags,
+                        score,
+                    };
 
-                            result.description.truncate(256);
-                            results.push(result);
-                        }
-                    }
+                    result.description.truncate(256);
+                    results.push(result);
                 }
             }
         }

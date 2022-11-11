@@ -13,6 +13,7 @@ mod m20221023_000001_connection_table;
 mod m20221031_000001_add_error_column_to_crawl_queue;
 mod m20221101_000001_add_open_url_col;
 mod m20221107_000001_recreate_connection_table;
+mod m20221109_add_tags_table;
 mod utils;
 
 pub struct Migrator;
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20221031_000001_add_error_column_to_crawl_queue::Migration),
             Box::new(m20221101_000001_add_open_url_col::Migration),
             Box::new(m20221107_000001_recreate_connection_table::Migration),
+            Box::new(m20221109_add_tags_table::Migration),
         ]
     }
 }

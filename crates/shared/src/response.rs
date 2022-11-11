@@ -93,6 +93,7 @@ pub struct SearchResult {
     pub title: String,
     pub description: String,
     pub url: String,
+    pub tags: Vec<(String, String)>,
     pub score: f32,
 }
 
@@ -102,7 +103,7 @@ pub struct SearchResults {
     pub meta: SearchMeta,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
 }

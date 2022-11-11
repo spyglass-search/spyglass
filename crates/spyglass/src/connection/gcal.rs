@@ -1,11 +1,12 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::tag::{self, TagType};
 use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
 use libgoog::{Credentials, GoogClient};
 use std::time::Duration;
 
-use crate::crawler::CrawlResult;
+use crate::crawler::{CrawlError, CrawlResult};
 use crate::oauth;
 use crate::state::AppState;
 use entities::models::{connection, crawl_queue};
@@ -15,6 +16,7 @@ use super::Connection;
 
 pub struct GCalConnection {
     client: GoogClient,
+    state: AppState,
     user: String,
 }
 
@@ -74,6 +76,7 @@ impl GCalConnection {
 
             Ok(Self {
                 client,
+                state: state.clone(),
                 user: account.to_string(),
             })
         } else {
@@ -146,10 +149,10 @@ impl Connection for GCalConnection {
         log::debug!("synced {} events", num_events);
     }
 
-    async fn get(&mut self, uri: &Url) -> anyhow::Result<Option<CrawlResult>> {
+    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
         if let Some(segments) = uri.path_segments().map(|c| c.collect::<Vec<_>>()) {
             if segments.len() != 2 {
-                return Ok(None);
+                return Err(CrawlError::FetchError("Invalid GCal API URL".to_string()));
             }
 
             let calendar_id = segments.first().expect("Should be len 2").to_string();
@@ -161,6 +164,27 @@ impl Connection for GCalConnection {
                 .await
             {
                 Ok(event) => {
+                    let mut tags = vec![
+                        tag::add_or_create(&self.state.db, TagType::Source, &Self::id()).await,
+                    ];
+                    for attendee in &event.attendees {
+                        if attendee.is_organizer {
+                            tags.push(
+                                tag::add_or_create(&self.state.db, TagType::Owner, &attendee.email)
+                                    .await,
+                            );
+                        } else {
+                            tags.push(
+                                tag::add_or_create(
+                                    &self.state.db,
+                                    TagType::SharedWith,
+                                    &attendee.email,
+                                )
+                                .await,
+                            );
+                        }
+                    }
+
                     let content = if event.attendees.is_empty() {
                         event.description.unwrap_or_default()
                     } else {
@@ -178,18 +202,18 @@ impl Connection for GCalConnection {
                         )
                     };
                     let title = format!("{} ({})", &event.summary, event.start.date);
-                    Ok(Some(CrawlResult::new(
+                    Ok(CrawlResult::new(
                         uri,
                         Some(event.html_link),
                         &content,
                         &title,
                         None,
-                    )))
+                    ))
                 }
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
+                Err(err) => Err(CrawlError::FetchError(err.to_string())),
             };
         }
 
-        Ok(None)
+        Err(CrawlError::FetchError("Invalid URL".to_string()))
     }
 }

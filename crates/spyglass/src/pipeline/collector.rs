@@ -32,7 +32,7 @@ impl DefaultCollector {
             .fetch_by_job(&context.state, task_id, false)
             .await;
 
-        if let Ok(Some(crawl_result)) = result {
+        if let Ok(crawl_result) = result {
             return Result::Ok(CollectionResult {
                 content: crawl_result,
             });

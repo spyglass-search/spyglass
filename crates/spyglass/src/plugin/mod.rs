@@ -212,7 +212,6 @@ pub async fn plugin_event_loop(
             }
         };
 
-        log::debug!("handling: {:?}", next_cmd);
         match next_cmd {
             Some(PluginCommand::DisablePlugin(plugin_name)) => {
                 log::info!("disabling plugin <{}>", plugin_name);

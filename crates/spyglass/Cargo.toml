@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "22.11.4"
+version = "22.11.5"
 edition = "2021"
 
 [dependencies]
@@ -41,6 +41,7 @@ spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 tantivy = "0.18"
 tendril = "0.4.2"
+thiserror = "1.0.37"
 tokio = { version = "1", features = ["full"] }
 tokio-retry = "0.3"
 tracing = "0.1"
