@@ -26,6 +26,9 @@ pub enum TagType {
     // Shared/invited to a doc/event/etc.
     #[sea_orm(string_value = "shared")]
     SharedWith,
+    // Part of this/these lens(es)
+    #[sea_orm(string_value = "lens")]
+    Lens,
 }
 
 #[derive(AsRefStr)]

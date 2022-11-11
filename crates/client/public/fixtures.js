@@ -21,7 +21,8 @@ export let invoke = async (func_name, params) => {
                 url: "https://google.com/this/is/a/path",
                 tags: [
                     ['mimetype', 'application/pdf'],
-                    ['source', ''],
+                    ['source', 'web'],
+                    ['lens', 'google'],
                 ],
                 score: 1.0
             }, {
