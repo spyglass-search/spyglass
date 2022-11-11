@@ -375,8 +375,7 @@ pub async fn search(
         .collect::<Vec<SearchFilter>>();
 
     let docs =
-        Searcher::search_with_lens(state.db.clone(), &applied, &index.reader, &search_req.query)
-            .await;
+        Searcher::search_with_lens(state.db.clone(), &applied, index, &search_req.query).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {
@@ -405,19 +404,40 @@ pub async fn search(
 
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
-                if let Ok(Some(indexed)) = indexed {
-                    let mut result = SearchResult {
-                        doc_id: doc_id.to_string(),
-                        domain: domain.as_text().unwrap_or_default().to_string(),
-                        title: title.as_text().unwrap_or_default().to_string(),
-                        crawl_uri: crawl_uri.clone(),
-                        description: description.as_text().unwrap_or_default().to_string(),
-                        url: indexed.open_url.unwrap_or(crawl_uri),
-                        score,
-                    };
+                if let Ok(indexed_doc) = indexed {
+                    match indexed_doc {
+                        Some(indexed) => {
+                            let mut result = SearchResult {
+                                doc_id: doc_id.to_string(),
+                                domain: domain.as_text().unwrap_or_default().to_string(),
+                                title: title.as_text().unwrap_or_default().to_string(),
+                                crawl_uri: crawl_uri.clone(),
+                                description: description.as_text().unwrap_or_default().to_string(),
+                                url: indexed.open_url.unwrap_or(crawl_uri),
+                                score,
+                            };
 
-                    result.description.truncate(256);
-                    results.push(result);
+                            result.description.truncate(256);
+                            results.push(result);
+                        }
+                        None => {
+                            // When making changes to the system it is possible for the database
+                            // state to get out of sync with the index state. We want to still
+                            // include results that are in the index, but not in the database.
+                            let mut result = SearchResult {
+                                doc_id: doc_id.to_string(),
+                                domain: domain.as_text().unwrap_or_default().to_string(),
+                                title: title.as_text().unwrap_or_default().to_string(),
+                                crawl_uri: crawl_uri.clone(),
+                                description: description.as_text().unwrap_or_default().to_string(),
+                                url: String::from(""),
+                                score,
+                            };
+
+                            result.description.truncate(256);
+                            results.push(result);
+                        }
+                    }
                 }
             }
         }

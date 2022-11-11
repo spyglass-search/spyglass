@@ -176,15 +176,17 @@ impl Searcher {
     pub async fn search_with_lens(
         _db: DatabaseConnection,
         applied_lenses: &Vec<SearchFilter>,
-        reader: &IndexReader,
+        searcher: &Searcher,
         query_string: &str,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
 
+        let index = &searcher.index;
+        let reader = &searcher.reader;
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
-
-        let query = build_query(fields.clone(), query_string);
+        let tokenizers = index.tokenizers().clone();
+        let query = build_query(index.schema(), tokenizers, fields.clone(), query_string);
 
         let mut allowed = Vec::new();
         let mut skipped = Vec::new();
@@ -375,7 +377,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
         assert_eq!(results.len(), 1);
     }
 
@@ -400,7 +402,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
         assert_eq!(results.len(), 1);
     }
 
@@ -426,7 +428,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher.reader, query).await;
+        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
         assert_eq!(results.len(), 0);
     }
 }
