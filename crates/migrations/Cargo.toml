@@ -9,7 +9,7 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-sea-orm-migration = { version = "0.9" }
+sea-orm-migration = { version = "0.10" }
 entities = { path = "../entities" }
 shared = { path = "../shared" }
 tantivy = "0.18"

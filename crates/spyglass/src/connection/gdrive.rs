@@ -1,11 +1,12 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::tag::{self, TagType, TagValue};
 use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
 use libgoog::{Credentials, GoogClient};
 use std::time::Duration;
 
-use crate::crawler::CrawlResult;
+use crate::crawler::{CrawlError, CrawlResult};
 use crate::oauth;
 use crate::state::AppState;
 use entities::models::{connection, crawl_queue};
@@ -14,6 +15,7 @@ use url::Url;
 use super::Connection;
 
 pub struct DriveConnection {
+    state: AppState,
     client: GoogClient,
     user: String,
 }
@@ -73,6 +75,7 @@ impl DriveConnection {
             }
 
             Ok(Self {
+                state: state.clone(),
                 client,
                 user: account.to_string(),
             })
@@ -158,9 +161,13 @@ impl Connection for DriveConnection {
         log::debug!("synced {} files", num_files);
     }
 
-    async fn get(&mut self, uri: &Url) -> anyhow::Result<Option<CrawlResult>> {
+    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
         let file_id = uri.path().trim_start_matches('/');
-        let metadata = self.client.get_file_metadata(file_id).await?;
+        let metadata = match self.client.get_file_metadata(file_id).await {
+            Ok(file) => file,
+            Err(err) => return Err(CrawlError::FetchError(err.to_string())),
+        };
+
         log::debug!("fetching file {} - {:?}", file_id, metadata);
 
         // Grab text for supported mimetypes
@@ -180,12 +187,31 @@ impl Connection for DriveConnection {
             "".to_string()
         };
 
-        Ok(Some(CrawlResult::new(
+        let mut tags = vec![
+            tag::add_or_create(&self.state.db, TagType::MimeType, &metadata.mime_type).await,
+            tag::add_or_create(&self.state.db, TagType::Source, &Self::id()).await,
+        ];
+
+        if metadata.starred {
+            tags.push(
+                tag::add_or_create(
+                    &self.state.db,
+                    TagType::Favorited,
+                    TagValue::Favorited.as_ref(),
+                )
+                .await,
+            );
+        }
+
+        let mut crawl = CrawlResult::new(
             uri,
             Some(metadata.web_view_link),
             &content,
             &metadata.name,
             None,
-        )))
+        );
+        crawl.tags = tags.into_iter().flatten().collect::<Vec<_>>();
+
+        Ok(crawl)
     }
 }

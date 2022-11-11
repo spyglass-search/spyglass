@@ -1,12 +1,9 @@
 use std::collections::HashSet;
-use std::fmt;
 
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
-use sea_orm::{
-    sea_query, ConnectionTrait, DbBackend, FromQueryResult, QuerySelect, QueryTrait, Set, Statement,
-};
+use sea_orm::{sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryTrait, Set, Statement};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -49,17 +46,6 @@ pub enum CrawlStatus {
     Failed,
 }
 
-impl fmt::Display for CrawlStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CrawlStatus::Queued => write!(f, "Queued"),
-            CrawlStatus::Processing => write!(f, "Processing"),
-            CrawlStatus::Completed => write!(f, "Completed"),
-            CrawlStatus::Failed => write!(f, "Failed"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum CrawlType {
@@ -74,16 +60,6 @@ pub enum CrawlType {
 impl Default for CrawlType {
     fn default() -> Self {
         CrawlType::Normal
-    }
-}
-
-impl fmt::Display for CrawlType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CrawlType::Api => write!(f, "Api"),
-            CrawlType::Bootstrap => write!(f, "Bootstrap"),
-            CrawlType::Normal => write!(f, "Normal"),
-        }
     }
 }
 
@@ -167,15 +143,10 @@ pub async fn reset_processing(db: &DatabaseConnection) {
                 CrawlStatus::Queued.to_string(),
             )))),
         )
-        .filter(Column::Status.contains(&CrawlStatus::Processing.to_string()))
+        .filter(Column::Status.eq(CrawlStatus::Processing))
         .exec(db)
         .await
         .unwrap();
-}
-
-#[derive(FromQueryResult)]
-struct CrawlQueueCount {
-    count: i64,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -190,13 +161,11 @@ pub async fn num_queued(
     status: CrawlStatus,
 ) -> anyhow::Result<u64, sea_orm::DbErr> {
     let res = Entity::find()
-        .column_as(Column::Id.count(), "count")
-        .filter(Column::Status.eq(status.to_string()))
-        .into_model::<CrawlQueueCount>()
-        .one(db)
+        .filter(Column::Status.eq(status))
+        .count(db)
         .await?;
 
-    Ok(res.unwrap().count as u64)
+    Ok(res)
 }
 
 fn gen_priority_values(items: &[String], is_prefix: bool) -> String {
@@ -295,7 +264,7 @@ pub async fn dequeue(
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
         // How many do we have in progress?
         let num_in_progress = Entity::find()
-            .filter(Column::Status.eq(CrawlStatus::Processing.to_string()))
+            .filter(Column::Status.eq(CrawlStatus::Processing))
             .count(db)
             .await? as u32;
 
@@ -306,8 +275,8 @@ pub async fn dequeue(
 
     // Prioritize any bootstrapping tasks first.
     let entity = Entity::find()
-        .filter(Column::Status.eq(CrawlStatus::Queued.to_string()))
-        .filter(Column::CrawlType.eq(CrawlType::Bootstrap.to_string()))
+        .filter(Column::Status.eq(CrawlStatus::Queued))
+        .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
         .one(db)
         .await?;
 

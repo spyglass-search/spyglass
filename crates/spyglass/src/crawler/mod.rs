@@ -2,14 +2,15 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use addr::parse_domain_name;
+use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
 use percent_encoding::percent_decode_str;
-use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 use url::{Host, Url};
 
-use entities::models::{crawl_queue, fetch_history};
+use entities::models::{crawl_queue, fetch_history, tag};
 use entities::sea_orm::prelude::*;
 use shared::url_to_file_path;
 
@@ -29,8 +30,31 @@ use robots::check_resource_rules;
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum CrawlError {
+    #[error("crawl denied by rule {0}")]
+    Denied(String),
+    #[error("unable crawl document due to {0}")]
+    FetchError(String),
+    #[error("unable to parse document due to {0}")]
+    ParseError(String),
+    /// Document was not found.
+    #[error("document not found")]
+    NotFound,
+    #[error("document was recently fetched")]
+    RecentlyFetched,
+    /// Request timeout, crawler will try again later.
+    #[error("document request timed out")]
+    Timeout,
+    #[error("crawl unsupported: {0}")]
+    Unsupported(String),
+    #[error("other crawl error: {0}")]
+    Other(String),
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct CrawlResult {
+    /// Used to determine
     pub content_hash: Option<String>,
     /// Text content from page after stripping HTML tags & any semantically
     /// unimportant sections (header/footer/etc.)
@@ -38,14 +62,16 @@ pub struct CrawlResult {
     /// A short description of the page provided by the <meta> tag or summarized
     /// from the content.
     pub description: Option<String>,
-    pub status: u16,
     pub title: Option<String>,
+    /// Uniquely identifying URL for this document. Used by the crawler to determine
+    /// duplicates & how/what to crawl
     pub url: String,
+    /// URL used to open the document in finder/web browser/etc.
     pub open_url: Option<String>,
     /// Links found in the page to add to the queue.
     pub links: HashSet<String>,
-    /// Raw HTML data.
-    pub raw: Option<String>,
+    /// Tags to apply to this document
+    pub tags: Vec<tag::Model>,
 }
 
 impl CrawlResult {
@@ -71,22 +97,11 @@ impl CrawlResult {
             content_hash,
             content: Some(content.to_string()),
             description: desc,
-            status: 200,
             title: Some(title.to_string()),
             url: url.to_string(),
             open_url,
-            links: HashSet::new(),
-            raw: None,
+            ..Default::default()
         }
-    }
-
-    pub fn is_success(&self) -> bool {
-        // Success codes
-        self.status >= 200 && self.status <= 299
-    }
-
-    pub fn is_bad_request(&self) -> bool {
-        self.status >= 400 && self.status <= 499
     }
 }
 
@@ -175,58 +190,53 @@ impl Crawler {
     }
 
     /// Fetches and parses the content of a page.
-    async fn crawl(&self, url: &Url, parse_results: bool) -> CrawlResult {
+    async fn crawl(&self, url: &Url, parse_results: bool) -> Result<CrawlResult, CrawlError> {
         let url = url.clone();
 
         // Fetch & store page data.
         let res = self.client.get(&url).await;
         if res.is_err() {
+            let err = res.unwrap_err();
             // Log out reason for failure.
-            log::warn!("Unable to fetch <{}> due to {}", &url, res.unwrap_err());
+            log::warn!("Unable to fetch <{}> due to {}", &url, err.to_string());
             // Unable to connect to host
-            return CrawlResult {
-                // TODO: Have our own internal error codes we can refer too later on
-                status: 600_u16,
-                url: url.to_string(),
-                ..Default::default()
-            };
+            return Err(CrawlError::FetchError(err.to_string()));
         }
 
         let res = res.expect("Expected valid response");
-        let status = res.status().as_u16();
-        if status == StatusCode::OK {
-            // Pull URL from request, this handles cases where we are 301 redirected
-            // to a different URL.
-            let end_url = res.url().to_owned();
-            if let Ok(raw_body) = res.text().await {
-                if parse_results {
-                    let mut scrape_result = self.scrape_page(&end_url, &raw_body).await;
-                    scrape_result.status = status;
-                    return scrape_result;
-                } else {
-                    return CrawlResult {
-                        content_hash: None,
-                        content: None,
-                        description: None,
-                        status: 200,
-                        title: None,
-                        url: end_url.to_string(),
-                        open_url: Some(end_url.to_string()),
-                        links: HashSet::new(),
-                        raw: Some(raw_body.to_string()),
-                    };
+        match res.error_for_status() {
+            Ok(res) => {
+                // Pull URL from request, this handles cases where we are 301 redirected
+                // to a different URL.
+                let end_url = res.url().to_owned();
+                match res.text().await {
+                    Ok(raw_body) => {
+                        if parse_results {
+                            Ok(self.scrape_page(&end_url, &raw_body).await)
+                        } else {
+                            Ok(CrawlResult {
+                                url: end_url.to_string(),
+                                open_url: Some(end_url.to_string()),
+                                ..Default::default()
+                            })
+                        }
+                    }
+                    Err(err) => Err(CrawlError::ParseError(err.to_string())),
                 }
             }
-        }
-
-        CrawlResult {
-            status,
-            url: url.to_string(),
-            ..Default::default()
+            Err(err) => {
+                if err.status() == Some(reqwest::StatusCode::NOT_FOUND) {
+                    Err(CrawlError::NotFound)
+                } else {
+                    Err(CrawlError::FetchError(err.to_string()))
+                }
+            }
         }
     }
 
     pub async fn scrape_page(&self, url: &Url, raw_body: &str) -> CrawlResult {
+        // TODO: Cache the raw_body on the filesystem?
+
         // Parse the html.
         let parse_result = html_to_text(raw_body);
 
@@ -245,13 +255,11 @@ impl Crawler {
             content_hash,
             content: Some(parse_result.content),
             description: Some(parse_result.description),
-            status: 200,
             title: parse_result.title,
             url: canonical_url.clone(),
             open_url: Some(canonical_url),
             links: parse_result.links,
-            // No need to store the raw HTML for now.
-            raw: None, // Some(raw_body.to_string()),
+            ..Default::default()
         }
     }
 
@@ -264,23 +272,32 @@ impl Crawler {
         state: &AppState,
         id: i64,
         parse_results: bool,
-    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
-        let crawl = crawl_queue::Entity::find_by_id(id).one(&state.db).await?;
-        if crawl.is_none() {
-            return Ok(None);
-        }
+    ) -> Result<CrawlResult, CrawlError> {
+        let crawl = crawl_queue::Entity::find_by_id(id).one(&state.db).await;
+        let crawl = match crawl {
+            Ok(c) => c,
+            Err(err) => {
+                return Err(CrawlError::Other(err.to_string()));
+            }
+        };
 
-        let crawl = crawl.expect("Invalid crawl model");
+        let crawl = match crawl {
+            None => {
+                return Err(CrawlError::Other("crawl job not found".to_string()));
+            }
+            Some(c) => c,
+        };
+
         log::debug!("handling job: {}", crawl.url);
 
         let url = Url::parse(&crawl.url).expect("Invalid fetch URL");
 
         // Have we crawled this recently?
-        if let Some(history) = fetch_history::find_by_url(&state.db, &url).await? {
+        if let Ok(Some(history)) = fetch_history::find_by_url(&state.db, &url).await {
             let since_last_fetch = Utc::now() - history.updated_at;
             if since_last_fetch < Duration::milliseconds(FETCH_DELAY_MS) {
                 log::trace!("Recently fetched, skipping");
-                return Ok(None);
+                return Err(CrawlError::RecentlyFetched);
             }
         }
 
@@ -294,10 +311,10 @@ impl Crawler {
                 self.handle_http_fetch(&state.db, &crawl, &url, parse_results)
                     .await
             }
-            _ => {
-                // unknown scheme, ignore
+            // unknown scheme, ignore
+            scheme => {
                 log::warn!("Ignoring unhandled scheme: {}", &url);
-                Ok(None)
+                Err(CrawlError::Unsupported(scheme.to_string()))
             }
         }
     }
@@ -307,13 +324,13 @@ impl Crawler {
         state: &AppState,
         _: &crawl_queue::Model,
         uri: &Url,
-    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+    ) -> Result<CrawlResult, CrawlError> {
         let account = percent_decode_str(uri.username()).decode_utf8_lossy();
         let api_id = uri.host_str().unwrap_or_default();
 
         match load_connection(state, api_id, &account).await {
             Ok(mut conn) => conn.as_mut().get(uri).await,
-            Err(err) => Err(err),
+            Err(err) => Err(CrawlError::Unsupported(format!("{}: {}", api_id, err))),
         }
     }
 
@@ -321,7 +338,7 @@ impl Crawler {
         &self,
         _: &crawl_queue::Model,
         url: &Url,
-    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+    ) -> Result<CrawlResult, CrawlError> {
         // Attempt to convert from the URL to a file path
         #[allow(unused_assignments)]
         let mut url_path = url
@@ -343,7 +360,7 @@ impl Crawler {
         let path = Path::new(&url_path);
         // Is this a file and does this exist?
         if !path.exists() || !path.is_file() {
-            return Ok(None);
+            return Err(CrawlError::NotFound);
         }
 
         let file_name = path
@@ -354,8 +371,16 @@ impl Crawler {
 
         // Attempt to read file
         let contents = match path.extension() {
-            Some(ext) if parser::supports_filetype(ext) => parser::parse_file(ext, path)?,
-            _ => std::fs::read_to_string(path)?,
+            Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
+                Err(err) => return Err(CrawlError::ParseError(err.to_string())),
+                Ok(contents) => contents,
+            },
+            _ => match std::fs::read_to_string(path) {
+                Ok(x) => x,
+                Err(err) => {
+                    return Err(CrawlError::FetchError(err.to_string()));
+                }
+            },
         };
 
         let mut hasher = Sha256::new();
@@ -375,18 +400,17 @@ impl Crawler {
             None
         };
 
-        Ok(Some(CrawlResult {
+        Ok(CrawlResult {
             content_hash,
             content: Some(contents.clone()),
             // Does a file have a description? Pull the first part of the file
             description,
-            status: 200,
             title: Some(file_name),
             url: url.to_string(),
             open_url: Some(url.to_string()),
             links: Default::default(),
-            raw: None,
-        }))
+            ..Default::default()
+        })
     }
 
     /// Handle HTTP related requests
@@ -396,7 +420,7 @@ impl Crawler {
         crawl: &crawl_queue::Model,
         url: &Url,
         parse_results: bool,
-    ) -> anyhow::Result<Option<CrawlResult>, anyhow::Error> {
+    ) -> Result<CrawlResult, CrawlError> {
         // Modify bootstrapped URLs to pull from the Internet Archive
         let url: Url = if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
             Url::parse(&create_archive_url(url.as_ref())).expect("Unable to create archive URL")
@@ -408,67 +432,63 @@ impl Crawler {
         // When looking at bootstrapped tasks, check the original URL
         if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
             let og_url = Url::parse(&crawl.url).expect("Invalid crawl URL");
-            if !check_resource_rules(db, &self.client, &og_url).await? {
-                return Ok(None);
+            if !check_resource_rules(db, &self.client, &og_url).await {
+                return Err(CrawlError::Denied("robots.txt".to_string()));
             }
-        } else if !check_resource_rules(db, &self.client, &url).await? {
-            return Ok(None);
+        } else if !check_resource_rules(db, &self.client, &url).await {
+            return Err(CrawlError::Denied("robots.txt".to_string()));
         }
 
         // Crawl & save the data
-        let mut result = self.crawl(&url, parse_results).await;
-        if result.is_bad_request() {
-            log::warn!("issue fetching {} {:?}", result.status, result.url);
-        }
+        match self.crawl(&url, parse_results).await {
+            Err(err) => {
+                log::error!("issue fetching {:?} - {}", url, err.to_string());
+                Err(err)
+            }
+            Ok(mut result) => {
+                log::debug!("fetched og: {}, canonical: {}", url, result.url);
 
-        #[cfg(debug_assertions)]
-        log::info!("fetched {} {:?}", result.status, result.url);
+                // Check to see if a canonical URL was found, if not use the original
+                // bootstrapped URL
+                if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
+                    let parsed = Url::parse(&result.url).expect("Invalid result URL");
+                    let domain = parsed.host_str().expect("Invalid result URL host");
+                    if domain == "web.archive.org" {
+                        result.url = crawl.url.clone();
+                    }
+                }
 
-        // Check to see if a canonical URL was found, if not use the original
-        // bootstrapped URL
-        if crawl.crawl_type == crawl_queue::CrawlType::Bootstrap {
-            let parsed = Url::parse(&result.url).expect("Invalid result URL");
-            let domain = parsed.host_str().expect("Invalid result URL host");
-            if domain == "web.archive.org" {
-                result.url = crawl.url.clone();
+                // Normalize links from scrape result. If the links start with "/" they
+                // should be appended to the current URL.
+                let normalized_links = result
+                    .links
+                    .iter()
+                    .filter_map(|link| normalize_href(&result.url, link))
+                    .collect();
+                result.links = normalized_links;
+
+                log::trace!(
+                    "crawl result: {:?} - {:?}\n{:?}",
+                    result.title,
+                    result.url,
+                    result.description,
+                );
+
+                // Update fetch history
+                // Break apart domain + path of the URL
+                let url = Url::parse(&result.url).expect("Invalid result URL");
+                let domain = url.host_str().expect("Invalid URL");
+                let mut path: String = url.path().to_string();
+                if let Some(query) = url.query() {
+                    path = format!("{}?{}", path, query);
+                }
+
+                let _ = fetch_history::upsert(db, domain, &path, result.content_hash.clone(), 200)
+                    .await;
+
+                Ok(result)
             }
         }
-
-        // Normalize links from scrape result. If the links start with "/" they
-        // should be appended to the current URL.
-        let normalized_links = result
-            .links
-            .iter()
-            .filter_map(|link| normalize_href(&result.url, link))
-            .collect();
-        result.links = normalized_links;
-
-        log::trace!(
-            "crawl result: {:?} - {:?}\n{:?}",
-            result.title,
-            result.url,
-            result.description,
-        );
-
-        // Update fetch history
-        // Break apart domain + path of the URL
-        let url = Url::parse(&result.url).expect("Invalid result URL");
-        let domain = url.host_str().expect("Invalid URL");
-        let mut path: String = url.path().to_string();
-        if let Some(query) = url.query() {
-            path = format!("{}?{}", path, query);
-        }
-
-        fetch_history::upsert(
-            db,
-            domain,
-            &path,
-            result.content_hash.clone(),
-            result.status,
-        )
-        .await?;
-
-        Ok(Some(result))
     }
 }
 
@@ -489,7 +509,7 @@ mod test {
     async fn test_crawl() {
         let crawler = Crawler::new();
         let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
-        let result = crawler.crawl(&url, true).await;
+        let result = crawler.crawl(&url, true).await.expect("success");
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
@@ -511,10 +531,7 @@ mod test {
         let model = query.insert(&db).await.unwrap();
         let state = AppState::builder().with_db(db).build();
 
-        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
-        assert!(crawl_result.is_some());
-
-        let result = crawl_result.unwrap();
+        let result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
 
@@ -537,10 +554,7 @@ mod test {
         };
         let model = query.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
-        assert!(crawl_result.is_some());
-
-        let result = crawl_result.unwrap();
+        let result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert_eq!(result.title, Some("xkcd: Astronaut Vandalism".to_string()));
         assert_eq!(result.url, "https://xkcd.com/1375/".to_string());
     }
@@ -561,10 +575,7 @@ mod test {
         };
         let model = query.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
-        assert!(crawl_result.is_some());
-
-        let result = crawl_result.unwrap();
+        let result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
         assert_eq!(
             result.title,
             Some("Luigi's Mansion Wiki Guide - IGN".to_string())
@@ -608,8 +619,8 @@ mod test {
         };
         let _ = rule.insert(&state.db).await.unwrap();
 
-        let crawl_result = crawler.fetch_by_job(&state, model.id, true).await.unwrap();
-        assert!(crawl_result.is_none());
+        let res = crawler.fetch_by_job(&state, model.id, true).await;
+        assert!(res.is_err());
     }
 
     #[test]

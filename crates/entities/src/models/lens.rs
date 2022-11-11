@@ -3,7 +3,6 @@ use sea_orm::sea_query;
 use sea_orm::Set;
 use serde::Serialize;
 use shared::config::LensConfig;
-use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
@@ -15,15 +14,6 @@ pub enum LensType {
     // source is.
     #[sea_orm(string_value = "Plugin")]
     Plugin,
-}
-
-impl fmt::Display for LensType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            LensType::Simple => write!(f, "Simple"),
-            LensType::Plugin => write!(f, "Plugin"),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
@@ -66,7 +56,7 @@ impl ActiveModelBehavior for ActiveModel {
 pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
         .col_expr(Column::IsEnabled, sea_query::Expr::value(false))
-        .filter(Column::LensType.contains(&LensType::Simple.to_string()))
+        .filter(Column::LensType.eq(LensType::Simple))
         .exec(db)
         .await?;
 
