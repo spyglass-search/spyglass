@@ -380,8 +380,7 @@ pub async fn search(
         .collect::<Vec<SearchFilter>>();
 
     let docs =
-        Searcher::search_with_lens(state.db.clone(), &applied, &index.reader, &search_req.query)
-            .await;
+        Searcher::search_with_lens(state.db.clone(), &applied, index, &search_req.query).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {
