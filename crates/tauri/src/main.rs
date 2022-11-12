@@ -234,12 +234,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 show_crawl_stats_window(app);
                             }
                             MenuID::SHOW_SEARCHBAR => {
-                                let _ = window.is_visible()
-                                    .map(|is_visible| {
-                                        if !is_visible {
-                                            window::hide_search_bar(&window);
-                                        }
-                                    });
+                                window::show_search_bar(&window);
                             }
                             MenuID::QUIT => app.exit(0),
                             MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
