@@ -33,6 +33,7 @@ pub enum ResultDisplay {
 
 #[derive(Clone, Debug)]
 pub enum Msg {
+    ClearFilters,
     ClearQuery,
     ClearResults,
     Focus,
@@ -139,7 +140,11 @@ impl Component for SearchPage {
             let link = link.clone();
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |_| {
-                    link.send_message(Msg::ClearQuery);
+                    link.send_message_batch(vec![
+                        Msg::ClearFilters,
+                        Msg::ClearResults,
+                        Msg::ClearQuery,
+                    ]);
                 }) as Box<dyn Fn(JsValue)>);
 
                 let _ = listen(ClientEvent::ClearSearch.as_ref(), &cb).await;
@@ -176,10 +181,14 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::ClearFilters => {
+                self.lens.clear();
+                true
+            }
             Msg::ClearResults => {
                 self.selected_idx = 0;
-                self.docs_results = Vec::new();
-                self.lens_results = Vec::new();
+                self.docs_results.clear();
+                self.lens_results.clear();
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
                 self.request_resize();
@@ -187,8 +196,8 @@ impl Component for SearchPage {
             }
             Msg::ClearQuery => {
                 self.selected_idx = 0;
-                self.docs_results = Vec::new();
-                self.lens_results = Vec::new();
+                self.docs_results.clear();
+                self.lens_results.clear();
                 self.search_meta = None;
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
