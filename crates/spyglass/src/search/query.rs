@@ -81,7 +81,6 @@ fn terms_for_field(
 
         let mut token_stream = text_analyzer.token_stream(query);
         token_stream.process(&mut |token| {
-            log::error!("Term {:?}", token.text);
             let term = Term::from_field_text(field, &token.text);
             terms.push(term);
         });

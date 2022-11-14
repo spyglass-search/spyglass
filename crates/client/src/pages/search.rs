@@ -110,7 +110,7 @@ impl SearchPage {
     fn request_resize(&self) {
         if let Some(node) = self.search_wrapper_ref.cast::<HtmlElement>() {
             spawn_local(async move {
-                resize_window(node.offset_height() as f64).await.unwrap();
+                let _ = resize_window(node.offset_height() as f64).await;
             });
         }
     }
@@ -215,7 +215,7 @@ impl Component for SearchPage {
                 true
             }
             Msg::HandleError(msg) => {
-                let window = window().unwrap();
+                let window = window().expect("Unable to get window");
                 let _ = window.alert_with_message(&msg);
                 false
             }
@@ -315,9 +315,12 @@ impl Component for SearchPage {
                 let query = self.query.clone();
 
                 link.send_future(async move {
-                    match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
-                        Ok(results) => match serde_wasm_bindgen::from_value(results) {
-                            Ok(deser) => Msg::UpdateDocsResults(deser),
+                    match serde_wasm_bindgen::to_value(&lenses) {
+                        Ok(lenses) => match search_docs(lenses, query).await {
+                            Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                                Ok(deser) => Msg::UpdateDocsResults(deser),
+                                Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                            },
                             Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                         },
                         Err(e) => Msg::HandleError(format!("Error: {:?}", e)),

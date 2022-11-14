@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn start_backend(state: &mut AppState, config: &Config) {
     // Initialize crawl_queue, requeue all in-flight tasks.
-    crawl_queue::reset_processing(&state.db).await;
+    let _ = crawl_queue::reset_processing(&state.db).await;
     if let Err(e) = lens::reset(&state.db).await {
         log::error!("Unable to reset lenses: {}", e);
     }

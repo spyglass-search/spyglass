@@ -81,12 +81,17 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
             {
                 use shared::url_to_file_path;
                 let path = url_to_file_path(url.path(), true);
-                open::that(format!("file://{}", path)).unwrap();
+                if let Err(err) = open::that(format!("file://{}", path)) {
+                    log::error!("Unable to open file://{} due to: {}", path, err);
+                }
+
                 return Ok(());
             }
         }
 
-        open::that(url.to_string()).unwrap();
+        if let Err(err) = open::that(url.to_string()) {
+            log::error!("Unable to open {} due to: {}", url.to_string(), err);
+        }
     }
     Ok(())
 }

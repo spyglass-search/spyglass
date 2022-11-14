@@ -65,7 +65,7 @@ pub struct SettingsPageProps {
 
 #[function_component(SettingsPage)]
 pub fn settings_page(props: &SettingsPageProps) -> Html {
-    let history = use_history().unwrap();
+    let history = use_history().expect("History not available in this browser");
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {

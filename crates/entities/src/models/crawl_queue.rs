@@ -135,7 +135,7 @@ pub async fn queue_stats(
     Ok(res)
 }
 
-pub async fn reset_processing(db: &DatabaseConnection) {
+pub async fn reset_processing(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
         .col_expr(
             Column::Status,
@@ -145,8 +145,9 @@ pub async fn reset_processing(db: &DatabaseConnection) {
         )
         .filter(Column::Status.eq(CrawlStatus::Processing))
         .exec(db)
-        .await
-        .unwrap();
+        .await?;
+
+    Ok(())
 }
 
 #[derive(Debug, FromQueryResult)]
