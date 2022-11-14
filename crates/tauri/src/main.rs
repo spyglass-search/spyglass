@@ -56,6 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
             sentry::ClientOptions {
                 release: Some(Cow::from(ctx.package_info().version.to_string())),
+                traces_sample_rate: 0.1,
                 ..Default::default()
             },
         )))
@@ -89,7 +90,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_thread_names(true)
                 .with_writer(io::stdout),
         )
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
+        .with(sentry_tracing::layer());
 
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;

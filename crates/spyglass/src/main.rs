@@ -38,6 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
             sentry::ClientOptions {
                 release: sentry::release_name!(),
+                traces_sample_rate: 1.0,
                 ..Default::default()
             },
         )))
@@ -65,7 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .add_directive("docx=WARN".parse().expect("Invalid EnvFilter")),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
+        .with(sentry_tracing::layer());
 
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
