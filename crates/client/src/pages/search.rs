@@ -208,7 +208,7 @@ impl Component for SearchPage {
                 true
             }
             Msg::Focus => {
-                if let Some(el) = self.search_input_ref.cast::<HtmlElement>() {
+                if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
                     let _ = el.focus();
                 }
                 self.request_resize();
@@ -448,17 +448,21 @@ impl Component for SearchPage {
         };
 
         html! {
-            <div ref={self.search_wrapper_ref.clone()} class="relative overflow-hidden rounded-xl border-neutral-600 border">
+            <div ref={self.search_wrapper_ref.clone()}
+                class="relative overflow-hidden rounded-xl border-neutral-600 border"
+                onclick={link.callback(|_| Msg::Focus)}
+            >
                 <div class="flex flex-nowrap w-full">
                     <SelectedLens lens={self.lens.clone()} />
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
+                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
                         placeholder="Search"
                         onkeyup={link.callback(Msg::KeyboardEvent)}
                         onkeydown={link.callback(Msg::KeyboardEvent)}
+                        onclick={link.callback(|_| Msg::Focus)}
                         spellcheck="false"
                         tabindex="-1"
                     />
