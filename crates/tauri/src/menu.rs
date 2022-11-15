@@ -113,6 +113,7 @@ pub fn get_app_menu(ctx: &Context<EmbeddedAssets>) -> Menu {
             .add_native_item(MenuItem::Paste)
             .add_native_item(MenuItem::SelectAll)
             .add_native_item(MenuItem::Separator)
+            .add_native_item(MenuItem::Hide)
             .add_native_item(MenuItem::Quit),
     ))
 }
