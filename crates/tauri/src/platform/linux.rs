@@ -1,6 +1,6 @@
+use crate::window;
 use shared::event::ClientEvent;
 use tauri::Window;
-use crate::window;
 
 pub fn show_search_bar(window: &Window) {
     let _ = window.unminimize();
