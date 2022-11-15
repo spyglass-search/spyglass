@@ -1,4 +1,4 @@
-use crate::constants;
+use crate::{constants, platform};
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{AppHandle, LogicalSize, Manager, Monitor, Size, Window, WindowBuilder, WindowUrl};
@@ -38,16 +38,19 @@ pub fn center_search_bar(window: &Window) {
 }
 
 pub fn show_search_bar(window: &Window) {
-    let _ = window.show();
-    let _ = window.set_focus();
-    let _ = window.set_always_on_top(true);
-    center_search_bar(window);
-    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+    #[cfg(target_os = "macos")]
+    platform::mac::show_search_bar(window);
+
+    #[cfg(target_os = "windows")]
+    platform::windows::show_search_bar(window);
 }
 
 pub fn hide_search_bar(window: &Window) {
-    let _ = window.hide();
-    let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
+    #[cfg(target_os = "macos")]
+    platform::mac::hide_search_bar(window);
+
+    #[cfg(target_os = "windows")]
+    platform::windows::hide_search_bar(window);
 }
 
 pub async fn resize_window(window: &Window, height: f64) {

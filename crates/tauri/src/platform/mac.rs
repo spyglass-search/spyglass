@@ -1,10 +1,13 @@
 use cocoa::appkit::{NSApp, NSApplication, NSEvent, NSEventMask, NSEventSubtype};
 use cocoa::base::nil;
 use cocoa::foundation::{NSAutoreleasePool, NSDate, NSString};
+
 use tauri::Window;
 
 use crate::window;
+use shared::event::ClientEvent;
 
+/// Poll for dock events
 pub fn poll_app_events(window: &Window) {
     unsafe {
         let _pool = NSAutoreleasePool::new(nil);
@@ -31,4 +34,17 @@ pub fn poll_app_events(window: &Window) {
             _ => {}
         }
     }
+}
+
+pub fn show_search_bar(window: &Window) {
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = window.set_always_on_top(true);
+    window::center_search_bar(window);
+    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+}
+
+pub fn hide_search_bar(window: &Window) {
+    let _ = window.hide();
+    let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
