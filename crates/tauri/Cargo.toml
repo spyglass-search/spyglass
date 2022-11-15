@@ -43,6 +43,7 @@ url = "2.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24"
+objc = "0.2.7"
 
 [features]
 default = [ "custom-protocol" ]

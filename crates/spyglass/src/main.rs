@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
             sentry::ClientOptions {
                 release: sentry::release_name!(),
-                traces_sample_rate: 1.0,
+                traces_sample_rate: 0.1,
                 ..Default::default()
             },
         )))
