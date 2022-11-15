@@ -184,14 +184,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if let Err(e) = shortcuts
                             .register(&config.user_settings.shortcut, move || {
                                 let window = window_clone.clone();
-                                let _ = window.is_visible()
-                                    .map(|is_visible| {
-                                        if is_visible {
-                                            window::hide_search_bar(&window);
-                                        } else {
-                                            window::show_search_bar(&window);
-                                        }
-                                    });
+                                window::show_search_bar(&window);
                             }) {
                             window::alert(&window, "Error registering global shortcut", &format!("{}", e));
                         }
@@ -204,13 +197,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .on_window_event(|event| {
             let window = event.window();
-            if window.label() == "main" {
+            if window.label() == constants::SEARCH_WIN_NAME {
                 if let tauri::WindowEvent::Focused(is_focused) = event.event() {
-                    let handle = event.window();
-                    if !is_focused {
-                        window::hide_search_bar(handle);
-                    } else {
-                        window::show_search_bar(handle);
+                    #[cfg(target_os = "macos")]
+                    {
+                        let handle = event.window();
+                        if !is_focused {
+                            window::hide_search_bar(handle);
+                        }
                     }
                 }
             }
