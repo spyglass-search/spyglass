@@ -129,8 +129,12 @@ pub async fn install_lens_to_path(download_url: &str, lens_folder: PathBuf) -> a
 
     // Grab the file name from the end of the URL
     let url = Url::parse(download_url)?;
-    let mut segments = url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
-    let file_name = segments.pop().unwrap();
+    let file_name = url
+        .path_segments()
+        .map(|c| c.collect::<Vec<_>>())
+        .and_then(|mut segs| segs.pop())
+        .expect("Unable to determine filename from lens path");
+
     // Write file out to lens folder
     fs::write(lens_folder.join(file_name), file_contents)?;
 

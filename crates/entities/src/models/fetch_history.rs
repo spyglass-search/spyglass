@@ -68,7 +68,7 @@ pub async fn find_by_url(
     url: &Url,
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     Entity::find()
-        .filter(Column::Domain.eq(url.host_str().unwrap().to_string()))
+        .filter(Column::Domain.eq(url.host_str().unwrap_or_default().to_string()))
         .filter(Column::Path.eq(url.path()))
         .one(db)
         .await
