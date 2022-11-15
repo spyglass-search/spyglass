@@ -39,6 +39,7 @@ pub fn poll_app_events(window: &Window) {
 pub fn show_search_bar(window: &Window) {
     let _ = window.show();
     window::center_search_bar(window);
+    let _ = window.set_always_on_top(true);
     let _ = window.set_focus();
 
     let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
