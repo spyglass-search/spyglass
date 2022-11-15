@@ -38,6 +38,7 @@ mod window;
 use window::{
     show_connection_manager_window, show_crawl_stats_window, show_lens_manager_window,
     show_plugin_manager, show_search_bar, show_user_settings, show_wizard_window,
+    show_update_window
 };
 
 const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
@@ -45,8 +46,6 @@ const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
 const SPYGLASS_LEVEL: &str = "spyglass_app=INFO";
 #[cfg(debug_assertions)]
 const SPYGLASS_LEVEL: &str = "spyglass_app=DEBUG";
-
-use crate::window::show_update_window;
 
 #[derive(Clone)]
 pub struct AppShutdown;

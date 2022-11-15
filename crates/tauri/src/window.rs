@@ -38,6 +38,9 @@ pub fn center_search_bar(window: &Window) {
 }
 
 pub fn show_search_bar(window: &Window) {
+    #[cfg(target_os = "linux")]
+    platform::linux::show_search_bar(window);
+
     #[cfg(target_os = "macos")]
     platform::mac::show_search_bar(window);
 
@@ -46,6 +49,9 @@ pub fn show_search_bar(window: &Window) {
 }
 
 pub fn hide_search_bar(window: &Window) {
+    #[cfg(target_os = "linux")]
+    platform::linux::hide_search_bar(window);
+
     #[cfg(target_os = "macos")]
     platform::mac::hide_search_bar(window);
 
