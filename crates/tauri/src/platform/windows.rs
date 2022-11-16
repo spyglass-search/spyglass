@@ -1,3 +1,7 @@
+use crate::window;
+use shared::event::ClientEvent;
+use tauri::Window;
+
 pub fn show_search_bar(window: &Window) {
     let _ = window.unminimize();
     window::center_search_bar(window);
