@@ -98,7 +98,10 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             // Add / update search index w/ crawl result.
             if let Some(content) = crawl_result.content {
                 let url = Url::parse(&crawl_result.url).expect("Invalid crawl URL");
-                let url_host = url.host_str().expect("Invalid URL host");
+                let url_host = match url.scheme() {
+                    "file" => "localhost",
+                    _ => url.host_str().expect("Invalid URL host"),
+                };
 
                 let existing = indexed_document::Entity::find()
                     .filter(indexed_document::Column::Url.eq(url.as_str()))
