@@ -3249,6 +3249,7 @@ dependencies = [
  "shared",
  "tantivy",
  "tar",
+ "url",
 ]
 
 [[package]]
