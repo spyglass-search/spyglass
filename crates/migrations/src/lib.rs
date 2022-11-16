@@ -15,6 +15,7 @@ mod m20221101_000001_add_open_url_col;
 mod m20221107_000001_recreate_connection_table;
 mod m20221109_add_tags_table;
 mod m20221115_000001_local_file_pathfix;
+mod m20221116_000001_add_connection_constraint;
 
 mod utils;
 
@@ -36,6 +37,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20221107_000001_recreate_connection_table::Migration),
             Box::new(m20221109_add_tags_table::Migration),
             Box::new(m20221115_000001_local_file_pathfix::Migration),
+            Box::new(m20221116_000001_add_connection_constraint::Migration),
         ]
     }
 }
