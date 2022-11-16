@@ -194,12 +194,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             Ok(())
         })
-        .on_window_event(|event| {
+        .on_window_event(|_event| {
             #[cfg(target_os = "macos")]
             {
-                let window = event.window();
+                let window = _event.window();
                 if window.label() == constants::SEARCH_WIN_NAME {
-                    if let tauri::WindowEvent::Focused(is_focused) = event.event() {
+                    if let tauri::WindowEvent::Focused(is_focused) = _event.event() {
                         if !is_focused {
                             window::hide_search_bar(window);
                         }
@@ -253,12 +253,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.run(|app_handle, e| match e {
         RunEvent::MainEventsCleared => {
-            let window = app_handle
-                .get_window(constants::SEARCH_WIN_NAME)
-                .expect("Unable to get search window");
-
             #[cfg(target_os = "macos")]
-            crate::platform::mac::poll_app_events(&window);
+            {
+                if let Some(window) = app_handle.get_window(constants::SEARCH_WIN_NAME) {
+                    crate::platform::mac::poll_app_events(&window);
+                }
+            }
         }
         RunEvent::ExitRequested { .. } => {
             // Do some cleanup for long running tasks
