@@ -684,8 +684,7 @@ mod test {
         std::fs::create_dir_all(test_folder).expect("Unable to create test dir");
 
         let test_path = test_folder.join("test.txt");
-        std::fs::write(test_path.clone(), "test_content")
-            .expect("Unable to write test file");
+        std::fs::write(test_path.clone(), "test_content").expect("Unable to write test file");
 
         let uri = path_to_uri(test_path.to_path_buf());
         let url = Url::parse(&uri).unwrap();
