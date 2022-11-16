@@ -5471,6 +5471,7 @@ dependencies = [
  "log",
  "migration",
  "num-format",
+ "objc",
  "open",
  "reqwest",
  "ron",

@@ -74,7 +74,7 @@
       "width": 640,
       "height": 96,
       "transparent": true,
-      "skipTaskbar": true
+      "skipTaskbar": false
     }],
     "security": {
       "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'; script-src 'unsafe-eval'"
