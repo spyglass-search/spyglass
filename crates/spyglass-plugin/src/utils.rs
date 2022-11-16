@@ -25,17 +25,29 @@ mod test {
     use url::Url;
 
     #[test]
-    #[cfg(target_os = "windows")]
     fn test_path_to_uri() {
+        #[cfg(target_os = "windows")]
         let test_folder = Path::new("C:\\tmp\\path_to_uri");
+
+        #[cfg(not(target_os = "windows"))]
+        let test_folder = Path::new("/tmp/path_to_uri");
+
         std::fs::create_dir_all(test_folder).expect("Unable to create test dir");
 
         let test_path = test_folder.join("test.txt");
         let uri = path_to_uri(test_path.to_path_buf());
 
+        #[cfg(target_os = "windows")]
         assert_eq!(uri, "file://localhost/C%3A/tmp/path_to_uri/test.txt");
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(uri, "file://localhost/tmp/path_to_uri/test.txt");
+
         let url = Url::parse(&uri).unwrap();
         let file_path = url.to_file_path().unwrap();
         assert_eq!(file_path, test_path);
+
+        if test_folder.exists() {
+            std::fs::remove_dir_all(test_folder).expect("Unable to clean up test folder");
+        }
     }
 }

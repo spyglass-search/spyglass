@@ -482,10 +482,11 @@ mod test {
     use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
+    use spyglass_plugin::utils::path_to_uri;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
     use crate::state::AppState;
-
+    use std::path::Path;
     use url::Url;
 
     #[tokio::test]
@@ -669,16 +670,26 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(target_os = "windows")]
     async fn test_file_fetch() {
         let crawler = Crawler::new();
 
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
 
-        // Should skip this URL
-        let url =
-            Url::parse("file://localhost/C%3A/Users/a5huynh/Documents/Projects/Rust%20Stuff/book/2018-edition/src/appendix-00.md").unwrap();
+        #[cfg(target_os = "windows")]
+        let test_folder = Path::new("C:\\tmp\\path_to_uri");
+        #[cfg(not(target_os = "windows"))]
+        let test_folder = Path::new("/tmp/path_to_uri");
+
+        std::fs::create_dir_all(test_folder).expect("Unable to create test dir");
+
+        let test_path = test_folder.join("test.txt");
+        std::fs::write(test_path.clone(), "test_content")
+            .expect("Unable to write test file");
+
+        let uri = path_to_uri(test_path.to_path_buf());
+        let url = Url::parse(&uri).unwrap();
+
         let query = crawl_queue::ActiveModel {
             domain: Set("localhost".to_string()),
             url: Set(url.to_string()),
@@ -689,7 +700,6 @@ mod test {
 
         // Add resource rule to stop the crawl above
         let res = crawler.fetch_by_job(&state, model.id, true).await;
-        dbg!(&res);
         assert!(res.is_ok());
     }
 }
