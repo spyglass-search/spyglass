@@ -109,10 +109,12 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
                         Ok(_) => {
                             log::debug!("saved connection {} for {}", user.email.clone(), api_id);
                             let _ = state
-                                .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
-                                    api_id,
-                                    account: user.email,
-                                }))
+                                .schedule_work(ManagerCommand::Collect(
+                                    CollectTask::ConnectionSync {
+                                        api_id,
+                                        account: user.email,
+                                    },
+                                ))
                                 .await;
                         }
                         Err(err) => log::error!("Unable to save connection: {}", err.to_string()),
