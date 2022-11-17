@@ -105,13 +105,20 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
                         auth.scopes,
                     );
                     let res = new_conn.insert(&state.db).await;
-                    log::debug!("saved connection: {:?}", res);
-                    let _ = state
-                        .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
-                            api_id,
-                            account: user.email,
-                        }))
-                        .await;
+                    match res {
+                        Ok(_) => {
+                            log::debug!("saved connection {} for {}", user.email.clone(), api_id);
+                            let _ = state
+                                .schedule_work(ManagerCommand::Collect(
+                                    CollectTask::ConnectionSync {
+                                        api_id,
+                                        account: user.email,
+                                    },
+                                ))
+                                .await;
+                        }
+                        Err(err) => log::error!("Unable to save connection: {}", err.to_string()),
+                    }
                 }
                 Err(err) => log::error!("unable to exchange token: {}", err),
             }
