@@ -19,6 +19,13 @@ pub struct SettingChangeEvent {
 }
 
 #[derive(Properties, PartialEq)]
+pub struct FormFieldProps {
+    pub name: String,
+    pub value: String,
+    pub onchange: Callback<SettingChangeEvent>,
+}
+
+#[derive(Properties, PartialEq)]
 pub struct FormProps {
     #[prop_or_default]
     pub onchange: Callback<SettingChangeEvent>,
@@ -64,6 +71,15 @@ impl FormElement {
                     />
                 }
             }
+            FormType::Path => {
+                html! {
+                    <PathField
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
+                    />
+                }
+            }
             FormType::PathList => {
                 html! {
                     <PathList
@@ -82,7 +98,7 @@ impl FormElement {
                     />
                 }
             }
-            FormType::Text | FormType::Path => {
+            FormType::Text => {
                 html! {
                     <Text
                         name={props.setting_name.clone()}
