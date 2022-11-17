@@ -17,7 +17,8 @@ pub enum PathMsg {
 }
 
 pub struct PathField {
-    pub path: PathBuf
+    pub path: PathBuf,
+    pub listen_for_change: bool
 }
 
 impl PathField {
@@ -53,16 +54,20 @@ impl Component for PathField {
             });
         }
 
-        Self { path: Path::new(&props.value).to_path_buf() }
+        Self { path: Path::new(&props.value).to_path_buf(), listen_for_change: false }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             PathMsg::UpdatePath(path) => {
-                self.path = path;
-                self.emit_onchange(ctx);
-
-                true
+                if self.listen_for_change {
+                    self.listen_for_change = false;
+                    self.path = path;
+                    self.emit_onchange(ctx);
+                    true
+                } else {
+                    false
+                }
             }
             PathMsg::OpenPath(path) => {
                 spawn_local(async move {
@@ -72,6 +77,7 @@ impl Component for PathField {
                 false
             }
             PathMsg::OpenFolderDialog => {
+                self.listen_for_change = true;
                 spawn_local(async {
                     let _ = invoke(ClientInvoke::ChooseFolder.as_ref(), JsValue::NULL).await;
                 });
@@ -135,6 +141,7 @@ pub enum Msg {
 /// a new value to the list.
 pub struct PathList {
     pub paths: Vec<PathBuf>,
+    pub listen_for_change: bool,
 }
 
 impl PathList {
@@ -177,19 +184,24 @@ impl Component for PathList {
             serde_json::from_str::<Vec<PathBuf>>(&props.value).map_or(Vec::new(), |x| x);
         paths.sort();
 
-        Self { paths }
+        Self { paths, listen_for_change: false }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::AddPath(path) => {
-                self.paths.push(path);
-                self.paths.sort();
-                self.emit_onchange(ctx);
-
-                true
+                if self.listen_for_change {
+                    self.listen_for_change = false;
+                    self.paths.push(path);
+                    self.paths.sort();
+                    self.emit_onchange(ctx);
+                    true
+                } else {
+                    false
+                }
             }
             Msg::OpenFolderDialog => {
+                self.listen_for_change = true;
                 spawn_local(async {
                     let _ = invoke(ClientInvoke::ChooseFolder.as_ref(), JsValue::NULL).await;
                 });
