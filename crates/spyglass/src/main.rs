@@ -38,6 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
             sentry::ClientOptions {
                 release: sentry::release_name!(),
+                traces_sample_rate: 0.1,
                 ..Default::default()
             },
         )))
@@ -65,7 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .add_directive("docx=WARN".parse().expect("Invalid EnvFilter")),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
+        .with(sentry_tracing::layer());
 
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
@@ -112,7 +114,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn start_backend(state: &mut AppState, config: &Config) {
     // Initialize crawl_queue, requeue all in-flight tasks.
-    crawl_queue::reset_processing(&state.db).await;
+    let _ = crawl_queue::reset_processing(&state.db).await;
     if let Err(e) = lens::reset(&state.db).await {
         log::error!("Unable to reset lenses: {}", e);
     }

@@ -211,7 +211,9 @@ async fn handle_walk_and_enqueue(
     path: PathBuf,
     supported_exts: &HashSet<String>,
 ) -> WalkStats {
-    let walker = WalkBuilder::new(path).standard_filters(true).build();
+    let walker = WalkBuilder::new(path.clone())
+        .standard_filters(true)
+        .build();
     let enqueue_settings = EnqueueSettings {
         force_allow: true,
         ..Default::default()
@@ -231,7 +233,7 @@ async fn handle_walk_and_enqueue(
 
             if let Some(ext) = ext {
                 if supported_exts.contains(ext) {
-                    to_enqueue.push(path_to_uri(entry.path().to_path_buf()));
+                    to_enqueue.push(path_to_uri(entry.into_path()));
                     stats.files += 1;
                 } else {
                     stats.skipped += 1;

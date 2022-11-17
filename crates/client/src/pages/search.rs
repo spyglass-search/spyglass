@@ -33,6 +33,7 @@ pub enum ResultDisplay {
 
 #[derive(Clone, Debug)]
 pub enum Msg {
+    ClearFilters,
     ClearQuery,
     ClearResults,
     Focus,
@@ -109,7 +110,7 @@ impl SearchPage {
     fn request_resize(&self) {
         if let Some(node) = self.search_wrapper_ref.cast::<HtmlElement>() {
             spawn_local(async move {
-                resize_window(node.offset_height() as f64).await.unwrap();
+                let _ = resize_window(node.offset_height() as f64).await;
             });
         }
     }
@@ -139,7 +140,11 @@ impl Component for SearchPage {
             let link = link.clone();
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |_| {
-                    link.send_message(Msg::ClearQuery);
+                    link.send_message_batch(vec![
+                        Msg::ClearFilters,
+                        Msg::ClearResults,
+                        Msg::ClearQuery,
+                    ]);
                 }) as Box<dyn Fn(JsValue)>);
 
                 let _ = listen(ClientEvent::ClearSearch.as_ref(), &cb).await;
@@ -176,10 +181,14 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::ClearFilters => {
+                self.lens.clear();
+                true
+            }
             Msg::ClearResults => {
                 self.selected_idx = 0;
-                self.docs_results = Vec::new();
-                self.lens_results = Vec::new();
+                self.docs_results.clear();
+                self.lens_results.clear();
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
                 self.request_resize();
@@ -187,8 +196,8 @@ impl Component for SearchPage {
             }
             Msg::ClearQuery => {
                 self.selected_idx = 0;
-                self.docs_results = Vec::new();
-                self.lens_results = Vec::new();
+                self.docs_results.clear();
+                self.lens_results.clear();
                 self.search_meta = None;
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
@@ -199,14 +208,14 @@ impl Component for SearchPage {
                 true
             }
             Msg::Focus => {
-                if let Some(el) = self.search_input_ref.cast::<HtmlElement>() {
+                if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
                     let _ = el.focus();
                 }
                 self.request_resize();
                 true
             }
             Msg::HandleError(msg) => {
-                let window = window().unwrap();
+                let window = window().expect("Unable to get window");
                 let _ = window.alert_with_message(&msg);
                 false
             }
@@ -306,9 +315,12 @@ impl Component for SearchPage {
                 let query = self.query.clone();
 
                 link.send_future(async move {
-                    match search_docs(serde_wasm_bindgen::to_value(&lenses).unwrap(), query).await {
-                        Ok(results) => match serde_wasm_bindgen::from_value(results) {
-                            Ok(deser) => Msg::UpdateDocsResults(deser),
+                    match serde_wasm_bindgen::to_value(&lenses) {
+                        Ok(lenses) => match search_docs(lenses, query).await {
+                            Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                                Ok(deser) => Msg::UpdateDocsResults(deser),
+                                Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                            },
                             Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
                         },
                         Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
@@ -436,17 +448,21 @@ impl Component for SearchPage {
         };
 
         html! {
-            <div ref={self.search_wrapper_ref.clone()} class="relative overflow-hidden rounded-xl border-neutral-600 border">
+            <div ref={self.search_wrapper_ref.clone()}
+                class="relative overflow-hidden rounded-xl border-neutral-600 border"
+                onclick={link.callback(|_| Msg::Focus)}
+            >
                 <div class="flex flex-nowrap w-full">
                     <SelectedLens lens={self.lens.clone()} />
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none"
+                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
                         placeholder="Search"
                         onkeyup={link.callback(Msg::KeyboardEvent)}
                         onkeydown={link.callback(Msg::KeyboardEvent)}
+                        onclick={link.callback(|_| Msg::Focus)}
                         spellcheck="false"
                         tabindex="-1"
                     />

@@ -218,8 +218,8 @@ impl Config {
 
         match prefs_path.exists() {
             true => {
-                let mut settings: UserSettings =
-                    ron::from_str(&fs::read_to_string(prefs_path).unwrap())?;
+                let contents = &fs::read_to_string(prefs_path).unwrap_or_default();
+                let mut settings: UserSettings = ron::from_str(contents)?;
                 settings.constraint_limits();
                 Ok(settings)
             }
@@ -228,7 +228,8 @@ impl Config {
                 // Write out default settings
                 fs::write(
                     prefs_path,
-                    ron::ser::to_string_pretty(&settings, Default::default()).unwrap(),
+                    ron::ser::to_string_pretty(&settings, Default::default())
+                        .expect("Unable to serialize settings."),
                 )
                 .expect("Unable to save user preferences file.");
 
@@ -278,7 +279,8 @@ impl Config {
     }
 
     pub fn default_data_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier())
+            .expect("Unable to find a default data directory");
         proj_dirs.data_dir().to_path_buf()
     }
 
@@ -299,7 +301,8 @@ impl Config {
     }
 
     pub fn prefs_dir() -> PathBuf {
-        let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier()).unwrap();
+        let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier())
+            .expect("Unable to find a suitable settings directory");
         proj_dirs.preference_dir().to_path_buf()
     }
 

@@ -32,10 +32,14 @@ pub async fn load_connection(
 ) -> Result<Box<dyn Connection + Send>> {
     match api_id {
         "calendar.google.com" => Ok(Box::new(
-            gcal::GCalConnection::new(state, account).await.unwrap(),
+            gcal::GCalConnection::new(state, account)
+                .await
+                .expect("Unable to create gcal connection"),
         )),
         "drive.google.com" => Ok(Box::new(
-            gdrive::DriveConnection::new(state, account).await.unwrap(),
+            gdrive::DriveConnection::new(state, account)
+                .await
+                .expect("Unable to create gdrive connection"),
         )),
         _ => Err(anyhow::anyhow!("Not suppported connection")),
     }

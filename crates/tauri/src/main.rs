@@ -31,15 +31,21 @@ mod cmd;
 mod constants;
 mod menu;
 use menu::MenuID;
+mod platform;
 mod plugins;
 mod rpc;
 mod window;
 use window::{
     show_connection_manager_window, show_crawl_stats_window, show_lens_manager_window,
-    show_plugin_manager, show_search_bar, show_user_settings, show_wizard_window,
+    show_plugin_manager, show_search_bar, show_update_window, show_user_settings,
+    show_wizard_window,
 };
 
-use crate::window::show_update_window;
+const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
+#[cfg(not(debug_assertions))]
+const SPYGLASS_LEVEL: &str = "spyglass_app=INFO";
+#[cfg(debug_assertions)]
+const SPYGLASS_LEVEL: &str = "spyglass_app=DEBUG";
 
 #[derive(Clone)]
 pub struct AppShutdown;
@@ -56,6 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
             sentry::ClientOptions {
                 release: Some(Cow::from(ctx.package_info().version.to_string())),
+                traces_sample_rate: 0.1,
                 ..Default::default()
             },
         )))
@@ -83,13 +90,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
-        .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
+        .with(
+            EnvFilter::from_default_env()
+                .add_directive(LOG_LEVEL.into())
+                .add_directive(SPYGLASS_LEVEL.parse().expect("Invalid EnvFilter")),
+        )
         .with(
             fmt::Layer::new()
                 .with_thread_names(true)
                 .with_writer(io::stdout),
         )
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
+        .with(sentry_tracing::layer());
 
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
@@ -141,13 +153,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
-            // macOS: hide from dock (also hides menu bar)
-            #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
             let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not found");
             window::center_search_bar(&window);
-
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
             {
@@ -176,14 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if let Err(e) = shortcuts
                             .register(&config.user_settings.shortcut, move || {
                                 let window = window_clone.clone();
-                                let _ = window.is_visible()
-                                    .map(|is_visible| {
-                                        if is_visible {
-                                            window::hide_search_bar(&window);
-                                        } else {
-                                            window::show_search_bar(&window);
-                                        }
-                                    });
+                                window::show_search_bar(&window);
                             }) {
                             window::alert(&window, "Error registering global shortcut", &format!("{}", e));
                         }
@@ -192,17 +192,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
             }
 
-            // Hide searchbar on start.
-            let _ = window.hide();
             Ok(())
         })
-        .on_window_event(|event| {
-            let window = event.window();
-            if window.label() == "main" {
-                if let tauri::WindowEvent::Focused(is_focused) = event.event() {
-                    if !is_focused {
-                        let handle = event.window();
-                        window::hide_search_bar(handle);
+        .on_window_event(|_event| {
+            #[cfg(target_os = "macos")]
+            {
+                let window = _event.window();
+                if window.label() == constants::SEARCH_WIN_NAME {
+                    if let tauri::WindowEvent::Focused(is_focused) = _event.event() {
+                        if !is_focused {
+                            window::hide_search_bar(window);
+                        }
                     }
                 }
             }
@@ -233,17 +233,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                             MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
                             MenuID::OPEN_WIZARD => { show_wizard_window(app); }
-                            MenuID::SHOW_CRAWL_STATUS => {
-                                show_crawl_stats_window(app);
-                            }
-                            MenuID::SHOW_SEARCHBAR => {
-                                let _ = window.is_visible()
-                                    .map(|is_visible| {
-                                        if !is_visible {
-                                            window::hide_search_bar(&window);
-                                        }
-                                    });
-                            }
+                            MenuID::SHOW_CRAWL_STATUS => { show_crawl_stats_window(app); }
+                            MenuID::SHOW_SEARCHBAR => { window::show_search_bar(&window); }
                             MenuID::QUIT => app.exit(0),
                             MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
                             MenuID::JOIN_DISCORD => {
@@ -261,6 +252,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("error while running tauri application");
 
     app.run(|app_handle, e| match e {
+        RunEvent::MainEventsCleared => {
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(window) = app_handle.get_window(constants::SEARCH_WIN_NAME) {
+                    crate::platform::mac::poll_app_events(&window);
+                }
+            }
+        }
         RunEvent::ExitRequested { .. } => {
             // Do some cleanup for long running tasks
             let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();

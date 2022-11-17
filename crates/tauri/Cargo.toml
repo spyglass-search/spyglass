@@ -24,7 +24,8 @@ num-format = "0.4"
 open = "3"
 reqwest = { version = "0.11", features = ["json"] }
 ron = "0.8"
-sentry = "0.27.0"
+sentry = "0.28.0"
+sentry-tracing = "0.28.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 shared = { path = "../shared" }
@@ -42,6 +43,7 @@ url = "2.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24"
+objc = "0.2.7"
 
 [features]
 default = [ "custom-protocol" ]

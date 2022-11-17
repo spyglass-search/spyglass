@@ -123,7 +123,7 @@ pub fn lens_component(props: &LensProps) -> Html {
             </div>
         }
     } else {
-        html! { <InstallButton download_url={result.download_url.clone().unwrap()} /> }
+        html! { <InstallButton download_url={result.download_url.clone().expect("Invalid lens download URL")} /> }
     };
 
     let view_link = if result.html_url.is_some() {

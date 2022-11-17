@@ -12,7 +12,6 @@ use url::{Host, Url};
 
 use entities::models::{crawl_queue, fetch_history, tag};
 use entities::sea_orm::prelude::*;
-use shared::url_to_file_path;
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
@@ -340,24 +339,9 @@ impl Crawler {
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
         // Attempt to convert from the URL to a file path
-        #[allow(unused_assignments)]
-        let mut url_path = url
-            .to_file_path()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|_| url.path().to_string());
+        let file_path = url.to_file_path().expect("Invalid file URL");
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            url_path = url_to_file_path(&url_path, false);
-        }
-
-        // Fixes issues handling Windows drive paths
-        #[cfg(target_os = "windows")]
-        {
-            url_path = url_to_file_path(url.path(), true);
-        }
-
-        let path = Path::new(&url_path);
+        let path = Path::new(&file_path);
         // Is this a file and does this exist?
         if !path.exists() || !path.is_file() {
             return Err(CrawlError::NotFound);
@@ -498,10 +482,11 @@ mod test {
     use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
+    use spyglass_plugin::utils::path_to_uri;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
     use crate::state::AppState;
-
+    use std::path::Path;
     use url::Url;
 
     #[tokio::test]
@@ -682,5 +667,38 @@ mod test {
 
         let res = determine_canonical(&a, &b);
         assert_eq!(res, "https://en.wikipedia.org/");
+    }
+
+    #[tokio::test]
+    async fn test_file_fetch() {
+        let crawler = Crawler::new();
+
+        let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db).build();
+
+        #[cfg(target_os = "windows")]
+        let test_folder = Path::new("C:\\tmp\\path_to_uri");
+        #[cfg(not(target_os = "windows"))]
+        let test_folder = Path::new("/tmp/path_to_uri");
+
+        std::fs::create_dir_all(test_folder).expect("Unable to create test dir");
+
+        let test_path = test_folder.join("test.txt");
+        std::fs::write(test_path.clone(), "test_content").expect("Unable to write test file");
+
+        let uri = path_to_uri(test_path.to_path_buf());
+        let url = Url::parse(&uri).unwrap();
+
+        let query = crawl_queue::ActiveModel {
+            domain: Set("localhost".to_string()),
+            url: Set(url.to_string()),
+            crawl_type: Set(crawl_queue::CrawlType::Bootstrap),
+            ..Default::default()
+        };
+        let model = query.insert(&state.db).await.unwrap();
+
+        // Add resource rule to stop the crawl above
+        let res = crawler.fetch_by_job(&state, model.id, true).await;
+        assert!(res.is_ok());
     }
 }

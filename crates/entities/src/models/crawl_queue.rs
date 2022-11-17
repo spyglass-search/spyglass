@@ -135,7 +135,7 @@ pub async fn queue_stats(
     Ok(res)
 }
 
-pub async fn reset_processing(db: &DatabaseConnection) {
+pub async fn reset_processing(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
         .col_expr(
             Column::Status,
@@ -145,8 +145,9 @@ pub async fn reset_processing(db: &DatabaseConnection) {
         )
         .filter(Column::Status.eq(CrawlStatus::Processing))
         .exec(db)
-        .await
-        .unwrap();
+        .await?;
+
+    Ok(())
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -431,15 +432,18 @@ pub async fn enqueue_all(
             let mut result = None;
             if !is_indexed.contains(&url) {
                 if let Ok(parsed) = Url::parse(&url) {
-                    if let Some(domain) = parsed.host_str() {
-                        result = Some(ActiveModel {
-                            domain: Set(domain.to_string()),
-                            crawl_type: Set(overrides.crawl_type.clone()),
-                            url: Set(url.to_string()),
-                            pipeline: Set(pipeline.clone()),
-                            ..Default::default()
-                        });
-                    }
+                    let domain = match parsed.scheme() {
+                        "file" => "localhost",
+                        _ => parsed.host_str().expect("Invalid URL host"),
+                    };
+
+                    result = Some(ActiveModel {
+                        domain: Set(domain.to_string()),
+                        crawl_type: Set(overrides.crawl_type.clone()),
+                        url: Set(url.to_string()),
+                        pipeline: Set(pipeline.clone()),
+                        ..Default::default()
+                    });
                 }
             }
             result

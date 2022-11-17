@@ -22,7 +22,11 @@ pub async fn create_connection(
     } else {
         format!(
             "sqlite://{}?mode=rwc",
-            config.data_dir().join("db.sqlite").to_str().unwrap()
+            config
+                .data_dir()
+                .join("db.sqlite")
+                .to_str()
+                .expect("Unable to create db")
         )
     };
 
