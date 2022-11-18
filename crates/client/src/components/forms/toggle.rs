@@ -1,26 +1,17 @@
 use yew::prelude::*;
 
+use super::FormFieldProps;
 use crate::components::forms::SettingChangeEvent;
-
 pub enum Msg {
     Toggle,
 }
-
-#[derive(Properties, PartialEq)]
-pub struct ToggleProps {
-    pub name: String,
-    pub value: String,
-    #[prop_or_default]
-    pub onchange: Callback<SettingChangeEvent>,
-}
-
 pub struct Toggle {
     state: bool,
 }
 
 impl Component for Toggle {
     type Message = Msg;
-    type Properties = ToggleProps;
+    type Properties = FormFieldProps;
 
     fn create(ctx: &Context<Self>) -> Self {
         let props = ctx.props();
