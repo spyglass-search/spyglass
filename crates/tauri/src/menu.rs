@@ -44,19 +44,19 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
     let settings_menu = SystemTrayMenu::new()
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_CONNECTION_MANAGER.to_string(),
-            "Manage connections",
+            "Connections",
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_LENS_MANAGER.to_string(),
-            "Manage lenses",
+            "Lenses",
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_PLUGIN_MANAGER.to_string(),
-            "Manage plugins",
+            "Plugins",
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_SETTINGS_MANAGER.to_string(),
-            "Manage user settings",
+            "User settings",
         ));
 
     tray = tray
