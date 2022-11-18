@@ -40,6 +40,7 @@ impl AppState {
             .await
             .expect("Unable to connect to database");
 
+        log::debug!("Loading index from: {:?}", config.index_dir());
         let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()))
             .expect("Unable to open index.");
 
