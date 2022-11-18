@@ -3,11 +3,11 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
+use super::FormFieldProps;
 use crate::components::forms::SettingChangeEvent;
 use crate::components::{btn, icons};
 use crate::{invoke, listen, open_folder_path};
 use shared::event::{ClientEvent, ClientInvoke, ListenPayload};
-use super::FormFieldProps;
 
 #[derive(Debug, Clone)]
 pub enum PathMsg {
@@ -18,7 +18,7 @@ pub enum PathMsg {
 
 pub struct PathField {
     pub path: PathBuf,
-    pub listen_for_change: bool
+    pub listen_for_change: bool,
 }
 
 impl PathField {
@@ -26,7 +26,7 @@ impl PathField {
         let props = ctx.props();
         props.onchange.emit(SettingChangeEvent {
             setting_name: props.name.clone(),
-            new_value: self.path.display().to_string()
+            new_value: self.path.display().to_string(),
         });
     }
 }
@@ -45,7 +45,9 @@ impl Component for PathField {
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
                     if let Ok(res) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
-                        link.send_message(PathMsg::UpdatePath(Path::new(&res.payload).to_path_buf()));
+                        link.send_message(PathMsg::UpdatePath(
+                            Path::new(&res.payload).to_path_buf(),
+                        ));
                     }
                 }) as Box<dyn Fn(JsValue)>);
 
@@ -54,7 +56,10 @@ impl Component for PathField {
             });
         }
 
-        Self { path: Path::new(&props.value).to_path_buf(), listen_for_change: false }
+        Self {
+            path: Path::new(&props.value).to_path_buf(),
+            listen_for_change: false,
+        }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
@@ -114,7 +119,7 @@ impl Component for PathField {
             }
         };
 
-        html!  {
+        html! {
             <div class="flex flex-col gap-4">
                 {path_html}
                 <div>
@@ -127,7 +132,6 @@ impl Component for PathField {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub enum Msg {
@@ -184,7 +188,10 @@ impl Component for PathList {
             serde_json::from_str::<Vec<PathBuf>>(&props.value).map_or(Vec::new(), |x| x);
         paths.sort();
 
-        Self { paths, listen_for_change: false }
+        Self {
+            paths,
+            listen_for_change: false,
+        }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
