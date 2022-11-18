@@ -144,41 +144,64 @@ impl Default for Crawler {
     }
 }
 
-fn determine_canonical(original: &Url, extracted: &Url) -> String {
-    // Ignore IPs
-    let origin_dn = match original.host() {
-        Some(Host::Domain(s)) => Some(s),
-        _ => None,
-    };
+fn determine_canonical(original: &Url, extracted: Option<Url>) -> String {
+    match extracted {
+        None => {
+            // Parse out the original path if the original URL was a web archive
+            // link.
+            if let Some(host) = original.host_str() {
+                if host == "web.archive.org" {
+                    let path = original.path().to_string();
+                    // Split the web archive url & check to see if it's a valid URL
+                    let splits = path.splitn(4, '/');
+                    let canonical = splits.last().unwrap_or_default();
+                    if let Ok(valid) = Url::parse(canonical) {
+                        return valid.to_string();
+                    }
+                }
+            }
 
-    let extracted_dn = match extracted.host() {
-        Some(Host::Domain(s)) => Some(s),
-        _ => None,
-    };
+            original.to_string()
+        }
+        Some(extracted) => {
+            // Ignore IPs
+            let origin_dn = match original.host() {
+                Some(Host::Domain(s)) => Some(s),
+                _ => None,
+            };
 
-    if origin_dn.is_none() || extracted_dn.is_none() {
-        return original.to_string();
-    }
+            let extracted_dn = match extracted.host() {
+                Some(Host::Domain(s)) => Some(s),
+                _ => None,
+            };
 
-    // Only allow overrides on the same root domain.
-    let origin_dn = parse_domain_name(origin_dn.expect("origin_dn should not be None"));
-    let extracted_dn = parse_domain_name(extracted_dn.expect("extracted_dn should not be None"));
+            if origin_dn.is_none() || extracted_dn.is_none() {
+                return original.to_string();
+            }
 
-    if origin_dn.is_err() || extracted_dn.is_err() {
-        return original.to_string();
-    }
+            // Only allow overrides on the same root domain.
+            let origin_dn = parse_domain_name(origin_dn.expect("origin_dn should not be None"));
+            let extracted_dn =
+                parse_domain_name(extracted_dn.expect("extracted_dn should not be None"));
 
-    let origin_dn = origin_dn.expect("origin_dn invalid");
-    let extracted_dn = extracted_dn.expect("extracted_dn invalid");
+            if origin_dn.is_err() || extracted_dn.is_err() {
+                return original.to_string();
+            }
 
-    // Special case for bootstrapper.
-    if let Some(root) = origin_dn.root() {
-        if root == "archive.org" || Some(root) == extracted_dn.root() {
-            return extracted.to_string();
+            let origin_dn = origin_dn.expect("origin_dn invalid");
+            let extracted_dn = extracted_dn.expect("extracted_dn invalid");
+
+            // Special case for bootstrapper where we allow the canonical URL parsed
+            // out of the HTML to override the original URL.
+            if let Some(root) = origin_dn.root() {
+                if root == "archive.org" || Some(root) == extracted_dn.root() {
+                    return extracted.to_string();
+                }
+            }
+
+            original.to_string()
         }
     }
-
-    original.to_string()
 }
 
 impl Crawler {
@@ -245,10 +268,7 @@ impl Crawler {
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
 
-        let canonical_url = match parse_result.canonical_url {
-            Some(canonical) => determine_canonical(url, &canonical),
-            None => url.to_string(),
-        };
+        let canonical_url = determine_canonical(url, parse_result.canonical_url);
 
         CrawlResult {
             content_hash,
@@ -644,29 +664,36 @@ mod test {
         let a = Url::parse("https://commons.wikipedia.org").unwrap();
         let b = Url::parse("https://en.wikipedia.org").unwrap();
 
-        let res = determine_canonical(&a, &b);
+        let res = determine_canonical(&a, Some(b));
         assert_eq!(res, "https://en.wikipedia.org/");
 
         // Test a valid override from a different domain.
         let a = Url::parse("https://web.archive.org").unwrap();
         let b = Url::parse("https://en.wikipedia.org").unwrap();
 
-        let res = determine_canonical(&a, &b);
+        let res = determine_canonical(&a, Some(b));
         assert_eq!(res, "https://en.wikipedia.org/");
 
         // Test ignoring an invalid override
         let a = Url::parse("https://localhost:5000").unwrap();
         let b = Url::parse("https://en.wikipedia.org").unwrap();
 
-        let res = determine_canonical(&a, &b);
+        let res = determine_canonical(&a, Some(b));
         assert_eq!(res, "https://localhost:5000/");
 
         // Test ignoring an invalid override
         let a = Url::parse("https://en.wikipedia.org").unwrap();
         let b = Url::parse("https://spam.com").unwrap();
 
-        let res = determine_canonical(&a, &b);
+        let res = determine_canonical(&a, Some(b));
         assert_eq!(res, "https://en.wikipedia.org/");
+
+        let a = Url::parse(
+            "https://web.archive.org/web/20211209075429id_/https://docs.rs/test/0.0.1/lib.rs.html",
+        )
+        .unwrap();
+        let res = determine_canonical(&a, None);
+        assert_eq!(res, "https://docs.rs/test/0.0.1/lib.rs.html");
     }
 
     #[tokio::test]
