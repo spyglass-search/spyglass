@@ -171,7 +171,7 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             FetchResult::Ignore
         }
         Err(err) => {
-            log::error!("Unable to crawl id: {} - {:?}", task.id, err);
+            log::info!("Unable to crawl id: {} - {:?}", task.id, err);
             match err {
                 // Ignore skips, recently fetched crawls, or not found
                 CrawlError::Denied(_) | CrawlError::RecentlyFetched | CrawlError::NotFound => {

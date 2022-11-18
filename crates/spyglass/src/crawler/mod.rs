@@ -426,7 +426,7 @@ impl Crawler {
         // Crawl & save the data
         match self.crawl(&url, parse_results).await {
             Err(err) => {
-                log::error!("issue fetching {:?} - {}", url, err.to_string());
+                log::debug!("issue fetching {:?} - {}", url, err.to_string());
                 Err(err)
             }
             Ok(mut result) => {
