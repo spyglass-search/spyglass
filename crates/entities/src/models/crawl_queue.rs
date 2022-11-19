@@ -137,10 +137,7 @@ pub async fn queue_stats(
 
 pub async fn reset_processing(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
-        .col_expr(
-            Column::Status,
-            sea_query::Expr::value(CrawlStatus::Queued)
-        )
+        .col_expr(Column::Status, sea_query::Expr::value(CrawlStatus::Queued))
         .filter(Column::Status.eq(CrawlStatus::Processing))
         .exec(db)
         .await?;
