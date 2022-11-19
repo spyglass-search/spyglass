@@ -1,5 +1,7 @@
+use crate::sea_orm::Statement;
 use entities::schema::{DocFields, SearchDocument};
 use sea_orm_migration::prelude::*;
+use sea_orm_migration::sea_orm::ConnectionTrait;
 
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -126,6 +128,15 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         println!("Updating crawl_queue");
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                "UPDATE crawl_queue SET status = 'Queued' where status = '''Queued''ru'"
+                    .to_string(),
+            ))
+            .await?;
+
         let queued = crawl_queue::Entity::find()
             .filter(crawl_queue::Column::Url.starts_with("file://"))
             .all(db)
