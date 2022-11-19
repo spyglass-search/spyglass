@@ -173,7 +173,7 @@ async fn start_crawl(
                     }
                 }
                 Err(err) => {
-                    log::error!("Unable to crawl id: {} - {:?}", task.id, err);
+                    log::info!("Unable to crawl id: {} - {:?}", task.id, err);
                     // mark crawl as failed
                     if let Err(e) =
                         crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed)
@@ -185,7 +185,7 @@ async fn start_crawl(
             }
         }
         Err(err) => {
-            log::error!("Unable to crawl id: {} - {:?}", task.id, err);
+            log::info!("Unable to crawl id: {} - {:?}", task.id, err);
             // mark crawl as failed
             if let Err(e) =
                 crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed).await

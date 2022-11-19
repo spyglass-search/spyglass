@@ -1,15 +1,9 @@
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
+use super::FormFieldProps;
 use crate::components::forms::SettingChangeEvent;
 use crate::components::{btn, icons};
-
-#[derive(Properties, PartialEq)]
-pub struct StringListProps {
-    pub name: String,
-    pub value: String,
-    pub onchange: Callback<SettingChangeEvent>,
-}
 
 #[derive(Debug, Clone)]
 pub enum Msg {
@@ -38,7 +32,7 @@ impl StringList {
 
 impl Component for StringList {
     type Message = Msg;
-    type Properties = StringListProps;
+    type Properties = FormFieldProps;
 
     fn create(ctx: &Context<Self>) -> Self {
         let props = ctx.props();

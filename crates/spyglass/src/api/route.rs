@@ -341,9 +341,7 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<(), Error
     let res = crawl_queue::Entity::update_many()
         .col_expr(
             crawl_queue::Column::Status,
-            sea_query::Expr::value(sea_query::Value::String(Some(Box::new(
-                CrawlStatus::Queued.to_string(),
-            )))),
+            sea_query::Expr::value(CrawlStatus::Queued),
         )
         .filter(crawl_queue::Column::Domain.eq(domain.clone()))
         .exec(db)

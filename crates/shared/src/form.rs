@@ -38,7 +38,7 @@ impl FormType {
             }
             FormType::Path => {
                 // Escape backslashes
-                let value = value.replace('\\', "\\\\");
+                let value = value.to_owned();
                 let existence_check = Path::new(&value);
                 if existence_check.exists() {
                     Ok(value)

@@ -14,7 +14,7 @@ use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
 use tauri::{
     AppHandle, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
-    Window,
+    Window, WindowBuilder, WindowUrl,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -153,8 +153,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
-            let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not found");
-            window::center_search_bar(&window);
+            let window = WindowBuilder::new(
+                app,
+                constants::SEARCH_WIN_NAME,
+                WindowUrl::App("/".into()),
+            )
+                .decorations(false)
+                .transparent(true)
+                .disable_file_drop_handler()
+                .inner_size(640.0, 96.0)
+                .visible(false)
+                .build()
+                .expect("Unable to create searchbar window");
+            let _ = window.hide();
+
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
             {
@@ -211,12 +223,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match event {
                 // Only occurs on Windows.
                 SystemTrayEvent::DoubleClick { .. } => {
-                    let window = app.get_window("main")
+                    let window = app.get_window(constants::SEARCH_WIN_NAME)
                         .expect("Main window not initialized");
                     show_search_bar(&window);
                 }
                 SystemTrayEvent::MenuItemClick { id, .. } => {
-                    let window = app.get_window("main").expect("Main window not initialized");
+                    let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not initialized");
 
                     if let Ok(menu_id) = MenuID::from_str(&id) {
                         match menu_id {

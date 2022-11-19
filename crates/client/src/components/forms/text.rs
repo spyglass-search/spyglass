@@ -1,17 +1,11 @@
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
+use super::FormFieldProps;
 use crate::components::forms::SettingChangeEvent;
 
 pub enum Msg {
     HandleInput,
-}
-
-#[derive(Properties, PartialEq)]
-pub struct TextProps {
-    pub name: String,
-    pub value: String,
-    pub onchange: Callback<SettingChangeEvent>,
 }
 
 pub struct Text {
@@ -21,7 +15,7 @@ pub struct Text {
 
 impl Component for Text {
     type Message = Msg;
-    type Properties = TextProps;
+    type Properties = FormFieldProps;
 
     fn create(ctx: &Context<Self>) -> Self {
         let props = ctx.props();
