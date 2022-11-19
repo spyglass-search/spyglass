@@ -66,16 +66,7 @@
     "allowlist": {
       "all": true
     },
-    "windows": [{
-      "label": "main",
-      "title": "spyglass",
-      "decorations": false,
-      "center": true,
-      "width": 640,
-      "height": 96,
-      "transparent": true,
-      "skipTaskbar": false
-    }],
+    "windows": [],
     "security": {
       "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'; script-src 'unsafe-eval'"
     },

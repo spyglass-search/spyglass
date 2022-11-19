@@ -9,7 +9,7 @@ use migration::Migrator;
 use shared::config::Config;
 
 use crate::rpc::SpyglassServerClient;
-use crate::window::{hide_search_bar, show_wizard_window};
+use crate::window::show_wizard_window;
 
 use crate::{constants, rpc::RpcMutex, AppShutdown};
 pub struct StartupProgressText(std::sync::Mutex<String>);
@@ -34,11 +34,6 @@ pub fn init() -> TauriPlugin<Wry> {
 
                     // Don't block the main thread
                     tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
-
-                    let window = app_handle
-                        .get_window(constants::SEARCH_WIN_NAME)
-                        .expect("Main window not found");
-                    hide_search_bar(&window);
                 }
                 RunEvent::Exit => {
                     let app_handle = app_handle.clone();
