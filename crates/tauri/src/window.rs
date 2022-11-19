@@ -33,7 +33,7 @@ pub fn center_search_bar(window: &Window) {
             y: constants::INPUT_Y,
         }));
     } else {
-        log::error!("Unable to detect any monitors.");
+        log::warn!("Unable to detect any monitors.");
     }
 }
 
