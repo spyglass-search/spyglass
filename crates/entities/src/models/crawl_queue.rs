@@ -8,11 +8,17 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::indexed_document;
+use super::tag::TagType;
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 5_000;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct TaskData {
+    tags: Vec<(TagType, String)>,
+}
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
@@ -77,6 +83,8 @@ pub struct Model {
     pub status: CrawlStatus,
     /// If this failed, the reason for the failure
     pub error: Option<TaskError>,
+    /// Data that we want to keep around about this task.
+    pub data: Option<TaskData>,
     /// Number of retries for this task.
     #[sea_orm(default_value = 0)]
     pub num_retries: u8,

@@ -17,6 +17,7 @@ mod m20221109_add_tags_table;
 mod m20221115_000001_local_file_pathfix;
 mod m20221116_000001_add_connection_constraint;
 mod m20221118_000001_fix_queued_enum;
+mod m20221121_000001_add_data_to_crawl_queue;
 
 mod utils;
 
@@ -40,6 +41,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20221115_000001_local_file_pathfix::Migration),
             Box::new(m20221116_000001_add_connection_constraint::Migration),
             Box::new(m20221118_000001_fix_queued_enum::Migration),
+            Box::new(m20221121_000001_add_data_to_crawl_queue::Migration),
         ]
     }
 }

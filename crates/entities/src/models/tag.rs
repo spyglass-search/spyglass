@@ -1,12 +1,21 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
 use super::indexed_document;
 
 #[derive(
-    AsRefStr, Clone, Debug, DeriveActiveEnum, EnumIter, EnumString, PartialEq, Eq, Serialize,
+    AsRefStr,
+    Clone,
+    Debug,
+    DeriveActiveEnum,
+    Deserialize,
+    EnumIter,
+    EnumString,
+    Eq,
+    PartialEq,
+    Serialize,
 )]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum TagType {

@@ -67,7 +67,7 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
 
-            // Collect all lenses that do not
+            // Grab enabled lenses
             let lenses: Vec<LensConfig> = state
                 .lenses
                 .iter()
