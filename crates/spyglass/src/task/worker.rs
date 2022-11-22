@@ -1,5 +1,6 @@
 use url::Url;
 
+use entities::models::crawl_queue::TaskData;
 use entities::models::{bootstrap_queue, crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -61,8 +62,13 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
     match result {
         Ok(crawl_result) => {
             // Update job status
-            let _ = crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Completed)
-                .await;
+            let _ = crawl_queue::mark_done(
+                &state.db,
+                task.id,
+                crawl_queue::CrawlStatus::Completed,
+                Some(TaskData::new(&crawl_result.tags)),
+            )
+            .await;
 
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
@@ -179,6 +185,7 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                         &state.db,
                         task.id,
                         crawl_queue::CrawlStatus::Completed,
+                        None,
                     )
                     .await;
                     FetchResult::Ignore
@@ -189,6 +196,7 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                         &state.db,
                         task.id,
                         crawl_queue::CrawlStatus::Failed,
+                        None,
                     )
                     .await;
                     FetchResult::Error

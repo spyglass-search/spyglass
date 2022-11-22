@@ -14,6 +14,7 @@ use super::indexed_document;
     EnumIter,
     EnumString,
     Eq,
+    Hash,
     PartialEq,
     Serialize,
 )]

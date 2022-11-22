@@ -8,16 +8,39 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::indexed_document;
-use super::tag::TagType;
+use super::tag::{self, TagType};
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 5_000;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct TaskData {
+    /// Tags applied to this
     tags: Vec<(TagType, String)>,
+}
+
+impl TaskData {
+    pub fn new(tags: &[tag::Model]) -> Self {
+        Self {
+            tags: tags
+                .iter()
+                .map(|x| (x.label.to_owned(), x.value.to_owned()))
+                .collect(),
+        }
+    }
+
+    // Merge tags, removing duplicates.
+    pub fn merge(&self, other: &TaskData) -> Self {
+        let mut tags: HashSet<(TagType, String)> =
+            HashSet::from_iter(self.tags.clone().into_iter());
+        tags.extend(other.tags.clone().into_iter());
+
+        Self {
+            tags: tags.into_iter().collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
@@ -500,9 +523,19 @@ pub async fn mark_done(
     db: &DatabaseConnection,
     id: i64,
     status: CrawlStatus,
+    data: Option<TaskData>,
 ) -> anyhow::Result<()> {
     if let Some(crawl) = Entity::find_by_id(id).one(db).await? {
         let mut updated: ActiveModel = crawl.clone().into();
+        // Merge task data
+        if let Some(new) = data {
+            match crawl.data {
+                Some(old) => updated.data = Set(Some(old.merge(&new))),
+                None => {
+                    updated.data = Set(Some(new));
+                }
+            }
+        }
 
         // Bump up number of retries if this failed
         if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
