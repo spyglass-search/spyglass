@@ -87,23 +87,21 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                 &lenses,
                 &state.user_settings,
                 &Default::default(),
-                Option::None,
+                None,
             )
             .await
             {
                 log::error!("error enqueuing all: {}", err);
             }
 
-            // Only add valid urls
-            // if added.is_none() || added.unwrap() == crawl_queue::SkipReason::Duplicate {
-            //     link::save_link(&state.db, &crawl_result.url, link)
-            //         .await
-            //         .unwrap();
-            // }
-
             // Add / update search index w/ crawl result.
             if let Some(content) = crawl_result.content {
-                let url = Url::parse(&crawl_result.url).expect("Invalid crawl URL");
+                let url = Url::parse(&crawl_result.url);
+                if url.is_err() {
+                    return FetchResult::Error;
+                }
+
+                let url = url.expect("Invalid crawl URL");
                 let url_host = match url.scheme() {
                     "file" => "localhost",
                     _ => url.host_str().expect("Invalid URL host"),
@@ -125,8 +123,9 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                 // Add document to index
                 let doc_id: Option<String> = {
                     if let Ok(mut index_writer) = state.index.writer.lock() {
-                        match Searcher::add_document(
+                        match Searcher::upsert_document(
                             &mut index_writer,
+                            existing.clone().map(|d| d.doc_id),
                             &crawl_result.title.unwrap_or_default(),
                             &crawl_result.description.unwrap_or_default(),
                             url_host,

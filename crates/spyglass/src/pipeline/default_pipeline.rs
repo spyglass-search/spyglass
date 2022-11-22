@@ -136,8 +136,9 @@ async fn start_crawl(
                         // Add document to index
                         let doc_id: Option<String> = {
                             if let Ok(mut index_writer) = state.index.writer.lock() {
-                                match Searcher::add_document(
+                                match Searcher::upsert_document(
                                     &mut index_writer,
+                                    existing.clone().map(|f| f.doc_id),
                                     &crawl_result.title.unwrap_or_default(),
                                     &crawl_result.description.unwrap_or_default(),
                                     url_host,

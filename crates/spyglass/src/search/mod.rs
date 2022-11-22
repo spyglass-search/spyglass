@@ -158,8 +158,9 @@ impl Searcher {
         })
     }
 
-    pub fn add_document(
+    pub fn upsert_document(
         writer: &mut IndexWriter,
+        doc_id: Option<String>,
         title: &str,
         description: &str,
         domain: &str,
@@ -168,7 +169,8 @@ impl Searcher {
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
-        let doc_id = Uuid::new_v4().as_hyphenated().to_string();
+        let doc_id = doc_id.map_or_else(|| Uuid::new_v4().as_hyphenated().to_string(), |s| s);
+
         let mut doc = Document::default();
         doc.add_text(fields.content, content);
         doc.add_text(fields.description, description);
@@ -289,8 +291,9 @@ mod test {
 
     fn _build_test_index(searcher: &mut Searcher) {
         let writer = &mut searcher.writer.lock().unwrap();
-        Searcher::add_document(
+        Searcher::upsert_document(
             writer,
+            None,
             "Of Mice and Men",
             "Of Mice and Men passage",
             "example.com",
@@ -306,8 +309,9 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        Searcher::add_document(
+        Searcher::upsert_document(
             writer,
+            None,
             "Of Mice and Men",
             "Of Mice and Men passage",
             "en.wikipedia.org",
@@ -323,8 +327,9 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        Searcher::add_document(
+        Searcher::upsert_document(
             writer,
+            None,
             "Of Cheese and Crackers",
             "Of Cheese and Crackers Passage",
             "en.wikipedia.org",
@@ -339,8 +344,9 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        Searcher::add_document(
+        Searcher::upsert_document(
             writer,
+            None,
             "Frankenstein: The Modern Prometheus",
             "A passage from Frankenstein",
             "monster.com",
