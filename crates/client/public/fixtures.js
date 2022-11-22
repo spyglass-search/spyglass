@@ -20,9 +20,10 @@ export let invoke = async (func_name, params) => {
                 crawl_uri: "https://google.com/this/is/a/path",
                 url: "https://google.com/this/is/a/path",
                 tags: [
-                    ['mimetype', 'application/pdf'],
                     ['source', 'web'],
                     ['lens', 'google'],
+                    ['lens', 'search-engines'],
+                    ['lens', 'bookmarks'],
                 ],
                 score: 1.0
             }, {
