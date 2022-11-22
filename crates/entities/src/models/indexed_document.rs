@@ -183,10 +183,11 @@ mod test {
         let doc = doc.save(&db).await.unwrap();
 
         // Insert related tags
-        let source_tag = tag::add_or_create(&db, tag::TagType::Source, "web").await?;
-        let mime_tag = tag::add_or_create(&db, tag::TagType::MimeType, "text/html").await?;
+        let tags = vec![
+            (tag::TagType::Source, "web".to_owned()),
+            (tag::TagType::MimeType, "text/html".to_owned()),
+        ];
 
-        let tags = vec![source_tag, mime_tag];
         if let Err(res) = doc.insert_tags(&db, &tags).await {
             dbg!(res);
         }

@@ -62,13 +62,18 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
     match result {
         Ok(crawl_result) => {
             // Update job status
-            let _ = crawl_queue::mark_done(
+            let task = match crawl_queue::mark_done(
                 &state.db,
                 task.id,
                 crawl_queue::CrawlStatus::Completed,
                 Some(TaskData::new(&crawl_result.tags)),
             )
-            .await;
+            .await
+            {
+                Some(task) => task,
+                // Task removed while being processed?
+                None => return FetchResult::Error,
+            };
 
             // Add all valid, non-duplicate, non-indexed links found to crawl queue
             let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
@@ -160,7 +165,8 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                     return match indexed.save(&state.db).await {
                         Ok(doc) => {
                             // attach tags to document once we're all done.
-                            let _ = doc.insert_tags(&state.db, &crawl_result.tags).await;
+                            let task_data = task.data.unwrap_or_default();
+                            let _ = doc.insert_tags(&state.db, &task_data.tags).await;
                             FetchResult::Updated
                         }
                         Err(e) => {

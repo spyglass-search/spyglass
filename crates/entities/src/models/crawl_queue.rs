@@ -18,7 +18,7 @@ const BATCH_SIZE: usize = 5_000;
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct TaskData {
     /// Tags applied to this
-    tags: Vec<TagPair>,
+    pub tags: Vec<TagPair>,
 }
 
 impl TaskData {
@@ -30,8 +30,7 @@ impl TaskData {
 
     // Merge tags, removing duplicates.
     pub fn merge(&self, other: &TaskData) -> Self {
-        let mut tags: HashSet<TagPair> =
-            HashSet::from_iter(self.tags.clone().into_iter());
+        let mut tags: HashSet<TagPair> = HashSet::from_iter(self.tags.clone().into_iter());
         tags.extend(other.tags.clone().into_iter());
 
         Self {
@@ -522,16 +521,14 @@ pub async fn mark_done(
     id: i64,
     status: CrawlStatus,
     data: Option<TaskData>,
-) -> anyhow::Result<()> {
-    if let Some(crawl) = Entity::find_by_id(id).one(db).await? {
+) -> Option<Model> {
+    if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = crawl.clone().into();
         // Merge task data
         if let Some(new) = data {
             match crawl.data {
                 Some(old) => updated.data = Set(Some(old.merge(&new))),
-                None => {
-                    updated.data = Set(Some(new));
-                }
+                None => updated.data = Set(Some(new)),
             }
         }
 
@@ -544,10 +541,10 @@ pub async fn mark_done(
             updated.status = Set(status);
         }
 
-        updated.update(db).await?;
+        updated.update(db).await.ok()
+    } else {
+        None
     }
-
-    Ok(())
 }
 
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected
