@@ -125,13 +125,13 @@ fn render_metadata(result: &SearchResult) -> Html {
         for (idx, node) in meta.iter().enumerate() {
             joined.push(node.to_owned());
             if idx != last_idx {
-                joined.push(html! { <span class="text-white font-bold">{"•"}</span> });
+                joined.push(html! { <span class="text-neutral-500 font-bold">{"•"}</span> });
             }
         }
     }
 
     html! {
-        <div class="text-xs place-items-center flex flex-row gap-1 text-cyan-500 py-0.5">
+        <div class="text-xs place-items-center flex flex-row gap-1.5 text-cyan-500 py-0.5 mt-1">
             {joined}
         </div>
     }
@@ -176,10 +176,10 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                 <h2 class="text-lg truncate font-bold w-[30rem]">
                     {result.title.clone()}
                 </h2>
-                {metadata}
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-16 overflow-hidden">
                     {result.description.clone()}
                 </div>
+                {metadata}
             </div>
             <div class="flex-none flex flex-col justify-self-end self-start pl-4 pr-4">
                 <DeleteButton doc_id={result.doc_id.clone()} />
