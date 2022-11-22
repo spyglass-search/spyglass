@@ -1,5 +1,5 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
-use entities::models::tag::{self, TagType};
+use entities::models::tag::{TagPair, TagType};
 use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
@@ -16,7 +16,6 @@ use super::Connection;
 
 pub struct GCalConnection {
     client: GoogClient,
-    state: AppState,
     user: String,
 }
 
@@ -76,7 +75,6 @@ impl GCalConnection {
 
             Ok(Self {
                 client,
-                state: state.clone(),
                 user: account.to_string(),
             })
         } else {
@@ -124,6 +122,7 @@ impl Connection for GCalConnection {
             // Enqueue URIs
             let enqueue_settings = EnqueueSettings {
                 crawl_type: CrawlType::Api,
+                tags: vec![(TagType::Source, GCalConnection::id())],
                 force_allow: true,
                 is_recrawl: true,
             };
@@ -164,24 +163,12 @@ impl Connection for GCalConnection {
                 .await
             {
                 Ok(event) => {
-                    let mut tags = vec![
-                        tag::add_or_create(&self.state.db, TagType::Source, &Self::id()).await,
-                    ];
+                    let mut tags: Vec<TagPair> = Vec::new();
                     for attendee in &event.attendees {
                         if attendee.is_organizer {
-                            tags.push(
-                                tag::add_or_create(&self.state.db, TagType::Owner, &attendee.email)
-                                    .await,
-                            );
+                            tags.push((TagType::Owner, attendee.email.clone()));
                         } else {
-                            tags.push(
-                                tag::add_or_create(
-                                    &self.state.db,
-                                    TagType::SharedWith,
-                                    &attendee.email,
-                                )
-                                .await,
-                            );
+                            tags.push((TagType::SharedWith, attendee.email.clone()));
                         }
                     }
 
@@ -202,13 +189,11 @@ impl Connection for GCalConnection {
                         )
                     };
                     let title = format!("{} ({})", &event.summary, event.start.date);
-                    Ok(CrawlResult::new(
-                        uri,
-                        Some(event.html_link),
-                        &content,
-                        &title,
-                        None,
-                    ))
+                    let mut crawl_result =
+                        CrawlResult::new(uri, Some(event.html_link), &content, &title, None);
+                    crawl_result.tags = tags;
+
+                    Ok(crawl_result)
                 }
                 Err(err) => Err(CrawlError::FetchError(err.to_string())),
             };

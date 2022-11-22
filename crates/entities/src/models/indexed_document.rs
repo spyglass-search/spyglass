@@ -2,6 +2,8 @@ use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
 use sea_orm::{FromQueryResult, InsertResult, QuerySelect, Set};
 
+use super::tag::{get_or_create, TagPair};
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "indexed_document")]
 pub struct Model {
@@ -68,10 +70,17 @@ impl ActiveModel {
     pub async fn insert_tags(
         &self,
         db: &DatabaseConnection,
-        tags: &[tag::Model],
+        tags: &[TagPair],
     ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+        let mut tag_models: Vec<tag::Model> = Vec::new();
+        for (label, value) in tags.iter() {
+            if let Ok(tag) = get_or_create(db, label.to_owned(), value).await {
+                tag_models.push(tag);
+            }
+        }
+
         // create connections for each tag
-        let doc_tags = tags
+        let doc_tags = tag_models
             .iter()
             .map(|t| document_tag::ActiveModel {
                 indexed_document_id: self.id.clone(),

@@ -14,6 +14,7 @@ use tokio_retry::Retry;
 use url::Url;
 
 use entities::models::crawl_queue::{self, EnqueueSettings};
+use entities::models::tag::TagType;
 use entities::sea_orm::DatabaseConnection;
 use shared::config::{LensConfig, UserSettings};
 
@@ -132,6 +133,7 @@ pub async fn bootstrap(
     let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
         crawl_type: crawl_queue::CrawlType::Bootstrap,
+        tags: vec![(TagType::Lens, lens.name.to_string())],
         ..Default::default()
     };
 

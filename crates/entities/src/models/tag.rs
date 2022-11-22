@@ -5,6 +5,8 @@ use strum_macros::{AsRefStr, EnumString};
 
 use super::indexed_document;
 
+pub type TagPair = (TagType, String);
+
 #[derive(
     AsRefStr,
     Clone,
@@ -96,7 +98,7 @@ impl Related<super::indexed_document::Entity> for Entity {
     }
 }
 
-pub async fn add_or_create(
+pub async fn get_or_create(
     db: &DatabaseConnection,
     label: TagType,
     value: &str,
@@ -140,10 +142,10 @@ mod test {
     #[tokio::test]
     async fn test_add_or_create() -> Result<(), DbErr> {
         let db = setup_test_db().await;
-        let new_tag = super::add_or_create(&db, tag::TagType::Source, "web").await?;
+        let new_tag = super::get_or_create(&db, tag::TagType::Source, "web").await?;
         let expected_id = new_tag.id;
 
-        let new_tag = super::add_or_create(&db, tag::TagType::Source, "web").await?;
+        let new_tag = super::get_or_create(&db, tag::TagType::Source, "web").await?;
         assert_eq!(expected_id, new_tag.id);
         Ok(())
     }

@@ -19,6 +19,7 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
 
     let lense_dir = config.lenses_dir();
 
+    // Keep track of failures and report to user?
     for entry in (fs::read_dir(lense_dir)?).flatten() {
         let path = entry.path();
         if path.is_file() && path.extension().unwrap_or_default() == "ron" {

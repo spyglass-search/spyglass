@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::indexed_document;
-use super::tag::{self, TagType};
+use super::tag::TagPair;
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
@@ -18,22 +18,19 @@ const BATCH_SIZE: usize = 5_000;
 #[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct TaskData {
     /// Tags applied to this
-    tags: Vec<(TagType, String)>,
+    tags: Vec<TagPair>,
 }
 
 impl TaskData {
-    pub fn new(tags: &[tag::Model]) -> Self {
+    pub fn new(tags: &[TagPair]) -> Self {
         Self {
-            tags: tags
-                .iter()
-                .map(|x| (x.label.to_owned(), x.value.to_owned()))
-                .collect(),
+            tags: tags.to_vec(),
         }
     }
 
     // Merge tags, removing duplicates.
     pub fn merge(&self, other: &TaskData) -> Self {
-        let mut tags: HashSet<(TagType, String)> =
+        let mut tags: HashSet<TagPair> =
             HashSet::from_iter(self.tags.clone().into_iter());
         tags.extend(other.tags.clone().into_iter());
 
@@ -354,6 +351,7 @@ pub enum SkipReason {
 #[derive(Default)]
 pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
+    pub tags: Vec<TagPair>,
     pub force_allow: bool,
     pub is_recrawl: bool,
 }
