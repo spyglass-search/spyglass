@@ -1,4 +1,3 @@
-use entities::models::tag::TagType;
 use url::Url;
 
 use entities::models::crawl_queue::TaskData;
@@ -44,37 +43,6 @@ pub async fn handle_bootstrap(
             }
         }
     } else {
-        // apply lens tag to existing & new urls
-        let tag = vec![(TagType::Lens, lens.name.to_owned())];
-        let existing_tasks = crawl_queue::Entity::find()
-            .filter(crawl_queue::Column::Url.starts_with(seed_url))
-            .all(db)
-            .await
-            .unwrap_or_default();
-
-        // Update existing tasks
-        let data = TaskData::new(&tag);
-        for task in existing_tasks {
-            let mut active: crawl_queue::ActiveModel = task.clone().into();
-            if let Some(old) = task.data {
-                active.data = Set(Some(data.merge(&old)));
-            } else {
-                active.data = Set(Some(data.clone()));
-            }
-            let _ = active.save(db).await;
-        }
-
-        // Update existing documents
-        let existing_docs = indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.starts_with(seed_url))
-            .all(db)
-            .await
-            .unwrap_or_default();
-        for doc in existing_docs {
-            let model: indexed_document::ActiveModel = doc.into();
-            let _ = model.insert_tags(db, &tag).await;
-        }
-
         log::info!(
             "bootstrap queue already contains seed url: {}, skipping",
             seed_url
