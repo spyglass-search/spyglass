@@ -74,8 +74,9 @@ impl ActiveModel {
     ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
         let mut tag_models: Vec<tag::Model> = Vec::new();
         for (label, value) in tags.iter() {
-            if let Ok(tag) = get_or_create(db, label.to_owned(), value).await {
-                tag_models.push(tag);
+            match get_or_create(db, label.to_owned(), value).await {
+                Ok(tag) => tag_models.push(tag),
+                Err(err) => log::error!("{}", err),
             }
         }
 

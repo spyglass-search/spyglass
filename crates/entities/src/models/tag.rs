@@ -104,32 +104,35 @@ pub async fn get_or_create(
     value: &str,
 ) -> Result<Model, DbErr> {
     let tag = ActiveModel {
-        label: Set(label),
+        label: Set(label.clone()),
         value: Set(value.to_string()),
         created_at: Set(chrono::Utc::now()),
         updated_at: Set(chrono::Utc::now()),
         ..Default::default()
     };
 
-    let result = Entity::insert(tag)
+    let _ = Entity::insert(tag)
         .on_conflict(
             sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
                 .do_nothing()
                 .to_owned(),
         )
-        .exec(db)
+        .exec_with_returning(db)
         .await;
 
-    match result {
-        Ok(result) => match Entity::find_by_id(result.last_insert_id).one(db).await {
-            Ok(Some(model)) => Ok(model),
-            Err(err) => Err(err),
-            _ => Err(DbErr::RecordNotFound(format!(
-                "tag_id: {}",
-                result.last_insert_id
-            ))),
-        },
+    let tag = Entity::find()
+        .filter(Column::Label.eq(label.clone()))
+        .filter(Column::Value.eq(value))
+        .one(db)
+        .await;
+
+    match tag {
+        Ok(Some(model)) => Ok(model),
         Err(err) => Err(err),
+        _ => Err(DbErr::RecordNotFound(format!(
+            "label: {}, value: {}",
+            label, value
+        ))),
     }
 }
 
