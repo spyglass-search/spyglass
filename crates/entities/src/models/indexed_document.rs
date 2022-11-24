@@ -90,8 +90,19 @@ impl ActiveModel {
                 ..Default::default()
             })
             .collect::<Vec<document_tag::ActiveModel>>();
-        // Insert connections
-        document_tag::Entity::insert_many(doc_tags).exec(db).await
+
+        // Insert connections, ignoring duplicates
+        document_tag::Entity::insert_many(doc_tags)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![
+                    document_tag::Column::IndexedDocumentId,
+                    document_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec(db)
+            .await
     }
 }
 
@@ -185,6 +196,8 @@ mod test {
         // Insert related tags
         let tags = vec![
             (tag::TagType::Source, "web".to_owned()),
+            // Should only add one of these.
+            (tag::TagType::MimeType, "text/html".to_owned()),
             (tag::TagType::MimeType, "text/html".to_owned()),
         ];
 
