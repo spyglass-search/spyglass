@@ -21,9 +21,9 @@ export let invoke = async (func_name, params) => {
                 url: "https://google.com/this/is/a/path",
                 tags: [
                     ['source', 'web'],
-                    ['lens', 'google'],
-                    ['lens', 'search-engines'],
-                    ['lens', 'bookmarks'],
+                    ['Lens', 'google'],
+                    ['Lens', 'search-engines'],
+                    ['Lens', 'bookmarks'],
                 ],
                 score: 1.0
             }, {

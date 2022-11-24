@@ -106,7 +106,7 @@ fn render_metadata(result: &SearchResult) -> Html {
         }
 
         let tag_icon = match tag.as_str() {
-            "lens" => html! {
+            "Lens" => html! {
                 <small class="mr-1">{"🔍"}</small>
             },
             _ => html! { <>{format!("{}:", tag)}</> },

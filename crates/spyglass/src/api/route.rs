@@ -421,7 +421,7 @@ pub async fn search(
                         .await
                         .unwrap_or_default()
                         .iter()
-                        .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                        .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                         .collect::<Vec<(String, String)>>();
 
                     let mut result = SearchResult {
