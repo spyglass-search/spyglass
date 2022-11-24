@@ -1,4 +1,5 @@
 use anyhow::Error;
+use entities::models::tag::TagType;
 use ignore::WalkBuilder;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -216,6 +217,10 @@ async fn handle_walk_and_enqueue(
         .build();
     let enqueue_settings = EnqueueSettings {
         force_allow: true,
+        tags: vec![
+            (TagType::Source, "local".to_string()),
+            (TagType::Lens, "files".to_string()),
+        ],
         ..Default::default()
     };
 
