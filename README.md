@@ -5,13 +5,13 @@
     <br />
     <br />
         Download now:
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.11.6/Spyglass_22.11.6_x64.dmg">
+        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.11.7/Spyglass_22.11.7_x64.dmg">
             <strong>macOS</strong>
         </a> |
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.11.6/Spyglass_22.11.6_x64_en-US.msi">
+        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.11.7/Spyglass_22.11.7_x64_en-US.msi">
             <strong>Windows</strong>
         </a> |
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.11.6/spyglass_22.11.6_amd64.AppImage">
+        <a href="https://github.com/a5huynh/spyglass/releases/download/v2022.11.7/spyglass_22.11.7_amd64.AppImage">
             <strong>Linux (AppImage)</strong>
         </a>
     <br />

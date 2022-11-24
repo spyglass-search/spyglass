@@ -132,7 +132,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "UPDATE crawl_queue SET status = 'Queued' where status = '''Queued''ru'"
+                "UPDATE crawl_queue SET status = 'Queued' where status = '''Queued'''"
                     .to_string(),
             ))
             .await?;
