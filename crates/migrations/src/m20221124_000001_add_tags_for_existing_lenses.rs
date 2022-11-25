@@ -19,10 +19,15 @@ impl MigrationName for Migration {
 }
 
 async fn add_tags_for_url(db: &DatabaseConnection, name: &str, url: &str) -> Result<(), DbErr> {
+    // Ignore http/https when querying database
+    let url = url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://");
+
     // apply lens tag to existing & new urls
     let tag = vec![(TagType::Lens, name.to_owned())];
     let existing_tasks = crawl_queue::Entity::find()
-        .filter(crawl_queue::Column::Url.starts_with(url))
+        .filter(crawl_queue::Column::Url.contains(url))
         .all(db)
         .await?;
 
@@ -42,7 +47,7 @@ async fn add_tags_for_url(db: &DatabaseConnection, name: &str, url: &str) -> Res
 
     // Update existing documents
     let existing_docs = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.starts_with(url))
+        .filter(indexed_document::Column::Url.contains(url))
         .all(db)
         .await?;
     let count = existing_docs.len();
@@ -58,22 +63,21 @@ async fn add_tags_for_url(db: &DatabaseConnection, name: &str, url: &str) -> Res
 async fn add_tags_for_lens(db: &DatabaseConnection, conf: &LensConfig) {
     // Tag domains
     for domain in &conf.domains {
-        let seed_url = format!("https://{}", domain);
-        if let Err(err) = add_tags_for_url(db, &conf.name, &seed_url).await {
-            log::error!("Unable to add task tags for {} - {}", seed_url, err);
+        if let Err(err) = add_tags_for_url(db, &conf.name, domain).await {
+            log::error!("Unable to add tags for {} - {}", domain, err);
         }
     }
 
     // Tag url prefixes
     for prefix in &conf.urls {
         let url = if prefix.ends_with('$') {
-            prefix.strip_suffix('$').expect("No $ at end of prefix")
+            prefix.trim_end_matches('$')
         } else {
             prefix.as_str()
         };
 
         if let Err(err) = add_tags_for_url(db, &conf.name, url).await {
-            log::error!("Unable to add doc tags for {} - {}", url, err);
+            log::error!("Unable to add tags for {} - {}", url, err);
         }
     }
 }
@@ -103,6 +107,11 @@ impl MigrationTrait for Migration {
                     Err(err) => log::error!("Unable to read lens: {}", err),
                 }
             }
+        }
+
+        // Handle local files
+        if let Err(err) = add_tags_for_url(db, "files", "file://").await {
+            log::error!("Unable to add tags for file:// urls: {}", err);
         }
 
         Ok(())
