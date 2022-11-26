@@ -299,8 +299,14 @@ pub async fn dequeue(
     if let Ok(Some(model)) = entity.one(db).await {
         let mut update: ActiveModel = model.into();
         update.status = Set(CrawlStatus::Processing);
-        let model: Model = update.update(db).await.expect("Unable to save");
-        return Ok(Some(model));
+        return match update.update(db).await {
+            Ok(model) => Ok(Some(model)),
+            // Deleted while being processed?
+            Err(err) => {
+                log::error!("Unable to update crawl task: {}", err);
+                Ok(None)
+            }
+        };
     }
 
     Ok(None)
