@@ -162,10 +162,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .transparent(true)
                 .disable_file_drop_handler()
                 .inner_size(640.0, 96.0)
-                .visible(false)
                 .build()
                 .expect("Unable to create searchbar window");
-            let _ = window.hide();
 
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
