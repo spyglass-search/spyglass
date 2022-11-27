@@ -164,6 +164,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .inner_size(640.0, 96.0)
                 .build()
                 .expect("Unable to create searchbar window");
+            // Center on launch.
+            window::center_search_bar(&window);
 
             // macOS: Handle multiple spaces correctly
             #[cfg(target_os = "macos")]
