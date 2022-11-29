@@ -264,11 +264,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("error while running tauri application");
 
     app.run(|app_handle, e| match e {
-        RunEvent::MainEventsCleared => {
+        // Only called on macos
+        RunEvent::ApplicationShouldHandleReopen {
+            has_visible_windows: _has_visible_windows,
+        } => {
             #[cfg(target_os = "macos")]
             {
                 if let Some(window) = app_handle.get_window(constants::SEARCH_WIN_NAME) {
-                    crate::platform::mac::poll_app_events(&window);
+                    match window.is_visible() {
+                        Ok(true) => window::hide_search_bar(&window),
+                        Ok(false) => window::show_search_bar(&window),
+                        _ => {}
+                    }
                 }
             }
         }
