@@ -35,6 +35,7 @@ export let invoke = async (func_name, params) => {
                 url: "https://example.com/this/is/a/path",
                 tags: [
                     ['source', 'drive.google.com'],
+                    ['Lens', 'example'],
                 ],
                 score: 1.0
             }, {
@@ -47,6 +48,7 @@ export let invoke = async (func_name, params) => {
                 tags: [
                     ['mimetype', 'application/pdf'],
                     ['source', 'drive.google.com'],
+                    ['Lens', 'example'],
                 ],
                 score: 1.0
             }, {
@@ -59,6 +61,7 @@ export let invoke = async (func_name, params) => {
                 tags: [
                     ['mimetype', 'application/pdf'],
                     ['source', 'localhost'],
+                    ['Lens', 'files'],
                 ],
                 score: 1.0
             }, {
@@ -71,6 +74,7 @@ export let invoke = async (func_name, params) => {
                 tags: [
                     ['mimetype', 'application/pdf'],
                     ['source', 'drive.google.com'],
+                    ['Lens', 'Google Drive'],
                 ],
                 score: 1.0
             }]

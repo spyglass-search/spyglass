@@ -105,17 +105,20 @@ fn render_metadata(result: &SearchResult) -> Html {
             continue;
         }
 
-        let tag_icon = match tag.as_str() {
-            "Lens" => html! {
-                <small class="mr-1">{"🔍"}</small>
-            },
-            _ => html! { <>{format!("{}:", tag)}</> },
+        let tag_label = match tag.as_str() {
+            "Lens" => "🔍",
+            _ => tag,
         };
 
         meta.push(html! {
-            <span class="rounded text-white bg-cyan-600 py-0.5 px-1">
-                {tag_icon}{value}
-            </span>
+            <div class="text-xs flex flex-row rounded text-white bg-cyan-600 items-center">
+                <div class="border-r border-cyan-900 py-0.5 px-1">
+                    <small>{tag_label}</small>
+                </div>
+                <div class="py-0.5 px-2">
+                    {value}
+                </div>
+            </div>
         });
     }
 
