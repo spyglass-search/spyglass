@@ -10,7 +10,7 @@ use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use spyglass_plugin::SearchFilter;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use wasmer::{Instance, Module, Store, WasmerEnv};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
@@ -21,7 +21,6 @@ use shared::plugin::{PluginConfig, PluginType};
 use spyglass_plugin::{consts::env, PluginEvent, PluginSubscription};
 
 use crate::state::AppState;
-use crate::task::AppShutdown;
 
 mod exports;
 
@@ -165,7 +164,6 @@ pub async fn plugin_event_loop(
     config: Config,
     cmd_writer: mpsc::Sender<PluginCommand>,
     mut cmd_queue: mpsc::Receiver<PluginCommand>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("🔌 plugin event loop started");
     // Initial load, send some basic configuration to the plugins
@@ -188,6 +186,8 @@ pub async fn plugin_event_loop(
 
     // Subscribe plugins check for updates every 10 minutes
     let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
+
     loop {
         // Wait for next command / handle shutdown responses
         let next_cmd = tokio::select! {

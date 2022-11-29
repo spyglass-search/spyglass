@@ -2,11 +2,11 @@ use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::task::{AppShutdown, CrawlTask};
+use crate::task::CrawlTask;
 
 use entities::models::{crawl_queue, indexed_document};
 use shared::config::{Config, LensConfig, PipelineConfiguration};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 
 use super::parser::DefaultParser;
 use super::PipelineCommand;
@@ -24,8 +24,8 @@ pub async fn pipeline_loop(
     pipeline: String,
     _pipeline_cfg: PipelineConfiguration,
     mut pipeline_queue: mpsc::Receiver<PipelineCommand>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
     log::debug!("Default Pipeline Loop Started for Pipeline: {:?}", pipeline);
 
     let collector = DefaultCollector::new();

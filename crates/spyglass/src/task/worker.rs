@@ -25,7 +25,7 @@ pub async fn handle_bootstrap(
     if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
         log::info!("bootstrapping {}", seed_url);
 
-        match bootstrap::bootstrap(lens, db, user_settings, seed_url, pipeline).await {
+        match bootstrap::bootstrap(state, lens, db, user_settings, seed_url, pipeline).await {
             Err(e) => {
                 log::error!("bootstrap {}", e);
                 return false;
