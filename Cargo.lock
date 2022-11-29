@@ -3219,6 +3219,7 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "entities",
+ "log",
  "rayon",
  "sea-orm-migration",
  "shared",

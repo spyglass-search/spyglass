@@ -3,7 +3,7 @@ use sea_orm::Set;
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
-#[sea_orm(table_name = "document_tags")]
+#[sea_orm(table_name = "document_tag")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,

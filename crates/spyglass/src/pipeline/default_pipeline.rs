@@ -87,6 +87,7 @@ async fn start_crawl(
                         &state.db,
                         task.id,
                         crawl_queue::CrawlStatus::Completed,
+                        None,
                     )
                     .await;
 
@@ -135,8 +136,9 @@ async fn start_crawl(
                         // Add document to index
                         let doc_id: Option<String> = {
                             if let Ok(mut index_writer) = state.index.writer.lock() {
-                                match Searcher::add_document(
+                                match Searcher::upsert_document(
                                     &mut index_writer,
+                                    existing.clone().map(|f| f.doc_id),
                                     &crawl_result.title.unwrap_or_default(),
                                     &crawl_result.description.unwrap_or_default(),
                                     url_host,
@@ -175,23 +177,22 @@ async fn start_crawl(
                 Err(err) => {
                     log::info!("Unable to crawl id: {} - {:?}", task.id, err);
                     // mark crawl as failed
-                    if let Err(e) =
-                        crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed)
-                            .await
-                    {
-                        log::error!("Unable to mark task as failed: {}", e);
-                    }
+                    let _ = crawl_queue::mark_done(
+                        &state.db,
+                        task.id,
+                        crawl_queue::CrawlStatus::Failed,
+                        None,
+                    )
+                    .await;
                 }
             }
         }
         Err(err) => {
             log::info!("Unable to crawl id: {} - {:?}", task.id, err);
             // mark crawl as failed
-            if let Err(e) =
-                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed).await
-            {
-                log::error!("Unable to mark task as failed: {}", e);
-            }
+            let _ =
+                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed, None)
+                    .await;
         }
     }
 }

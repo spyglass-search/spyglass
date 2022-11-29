@@ -8,11 +8,36 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::indexed_document;
+use super::tag::TagPair;
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 5_000;
+
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct TaskData {
+    /// Tags applied to this
+    pub tags: Vec<TagPair>,
+}
+
+impl TaskData {
+    pub fn new(tags: &[TagPair]) -> Self {
+        Self {
+            tags: tags.to_vec(),
+        }
+    }
+
+    // Merge tags, removing duplicates.
+    pub fn merge(&self, other: &TaskData) -> Self {
+        let mut tags: HashSet<TagPair> = HashSet::from_iter(self.tags.clone().into_iter());
+        tags.extend(other.tags.clone().into_iter());
+
+        Self {
+            tags: tags.into_iter().collect(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
@@ -77,6 +102,8 @@ pub struct Model {
     pub status: CrawlStatus,
     /// If this failed, the reason for the failure
     pub error: Option<TaskError>,
+    /// Data that we want to keep around about this task.
+    pub data: Option<TaskData>,
     /// Number of retries for this task.
     #[sea_orm(default_value = 0)]
     pub num_retries: u8,
@@ -323,6 +350,7 @@ pub enum SkipReason {
 #[derive(Default)]
 pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
+    pub tags: Vec<TagPair>,
     pub force_allow: bool,
     pub is_recrawl: bool,
 }
@@ -492,9 +520,17 @@ pub async fn mark_done(
     db: &DatabaseConnection,
     id: i64,
     status: CrawlStatus,
-) -> anyhow::Result<()> {
-    if let Some(crawl) = Entity::find_by_id(id).one(db).await? {
+    data: Option<TaskData>,
+) -> Option<Model> {
+    if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = crawl.clone().into();
+        // Merge task data
+        if let Some(new) = data {
+            match crawl.data {
+                Some(old) => updated.data = Set(Some(old.merge(&new))),
+                None => updated.data = Set(Some(new)),
+            }
+        }
 
         // Bump up number of retries if this failed
         if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
@@ -505,10 +541,10 @@ pub async fn mark_done(
             updated.status = Set(status);
         }
 
-        updated.update(db).await?;
+        updated.update(db).await.ok()
+    } else {
+        None
     }
-
-    Ok(())
 }
 
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected

@@ -160,14 +160,80 @@ pub async fn worker_task(
             continue;
         }
 
-        let next_cmd = tokio::select! {
-            res = queue.recv() => res,
+        tokio::select! {
+            res = queue.recv() => {
+                if let Some(cmd) = res {
+                    match cmd {
+                        WorkerCommand::Collect(task) => match task {
+                            CollectTask::Bootstrap {
+                                lens,
+                                seed_url,
+                                pipeline,
+                            } => {
+                                log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
+                                let state = state.clone();
+                                tokio::spawn(async move {
+                                    if let Some(lens_config) = &state.lenses.get(&lens) {
+                                        worker::handle_bootstrap(&state, lens_config, &seed_url, pipeline)
+                                            .await;
+                                    }
+                                });
+                            }
+                            CollectTask::ConnectionSync { api_id, account } => {
+                                log::debug!("handling ConnectionSync for {}", api_id);
+                                let state = state.clone();
+                                tokio::spawn(async move {
+                                    match load_connection(&state, &api_id, &account).await {
+                                        Ok(mut conn) => {
+                                            conn.as_mut().sync(&state).await;
+                                        }
+                                        Err(err) => log::error!(
+                                            "Unable to sync w/ connection: {} - {}",
+                                            api_id,
+                                            err.to_string()
+                                        ),
+                                    }
+                                });
+                            }
+                        },
+                        WorkerCommand::CommitIndex => {
+                            let state = state.clone();
+                            if updated_docs > 0 {
+                                log::debug!("committing {} new/updated docs in index", updated_docs);
+                                updated_docs = 0;
+                                tokio::spawn(async move {
+                                    match state.index.writer.lock() {
+                                        Ok(mut writer) => {
+                                            let _ = writer.commit();
+                                        }
+                                        Err(err) => {
+                                            log::debug!(
+                                                "Unable to acquire lock on index writer: {}",
+                                                err.to_string()
+                                            )
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                        WorkerCommand::Crawl { id } => {
+                            if let Ok(fetch_result) =
+                                tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                            {
+                                match fetch_result {
+                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                                    _ => {}
+                                }
+                            }
+                        }
+                        WorkerCommand::Tag => {}
+                    }
+                }
+            },
             res = pause_rx.recv() => {
                 if let Ok(AppPause::Pause) = res {
                     is_paused = true;
                 }
-
-                None
             },
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down worker");
@@ -175,74 +241,6 @@ pub async fn worker_task(
                 return;
             }
         };
-
-        if let Some(cmd) = next_cmd {
-            match cmd {
-                WorkerCommand::Collect(task) => match task {
-                    CollectTask::Bootstrap {
-                        lens,
-                        seed_url,
-                        pipeline,
-                    } => {
-                        log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
-                        let state = state.clone();
-                        tokio::spawn(async move {
-                            if let Some(lens_config) = &state.lenses.get(&lens) {
-                                worker::handle_bootstrap(&state, lens_config, &seed_url, pipeline)
-                                    .await;
-                            }
-                        });
-                    }
-                    CollectTask::ConnectionSync { api_id, account } => {
-                        log::debug!("handling ConnectionSync for {}", api_id);
-                        let state = state.clone();
-                        tokio::spawn(async move {
-                            match load_connection(&state, &api_id, &account).await {
-                                Ok(mut conn) => {
-                                    conn.as_mut().sync(&state).await;
-                                }
-                                Err(err) => log::error!(
-                                    "Unable to sync w/ connection: {} - {}",
-                                    api_id,
-                                    err.to_string()
-                                ),
-                            }
-                        });
-                    }
-                },
-                WorkerCommand::CommitIndex => {
-                    let state = state.clone();
-                    if updated_docs > 0 {
-                        log::debug!("committing {} new/updated docs in index", updated_docs);
-                        updated_docs = 0;
-                        tokio::spawn(async move {
-                            match state.index.writer.lock() {
-                                Ok(mut writer) => {
-                                    let _ = writer.commit();
-                                }
-                                Err(err) => {
-                                    log::debug!(
-                                        "Unable to acquire lock on index writer: {}",
-                                        err.to_string()
-                                    )
-                                }
-                            }
-                        });
-                    }
-                }
-                WorkerCommand::Crawl { id } => {
-                    if let Ok(fetch_result) =
-                        tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
-                    {
-                        match fetch_result {
-                            FetchResult::New | FetchResult::Updated => updated_docs += 1,
-                            _ => {}
-                        }
-                    }
-                }
-                WorkerCommand::Tag => {}
-            }
-        }
     }
 }
 
@@ -261,7 +259,7 @@ pub async fn lens_watcher(
         futures::executor::block_on(async {
             if !tx.is_closed() {
                 if let Err(err) = tx.send(res).await {
-                    log::error!("fseventwatcher channel error: {}", err.to_string());
+                    log::error!("fseventwatcher channel error: {}. If we're in shutdown mode, nothing to worry about.", err.to_string());
                 }
             }
         })
@@ -325,8 +323,9 @@ pub async fn lens_watcher(
                             EventKind::Create(_)
                             | EventKind::Modify(ModifyKind::Data(_))
                             | EventKind::Modify(ModifyKind::Name(_)) => {
-                                let _ = read_lenses(&state, &config).await;
-                                load_lenses(state.clone()).await;
+                                if read_lenses(&state, &config).await.is_ok() {
+                                    load_lenses(state.clone()).await;
+                                }
                             }
                             _ => {}
                         }

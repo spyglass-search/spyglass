@@ -14,6 +14,7 @@ use tokio_retry::Retry;
 use url::Url;
 
 use entities::models::crawl_queue::{self, EnqueueSettings};
+use entities::models::tag::TagType;
 use entities::sea_orm::DatabaseConnection;
 use shared::config::{LensConfig, UserSettings};
 
@@ -117,14 +118,12 @@ pub async fn bootstrap(
     lens: &LensConfig,
     db: &DatabaseConnection,
     settings: &UserSettings,
-    url: &str,
+    url: &Url,
     pipeline: Option<String>,
 ) -> anyhow::Result<usize> {
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     // Check for valid URL and normalize it.
-    let url = Url::parse(url)?;
-
     let client = reqwest::Client::new();
     let mut resume_key = None;
     let prefix = url.as_str();
@@ -132,6 +131,7 @@ pub async fn bootstrap(
     let mut count: usize = 0;
     let overrides = crawl_queue::EnqueueSettings {
         crawl_type: crawl_queue::CrawlType::Bootstrap,
+        tags: vec![(TagType::Lens, lens.name.to_string())],
         ..Default::default()
     };
 
@@ -205,6 +205,7 @@ mod test {
     use super::bootstrap;
     use entities::models::crawl_queue;
     use entities::test::setup_test_db;
+    use url::Url;
 
     use shared::config::{Limit, UserSettings};
     // These tests are ignored since they hit a 3rd party service and we don't
@@ -226,7 +227,7 @@ mod test {
             &lens,
             &db,
             &settings,
-            "https://roll20.net/compendium/dnd5e",
+            &Url::parse("https://roll20.net/compendium/dnd5e").expect("invalid url"),
             Option::None,
         )
         .await;

@@ -5,12 +5,13 @@ use addr::parse_domain_name;
 use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
+use entities::models::tag::TagPair;
 use percent_encoding::percent_decode_str;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use url::{Host, Url};
 
-use entities::models::{crawl_queue, fetch_history, tag};
+use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 
 use crate::connection::load_connection;
@@ -70,7 +71,7 @@ pub struct CrawlResult {
     /// Links found in the page to add to the queue.
     pub links: HashSet<String>,
     /// Tags to apply to this document
-    pub tags: Vec<tag::Model>,
+    pub tags: Vec<TagPair>,
 }
 
 impl CrawlResult {

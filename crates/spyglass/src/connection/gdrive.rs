@@ -1,5 +1,5 @@
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
-use entities::models::tag::{self, TagType, TagValue};
+use entities::models::tag::{TagPair, TagType, TagValue};
 use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
 use libgoog::auth::{AccessToken, RefreshToken};
@@ -15,7 +15,6 @@ use url::Url;
 use super::Connection;
 
 pub struct DriveConnection {
-    state: AppState,
     client: GoogClient,
     user: String,
 }
@@ -75,7 +74,6 @@ impl DriveConnection {
             }
 
             Ok(Self {
-                state: state.clone(),
                 client,
                 user: account.to_string(),
             })
@@ -136,6 +134,7 @@ impl Connection for DriveConnection {
             // Enqueue URIs
             let enqueue_settings = EnqueueSettings {
                 crawl_type: CrawlType::Api,
+                tags: vec![(TagType::Source, Self::id())],
                 force_allow: true,
                 is_recrawl: true,
             };
@@ -187,20 +186,10 @@ impl Connection for DriveConnection {
             "".to_string()
         };
 
-        let mut tags = vec![
-            tag::add_or_create(&self.state.db, TagType::MimeType, &metadata.mime_type).await,
-            tag::add_or_create(&self.state.db, TagType::Source, &Self::id()).await,
-        ];
-
+        // Extract and apply tags to crawl result.
+        let mut tags: Vec<TagPair> = vec![(TagType::MimeType, metadata.mime_type)];
         if metadata.starred {
-            tags.push(
-                tag::add_or_create(
-                    &self.state.db,
-                    TagType::Favorited,
-                    TagValue::Favorited.as_ref(),
-                )
-                .await,
-            );
+            tags.push((TagType::Favorited, TagValue::Favorited.as_ref().to_owned()));
         }
 
         let mut crawl = CrawlResult::new(
@@ -210,7 +199,7 @@ impl Connection for DriveConnection {
             &metadata.name,
             None,
         );
-        crawl.tags = tags.into_iter().flatten().collect::<Vec<_>>();
+        crawl.tags = tags;
 
         Ok(crawl)
     }
