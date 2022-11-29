@@ -72,12 +72,12 @@ pub async fn manager_task(
     queue: mpsc::Sender<WorkerCommand>,
     manager_cmd_tx: mpsc::UnboundedSender<ManagerCommand>,
     mut manager_cmd_rx: mpsc::UnboundedReceiver<ManagerCommand>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
 
     let mut queue_check_interval = tokio::time::interval(Duration::from_millis(100));
     let mut commit_check_interval = tokio::time::interval(Duration::from_secs(10));
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
         tokio::select! {
@@ -133,11 +133,11 @@ pub async fn worker_task(
     state: AppState,
     mut queue: mpsc::Receiver<WorkerCommand>,
     mut pause_rx: broadcast::Receiver<AppPause>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("worker started");
     let mut is_paused = false;
     let mut updated_docs = 0;
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
         // Run w/ a select on the shutdown signal otherwise we're stuck in an
@@ -250,8 +250,7 @@ pub async fn worker_task(
 pub async fn lens_watcher(
     state: AppState,
     config: Config,
-    mut pause_rx: broadcast::Receiver<AppPause>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
+    mut pause_rx: broadcast::Receiver<AppPause>
 ) {
     log::info!("👀 lens watcher started");
 
@@ -274,6 +273,7 @@ pub async fn lens_watcher(
     // Read + load lenses for the first time.
     let _ = read_lenses(&state, &config).await;
     load_lenses(state.clone()).await;
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
         // Run w/ a select on the shutdown signal otherwise we're stuck in an

@@ -7,6 +7,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
+use crate::task::AppShutdown;
 use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
@@ -25,6 +26,7 @@ pub struct AppState {
     pub index: Searcher,
     // Task scheduler command/control
     pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
+    pub shutdown_cmd_tx: Arc<Mutex<broadcast::Sender<AppShutdown>>>,
     // Pause/unpause worker pool.
     pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
     // Plugin command/control
@@ -59,6 +61,8 @@ impl AppState {
             pipelines.insert(key.clone(), value.clone());
         }
 
+        let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
+
         AppState {
             db,
             app_state: Arc::new(app_state),
@@ -66,6 +70,7 @@ impl AppState {
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             index,
+            shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
             pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
@@ -125,12 +130,15 @@ impl AppStateBuilder {
             UserSettings::default()
         };
 
+        let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
+
         AppState {
             app_state: Arc::new(DashMap::new()),
             db: self.db.as_ref().expect("Must set db").to_owned(),
             user_settings,
             index,
             lenses: Arc::new(lenses),
+            shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
             pipelines: Arc::new(pipelines),
             pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),

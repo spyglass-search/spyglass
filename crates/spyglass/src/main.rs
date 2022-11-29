@@ -129,8 +129,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
             .expect("Unable to parse inflight_crawl_limit"),
     );
 
-    // Channel for shutdown listeners
-    let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
     // Channel for pause/unpause listeners
     let (pause_tx, _) = broadcast::channel::<AppPause>(16);
 
@@ -175,32 +173,28 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         state.clone(),
         worker_cmd_tx,
         manager_cmd_tx.clone(),
-        manager_cmd_rx,
-        shutdown_tx.subscribe(),
+        manager_cmd_rx
     ));
 
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
         worker_cmd_rx,
-        pause_tx.subscribe(),
-        shutdown_tx.subscribe(),
+        pause_tx.subscribe()
     ));
 
     // Check lenses for updates & add any bootstrapped URLs to crawler.
     let lens_watcher_handle = tokio::spawn(task::lens_watcher(
         state.clone(),
         config.clone(),
-        pause_tx.subscribe(),
-        shutdown_tx.subscribe(),
+        pause_tx.subscribe()
     ));
 
     // Loads and processes pipeline commands
     let _pipeline_handler = tokio::spawn(pipeline::initialize_pipelines(
         state.clone(),
         config.clone(),
-        pipeline_cmd_rx,
-        shutdown_tx.clone(),
+        pipeline_cmd_rx
     ));
 
     // Plugin server
@@ -208,8 +202,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         state.clone(),
         config.clone(),
         plugin_cmd_tx.clone(),
-        plugin_cmd_rx,
-        shutdown_tx.subscribe(),
+        plugin_cmd_rx
     ));
 
     // API server
@@ -219,13 +212,13 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");
-            shutdown_tx
+            state.shutdown_cmd_tx.lock().await
                 .send(AppShutdown::Now)
                 .expect("Unable to send AppShutdown cmd");
         }
         Err(err) => {
             log::error!("Unable to listen for shutdown signal: {}", err);
-            shutdown_tx
+            state.shutdown_cmd_tx.lock().await
                 .send(AppShutdown::Now)
                 .expect("Unable to send AppShutdown cmd");
         }
