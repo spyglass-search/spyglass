@@ -80,7 +80,7 @@ pub async fn initialize_pipelines(
                 config.clone(),
                 pipeline.clone(),
                 pipelines.get(&pipeline).unwrap().clone(),
-                pipeline_cmd_rx
+                pipeline_cmd_rx,
             ));
         } else {
             log::error!(

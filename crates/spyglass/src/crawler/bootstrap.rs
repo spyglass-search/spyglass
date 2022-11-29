@@ -17,6 +17,8 @@ use entities::models::crawl_queue::{self, EnqueueSettings};
 use entities::sea_orm::DatabaseConnection;
 use shared::config::{LensConfig, UserSettings};
 
+use crate::state::AppState;
+
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
 const ARCHIVE_WEB_ENDPOINT: &str = "https://web.archive.org/web";
@@ -111,12 +113,15 @@ async fn fetch_cdx_page(
 /// from the Internet Archive. We then crawl their archived stuff as fast as possible
 /// locally to bring the index up to date.
 pub async fn bootstrap(
+    state: &AppState,
     lens: &LensConfig,
     db: &DatabaseConnection,
     settings: &UserSettings,
     url: &str,
     pipeline: Option<String>,
 ) -> anyhow::Result<usize> {
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
+
     // Check for valid URL and normalize it.
     let url = Url::parse(url)?;
 
@@ -133,7 +138,16 @@ pub async fn bootstrap(
     // Stream pages of URLs from the CDX server & add them to our crawl queue.
     loop {
         log::info!("fetching page from cdx");
-        if let Ok((urls, resume)) = fetch_cdx(&client, prefix, 1000, resume_key.clone()).await {
+
+        let result = tokio::select! {
+            res = fetch_cdx(&client, prefix, 1000, resume_key.clone()) => res,
+            _ = shutdown_rx.recv() => {
+                log::info!("🛑 Shutting down bootstrapper");
+                return Ok(count);
+            }
+        };
+
+        if let Ok((urls, resume)) = result {
             // Add URLs to crawl queue
             log::info!("enqueing {} urls", urls.len());
             let urls: Vec<String> = urls.into_iter().collect();
@@ -186,6 +200,8 @@ pub async fn bootstrap(
 
 #[cfg(test)]
 mod test {
+    use crate::state::AppState;
+
     use super::bootstrap;
     use entities::models::crawl_queue;
     use entities::test::setup_test_db;
@@ -197,6 +213,8 @@ mod test {
     #[ignore]
     async fn test_bootstrap() {
         let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db.clone()).build();
+
         let settings = UserSettings {
             domain_crawl_limit: Limit::Infinite,
             ..Default::default()
@@ -204,6 +222,7 @@ mod test {
 
         let lens = Default::default();
         let res = bootstrap(
+            &state,
             &lens,
             &db,
             &settings,

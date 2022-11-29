@@ -163,7 +163,7 @@ pub async fn plugin_event_loop(
     state: AppState,
     config: Config,
     cmd_writer: mpsc::Sender<PluginCommand>,
-    mut cmd_queue: mpsc::Receiver<PluginCommand>
+    mut cmd_queue: mpsc::Receiver<PluginCommand>,
 ) {
     log::info!("🔌 plugin event loop started");
     // Initial load, send some basic configuration to the plugins

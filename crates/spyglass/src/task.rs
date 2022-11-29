@@ -250,7 +250,7 @@ pub async fn worker_task(
 pub async fn lens_watcher(
     state: AppState,
     config: Config,
-    mut pause_rx: broadcast::Receiver<AppPause>
+    mut pause_rx: broadcast::Receiver<AppPause>,
 ) {
     log::info!("👀 lens watcher started");
 
