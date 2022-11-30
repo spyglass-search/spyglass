@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use ignore::WalkBuilder;
 use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -345,12 +346,29 @@ pub async fn plugin_event_loop(
                 for (path, event) in paths {
                     for (plugin_id, watched_path) in file_watch_subs.iter() {
                         if path.starts_with(watched_path) {
-                            let _ = cmd_writer
-                                .send(PluginCommand::HandleUpdate {
-                                    plugin_id: *plugin_id,
-                                    event: event.clone(),
+                            // Use ignore crate to check whether this path would've
+                            // been ignored based on the standard filters.
+                            let walker = WalkBuilder::new(watched_path)
+                                .standard_filters(true)
+                                .build();
+
+                            let valid_paths = walker
+                                .flat_map(|entry| match entry {
+                                    Ok(entry) => Some(entry.into_path()),
+                                    _ => None,
                                 })
-                                .await;
+                                .collect::<HashSet<PathBuf>>();
+
+                            if valid_paths.contains(&path) {
+                                let _ = cmd_writer
+                                    .send(PluginCommand::HandleUpdate {
+                                        plugin_id: *plugin_id,
+                                        event: event.clone(),
+                                    })
+                                    .await;
+                            } else {
+                                log::debug!("ignored changes to {}", path.display());
+                            }
                         }
                     }
                 }
@@ -470,16 +488,6 @@ pub async fn plugin_init(
         .map(|base| base.home_dir().display().to_string())
         .map_or_else(|| "".to_string(), |dir| dir);
 
-    let host_name: String = if let Ok(hname) = hostname::get() {
-        if let Some(hname) = hname.to_str() {
-            hname.to_string()
-        } else {
-            "home.local".to_string()
-        }
-    } else {
-        "home.local".to_string()
-    };
-
     let mut wasi_env = WasiState::new(&plugin.name)
         // Attach the plugin data directory. Anything created by the plugin will live
         // there.
@@ -487,7 +495,6 @@ pub async fn plugin_init(
         .expect("Unable to mount plugin data folder")
         .env(env::BASE_CONFIG_DIR, base_config_dir)
         .env(env::BASE_DATA_DIR, base_data_dir)
-        .env(env::HOST_NAME, host_name)
         .env(env::HOST_HOME_DIR, home_dir)
         .env(env::HOST_OS, std::env::consts::OS)
         // Load user settings as environment variables
