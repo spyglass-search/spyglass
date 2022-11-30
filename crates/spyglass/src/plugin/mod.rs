@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use ignore::WalkBuilder;
 use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -345,12 +346,29 @@ pub async fn plugin_event_loop(
                 for (path, event) in paths {
                     for (plugin_id, watched_path) in file_watch_subs.iter() {
                         if path.starts_with(watched_path) {
-                            let _ = cmd_writer
-                                .send(PluginCommand::HandleUpdate {
-                                    plugin_id: *plugin_id,
-                                    event: event.clone(),
+                            // Use ignore crate to check whether this path would've
+                            // been ignored based on the standard filters.
+                            let walker = WalkBuilder::new(watched_path)
+                                .standard_filters(true)
+                                .build();
+
+                            let valid_paths = walker
+                                .flat_map(|entry| match entry {
+                                    Ok(entry) => Some(entry.into_path()),
+                                    _ => None,
                                 })
-                                .await;
+                                .collect::<HashSet<PathBuf>>();
+
+                            if valid_paths.contains(&path) {
+                                let _ = cmd_writer
+                                    .send(PluginCommand::HandleUpdate {
+                                        plugin_id: *plugin_id,
+                                        event: event.clone(),
+                                    })
+                                    .await;
+                            } else {
+                                log::debug!("ignored changes to {}", path.display());
+                            }
                         }
                     }
                 }
