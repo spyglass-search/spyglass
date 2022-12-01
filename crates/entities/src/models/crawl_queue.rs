@@ -191,39 +191,10 @@ pub async fn num_queued(
     Ok(res)
 }
 
-fn gen_priority_values(items: &[String], is_prefix: bool) -> String {
-    if items.is_empty() {
-        "(\"\", 0)".to_string()
-    } else {
-        items
-            .iter()
-            .map(|item| {
-                let item = if is_prefix {
-                    // Wildcards not supported in prefixes
-                    item.to_owned() + "%"
-                } else {
-                    // TODO: Should probably sanitize this...
-                    item.replace('*', "%")
-                };
-
-                format!("(\"{}\", 1)", item)
-            })
-            .collect::<Vec<String>>()
-            .join(",")
-    }
-}
-
-fn gen_priority_sql(p_domains: &str, p_prefixes: &str, user_settings: UserSettings) -> Statement {
+fn gen_dequeue_sql(user_settings: UserSettings) -> Statement {
     Statement::from_sql_and_values(
         DbBackend::Sqlite,
-        &format!(
-            r#"WITH
-                p_domain(domain, priority) AS (values {}),
-                p_prefix(prefix, priority) AS (values {}), {}"#,
-            p_domains,
-            p_prefixes,
-            include_str!("sql/dequeue.sqlx")
-        ),
+        include_str!("sql/dequeue.sqlx"),
         vec![
             user_settings.domain_crawl_limit.value().into(),
             user_settings.inflight_domain_limit.value().into(),
@@ -278,10 +249,6 @@ fn create_ruleset_from_lens(lens: &LensConfig) -> LensRuleSets {
 pub async fn dequeue(
     db: &DatabaseConnection,
     user_settings: UserSettings,
-    // Prioritized domains
-    p_domains: &[String],
-    // Prioritized prefixes
-    p_prefixes: &[String],
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     // Check for inflight limits
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
@@ -313,14 +280,7 @@ pub async fn dequeue(
     // List of domains to prioritize when dequeuing tasks
     // For example, we'll pull domains that make up with lenses before
     // general crawling.
-    let prioritized_domains = gen_priority_values(p_domains, false);
-    let prioritized_prefixes = gen_priority_values(p_prefixes, true);
-
-    let entity = Entity::find().from_raw_sql(gen_priority_sql(
-        &prioritized_domains,
-        &prioritized_prefixes,
-        user_settings,
-    ));
+    let entity = Entity::find().from_raw_sql(gen_dequeue_sql(user_settings));
 
     // Grab new entity and immediately mark in-progress
     if let Ok(Some(model)) = entity.one(db).await {
@@ -573,7 +533,7 @@ mod test {
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
-    use super::{filter_urls, gen_priority_sql, gen_priority_values, EnqueueSettings};
+    use super::{filter_urls, gen_dequeue_sql, EnqueueSettings};
 
     #[tokio::test]
     async fn test_insert() {
@@ -602,14 +562,10 @@ mod test {
     #[test]
     fn test_priority_sql() {
         let settings = UserSettings::default();
-        let p_domains = gen_priority_values(&["en.wikipedia.org".to_string()], false);
-        let p_prefixes =
-            gen_priority_values(&["https://roll20.net/compendium/dnd5e".to_string()], true);
-
-        let sql = gen_priority_sql(&p_domains, &p_prefixes, settings);
+        let sql = gen_dequeue_sql(settings);
         assert_eq!(
             sql.to_string(),
-            "WITH\n                p_domain(domain, priority) AS (values (\"en.wikipedia.org\", 1)),\n                p_prefix(prefix, priority) AS (values (\"https://roll20.net/compendium/dnd5e%\", 1)), indexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN p_domain ON cq.domain like p_domain.domain\nLEFT JOIN p_prefix ON cq.url like p_prefix.prefix\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\"\nORDER BY\n    p_prefix.priority DESC,\n    p_domain.priority DESC,\n    cq.updated_at ASC"
+            "WITH\nindexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\"\nORDER BY\n    cq.updated_at ASC"
         );
     }
 
@@ -723,7 +679,6 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-        let prioritized = vec![];
         let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
@@ -740,9 +695,7 @@ mod test {
         .await
         .unwrap();
 
-        let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
 
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url[0]);
@@ -757,7 +710,6 @@ mod test {
         let db = setup_test_db().await;
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
-        let prioritized = vec![];
         let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
@@ -780,18 +732,14 @@ mod test {
             ..Default::default()
         };
         doc.save(&db).await.unwrap();
-        let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_some());
 
         let settings = UserSettings {
             domain_crawl_limit: Limit::Finite(1),
             ..Default::default()
         };
-        let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_none());
     }
 
