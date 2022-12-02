@@ -44,13 +44,17 @@ pub enum ManagerCommand {
 /// Send tasks to the worker
 #[derive(Clone, Debug)]
 pub enum WorkerCommand {
+    /// Enqueues the URLs needed to start crawl.
     Collect(CollectTask),
-    // Commit any changes that have been made to the index.
+    /// Commit any changes that have been made to the index.
     CommitIndex,
-    // Fetch, parses, & indexes a URI
-    // TODO: Split this up so that this work can be spread out.
+    /// Fetch, parses, & indexes a URI
+    /// TODO: Split this up so that this work can be spread out.
     Crawl { id: i64 },
-    // Applies tag information to an URI
+    /// Refetches, parses, & indexes a URI
+    /// If the URI no longer exists (file moved, 404 etc), delete from index.
+    Recrawl { id: i64 },
+    /// Applies tag information to an URI
     Tag,
 }
 
