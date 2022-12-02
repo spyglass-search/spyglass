@@ -264,27 +264,26 @@ pub async fn dequeue(
     }
 
     // Prioritize any bootstrapping tasks first.
-    let entity = Entity::find()
-        .filter(Column::Status.eq(CrawlStatus::Queued))
-        .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
-        .one(db)
-        .await?;
+    let entity = {
+        let result = Entity::find()
+            .filter(Column::Status.eq(CrawlStatus::Queued))
+            .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
+            .one(db)
+            .await?;
 
-    if let Some(task) = entity {
-        let mut update: ActiveModel = task.into();
-        update.status = Set(CrawlStatus::Processing);
-        let model: Model = update.update(db).await.expect("Unable to save");
-        return Ok(Some(model));
-    }
-
-    // List of domains to prioritize when dequeuing tasks
-    // For example, we'll pull domains that make up with lenses before
-    // general crawling.
-    let entity = Entity::find().from_raw_sql(gen_dequeue_sql(user_settings));
+        if let Some(task) = result {
+            Some(task)
+        } else {
+            // Otherwise, grab a URL off the stack & send it back.
+            Entity::find()
+                .from_raw_sql(gen_dequeue_sql(user_settings))
+                .one(db).await?
+        }
+    };
 
     // Grab new entity and immediately mark in-progress
-    if let Ok(Some(model)) = entity.one(db).await {
-        let mut update: ActiveModel = model.into();
+    if let Some(task) = entity {
+        let mut update: ActiveModel = task.into();
         update.status = Set(CrawlStatus::Processing);
         return match update.update(db).await {
             Ok(model) => Ok(Some(model)),
