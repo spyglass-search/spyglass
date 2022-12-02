@@ -83,13 +83,7 @@ async fn start_crawl(
                 Ok(parse_result) => {
                     let crawl_result = parse_result.content;
                     // Update job status
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Completed,
-                        None,
-                    )
-                    .await;
+                    let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
 
                     // Add all valid, non-duplicate, non-indexed links found to crawl queue
                     let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
@@ -177,22 +171,14 @@ async fn start_crawl(
                 Err(err) => {
                     log::info!("Unable to crawl id: {} - {:?}", task.id, err);
                     // mark crawl as failed
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Failed,
-                        None,
-                    )
-                    .await;
+                    crawl_queue::mark_failed(&state.db, task.id, false).await;
                 }
             }
         }
         Err(err) => {
             log::info!("Unable to crawl id: {} - {:?}", task.id, err);
             // mark crawl as failed
-            let _ =
-                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed, None)
-                    .await;
+            crawl_queue::mark_failed(&state.db, task.id, false).await;
         }
     }
 }

@@ -136,8 +136,7 @@ pub async fn initialize_pipelines(
 // Helper function used to set any crawl failures with the status of failed.
 pub async fn fail_crawl_cmd(state: &AppState, task_uid: i64) {
     // mark crawl as failed
-    let _ =
-        crawl_queue::mark_done(&state.db, task_uid, crawl_queue::CrawlStatus::Failed, None).await;
+    crawl_queue::mark_failed(&state.db, task_uid, false).await;
 }
 
 /// Read pipelines into the AppState

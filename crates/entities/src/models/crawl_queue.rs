@@ -527,12 +527,7 @@ pub async fn enqueue_all(
     Ok(())
 }
 
-pub async fn mark_done(
-    db: &DatabaseConnection,
-    id: i64,
-    status: CrawlStatus,
-    data: Option<TaskData>,
-) -> Option<Model> {
+pub async fn mark_done(db: &DatabaseConnection, id: i64, data: Option<TaskData>) -> Option<Model> {
     if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = crawl.clone().into();
         // Merge task data
@@ -542,19 +537,26 @@ pub async fn mark_done(
                 None => updated.data = Set(Some(new)),
             }
         }
+        updated.status = Set(CrawlStatus::Completed);
+        updated.update(db).await.ok()
+    } else {
+        None
+    }
+}
+
+pub async fn mark_failed(db: &DatabaseConnection, id: i64, retry: bool) {
+    if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
+        let mut updated: ActiveModel = crawl.clone().into();
 
         // Bump up number of retries if this failed
-        if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
+        if retry && crawl.num_retries <= MAX_RETRIES {
             updated.num_retries = Set(crawl.num_retries + 1);
             // Queue again
             updated.status = Set(CrawlStatus::Queued);
         } else {
-            updated.status = Set(status);
+            updated.status = Set(CrawlStatus::Failed);
         }
-
-        updated.update(db).await.ok()
-    } else {
-        None
+        let _ = updated.update(db).await;
     }
 }
 

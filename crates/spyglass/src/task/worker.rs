@@ -55,7 +55,7 @@ pub async fn handle_bootstrap(
 #[derive(Debug, Eq, PartialEq)]
 pub enum FetchResult {
     New,
-    Error,
+    Error(CrawlError),
     Ignore,
     Updated,
 }
@@ -66,18 +66,16 @@ pub async fn process_crawl(
     crawl_result: &CrawlResult,
 ) -> FetchResult {
     // Update job status
-    let task = match crawl_queue::mark_done(
-        &state.db,
-        task_id,
-        crawl_queue::CrawlStatus::Completed,
-        Some(TaskData::new(&crawl_result.tags)),
-    )
-    .await
-    {
-        Some(task) => task,
-        // Task removed while being processed?
-        None => return FetchResult::Error,
-    };
+    let task =
+        match crawl_queue::mark_done(&state.db, task_id, Some(TaskData::new(&crawl_result.tags)))
+            .await
+        {
+            Some(task) => task,
+            // Task removed while being processed?
+            None => {
+                return FetchResult::Error(CrawlError::Other("task no longer exists".to_owned()))
+            }
+        };
 
     // Add all valid, non-duplicate, non-indexed links found to crawl queue
     let to_enqueue: Vec<String> = crawl_result.links.clone().into_iter().collect();
@@ -107,7 +105,10 @@ pub async fn process_crawl(
     if let Some(content) = crawl_result.content.clone() {
         let url = Url::parse(&crawl_result.url);
         if url.is_err() {
-            return FetchResult::Error;
+            return FetchResult::Error(CrawlError::FetchError(format!(
+                "Invalid url: {}",
+                &crawl_result.url
+            )));
         }
 
         let url = url.expect("Invalid crawl URL");
@@ -143,13 +144,16 @@ pub async fn process_crawl(
                 ) {
                     Ok(new_doc_id) => new_doc_id,
                     Err(err) => {
-                        log::error!("Unable to save document, {}", err);
-                        return FetchResult::Error;
+                        return FetchResult::Error(CrawlError::Other(format!(
+                            "Unable to save document: {}",
+                            err
+                        )));
                     }
                 }
             } else {
-                log::error!("Unable to save document, writer lock.");
-                return FetchResult::Error;
+                return FetchResult::Error(CrawlError::Other(
+                    "Unable to save document, writer lock.".to_owned(),
+                ));
             }
         };
 
@@ -182,8 +186,7 @@ pub async fn process_crawl(
                 }
             }
             Err(e) => {
-                log::error!("Unable to save document: {}", e);
-                FetchResult::Error
+                FetchResult::Error(CrawlError::Other(format!("Unable to save document: {}", e)))
             }
         };
     }
@@ -203,25 +206,19 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             match err {
                 // Ignore skips, recently fetched crawls, or not found
                 CrawlError::Denied(_) | CrawlError::RecentlyFetched | CrawlError::NotFound => {
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Completed,
-                        None,
-                    )
-                    .await;
+                    let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
                     FetchResult::Ignore
                 }
-                _ => {
+                // Retry timeouts, might be a network issue
+                CrawlError::FetchError(_) | CrawlError::Timeout => {
+                    crawl_queue::mark_failed(&state.db, task.id, true).await;
+                    FetchResult::Error(err.clone())
+                }
+                // No need to retry these, mark as failed.
+                CrawlError::ParseError(_) | CrawlError::Unsupported(_) | CrawlError::Other(_) => {
                     // mark crawl as failed
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Failed,
-                        None,
-                    )
-                    .await;
-                    FetchResult::Error
+                    crawl_queue::mark_failed(&state.db, task.id, false).await;
+                    FetchResult::Error(err.clone())
                 }
             }
         }
