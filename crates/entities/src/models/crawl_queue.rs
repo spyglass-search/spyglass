@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
-use sea_orm::{sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryTrait, Set, Statement};
+use sea_orm::{
+    sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryOrder, QueryTrait, Set, Statement,
+};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -245,6 +247,14 @@ fn create_ruleset_from_lens(lens: &LensConfig) -> LensRuleSets {
     }
 }
 
+/// How many tasks do we have in progress?
+pub async fn num_tasks_in_progress(db: &DatabaseConnection) -> anyhow::Result<u64, DbErr> {
+    Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Processing))
+        .count(db)
+        .await
+}
+
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
@@ -253,12 +263,9 @@ pub async fn dequeue(
     // Check for inflight limits
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
         // How many do we have in progress?
-        let num_in_progress = Entity::find()
-            .filter(Column::Status.eq(CrawlStatus::Processing))
-            .count(db)
-            .await? as u32;
-
-        if num_in_progress >= inflight_crawl_limit {
+        let num_in_progress = num_tasks_in_progress(db).await?;
+        // Nothing to do if we have too many crawls
+        if num_in_progress >= inflight_crawl_limit as u64 {
             return Ok(None);
         }
     }
@@ -277,12 +284,57 @@ pub async fn dequeue(
             // Otherwise, grab a URL off the stack & send it back.
             Entity::find()
                 .from_raw_sql(gen_dequeue_sql(user_settings))
-                .one(db).await?
+                .one(db)
+                .await?
         }
     };
 
     // Grab new entity and immediately mark in-progress
     if let Some(task) = entity {
+        let mut update: ActiveModel = task.into();
+        update.status = Set(CrawlStatus::Processing);
+        return match update.update(db).await {
+            Ok(model) => Ok(Some(model)),
+            // Deleted while being processed?
+            Err(err) => {
+                log::error!("Unable to update crawl task: {}", err);
+                Ok(None)
+            }
+        };
+    }
+
+    Ok(None)
+}
+
+pub async fn dequeue_recrawl(
+    db: &DatabaseConnection,
+    user_settings: &UserSettings,
+) -> anyhow::Result<Option<Model>, DbErr> {
+    // Check for inflight limits
+    if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
+        // How many do we have in progress?
+        let num_in_progress = num_tasks_in_progress(db).await?;
+        // Nothing to do if we have too many crawls
+        if num_in_progress >= inflight_crawl_limit as u64 {
+            return Ok(None);
+        }
+    }
+
+    // Prioritize any bootstrapping tasks first.
+    let task = Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Completed))
+        .order_by_asc(Column::UpdatedAt)
+        .one(db)
+        .await?;
+
+    // Grab new entity and immediately mark in-progress
+    if let Some(task) = task {
+        let now = chrono::Utc::now();
+        let time_since = now - task.updated_at;
+        if time_since.num_days() < 1 {
+            return Ok(None);
+        }
+
         let mut update: ActiveModel = task.into();
         update.status = Set(CrawlStatus::Processing);
         return match update.update(db).await {
@@ -529,6 +581,7 @@ mod test {
     use shared::config::{LensConfig, LensRule, Limit, UserSettings};
     use shared::regex::{regex_for_robots, WildcardType};
 
+    use crate::models::crawl_queue::CrawlType;
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
@@ -857,5 +910,31 @@ mod test {
             filtered.pop(),
             Some("https://bahai-library.com//shoghi-effendi_goals_crusade".into())
         );
+    }
+
+    #[tokio::test]
+    async fn test_dequeue_recrawl() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = "https://oldschool.runescape.wiki/";
+
+        let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
+        let model = crawl_queue::ActiveModel {
+            crawl_type: Set(CrawlType::Normal),
+            domain: Set("oldschool.runescape.wiki".to_string()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            url: Set(url.to_string()),
+            created_at: Set(one_day_ago.clone()),
+            updated_at: Set(one_day_ago),
+            ..Default::default()
+        };
+
+        if let Err(res) = model.save(&db).await {
+            dbg!(res);
+        }
+
+        let queue = crawl_queue::dequeue_recrawl(&db, &settings).await.unwrap();
+        assert!(queue.is_some());
+        assert_eq!(queue.unwrap().url, url);
     }
 }
