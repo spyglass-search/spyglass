@@ -116,12 +116,25 @@ mod test {
             updated_at: Set(one_day_ago),
             ..Default::default()
         };
+        let _ = task.save(&db).await.expect("Unable to save dummy task");
+
+        let two_day_ago = chrono::Utc::now() - chrono::Duration::days(2);
+        let task = crawl_queue::ActiveModel {
+            url: Set("https://example.com/this_one".to_owned()),
+            domain: Set("example.com".to_owned()),
+            crawl_type: Set(CrawlType::Normal),
+            status: Set(CrawlStatus::Completed),
+            created_at: Set(two_day_ago.clone()),
+            updated_at: Set(two_day_ago),
+            ..Default::default()
+        };
         let mut saved = task.save(&db).await.expect("Unable to save dummy task");
 
         let (sender, mut recv) = mpsc::channel(10);
         let has_job = check_for_jobs(&state, &sender).await;
         assert!(has_job);
 
+        // Should return the ID of the latest task.
         let message = recv.recv().await.expect("no WorkerCommand in channel");
         assert_eq!(
             message,
