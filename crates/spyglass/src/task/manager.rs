@@ -12,20 +12,14 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
         Ok(Some(task)) => {
             match &task.pipeline {
                 Some(pipeline) => {
-                    let mut pipeline_tx = state.pipeline_cmd_tx.lock().await;
-                    match &mut *pipeline_tx {
-                        Some(pipeline_tx) => {
-                            log::debug!("Sending crawl task to pipeline");
-                            let cmd = PipelineCommand::ProcessUrl(
-                                pipeline.clone(),
-                                CrawlTask { id: task.id },
-                            );
-                            if let Err(err) = pipeline_tx.send(cmd).await {
-                                log::error!("Unable to send crawl task to pipeline {:?}", err);
-                            }
-                        }
-                        None => {
-                            log::error!("Unable to send crawl task to pipeline, no queue found");
+                    if let Some(pipeline_tx) = state.pipeline_cmd_tx.lock().await.as_mut() {
+                        log::debug!("Sending crawl task to pipeline");
+                        let cmd = PipelineCommand::ProcessUrl(
+                            pipeline.clone(),
+                            CrawlTask { id: task.id },
+                        );
+                        if let Err(err) = pipeline_tx.send(cmd).await {
+                            log::error!("Unable to send crawl task to pipeline {:?}", err);
                         }
                     }
                     true
