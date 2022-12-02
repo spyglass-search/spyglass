@@ -19,7 +19,7 @@ pub struct CrawlTask {
     pub id: i64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CollectTask {
     // Pull URLs from a CDX server
     Bootstrap {
@@ -42,7 +42,7 @@ pub enum ManagerCommand {
 }
 
 /// Send tasks to the worker
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WorkerCommand {
     /// Enqueues the URLs needed to start crawl.
     Collect(CollectTask),
@@ -223,6 +223,15 @@ pub async fn worker_task(
                         WorkerCommand::Crawl { id } => {
                             if let Ok(fetch_result) =
                                 tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                            {
+                                match fetch_result {
+                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                                    _ => {}
+                                }
+                            }
+                        }
+                        WorkerCommand::Recrawl { id } => {
+                            if let Ok(fetch_result) = tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
                             {
                                 match fetch_result {
                                     FetchResult::New | FetchResult::Updated => updated_docs += 1,
