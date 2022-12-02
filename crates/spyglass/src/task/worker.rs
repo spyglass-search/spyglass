@@ -66,7 +66,7 @@ pub async fn process_crawl(
     crawl_result: &CrawlResult,
 ) -> anyhow::Result<FetchResult, CrawlError> {
     // Update job status
-    let task =
+    let mut task =
         match crawl_queue::mark_done(&state.db, task_id, Some(TaskData::new(&crawl_result.tags)))
             .await
         {
@@ -74,6 +74,24 @@ pub async fn process_crawl(
             // Task removed while being processed?
             None => return Err(CrawlError::Other("task no longer exists".to_owned())),
         };
+
+    // Update URL in crawl_task to match the canonical URL extracted in the crawl result.
+    if task.url != crawl_result.url {
+        log::debug!("Updating task URL {} -> {}", task.url, crawl_result.url);
+        task = match crawl_queue::update_or_remove_task(&state.db, task.id, &crawl_result.url).await {
+            Ok(updated) => {
+                if updated.id != task.id {
+                    log::debug!("Removed {}, duplicate canonical URL found", task.id);
+                }
+
+                updated
+            },
+            Err(err) => {
+                log::error!("Unable to update task URL: {}", err);
+                task
+            },
+        }
+    }
 
     // Add all valid, non-duplicate, non-indexed links found to crawl queue
     let to_enqueue: Vec<String> = crawl_result.links.clone().into_iter().collect();
@@ -197,11 +215,17 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
 
     match result {
         Ok(crawl_result) => match process_crawl(&state, task.id, &crawl_result).await {
-            Ok(res) => res,
-            Err(err) => FetchResult::Error(err),
+            Ok(res) => {
+                log::debug!("Crawled task id: {} - {:?}", task.id, res);
+                res
+            },
+            Err(err) => {
+                log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
+                FetchResult::Error(err)
+            },
         },
         Err(err) => {
-            log::info!("Unable to crawl id: {} - {:?}", task.id, err);
+            log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
             match err {
                 // Ignore skips, recently fetched crawls, or not found
                 CrawlError::Denied(_) | CrawlError::RecentlyFetched | CrawlError::NotFound => {

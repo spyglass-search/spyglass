@@ -574,6 +574,43 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
     Ok(res.rows_affected)
 }
 
+/// Update the URL of a task. Typically used after a crawl to set the canonical URL
+/// extracted from the crawl result. If there's a conflict, this means another crawl task
+/// already points to this same URL and thus can be safely removed.
+pub async fn update_or_remove_task(db: &DatabaseConnection, id: i64, url: &str) -> anyhow::Result<Model, DbErr> {
+    let existing_task = Entity::find()
+        .filter(Column::Url.eq(url))
+        .one(db)
+        .await?;
+
+    // Task already exists w/ this URL, remove this one.
+    if let Some(existing) = existing_task {
+        if existing.id != id {
+            Entity::delete_by_id(id).exec(db).await?;
+        }
+
+        Ok(existing)
+    } else {
+        let task = Entity::find_by_id(id)
+            .one(db)
+            .await?;
+
+        if let Some(mut task) = task {
+            if task.url != url {
+                let mut update: ActiveModel = task.clone().into();
+                update.url = Set(url.to_owned());
+                let _ = update.save(db).await?;
+                task.url = url.to_owned();
+            }
+
+            Ok(task)
+
+        } else {
+            Err(DbErr::Custom("Task not found".to_owned()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;
@@ -938,5 +975,43 @@ mod test {
         let queue = crawl_queue::dequeue_recrawl(&db, &settings).await.unwrap();
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url);
+    }
+
+    #[tokio::test]
+    async fn test_update_or_remove_task() {
+        let db = setup_test_db().await;
+
+        let model = crawl_queue::ActiveModel {
+            crawl_type: Set(CrawlType::Normal),
+            domain: Set("example.com".to_string()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            url: Set("https://example.com".to_string()),
+            ..Default::default()
+        };
+        let first = model.save(&db).await
+            .expect("saved");
+
+        let model = crawl_queue::ActiveModel {
+            crawl_type: Set(CrawlType::Normal),
+            domain: Set("example.com".to_string()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            url: Set("https://example.com/redirect".to_string()),
+            ..Default::default()
+        };
+        let task = model.save(&db).await
+            .expect("saved");
+
+        let res = super::update_or_remove_task(&db, task.id.unwrap(), "https://example.com").await
+            .expect("success");
+
+        let all_tasks = crawl_queue::Entity::find()
+            .all(&db)
+            .await
+            .expect("success");
+
+        // Should update the task URL, delete the duplicate, and return the first model
+        assert_eq!(res.url, "https://example.com");
+        assert_eq!(res.id, first.id.unwrap());
+        assert_eq!(1, all_tasks.len());
     }
 }
