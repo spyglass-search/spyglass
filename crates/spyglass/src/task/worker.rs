@@ -55,8 +55,9 @@ pub async fn handle_bootstrap(
 #[derive(Debug, Eq, PartialEq)]
 pub enum FetchResult {
     New,
-    Error,
+    Error(CrawlError),
     Ignore,
+    NotFound,
     Updated,
 }
 
@@ -64,20 +65,35 @@ pub async fn process_crawl(
     state: &AppState,
     task_id: i64,
     crawl_result: &CrawlResult,
-) -> FetchResult {
+) -> anyhow::Result<FetchResult, CrawlError> {
     // Update job status
-    let task = match crawl_queue::mark_done(
-        &state.db,
-        task_id,
-        crawl_queue::CrawlStatus::Completed,
-        Some(TaskData::new(&crawl_result.tags)),
-    )
-    .await
-    {
-        Some(task) => task,
-        // Task removed while being processed?
-        None => return FetchResult::Error,
-    };
+    let mut task =
+        match crawl_queue::mark_done(&state.db, task_id, Some(TaskData::new(&crawl_result.tags)))
+            .await
+        {
+            Some(task) => task,
+            // Task removed while being processed?
+            None => return Err(CrawlError::Other("task no longer exists".to_owned())),
+        };
+
+    // Update URL in crawl_task to match the canonical URL extracted in the crawl result.
+    if task.url != crawl_result.url {
+        log::debug!("Updating task URL {} -> {}", task.url, crawl_result.url);
+        task = match crawl_queue::update_or_remove_task(&state.db, task.id, &crawl_result.url).await
+        {
+            Ok(updated) => {
+                if updated.id != task.id {
+                    log::debug!("Removed {}, duplicate canonical URL found", task.id);
+                }
+
+                updated
+            }
+            Err(err) => {
+                log::error!("Unable to update task URL: {}", err);
+                task
+            }
+        }
+    }
 
     // Add all valid, non-duplicate, non-indexed links found to crawl queue
     let to_enqueue: Vec<String> = crawl_result.links.clone().into_iter().collect();
@@ -107,7 +123,10 @@ pub async fn process_crawl(
     if let Some(content) = crawl_result.content.clone() {
         let url = Url::parse(&crawl_result.url);
         if url.is_err() {
-            return FetchResult::Error;
+            return Err(CrawlError::FetchError(format!(
+                "Invalid url: {}",
+                &crawl_result.url
+            )));
         }
 
         let url = url.expect("Invalid crawl URL");
@@ -143,13 +162,16 @@ pub async fn process_crawl(
                 ) {
                     Ok(new_doc_id) => new_doc_id,
                     Err(err) => {
-                        log::error!("Unable to save document, {}", err);
-                        return FetchResult::Error;
+                        return Err(CrawlError::Other(format!(
+                            "Unable to save document: {}",
+                            err
+                        )));
                     }
                 }
             } else {
-                log::error!("Unable to save document, writer lock.");
-                return FetchResult::Error;
+                return Err(CrawlError::Other(
+                    "Unable to save document, writer lock.".to_owned(),
+                ));
             }
         };
 
@@ -176,19 +198,16 @@ pub async fn process_crawl(
                 let task_data = task.data.unwrap_or_default();
                 let _ = doc.insert_tags(&state.db, &task_data.tags).await;
                 if is_update {
-                    FetchResult::Updated
+                    Ok(FetchResult::Updated)
                 } else {
-                    FetchResult::New
+                    Ok(FetchResult::New)
                 }
             }
-            Err(e) => {
-                log::error!("Unable to save document: {}", e);
-                FetchResult::Error
-            }
+            Err(e) => Err(CrawlError::Other(format!("Unable to save document: {}", e))),
         };
     }
 
-    FetchResult::Ignore
+    Err(CrawlError::ParseError("No content found".to_string()))
 }
 
 #[tracing::instrument(skip(state))]
@@ -197,35 +216,77 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
     let result = crawler.fetch_by_job(&state, task.id, true).await;
 
     match result {
-        Ok(crawl_result) => process_crawl(&state, task.id, &crawl_result).await,
+        Ok(crawl_result) => match process_crawl(&state, task.id, &crawl_result).await {
+            Ok(res) => {
+                log::debug!("Crawled task id: {} - {:?}", task.id, res);
+                res
+            }
+            Err(err) => {
+                log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
+                FetchResult::Error(err)
+            }
+        },
         Err(err) => {
-            log::info!("Unable to crawl id: {} - {:?}", task.id, err);
+            log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
             match err {
                 // Ignore skips, recently fetched crawls, or not found
-                CrawlError::Denied(_) | CrawlError::RecentlyFetched | CrawlError::NotFound => {
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Completed,
-                        None,
-                    )
-                    .await;
+                CrawlError::Denied(_) | CrawlError::RecentlyFetched => {
+                    let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
                     FetchResult::Ignore
                 }
-                _ => {
+                CrawlError::NotFound => {
+                    let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
+                    FetchResult::NotFound
+                }
+                // Retry timeouts, might be a network issue
+                CrawlError::Timeout => {
+                    log::info!("Retrying task {} if possible", task.id);
+                    crawl_queue::mark_failed(&state.db, task.id, true).await;
+                    FetchResult::Error(err.clone())
+                }
+                // No need to retry these, mark as failed.
+                CrawlError::FetchError(_)
+                | CrawlError::ParseError(_)
+                | CrawlError::Unsupported(_)
+                | CrawlError::Other(_) => {
                     // mark crawl as failed
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Failed,
-                        None,
-                    )
-                    .await;
-                    FetchResult::Error
+                    crawl_queue::mark_failed(&state.db, task.id, false).await;
+                    FetchResult::Error(err.clone())
                 }
             }
         }
     }
+}
+
+#[tracing::instrument(skip(state))]
+pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<(), DbErr> {
+    let task = crawl_queue::Entity::find_by_id(task_id)
+        .one(&state.db)
+        .await?;
+
+    if let Some(task) = task {
+        // Delete any documents that match this task.
+        let docs = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.eq(task.url.clone()))
+            .all(&state.db)
+            .await?;
+
+        // Grab doc ids to remove from index
+        let doc_ids = docs
+            .iter()
+            .map(|x| x.doc_id.to_string())
+            .collect::<Vec<String>>();
+
+        // Remove doc references from DB & from index
+        for doc_id in doc_ids {
+            let _ = Searcher::delete_by_id(&state, &doc_id).await;
+        }
+
+        // Finally delete this crawl task as well.
+        task.delete(&state.db).await?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -283,7 +344,9 @@ mod test {
         };
 
         // Should consider this a new FetchResult
-        let result = process_crawl(&state, task.id, &crawl_result).await;
+        let result = process_crawl(&state, task.id, &crawl_result)
+            .await
+            .expect("success");
         assert_eq!(result, FetchResult::New);
 
         // Should update the task status
@@ -341,7 +404,9 @@ mod test {
             ..Default::default()
         };
 
-        let result = process_crawl(&state, task.id, &crawl_result).await;
+        let result = process_crawl(&state, task.id, &crawl_result)
+            .await
+            .expect("success");
         assert_eq!(result, FetchResult::Updated);
 
         // Should still only have one indexed doc
@@ -383,7 +448,9 @@ mod test {
         };
 
         // Should consider this a new FetchResult
-        let result = process_crawl(&state, task.id, &crawl_result).await;
+        let result = process_crawl(&state, task.id, &crawl_result)
+            .await
+            .expect("success");
         assert_eq!(result, FetchResult::New);
 
         // Should update the task status
@@ -459,7 +526,9 @@ mod test {
             ..Default::default()
         };
 
-        let result = process_crawl(&state, task.id, &crawl_result).await;
+        let result = process_crawl(&state, task.id, &crawl_result)
+            .await
+            .expect("success");
         assert_eq!(result, FetchResult::Updated);
 
         // Should still only have one indexed doc

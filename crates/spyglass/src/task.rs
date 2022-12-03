@@ -19,7 +19,7 @@ pub struct CrawlTask {
     pub id: i64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CollectTask {
     // Pull URLs from a CDX server
     Bootstrap {
@@ -42,15 +42,19 @@ pub enum ManagerCommand {
 }
 
 /// Send tasks to the worker
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WorkerCommand {
+    /// Enqueues the URLs needed to start crawl.
     Collect(CollectTask),
-    // Commit any changes that have been made to the index.
+    /// Commit any changes that have been made to the index.
     CommitIndex,
-    // Fetch, parses, & indexes a URI
-    // TODO: Split this up so that this work can be spread out.
+    /// Fetch, parses, & indexes a URI
+    /// TODO: Split this up so that this work can be spread out.
     Crawl { id: i64 },
-    // Applies tag information to an URI
+    /// Refetches, parses, & indexes a URI
+    /// If the URI no longer exists (file moved, 404 etc), delete from index.
+    Recrawl { id: i64 },
+    /// Applies tag information to an URI
     Tag,
 }
 
@@ -223,6 +227,23 @@ pub async fn worker_task(
                                 match fetch_result {
                                     FetchResult::New | FetchResult::Updated => updated_docs += 1,
                                     _ => {}
+                                }
+                            }
+                        }
+                        WorkerCommand::Recrawl { id } => {
+                            if let Ok(fetch_result) = tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                            {
+                                match fetch_result {
+                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                                    FetchResult::NotFound => {
+                                        // URL no longer exists, delete from index.
+                                        log::debug!("URI not found, deleting from index");
+                                        let _ = tokio::spawn(worker::handle_deletion(state.clone(), id)).await;
+                                    }
+                                    FetchResult::Error(err) => {
+                                        log::warn!("Unable to recrawl {} - {}", id, err);
+                                    },
+                                    FetchResult::Ignore => {}
                                 }
                             }
                         }

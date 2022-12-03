@@ -1,3 +1,4 @@
+WITH
 indexed AS (
     SELECT
         domain,
@@ -16,8 +17,6 @@ inflight AS (
 SELECT
     cq.*
 FROM crawl_queue cq
-LEFT JOIN p_domain ON cq.domain like p_domain.domain
-LEFT JOIN p_prefix ON cq.url like p_prefix.prefix
 LEFT JOIN indexed ON indexed.domain = cq.domain
 LEFT JOIN inflight ON inflight.domain = cq.domain
 WHERE
@@ -25,6 +24,4 @@ WHERE
     COALESCE(inflight.count, 0) < ? AND
     status = "Queued"
 ORDER BY
-    p_prefix.priority DESC,
-    p_domain.priority DESC,
     cq.updated_at ASC
