@@ -57,6 +57,7 @@ pub enum FetchResult {
     New,
     Error(CrawlError),
     Ignore,
+    NotFound,
     Updated,
 }
 
@@ -229,9 +230,13 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
             match err {
                 // Ignore skips, recently fetched crawls, or not found
-                CrawlError::Denied(_) | CrawlError::RecentlyFetched | CrawlError::NotFound => {
+                CrawlError::Denied(_) | CrawlError::RecentlyFetched => {
                     let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
                     FetchResult::Ignore
+                }
+                CrawlError::NotFound => {
+                    let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
+                    FetchResult::NotFound
                 }
                 // Retry timeouts, might be a network issue
                 CrawlError::Timeout => {
@@ -251,6 +256,37 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             }
         }
     }
+}
+
+#[tracing::instrument(skip(state))]
+pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<(), DbErr> {
+    let task = crawl_queue::Entity::find_by_id(task_id)
+        .one(&state.db)
+        .await?;
+
+    if let Some(task) = task {
+        // Delete any documents that match this task.
+        let docs = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.eq(task.url.clone()))
+            .all(&state.db)
+            .await?;
+
+        // Grab doc ids to remove from index
+        let doc_ids = docs
+            .iter()
+            .map(|x| x.doc_id.to_string())
+            .collect::<Vec<String>>();
+
+        // Remove doc references from DB & from index
+        for doc_id in doc_ids {
+            let _ = Searcher::delete_by_id(&state, &doc_id).await;
+        }
+
+        // Finally delete this crawl task as well.
+        task.delete(&state.db).await?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

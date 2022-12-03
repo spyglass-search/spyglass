@@ -360,7 +360,10 @@ impl Crawler {
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
         // Attempt to convert from the URL to a file path
-        let file_path = url.to_file_path().expect("Invalid file URL");
+        let file_path = match url.to_file_path() {
+            Ok(path) => path,
+            Err(_) => return Err(CrawlError::NotFound),
+        };
 
         let path = Path::new(&file_path);
         // Is this a file and does this exist?

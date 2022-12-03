@@ -235,7 +235,15 @@ pub async fn worker_task(
                             {
                                 match fetch_result {
                                     FetchResult::New | FetchResult::Updated => updated_docs += 1,
-                                    _ => {}
+                                    FetchResult::NotFound => {
+                                        // URL no longer exists, delete from index.
+                                        log::debug!("URI not found, deleting from index");
+                                        let _ = tokio::spawn(worker::handle_deletion(state.clone(), id)).await;
+                                    }
+                                    FetchResult::Error(err) => {
+                                        log::warn!("Unable to recrawl {} - {}", id, err);
+                                    },
+                                    FetchResult::Ignore => {}
                                 }
                             }
                         }

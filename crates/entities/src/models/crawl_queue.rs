@@ -323,7 +323,7 @@ pub async fn dequeue_recrawl(
     // TODO: Right now only recrawl local files.
     let task = Entity::find()
         .filter(Column::Status.eq(CrawlStatus::Completed))
-        .filter(Column::Domain.eq("localhost"))
+        .filter(Column::Url.starts_with("file://"))
         .order_by_asc(Column::UpdatedAt)
         .one(db)
         .await?;
