@@ -78,18 +78,19 @@ pub async fn process_crawl(
     // Update URL in crawl_task to match the canonical URL extracted in the crawl result.
     if task.url != crawl_result.url {
         log::debug!("Updating task URL {} -> {}", task.url, crawl_result.url);
-        task = match crawl_queue::update_or_remove_task(&state.db, task.id, &crawl_result.url).await {
+        task = match crawl_queue::update_or_remove_task(&state.db, task.id, &crawl_result.url).await
+        {
             Ok(updated) => {
                 if updated.id != task.id {
                     log::debug!("Removed {}, duplicate canonical URL found", task.id);
                 }
 
                 updated
-            },
+            }
             Err(err) => {
                 log::error!("Unable to update task URL: {}", err);
                 task
-            },
+            }
         }
     }
 
@@ -218,11 +219,11 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             Ok(res) => {
                 log::debug!("Crawled task id: {} - {:?}", task.id, res);
                 res
-            },
+            }
             Err(err) => {
                 log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
                 FetchResult::Error(err)
-            },
+            }
         },
         Err(err) => {
             log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
