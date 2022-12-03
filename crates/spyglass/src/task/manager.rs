@@ -108,8 +108,8 @@ mod test {
         // Insert dummy job
         let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
         let task = crawl_queue::ActiveModel {
-            url: Set("https://example.com".to_owned()),
-            domain: Set("example.com".to_owned()),
+            url: Set("file:///tmp/test.txt".to_owned()),
+            domain: Set("localhost".to_owned()),
             crawl_type: Set(CrawlType::Normal),
             status: Set(CrawlStatus::Completed),
             created_at: Set(one_day_ago.clone()),
@@ -120,8 +120,8 @@ mod test {
 
         let two_day_ago = chrono::Utc::now() - chrono::Duration::days(2);
         let task = crawl_queue::ActiveModel {
-            url: Set("https://example.com/this_one".to_owned()),
-            domain: Set("example.com".to_owned()),
+            url: Set("file:///tmp/this_one.txt".to_owned()),
+            domain: Set("localhost".to_owned()),
             crawl_type: Set(CrawlType::Normal),
             status: Set(CrawlStatus::Completed),
             created_at: Set(two_day_ago.clone()),

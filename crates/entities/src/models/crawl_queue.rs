@@ -954,12 +954,12 @@ mod test {
     async fn test_dequeue_recrawl() {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
-        let url = "https://oldschool.runescape.wiki/";
+        let url = "file:///tmp/test.txt";
 
         let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
         let model = crawl_queue::ActiveModel {
             crawl_type: Set(CrawlType::Normal),
-            domain: Set("oldschool.runescape.wiki".to_string()),
+            domain: Set("localhost".to_string()),
             status: Set(crawl_queue::CrawlStatus::Completed),
             url: Set(url.to_string()),
             created_at: Set(one_day_ago.clone()),
