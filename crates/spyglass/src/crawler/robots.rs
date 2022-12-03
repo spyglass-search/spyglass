@@ -106,7 +106,7 @@ pub async fn check_resource_rules(db: &DatabaseConnection, client: &HTTPClient, 
         .await
         .expect("Unable to add resource rules");
 
-    if rules.is_empty() {
+    if rules.is_empty() && domain != "localhost" {
         log::info!("No rules found for <{}>, fetching robot.txt", domain);
         let mut robots_url = url.clone();
         robots_url.set_path("/robots.txt");
