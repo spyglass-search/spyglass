@@ -309,8 +309,10 @@ impl Crawler {
         };
 
         log::debug!("handling job: {}", crawl.url);
-
-        let url = Url::parse(&crawl.url).expect("Invalid fetch URL");
+        let url = match Url::parse(&crawl.url) {
+            Ok(url) => url,
+            Err(_) => return Err(CrawlError::NotFound),
+        };
 
         // Have we crawled this recently?
         if let Ok(Some(history)) = fetch_history::find_by_url(&state.db, &url).await {
