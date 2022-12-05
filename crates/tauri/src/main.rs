@@ -206,19 +206,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             Ok(())
         })
-        .on_window_event(|_event| {
-            #[cfg(target_os = "macos")]
-            {
-                let window = _event.window();
-                if window.label() == constants::SEARCH_WIN_NAME {
-                    if let tauri::WindowEvent::Focused(is_focused) = _event.event() {
-                        if !is_focused {
-                            window::hide_search_bar(window);
-                        }
-                    }
-                }
-            }
-        })
         .on_system_tray_event(move |app, event| {
             match event {
                 // Only occurs on Windows.
