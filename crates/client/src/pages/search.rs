@@ -129,7 +129,7 @@ impl Component for SearchPage {
         // Listen to onblur events so we can hide the search bar
         if let Some(wind) = window() {
             let link_clone = link.clone();
-            let on_blur = EventListener::new(&wind, "blur", move |_event| {
+            let on_blur = EventListener::new(&wind, "blur", move |_| {
                 link_clone.send_message(Msg::Blur);
             });
 

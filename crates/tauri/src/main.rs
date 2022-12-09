@@ -153,6 +153,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
+            let default_height = if cfg!(target_os = "windows") {
+                98.0
+            } else {
+                96.0
+            };
+
             let window = WindowBuilder::new(
                 app,
                 constants::SEARCH_WIN_NAME,
@@ -161,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .decorations(false)
                 .transparent(true)
                 .disable_file_drop_handler()
-                .inner_size(640.0, 96.0)
+                .inner_size(640.0, default_height)
                 .build()
                 .expect("Unable to create searchbar window");
             // Center on launch.
