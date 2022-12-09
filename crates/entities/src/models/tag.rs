@@ -1,5 +1,5 @@
-use sea_orm::entity::prelude::*;
 use sea_orm::Set;
+use sea_orm::{entity::prelude::*, ConnectionTrait};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
@@ -98,11 +98,10 @@ impl Related<super::indexed_document::Entity> for Entity {
     }
 }
 
-pub async fn get_or_create(
-    db: &DatabaseConnection,
-    label: TagType,
-    value: &str,
-) -> Result<Model, DbErr> {
+pub async fn get_or_create<C>(db: &C, label: TagType, value: &str) -> Result<Model, DbErr>
+where
+    C: ConnectionTrait,
+{
     let tag = ActiveModel {
         label: Set(label.clone()),
         value: Set(value.to_string()),

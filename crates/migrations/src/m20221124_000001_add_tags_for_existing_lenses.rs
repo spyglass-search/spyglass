@@ -1,14 +1,18 @@
 use entities::{
     models::{
         crawl_queue::{self, TaskData},
-        indexed_document,
+        document_tag, indexed_document,
         lens::{self, LensType},
-        tag::TagType,
+        tag::{get_or_create, TagType},
     },
-    sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set},
+    sea_orm::{
+        ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set,
+        TransactionTrait,
+    },
 };
 use sea_orm_migration::prelude::*;
 use shared::config::{Config, LensConfig};
+use std::time::Instant;
 
 pub struct Migration;
 
@@ -18,49 +22,75 @@ impl MigrationName for Migration {
     }
 }
 
-async fn add_tags_for_url(db: &DatabaseConnection, name: &str, url: &str) -> Result<(), DbErr> {
+async fn add_tags_for_url<C>(tx: &C, name: &str, url: &str) -> Result<(), DbErr>
+where
+    C: ConnectionTrait,
+{
     // Ignore http/https when querying database
     let url = url
         .trim_start_matches("http://")
         .trim_start_matches("https://");
 
-    // apply lens tag to existing & new urls
-    let tag = vec![(TagType::Lens, name.to_owned())];
-    let existing_tasks = crawl_queue::Entity::find()
-        .filter(crawl_queue::Column::Url.contains(url))
-        .all(db)
-        .await?;
-
     // Update existing tasks
+    let start_time = Instant::now();
+    let tag = vec![(TagType::Lens, name.to_owned())];
     let data = TaskData::new(&tag);
-    let count = existing_tasks.len();
-    for task in existing_tasks {
-        let mut active: crawl_queue::ActiveModel = task.clone().into();
-        if let Some(old) = task.data {
-            active.data = Set(Some(data.merge(&old)));
-        } else {
-            active.data = Set(Some(data.clone()));
-        }
-        active.save(db).await?;
-    }
-    log::info!("{}: tagged {} tasks", name, count);
+    crawl_queue::Entity::update_many()
+        .col_expr(crawl_queue::Column::Data, Expr::value(data))
+        .filter(crawl_queue::Column::Url.contains(url))
+        .exec(tx)
+        .await?;
+    let time_taken = Instant::now() - start_time;
+    log::info!("{}: tagged tasks in {}ms", name, time_taken.as_millis());
 
     // Update existing documents
+    let start_time = Instant::now();
     let existing_docs = indexed_document::Entity::find()
         .filter(indexed_document::Column::Url.contains(url))
-        .all(db)
+        .all(tx)
         .await?;
-    let count = existing_docs.len();
-    for doc in existing_docs {
-        let model: indexed_document::ActiveModel = doc.into();
-        model.insert_tags(db, &tag).await?;
+
+    let tag = get_or_create(tx, TagType::Lens, name).await?;
+    // create connections for each tag
+    let doc_tags = existing_docs
+        .iter()
+        .map(|doc| document_tag::ActiveModel {
+            indexed_document_id: Set(doc.id),
+            tag_id: Set(tag.id),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
+        })
+        .collect::<Vec<document_tag::ActiveModel>>();
+
+    // Insert connections, ignoring duplicates
+    for chunk in doc_tags.chunks(5000) {
+        document_tag::Entity::insert_many(chunk.to_vec())
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![
+                    document_tag::Column::IndexedDocumentId,
+                    document_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec(tx)
+            .await?;
     }
-    log::info!("{}: tagged {} docs", name, count);
+
+    let count = existing_docs.len();
+    let time_taken = Instant::now() - start_time;
+    log::info!(
+        "{}: tagged {} docs in {}ms",
+        name,
+        count,
+        time_taken.as_millis()
+    );
 
     Ok(())
 }
 
-async fn add_tags_for_lens(db: &DatabaseConnection, conf: &LensConfig) {
+async fn add_tags_for_lens(db: &DatabaseTransaction, conf: &LensConfig) {
     // Tag domains
     for domain in &conf.domains {
         if let Err(err) = add_tags_for_url(db, &conf.name, domain).await {
@@ -103,7 +133,11 @@ impl MigrationTrait for Migration {
             let lens_path = lens_dir.join(format!("{}.ron", lens.name));
             if lens_path.exists() {
                 match LensConfig::from_path(lens_path) {
-                    Ok(lens_config) => add_tags_for_lens(db, &lens_config).await,
+                    Ok(lens_config) => {
+                        let txn = db.begin().await?;
+                        add_tags_for_lens(&txn, &lens_config).await;
+                        txn.commit().await?;
+                    }
                     Err(err) => log::error!("Unable to read lens: {}", err),
                 }
             }
