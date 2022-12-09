@@ -35,13 +35,13 @@ where
     let start_time = Instant::now();
     let tag = vec![(TagType::Lens, name.to_owned())];
     let data = TaskData::new(&tag);
-    crawl_queue::Entity::update_many()
+    let res = crawl_queue::Entity::update_many()
         .col_expr(crawl_queue::Column::Data, Expr::value(data))
         .filter(crawl_queue::Column::Url.contains(url))
         .exec(tx)
         .await?;
     let time_taken = Instant::now() - start_time;
-    log::info!("{}: tagged tasks in {}ms", name, time_taken.as_millis());
+    log::info!("{}: tagged {} tasks in {}ms", name, res.rows_affected, time_taken.as_millis());
 
     // Update existing documents
     let start_time = Instant::now();
