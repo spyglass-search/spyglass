@@ -9,6 +9,7 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
+chrono = { version = "0.4", features = ["serde"] }
 entities = { path = "../entities" }
 log = "0.4"
 rayon = "1.5"

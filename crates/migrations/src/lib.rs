@@ -20,7 +20,7 @@ mod m20221118_000001_fix_queued_enum;
 mod m20221121_000001_add_data_to_crawl_queue;
 mod m20221123_000001_add_document_tag_constraint;
 mod m20221124_000001_add_tags_for_existing_lenses;
-
+mod m20221210_000001_add_crawl_tags_table;
 mod utils;
 
 pub struct Migrator;
@@ -46,6 +46,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20221121_000001_add_data_to_crawl_queue::Migration),
             Box::new(m20221123_000001_add_document_tag_constraint::Migration),
             Box::new(m20221124_000001_add_tags_for_existing_lenses::Migration),
+            Box::new(m20221210_000001_add_crawl_tags_table::Migration),
         ]
     }
 }

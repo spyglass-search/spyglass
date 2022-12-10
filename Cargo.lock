@@ -3218,6 +3218,7 @@ dependencies = [
 name = "migration"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "entities",
  "log",
  "rayon",

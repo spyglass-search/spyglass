@@ -1,9 +1,9 @@
-use sea_orm::entity::prelude::*;
 use sea_orm::Set;
+use sea_orm::{entity::prelude::*, ConnectionTrait};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
-use super::indexed_document;
+use super::{crawl_queue, indexed_document};
 
 pub type TagPair = (TagType, String);
 
@@ -62,12 +62,14 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter)]
 pub enum Relation {
+    CrawlQueue,
     IndexedDocument,
 }
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
+            Self::CrawlQueue => Entity::has_many(crawl_queue::Entity).into(),
             Self::IndexedDocument => Entity::has_many(indexed_document::Entity).into(),
         }
     }
@@ -87,6 +89,17 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
+impl Related<super::crawl_queue::Entity> for Entity {
+    // The final relation is IndexedDocument -> DocumentTag -> Tag
+    fn to() -> RelationDef {
+        super::crawl_tag::Relation::Tag.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::crawl_tag::Relation::Tag.def().rev())
+    }
+}
+
 impl Related<super::indexed_document::Entity> for Entity {
     // The final relation is IndexedDocument -> DocumentTag -> Tag
     fn to() -> RelationDef {
@@ -98,11 +111,10 @@ impl Related<super::indexed_document::Entity> for Entity {
     }
 }
 
-pub async fn get_or_create(
-    db: &DatabaseConnection,
-    label: TagType,
-    value: &str,
-) -> Result<Model, DbErr> {
+pub async fn get_or_create<C>(db: &C, label: TagType, value: &str) -> Result<Model, DbErr>
+where
+    C: ConnectionTrait,
+{
     let tag = ActiveModel {
         label: Set(label.clone()),
         value: Set(value.to_string()),

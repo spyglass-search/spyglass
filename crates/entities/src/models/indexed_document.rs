@@ -1,6 +1,6 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{FromQueryResult, InsertResult, QuerySelect, Set};
+use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
 
 use super::tag::{get_or_create, TagPair};
 
@@ -67,9 +67,9 @@ impl ActiveModelBehavior for ActiveModel {
 }
 
 impl ActiveModel {
-    pub async fn insert_tags(
+    pub async fn insert_tags<C: ConnectionTrait>(
         &self,
-        db: &DatabaseConnection,
+        db: &C,
         tags: &[TagPair],
     ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
         let mut tag_models: Vec<tag::Model> = Vec::new();

@@ -1,7 +1,6 @@
 use url::Url;
 
-use entities::models::crawl_queue::TaskData;
-use entities::models::{bootstrap_queue, crawl_queue, indexed_document};
+use entities::models::{bootstrap_queue, crawl_queue, indexed_document, tag};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::LensConfig;
@@ -68,9 +67,7 @@ pub async fn process_crawl(
 ) -> anyhow::Result<FetchResult, CrawlError> {
     // Update job status
     let mut task =
-        match crawl_queue::mark_done(&state.db, task_id, Some(TaskData::new(&crawl_result.tags)))
-            .await
-        {
+        match crawl_queue::mark_done(&state.db, task_id, Some(crawl_result.tags.clone())).await {
             Some(task) => task,
             // Task removed while being processed?
             None => return Err(CrawlError::Other("task no longer exists".to_owned())),
@@ -195,8 +192,18 @@ pub async fn process_crawl(
         return match indexed.save(&state.db).await {
             Ok(doc) => {
                 // attach tags to document once we're all done.
-                let task_data = task.data.unwrap_or_default();
-                let _ = doc.insert_tags(&state.db, &task_data.tags).await;
+                let task_tags = task
+                    .find_related(tag::Entity)
+                    .all(&state.db)
+                    .await
+                    .unwrap_or_default();
+
+                let tag_pairs: Vec<tag::TagPair> = task_tags
+                    .iter()
+                    .map(|tag| (tag.label.to_owned(), tag.value.to_string()))
+                    .collect();
+
+                let _ = doc.insert_tags(&state.db, &tag_pairs).await;
                 if is_update {
                     Ok(FetchResult::Updated)
                 } else {
@@ -293,7 +300,7 @@ pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<()
 mod test {
     use crate::crawler::CrawlResult;
     use crate::search::IndexPath;
-    use entities::models::crawl_queue::{self, CrawlStatus, CrawlType, TaskData};
+    use entities::models::crawl_queue::{self, CrawlStatus, CrawlType};
     use entities::models::tag::{self, TagType};
     use entities::models::{bootstrap_queue, indexed_document};
     use entities::sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, Set};
@@ -432,13 +439,12 @@ mod test {
             url: Set("https://example.com/test".to_owned()),
             status: Set(CrawlStatus::Processing),
             crawl_type: Set(CrawlType::Normal),
-            data: Set(Some(TaskData::new(&vec![(
-                TagType::Source,
-                "web".to_string(),
-            )]))),
             ..Default::default()
         };
-        let task = model.insert(&db).await.expect("Unable to save model");
+        let task = model.save(&db).await.expect("Unable to save model");
+        let _ = task
+            .insert_tags(&db, &vec![(TagType::Source, "web".to_string())])
+            .await;
 
         let crawl_result = CrawlResult {
             content: Some("fake content".to_owned()),
@@ -448,13 +454,14 @@ mod test {
         };
 
         // Should consider this a new FetchResult
-        let result = process_crawl(&state, task.id, &crawl_result)
+        let task_id = task.id.unwrap();
+        let result = process_crawl(&state, task_id, &crawl_result)
             .await
             .expect("success");
         assert_eq!(result, FetchResult::New);
 
         // Should update the task status
-        let task = crawl_queue::Entity::find_by_id(task.id)
+        let task = crawl_queue::Entity::find_by_id(task_id)
             .one(&db)
             .await
             .expect("Unable to query crawl task");
@@ -497,15 +504,21 @@ mod test {
             url: Set("https://example.com/test".to_owned()),
             status: Set(CrawlStatus::Processing),
             crawl_type: Set(CrawlType::Normal),
-            data: Set(Some(TaskData::new(&vec![
-                (TagType::Source, "web".to_owned()),
-                (TagType::Lens, "lens".to_owned()),
-            ]))),
             ..Default::default()
         }
         .insert(&db)
         .await
         .expect("Unable to save model");
+        let model: crawl_queue::ActiveModel = task.clone().into();
+        let _ = model
+            .insert_tags(
+                &db,
+                &vec![
+                    (TagType::Source, "web".to_owned()),
+                    (TagType::Lens, "lens".to_owned()),
+                ],
+            )
+            .await;
 
         let doc = indexed_document::ActiveModel {
             domain: Set(task.domain),
@@ -554,6 +567,11 @@ mod test {
             .await
             .expect("find one");
         let task = task.expect("should have task");
-        assert_eq!(task.data.expect("should have data").tags.len(), 3);
+        let task_tags = task
+            .find_related(tag::Entity)
+            .all(&db)
+            .await
+            .unwrap_or_default();
+        assert_eq!(task_tags.len(), 3);
     }
 }

@@ -272,6 +272,7 @@ pub async fn lens_watcher(
     mut pause_rx: broadcast::Receiver<AppPause>,
 ) {
     log::info!("👀 lens watcher started");
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     let mut is_paused = false;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
@@ -292,7 +293,6 @@ pub async fn lens_watcher(
     // Read + load lenses for the first time.
     let _ = read_lenses(&state, &config).await;
     load_lenses(state.clone()).await;
-    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
         // Run w/ a select on the shutdown signal otherwise we're stuck in an
