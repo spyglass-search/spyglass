@@ -1,12 +1,12 @@
 use entities::{
     models::{
-        document_tag, indexed_document,
+        crawl_queue, crawl_tag,
         lens::{self, LensType},
         tag::{get_or_create, TagType},
     },
     sea_orm::{
         ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set,
-        TransactionTrait,
+        Statement, TransactionTrait,
     },
 };
 use sea_orm_migration::prelude::*;
@@ -17,7 +17,7 @@ pub struct Migration;
 
 impl MigrationName for Migration {
     fn name(&self) -> &str {
-        "m20221124_000001_add_tags_for_existing_lenses"
+        "m20221210_000001_add_crawl_tags_table"
     }
 }
 
@@ -30,33 +30,33 @@ where
         .trim_start_matches("http://")
         .trim_start_matches("https://");
 
-    // Update existing documents
+    // Update existing tasks
     let start_time = Instant::now();
-    let existing_docs = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.contains(url))
+    let existing_tasks = crawl_queue::Entity::find()
+        .filter(crawl_queue::Column::Url.contains(url))
         .all(tx)
         .await?;
 
     let tag = get_or_create(tx, TagType::Lens, name).await?;
     // create connections for each tag
-    let doc_tags = existing_docs
+    let task_tags = existing_tasks
         .iter()
-        .map(|doc| document_tag::ActiveModel {
-            indexed_document_id: Set(doc.id),
+        .map(|task| crawl_tag::ActiveModel {
+            crawl_queue_id: Set(task.id),
             tag_id: Set(tag.id),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
             ..Default::default()
         })
-        .collect::<Vec<document_tag::ActiveModel>>();
+        .collect::<Vec<crawl_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates
-    for chunk in doc_tags.chunks(5000) {
-        document_tag::Entity::insert_many(chunk.to_vec())
+    for chunk in task_tags.chunks(5000) {
+        crawl_tag::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 sea_orm::sea_query::OnConflict::columns(vec![
-                    document_tag::Column::IndexedDocumentId,
-                    document_tag::Column::TagId,
+                    crawl_tag::Column::CrawlQueueId,
+                    crawl_tag::Column::TagId,
                 ])
                 .do_nothing()
                 .to_owned(),
@@ -65,10 +65,10 @@ where
             .await?;
     }
 
-    let count = existing_docs.len();
+    let count = existing_tasks.len();
     let time_taken = Instant::now() - start_time;
     log::info!(
-        "{}: tagged {} docs in {}ms",
+        "{}: tagged {} tasks in {}ms",
         name,
         count,
         time_taken.as_millis()
@@ -102,6 +102,33 @@ async fn add_tags_for_lens(db: &DatabaseTransaction, conf: &LensConfig) {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Add crawl_tag table & idx
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                r#"CREATE TABLE IF NOT EXISTS "crawl_tag" (
+                    "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    "crawl_queue_id" integer NOT NULL,
+                    "tag_id" integer NOT NULL,
+                    "created_at" text NOT NULL,
+                    "updated_at" text NOT NULL,
+                    FOREIGN KEY(crawl_queue_id) REFERENCES crawl_queue(id),
+                    FOREIGN KEY(tag_id)         REFERENCES tags(id)
+                );"#
+                .to_string(),
+            ))
+            .await?;
+
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                "CREATE UNIQUE INDEX `idx-crawl-tag-doc-id-tag-id` ON `crawl_tag` (`crawl_queue_id`, `tag_id`);"
+                    .to_string(),
+            ))
+            .await?;
+
         let config = Config::new();
         let db = manager.get_connection();
 

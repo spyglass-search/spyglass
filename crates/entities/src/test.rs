@@ -2,8 +2,8 @@ use sea_orm::{sea_query::Index, ConnectionTrait, DatabaseConnection, Schema};
 use shared::config::Config;
 
 use crate::models::{
-    bootstrap_queue, crawl_queue, create_connection, document_tag, fetch_history, indexed_document,
-    lens, link, resource_rule, tag,
+    bootstrap_queue, crawl_queue, crawl_tag, create_connection, document_tag, fetch_history,
+    indexed_document, lens, link, resource_rule, tag,
 };
 
 #[allow(dead_code)]
@@ -94,6 +94,15 @@ async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm::Db
 
     db.execute(
         builder.build(
+            schema
+                .create_table_from_entity(crawl_tag::Entity)
+                .if_not_exists(),
+        ),
+    )
+    .await?;
+
+    db.execute(
+        builder.build(
             &Index::create()
                 .unique()
                 .name("idx-tags-label-value")
@@ -113,6 +122,19 @@ async fn setup_schema(db: &DatabaseConnection) -> anyhow::Result<(), sea_orm::Db
                 .table(document_tag::Entity)
                 .col(document_tag::Column::IndexedDocumentId)
                 .col(document_tag::Column::TagId)
+                .to_owned(),
+        ),
+    )
+    .await?;
+
+    db.execute(
+        builder.build(
+            &Index::create()
+                .unique()
+                .name("idx-crawl-tag-doc-id-tag-id")
+                .table(crawl_tag::Entity)
+                .col(crawl_tag::Column::CrawlQueueId)
+                .col(crawl_tag::Column::TagId)
                 .to_owned(),
         ),
     )

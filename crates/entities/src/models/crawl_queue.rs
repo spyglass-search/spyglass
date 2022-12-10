@@ -4,42 +4,20 @@ use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
 use sea_orm::{
-    sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryOrder, QueryTrait, Set, Statement,
+    sea_query, ConnectionTrait, DbBackend, FromQueryResult, InsertResult, QueryOrder, QueryTrait,
+    Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use super::crawl_tag;
 use super::indexed_document;
-use super::tag::TagPair;
+use super::tag::{self, get_or_create, TagPair};
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
 const BATCH_SIZE: usize = 5_000;
-
-#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
-pub struct TaskData {
-    /// Tags applied to this
-    pub tags: Vec<TagPair>,
-}
-
-impl TaskData {
-    pub fn new(tags: &[TagPair]) -> Self {
-        Self {
-            tags: tags.to_vec(),
-        }
-    }
-
-    // Merge tags, removing duplicates.
-    pub fn merge(&self, other: &TaskData) -> Self {
-        let mut tags: HashSet<TagPair> = HashSet::from_iter(self.tags.clone().into_iter());
-        tags.extend(other.tags.clone().into_iter());
-
-        Self {
-            tags: tags.into_iter().collect(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
@@ -105,7 +83,7 @@ pub struct Model {
     /// If this failed, the reason for the failure
     pub error: Option<TaskError>,
     /// Data that we want to keep around about this task.
-    pub data: Option<TaskData>,
+    pub data: Option<String>,
     /// Number of retries for this task.
     #[sea_orm(default_value = 0)]
     pub num_retries: u8,
@@ -118,12 +96,27 @@ pub struct Model {
     pub pipeline: Option<String>,
 }
 
+impl Related<super::tag::Entity> for Entity {
+    // The final relation is IndexedDocument -> DocumentTag -> Tag
+    fn to() -> RelationDef {
+        super::crawl_tag::Relation::Tag.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::crawl_tag::Relation::CrawlQueue.def().rev())
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
+pub enum Relation {
+    Tag,
+}
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
-        panic!("No RelationDef")
+        match self {
+            Self::Tag => Entity::has_many(tag::Entity).into(),
+        }
     }
 }
 
@@ -145,6 +138,47 @@ impl ActiveModelBehavior for ActiveModel {
         }
 
         Ok(self)
+    }
+}
+
+impl ActiveModel {
+    pub async fn insert_tags<C: ConnectionTrait>(
+        &self,
+        db: &C,
+        tags: &[TagPair],
+    ) -> Result<InsertResult<crawl_tag::ActiveModel>, DbErr> {
+        let mut tag_models: Vec<tag::Model> = Vec::new();
+        for (label, value) in tags.iter() {
+            match get_or_create(db, label.to_owned(), value).await {
+                Ok(tag) => tag_models.push(tag),
+                Err(err) => log::error!("{}", err),
+            }
+        }
+
+        // create connections for each tag
+        let doc_tags = tag_models
+            .iter()
+            .map(|t| crawl_tag::ActiveModel {
+                crawl_queue_id: self.id.clone(),
+                tag_id: Set(t.id),
+                created_at: Set(chrono::Utc::now()),
+                updated_at: Set(chrono::Utc::now()),
+                ..Default::default()
+            })
+            .collect::<Vec<crawl_tag::ActiveModel>>();
+
+        // Insert connections, ignoring duplicates
+        crawl_tag::Entity::insert_many(doc_tags)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![
+                    crawl_tag::Column::CrawlQueueId,
+                    crawl_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec(db)
+            .await
     }
 }
 
@@ -528,16 +562,17 @@ pub async fn enqueue_all(
     Ok(())
 }
 
-pub async fn mark_done(db: &DatabaseConnection, id: i64, data: Option<TaskData>) -> Option<Model> {
+pub async fn mark_done(
+    db: &DatabaseConnection,
+    id: i64,
+    tags: Option<Vec<TagPair>>,
+) -> Option<Model> {
     if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = crawl.clone().into();
-        // Merge task data
-        if let Some(new) = data {
-            match crawl.data {
-                Some(old) => updated.data = Set(Some(old.merge(&new))),
-                None => updated.data = Set(Some(new)),
-            }
+        if let Some(tags) = tags {
+            let _ = updated.insert_tags(db, &tags).await;
         }
+
         updated.status = Set(CrawlStatus::Completed);
         updated.update(db).await.ok()
     } else {

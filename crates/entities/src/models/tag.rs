@@ -3,7 +3,7 @@ use sea_orm::{entity::prelude::*, ConnectionTrait};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
-use super::indexed_document;
+use super::{crawl_queue, indexed_document};
 
 pub type TagPair = (TagType, String);
 
@@ -62,12 +62,14 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter)]
 pub enum Relation {
+    CrawlQueue,
     IndexedDocument,
 }
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
+            Self::CrawlQueue => Entity::has_many(crawl_queue::Entity).into(),
             Self::IndexedDocument => Entity::has_many(indexed_document::Entity).into(),
         }
     }
@@ -84,6 +86,17 @@ impl ActiveModelBehavior for ActiveModel {
         }
 
         Ok(self)
+    }
+}
+
+impl Related<super::crawl_queue::Entity> for Entity {
+    // The final relation is IndexedDocument -> DocumentTag -> Tag
+    fn to() -> RelationDef {
+        super::crawl_tag::Relation::Tag.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::crawl_tag::Relation::Tag.def().rev())
     }
 }
 
