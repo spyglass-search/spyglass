@@ -69,19 +69,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Check and register this app to run on boot
-    if !config.user_settings.disable_autolaunch {
-        if let Ok(path) = std::env::current_exe() {
-            if let Some(path) = path.to_str() {
-                if let Ok(auto) = AutoLaunchBuilder::new()
-                    .set_app_name("com.athlabs.spyglass")
-                    .set_app_path(path)
-                    .set_use_launch_agent(true)
-                    .build()
-                {
-                    if let Err(e) = auto.enable() {
-                        log::warn!("Unable to add spyglass to startup items: {}", e);
-                    }
-                }
+    let path = std::env::current_exe().map(|path| path.to_str().map(|s| s.to_owned()));
+    if let Ok(Some(path)) = path {
+        if let Ok(auto) = AutoLaunchBuilder::new()
+            .set_app_name("com.athlabs.spyglass")
+            .set_app_path(&path)
+            .set_use_launch_agent(true)
+            .build()
+        {
+            if !config.user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
+                let _ = auto.enable();
+            } else if let Ok(true) = auto.is_enabled() {
+                let _ = auto.disable();
             }
         }
     }
