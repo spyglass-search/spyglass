@@ -186,7 +186,7 @@ impl MigrationTrait for Migration {
                     manager.get_connection()
                         .execute(Statement::from_sql_and_values(
                             manager.get_database_backend(),
-                            "UPDATE indexed_document SET domain = 'localhost', open_url = ?, url = ? AND openWHERE id = ?",
+                            "UPDATE indexed_document SET domain = 'localhost', open_url = ?, url = ? WHERE id = ?",
                             vec![id.into(), updated_url.clone().into(), updated_url.into()],
                         ))
                         .await?;
