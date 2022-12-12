@@ -62,7 +62,7 @@ setup-dev:
 # Required for plugin development
 	rustup target add wasm32-wasi
 # Install tauri-cli & trunk for client development
-	cargo install tauri-cli --locked --version ^1.1
+	cargo install --locked tauri-cli
 	cargo install --locked trunk
 # Install tailwind
 	cd ./crates/client && npm install

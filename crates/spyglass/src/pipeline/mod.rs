@@ -4,7 +4,6 @@ pub mod parser;
 
 use crate::search::lens;
 use crate::state::AppState;
-use crate::task::AppShutdown;
 use crate::task::CrawlTask;
 use entities::models::crawl_queue;
 use shared::config::Config;
@@ -12,7 +11,7 @@ use shared::config::PipelineConfiguration;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 
 // The pipeline context is a context object that is passed between
 // all stages of the pipeline. This allows later stages in the pipeline
@@ -49,10 +48,8 @@ pub async fn initialize_pipelines(
     app_state: AppState,
     config: Config,
     mut general_pipeline_queue: mpsc::Receiver<PipelineCommand>,
-    shutdown_tx: broadcast::Sender<AppShutdown>,
 ) {
-    let mut shutdown_rx = shutdown_tx.subscribe();
-
+    let mut shutdown_rx = app_state.shutdown_cmd_tx.lock().await.subscribe();
     // Yes probably should do some error handling, but not really needed. No pipelines
     // just means not tasks to send.
     let _ = lens::read_lenses(&app_state, &config).await;
@@ -84,7 +81,6 @@ pub async fn initialize_pipelines(
                 pipeline.clone(),
                 pipelines.get(&pipeline).unwrap().clone(),
                 pipeline_cmd_rx,
-                shutdown_tx.subscribe(),
             ));
         } else {
             log::error!(
@@ -140,11 +136,7 @@ pub async fn initialize_pipelines(
 // Helper function used to set any crawl failures with the status of failed.
 pub async fn fail_crawl_cmd(state: &AppState, task_uid: i64) {
     // mark crawl as failed
-    if let Err(e) =
-        crawl_queue::mark_done(&state.db, task_uid, crawl_queue::CrawlStatus::Failed).await
-    {
-        log::error!("Unable to mark task as failed: {}", e);
-    }
+    crawl_queue::mark_failed(&state.db, task_uid, false).await;
 }
 
 /// Read pipelines into the AppState

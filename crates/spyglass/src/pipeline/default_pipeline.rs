@@ -2,11 +2,11 @@ use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::task::{AppShutdown, CrawlTask};
+use crate::task::CrawlTask;
 
 use entities::models::{crawl_queue, indexed_document};
 use shared::config::{Config, LensConfig, PipelineConfiguration};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 
 use super::parser::DefaultParser;
 use super::PipelineCommand;
@@ -24,8 +24,8 @@ pub async fn pipeline_loop(
     pipeline: String,
     _pipeline_cfg: PipelineConfiguration,
     mut pipeline_queue: mpsc::Receiver<PipelineCommand>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
     log::debug!("Default Pipeline Loop Started for Pipeline: {:?}", pipeline);
 
     let collector = DefaultCollector::new();
@@ -83,12 +83,7 @@ async fn start_crawl(
                 Ok(parse_result) => {
                     let crawl_result = parse_result.content;
                     // Update job status
-                    let _ = crawl_queue::mark_done(
-                        &state.db,
-                        task.id,
-                        crawl_queue::CrawlStatus::Completed,
-                    )
-                    .await;
+                    let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
 
                     // Add all valid, non-duplicate, non-indexed links found to crawl queue
                     let to_enqueue: Vec<String> = crawl_result.links.into_iter().collect();
@@ -135,8 +130,9 @@ async fn start_crawl(
                         // Add document to index
                         let doc_id: Option<String> = {
                             if let Ok(mut index_writer) = state.index.writer.lock() {
-                                match Searcher::add_document(
+                                match Searcher::upsert_document(
                                     &mut index_writer,
+                                    existing.clone().map(|f| f.doc_id),
                                     &crawl_result.title.unwrap_or_default(),
                                     &crawl_result.description.unwrap_or_default(),
                                     url_host,
@@ -175,23 +171,14 @@ async fn start_crawl(
                 Err(err) => {
                     log::info!("Unable to crawl id: {} - {:?}", task.id, err);
                     // mark crawl as failed
-                    if let Err(e) =
-                        crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed)
-                            .await
-                    {
-                        log::error!("Unable to mark task as failed: {}", e);
-                    }
+                    crawl_queue::mark_failed(&state.db, task.id, false).await;
                 }
             }
         }
         Err(err) => {
             log::info!("Unable to crawl id: {} - {:?}", task.id, err);
             // mark crawl as failed
-            if let Err(e) =
-                crawl_queue::mark_done(&state.db, task.id, crawl_queue::CrawlStatus::Failed).await
-            {
-                log::error!("Unable to mark task as failed: {}", e);
-            }
+            crawl_queue::mark_failed(&state.db, task.id, false).await;
         }
     }
 }

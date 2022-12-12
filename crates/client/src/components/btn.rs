@@ -12,7 +12,10 @@ pub struct DeleteButtonProps {
 pub fn delete_btn(props: &DeleteButtonProps) -> Html {
     let onclick = {
         let doc_id = props.doc_id.clone();
-        Callback::from(move |_| {
+        Callback::from(move |e: MouseEvent| {
+            e.prevent_default();
+            e.stop_immediate_propagation();
+
             let doc_id = doc_id.clone();
             spawn_local(async move {
                 let _ = crate::delete_doc(doc_id.clone()).await;

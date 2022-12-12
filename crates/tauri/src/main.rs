@@ -69,19 +69,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Check and register this app to run on boot
-    if !config.user_settings.disable_autolaunch {
-        if let Ok(path) = std::env::current_exe() {
-            if let Some(path) = path.to_str() {
-                if let Ok(auto) = AutoLaunchBuilder::new()
-                    .set_app_name("com.athlabs.spyglass")
-                    .set_app_path(path)
-                    .set_use_launch_agent(true)
-                    .build()
-                {
-                    if let Err(e) = auto.enable() {
-                        log::warn!("Unable to add spyglass to startup items: {}", e);
-                    }
-                }
+    let path = std::env::current_exe().map(|path| path.to_str().map(|s| s.to_owned()));
+    if let Ok(Some(path)) = path {
+        if let Ok(auto) = AutoLaunchBuilder::new()
+            .set_app_name("com.athlabs.spyglass")
+            .set_app_path(&path)
+            .set_use_launch_agent(true)
+            .build()
+        {
+            if !config.user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
+                let _ = auto.enable();
+            } else if let Ok(true) = auto.is_enabled() {
+                let _ = auto.disable();
             }
         }
     }
@@ -153,6 +152,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
+            let default_height = if cfg!(target_os = "windows") {
+                98.0
+            } else {
+                96.0
+            };
+
             let window = WindowBuilder::new(
                 app,
                 constants::SEARCH_WIN_NAME,
@@ -161,7 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .decorations(false)
                 .transparent(true)
                 .disable_file_drop_handler()
-                .inner_size(640.0, 96.0)
+                .inner_size(640.0, default_height)
                 .build()
                 .expect("Unable to create searchbar window");
             // Center on launch.
@@ -205,19 +210,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             Ok(())
-        })
-        .on_window_event(|_event| {
-            #[cfg(target_os = "macos")]
-            {
-                let window = _event.window();
-                if window.label() == constants::SEARCH_WIN_NAME {
-                    if let tauri::WindowEvent::Focused(is_focused) = _event.event() {
-                        if !is_focused {
-                            window::hide_search_bar(window);
-                        }
-                    }
-                }
-            }
         })
         .on_system_tray_event(move |app, event| {
             match event {
@@ -264,11 +256,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("error while running tauri application");
 
     app.run(|app_handle, e| match e {
-        RunEvent::MainEventsCleared => {
+        // Only called on macos
+        RunEvent::ApplicationShouldHandleReopen {
+            has_visible_windows: _has_visible_windows,
+        } => {
             #[cfg(target_os = "macos")]
             {
                 if let Some(window) = app_handle.get_window(constants::SEARCH_WIN_NAME) {
-                    crate::platform::mac::poll_app_events(&window);
+                    match window.is_visible() {
+                        Ok(true) => window::hide_search_bar(&window),
+                        Ok(false) => window::show_search_bar(&window),
+                        _ => {}
+                    }
                 }
             }
         }

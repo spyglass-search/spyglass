@@ -1,3 +1,4 @@
+use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
 use num_format::{Buffer, Locale};
 use wasm_bindgen::{prelude::*, JsCast};
@@ -33,6 +34,7 @@ pub enum ResultDisplay {
 
 #[derive(Clone, Debug)]
 pub enum Msg {
+    Blur,
     ClearFilters,
     ClearQuery,
     ClearResults,
@@ -57,6 +59,7 @@ pub struct SearchPage {
     selected_idx: usize,
     query: String,
     query_debounce: Option<i32>,
+    blur_timeout: Option<i32>,
 }
 
 impl SearchPage {
@@ -123,6 +126,22 @@ impl Component for SearchPage {
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
 
+        // Listen to onblur events so we can hide the search bar
+        if let Some(wind) = window() {
+            let link_clone = link.clone();
+            let on_blur = EventListener::new(&wind, "blur", move |_| {
+                link_clone.send_message(Msg::Blur);
+            });
+
+            let link_clone = link.clone();
+            let on_focus = EventListener::new(&wind, "focus", move |_| {
+                link_clone.send_message(Msg::Focus);
+            });
+
+            on_blur.forget();
+            on_focus.forget();
+        }
+
         {
             // Listen to refresh search results event
             let link = link.clone();
@@ -175,6 +194,7 @@ impl Component for SearchPage {
             selected_idx: 0,
             query: String::new(),
             query_debounce: None,
+            blur_timeout: None,
         }
     }
 
@@ -207,16 +227,40 @@ impl Component for SearchPage {
                 self.request_resize();
                 true
             }
+            Msg::Blur => {
+                let link = link.clone();
+                // Handle the hide as a timeout since there's a brief moment when
+                // alt-tabbing / clicking on the task will yield a blur event & then a
+                // focus event.
+                let handle = Timeout::new(100, move || {
+                    spawn_local(async move {
+                        let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
+                        link.send_message(Msg::ClearQuery);
+                    });
+                });
+
+                self.blur_timeout = Some(handle.forget());
+                false
+            }
             Msg::Focus => {
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
                     let _ = el.focus();
                 }
                 self.request_resize();
+
+                if let Some(timeout) = self.blur_timeout {
+                    clear_timeout(timeout);
+                    self.blur_timeout = None;
+                }
+
                 true
             }
             Msg::HandleError(msg) => {
-                let window = window().expect("Unable to get window");
-                let _ = window.alert_with_message(&msg);
+                if let Some(window) = window() {
+                    let _ = window.alert_with_message(&msg);
+                } else {
+                    log::error!("{}", msg);
+                }
                 false
             }
             Msg::KeyboardEvent(e) => {

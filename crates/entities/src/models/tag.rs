@@ -1,12 +1,24 @@
-use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use serde::Serialize;
+use sea_orm::{entity::prelude::*, ConnectionTrait};
+use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
-use super::indexed_document;
+use super::{crawl_queue, indexed_document};
+
+pub type TagPair = (TagType, String);
 
 #[derive(
-    AsRefStr, Clone, Debug, DeriveActiveEnum, EnumIter, EnumString, PartialEq, Eq, Serialize,
+    AsRefStr,
+    Clone,
+    Debug,
+    DeriveActiveEnum,
+    Deserialize,
+    EnumIter,
+    EnumString,
+    Eq,
+    Hash,
+    PartialEq,
+    Serialize,
 )]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum TagType {
@@ -26,6 +38,9 @@ pub enum TagType {
     // Shared/invited to a doc/event/etc.
     #[sea_orm(string_value = "shared")]
     SharedWith,
+    // Part of this/these lens(es)
+    #[sea_orm(string_value = "lens")]
+    Lens,
 }
 
 #[derive(AsRefStr)]
@@ -47,12 +62,14 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter)]
 pub enum Relation {
+    CrawlQueue,
     IndexedDocument,
 }
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
         match self {
+            Self::CrawlQueue => Entity::has_many(crawl_queue::Entity).into(),
             Self::IndexedDocument => Entity::has_many(indexed_document::Entity).into(),
         }
     }
@@ -72,6 +89,17 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
+impl Related<super::crawl_queue::Entity> for Entity {
+    // The final relation is IndexedDocument -> DocumentTag -> Tag
+    fn to() -> RelationDef {
+        super::crawl_tag::Relation::Tag.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::crawl_tag::Relation::Tag.def().rev())
+    }
+}
+
 impl Related<super::indexed_document::Entity> for Entity {
     // The final relation is IndexedDocument -> DocumentTag -> Tag
     fn to() -> RelationDef {
@@ -83,38 +111,40 @@ impl Related<super::indexed_document::Entity> for Entity {
     }
 }
 
-pub async fn add_or_create(
-    db: &DatabaseConnection,
-    label: TagType,
-    value: &str,
-) -> Result<Model, DbErr> {
+pub async fn get_or_create<C>(db: &C, label: TagType, value: &str) -> Result<Model, DbErr>
+where
+    C: ConnectionTrait,
+{
     let tag = ActiveModel {
-        label: Set(label),
+        label: Set(label.clone()),
         value: Set(value.to_string()),
         created_at: Set(chrono::Utc::now()),
         updated_at: Set(chrono::Utc::now()),
         ..Default::default()
     };
 
-    let result = Entity::insert(tag)
+    let _ = Entity::insert(tag)
         .on_conflict(
             sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
                 .do_nothing()
                 .to_owned(),
         )
-        .exec(db)
+        .exec_with_returning(db)
         .await;
 
-    match result {
-        Ok(result) => match Entity::find_by_id(result.last_insert_id).one(db).await {
-            Ok(Some(model)) => Ok(model),
-            Err(err) => Err(err),
-            _ => Err(DbErr::RecordNotFound(format!(
-                "tag_id: {}",
-                result.last_insert_id
-            ))),
-        },
+    let tag = Entity::find()
+        .filter(Column::Label.eq(label.clone()))
+        .filter(Column::Value.eq(value))
+        .one(db)
+        .await;
+
+    match tag {
+        Ok(Some(model)) => Ok(model),
         Err(err) => Err(err),
+        _ => Err(DbErr::RecordNotFound(format!(
+            "label: {}, value: {}",
+            label, value
+        ))),
     }
 }
 
@@ -127,10 +157,10 @@ mod test {
     #[tokio::test]
     async fn test_add_or_create() -> Result<(), DbErr> {
         let db = setup_test_db().await;
-        let new_tag = super::add_or_create(&db, tag::TagType::Source, "web").await?;
+        let new_tag = super::get_or_create(&db, tag::TagType::Source, "web").await?;
         let expected_id = new_tag.id;
 
-        let new_tag = super::add_or_create(&db, tag::TagType::Source, "web").await?;
+        let new_tag = super::get_or_create(&db, tag::TagType::Source, "web").await?;
         assert_eq!(expected_id, new_tag.id);
         Ok(())
     }

@@ -1,6 +1,8 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{FromQueryResult, InsertResult, QuerySelect, Set};
+use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
+
+use super::tag::{get_or_create, TagPair};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "indexed_document")]
@@ -65,13 +67,21 @@ impl ActiveModelBehavior for ActiveModel {
 }
 
 impl ActiveModel {
-    pub async fn insert_tags(
+    pub async fn insert_tags<C: ConnectionTrait>(
         &self,
-        db: &DatabaseConnection,
-        tags: &[tag::Model],
+        db: &C,
+        tags: &[TagPair],
     ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+        let mut tag_models: Vec<tag::Model> = Vec::new();
+        for (label, value) in tags.iter() {
+            match get_or_create(db, label.to_owned(), value).await {
+                Ok(tag) => tag_models.push(tag),
+                Err(err) => log::error!("{}", err),
+            }
+        }
+
         // create connections for each tag
-        let doc_tags = tags
+        let doc_tags = tag_models
             .iter()
             .map(|t| document_tag::ActiveModel {
                 indexed_document_id: self.id.clone(),
@@ -81,8 +91,19 @@ impl ActiveModel {
                 ..Default::default()
             })
             .collect::<Vec<document_tag::ActiveModel>>();
-        // Insert connections
-        document_tag::Entity::insert_many(doc_tags).exec(db).await
+
+        // Insert connections, ignoring duplicates
+        document_tag::Entity::insert_many(doc_tags)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![
+                    document_tag::Column::IndexedDocumentId,
+                    document_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec(db)
+            .await
     }
 }
 
@@ -174,10 +195,13 @@ mod test {
         let doc = doc.save(&db).await.unwrap();
 
         // Insert related tags
-        let source_tag = tag::add_or_create(&db, tag::TagType::Source, "web").await?;
-        let mime_tag = tag::add_or_create(&db, tag::TagType::MimeType, "text/html").await?;
+        let tags = vec![
+            (tag::TagType::Source, "web".to_owned()),
+            // Should only add one of these.
+            (tag::TagType::MimeType, "text/html".to_owned()),
+            (tag::TagType::MimeType, "text/html".to_owned()),
+        ];
 
-        let tags = vec![source_tag, mime_tag];
         if let Err(res) = doc.insert_tags(&db, &tags).await {
             dbg!(res);
         }

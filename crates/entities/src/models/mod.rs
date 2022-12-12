@@ -3,6 +3,7 @@ use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 pub mod bootstrap_queue;
 pub mod connection;
 pub mod crawl_queue;
+pub mod crawl_tag;
 pub mod document_tag;
 pub mod fetch_history;
 pub mod indexed_document;

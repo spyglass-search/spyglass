@@ -3,11 +3,16 @@ use std::collections::HashSet;
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
-use sea_orm::{sea_query, ConnectionTrait, DbBackend, FromQueryResult, QueryTrait, Set, Statement};
+use sea_orm::{
+    sea_query, ConnectionTrait, DbBackend, FromQueryResult, InsertResult, QueryOrder, QueryTrait,
+    Set, Statement,
+};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use super::crawl_tag;
 use super::indexed_document;
+use super::tag::{self, get_or_create, TagPair};
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
@@ -77,6 +82,8 @@ pub struct Model {
     pub status: CrawlStatus,
     /// If this failed, the reason for the failure
     pub error: Option<TaskError>,
+    /// Data that we want to keep around about this task.
+    pub data: Option<String>,
     /// Number of retries for this task.
     #[sea_orm(default_value = 0)]
     pub num_retries: u8,
@@ -89,12 +96,27 @@ pub struct Model {
     pub pipeline: Option<String>,
 }
 
+impl Related<super::tag::Entity> for Entity {
+    // The final relation is IndexedDocument -> DocumentTag -> Tag
+    fn to() -> RelationDef {
+        super::crawl_tag::Relation::Tag.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::crawl_tag::Relation::CrawlQueue.def().rev())
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
+pub enum Relation {
+    Tag,
+}
 
 impl RelationTrait for Relation {
     fn def(&self) -> RelationDef {
-        panic!("No RelationDef")
+        match self {
+            Self::Tag => Entity::has_many(tag::Entity).into(),
+        }
     }
 }
 
@@ -116,6 +138,47 @@ impl ActiveModelBehavior for ActiveModel {
         }
 
         Ok(self)
+    }
+}
+
+impl ActiveModel {
+    pub async fn insert_tags<C: ConnectionTrait>(
+        &self,
+        db: &C,
+        tags: &[TagPair],
+    ) -> Result<InsertResult<crawl_tag::ActiveModel>, DbErr> {
+        let mut tag_models: Vec<tag::Model> = Vec::new();
+        for (label, value) in tags.iter() {
+            match get_or_create(db, label.to_owned(), value).await {
+                Ok(tag) => tag_models.push(tag),
+                Err(err) => log::error!("{}", err),
+            }
+        }
+
+        // create connections for each tag
+        let doc_tags = tag_models
+            .iter()
+            .map(|t| crawl_tag::ActiveModel {
+                crawl_queue_id: self.id.clone(),
+                tag_id: Set(t.id),
+                created_at: Set(chrono::Utc::now()),
+                updated_at: Set(chrono::Utc::now()),
+                ..Default::default()
+            })
+            .collect::<Vec<crawl_tag::ActiveModel>>();
+
+        // Insert connections, ignoring duplicates
+        crawl_tag::Entity::insert_many(doc_tags)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![
+                    crawl_tag::Column::CrawlQueueId,
+                    crawl_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec(db)
+            .await
     }
 }
 
@@ -164,39 +227,10 @@ pub async fn num_queued(
     Ok(res)
 }
 
-fn gen_priority_values(items: &[String], is_prefix: bool) -> String {
-    if items.is_empty() {
-        "(\"\", 0)".to_string()
-    } else {
-        items
-            .iter()
-            .map(|item| {
-                let item = if is_prefix {
-                    // Wildcards not supported in prefixes
-                    item.to_owned() + "%"
-                } else {
-                    // TODO: Should probably sanitize this...
-                    item.replace('*', "%")
-                };
-
-                format!("(\"{}\", 1)", item)
-            })
-            .collect::<Vec<String>>()
-            .join(",")
-    }
-}
-
-fn gen_priority_sql(p_domains: &str, p_prefixes: &str, user_settings: UserSettings) -> Statement {
+fn gen_dequeue_sql(user_settings: UserSettings) -> Statement {
     Statement::from_sql_and_values(
         DbBackend::Sqlite,
-        &format!(
-            r#"WITH
-                p_domain(domain, priority) AS (values {}),
-                p_prefix(prefix, priority) AS (values {}), {}"#,
-            p_domains,
-            p_prefixes,
-            include_str!("sql/dequeue.sqlx")
-        ),
+        include_str!("sql/dequeue.sqlx"),
         vec![
             user_settings.domain_crawl_limit.value().into(),
             user_settings.inflight_domain_limit.value().into(),
@@ -247,57 +281,96 @@ fn create_ruleset_from_lens(lens: &LensConfig) -> LensRuleSets {
     }
 }
 
+/// How many tasks do we have in progress?
+pub async fn num_tasks_in_progress(db: &DatabaseConnection) -> anyhow::Result<u64, DbErr> {
+    Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Processing))
+        .count(db)
+        .await
+}
+
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
     user_settings: UserSettings,
-    // Prioritized domains
-    p_domains: &[String],
-    // Prioritized prefixes
-    p_prefixes: &[String],
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     // Check for inflight limits
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
         // How many do we have in progress?
-        let num_in_progress = Entity::find()
-            .filter(Column::Status.eq(CrawlStatus::Processing))
-            .count(db)
-            .await? as u32;
-
-        if num_in_progress >= inflight_crawl_limit {
+        let num_in_progress = num_tasks_in_progress(db).await?;
+        // Nothing to do if we have too many crawls
+        if num_in_progress >= inflight_crawl_limit as u64 {
             return Ok(None);
         }
     }
 
     // Prioritize any bootstrapping tasks first.
-    let entity = Entity::find()
-        .filter(Column::Status.eq(CrawlStatus::Queued))
-        .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
-        .one(db)
-        .await?;
+    let entity = {
+        let result = Entity::find()
+            .filter(Column::Status.eq(CrawlStatus::Queued))
+            .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
+            .one(db)
+            .await?;
 
+        if let Some(task) = result {
+            Some(task)
+        } else {
+            // Otherwise, grab a URL off the stack & send it back.
+            Entity::find()
+                .from_raw_sql(gen_dequeue_sql(user_settings))
+                .one(db)
+                .await?
+        }
+    };
+
+    // Grab new entity and immediately mark in-progress
     if let Some(task) = entity {
         let mut update: ActiveModel = task.into();
         update.status = Set(CrawlStatus::Processing);
-        let model: Model = update.update(db).await.expect("Unable to save");
-        return Ok(Some(model));
+        return match update.update(db).await {
+            Ok(model) => Ok(Some(model)),
+            // Deleted while being processed?
+            Err(err) => {
+                log::error!("Unable to update crawl task: {}", err);
+                Ok(None)
+            }
+        };
     }
 
-    // List of domains to prioritize when dequeuing tasks
-    // For example, we'll pull domains that make up with lenses before
-    // general crawling.
-    let prioritized_domains = gen_priority_values(p_domains, false);
-    let prioritized_prefixes = gen_priority_values(p_prefixes, true);
+    Ok(None)
+}
 
-    let entity = Entity::find().from_raw_sql(gen_priority_sql(
-        &prioritized_domains,
-        &prioritized_prefixes,
-        user_settings,
-    ));
+pub async fn dequeue_recrawl(
+    db: &DatabaseConnection,
+    user_settings: &UserSettings,
+) -> anyhow::Result<Option<Model>, DbErr> {
+    // Check for inflight limits
+    if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
+        // How many do we have in progress?
+        let num_in_progress = num_tasks_in_progress(db).await?;
+        // Nothing to do if we have too many crawls
+        if num_in_progress >= inflight_crawl_limit as u64 {
+            return Ok(None);
+        }
+    }
+
+    // TODO: Right now only recrawl local files.
+    let task = Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Completed))
+        .filter(Column::Url.starts_with("file://"))
+        .order_by_asc(Column::UpdatedAt)
+        .one(db)
+        .await?;
 
     // Grab new entity and immediately mark in-progress
-    if let Ok(Some(model)) = entity.one(db).await {
-        let mut update: ActiveModel = model.into();
+    if let Some(task) = task {
+        let now = chrono::Utc::now();
+        let time_since = now - task.updated_at;
+        if time_since.num_days() < 1 {
+            return Ok(None);
+        }
+
+        let mut update: ActiveModel = task.into();
         update.status = Set(CrawlStatus::Processing);
         return match update.update(db).await {
             Ok(model) => Ok(Some(model)),
@@ -323,6 +396,7 @@ pub enum SkipReason {
 #[derive(Default)]
 pub struct EnqueueSettings {
     pub crawl_type: CrawlType,
+    pub tags: Vec<TagPair>,
     pub force_allow: bool,
     pub is_recrawl: bool,
 }
@@ -491,24 +565,35 @@ pub async fn enqueue_all(
 pub async fn mark_done(
     db: &DatabaseConnection,
     id: i64,
-    status: CrawlStatus,
-) -> anyhow::Result<()> {
-    if let Some(crawl) = Entity::find_by_id(id).one(db).await? {
+    tags: Option<Vec<TagPair>>,
+) -> Option<Model> {
+    if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
+        let mut updated: ActiveModel = crawl.clone().into();
+        if let Some(tags) = tags {
+            let _ = updated.insert_tags(db, &tags).await;
+        }
+
+        updated.status = Set(CrawlStatus::Completed);
+        updated.update(db).await.ok()
+    } else {
+        None
+    }
+}
+
+pub async fn mark_failed(db: &DatabaseConnection, id: i64, retry: bool) {
+    if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = crawl.clone().into();
 
         // Bump up number of retries if this failed
-        if status == CrawlStatus::Failed && crawl.num_retries <= MAX_RETRIES {
+        if retry && crawl.num_retries <= MAX_RETRIES {
             updated.num_retries = Set(crawl.num_retries + 1);
             // Queue again
             updated.status = Set(CrawlStatus::Queued);
         } else {
-            updated.status = Set(status);
+            updated.status = Set(CrawlStatus::Failed);
         }
-
-        updated.update(db).await?;
+        let _ = updated.update(db).await;
     }
-
-    Ok(())
 }
 
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected
@@ -525,6 +610,41 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
     Ok(res.rows_affected)
 }
 
+/// Update the URL of a task. Typically used after a crawl to set the canonical URL
+/// extracted from the crawl result. If there's a conflict, this means another crawl task
+/// already points to this same URL and thus can be safely removed.
+pub async fn update_or_remove_task(
+    db: &DatabaseConnection,
+    id: i64,
+    url: &str,
+) -> anyhow::Result<Model, DbErr> {
+    let existing_task = Entity::find().filter(Column::Url.eq(url)).one(db).await?;
+
+    // Task already exists w/ this URL, remove this one.
+    if let Some(existing) = existing_task {
+        if existing.id != id {
+            Entity::delete_by_id(id).exec(db).await?;
+        }
+
+        Ok(existing)
+    } else {
+        let task = Entity::find_by_id(id).one(db).await?;
+
+        if let Some(mut task) = task {
+            if task.url != url {
+                let mut update: ActiveModel = task.clone().into();
+                update.url = Set(url.to_owned());
+                let _ = update.save(db).await?;
+                task.url = url.to_owned();
+            }
+
+            Ok(task)
+        } else {
+            Err(DbErr::Custom("Task not found".to_owned()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;
@@ -534,10 +654,11 @@ mod test {
     use shared::config::{LensConfig, LensRule, Limit, UserSettings};
     use shared::regex::{regex_for_robots, WildcardType};
 
+    use crate::models::crawl_queue::CrawlType;
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
-    use super::{filter_urls, gen_priority_sql, gen_priority_values, EnqueueSettings};
+    use super::{filter_urls, gen_dequeue_sql, EnqueueSettings};
 
     #[tokio::test]
     async fn test_insert() {
@@ -566,14 +687,10 @@ mod test {
     #[test]
     fn test_priority_sql() {
         let settings = UserSettings::default();
-        let p_domains = gen_priority_values(&["en.wikipedia.org".to_string()], false);
-        let p_prefixes =
-            gen_priority_values(&["https://roll20.net/compendium/dnd5e".to_string()], true);
-
-        let sql = gen_priority_sql(&p_domains, &p_prefixes, settings);
+        let sql = gen_dequeue_sql(settings);
         assert_eq!(
             sql.to_string(),
-            "WITH\n                p_domain(domain, priority) AS (values (\"en.wikipedia.org\", 1)),\n                p_prefix(prefix, priority) AS (values (\"https://roll20.net/compendium/dnd5e%\", 1)), indexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN p_domain ON cq.domain like p_domain.domain\nLEFT JOIN p_prefix ON cq.url like p_prefix.prefix\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\"\nORDER BY\n    p_prefix.priority DESC,\n    p_domain.priority DESC,\n    cq.updated_at ASC"
+            "WITH\nindexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\"\nORDER BY\n    cq.updated_at ASC"
         );
     }
 
@@ -687,7 +804,6 @@ mod test {
         let settings = UserSettings::default();
         let db = setup_test_db().await;
         let url = vec!["https://oldschool.runescape.wiki/".into()];
-        let prioritized = vec![];
         let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
@@ -704,9 +820,7 @@ mod test {
         .await
         .unwrap();
 
-        let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
 
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url[0]);
@@ -721,7 +835,6 @@ mod test {
         let db = setup_test_db().await;
         let url: Vec<String> = vec!["https://oldschool.runescape.wiki/".into()];
         let parsed = Url::parse(&url[0]).unwrap();
-        let prioritized = vec![];
         let lens = LensConfig {
             domains: vec!["oldschool.runescape.wiki".into()],
             ..Default::default()
@@ -744,18 +857,14 @@ mod test {
             ..Default::default()
         };
         doc.save(&db).await.unwrap();
-        let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_some());
 
         let settings = UserSettings {
             domain_crawl_limit: Limit::Finite(1),
             ..Default::default()
         };
-        let queue = crawl_queue::dequeue(&db, settings, &prioritized, &[])
-            .await
-            .unwrap();
+        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
         assert!(queue.is_none());
     }
 
@@ -874,5 +983,65 @@ mod test {
             filtered.pop(),
             Some("https://bahai-library.com//shoghi-effendi_goals_crusade".into())
         );
+    }
+
+    #[tokio::test]
+    async fn test_dequeue_recrawl() {
+        let settings = UserSettings::default();
+        let db = setup_test_db().await;
+        let url = "file:///tmp/test.txt";
+
+        let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
+        let model = crawl_queue::ActiveModel {
+            crawl_type: Set(CrawlType::Normal),
+            domain: Set("localhost".to_string()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            url: Set(url.to_string()),
+            created_at: Set(one_day_ago.clone()),
+            updated_at: Set(one_day_ago),
+            ..Default::default()
+        };
+
+        if let Err(res) = model.save(&db).await {
+            dbg!(res);
+        }
+
+        let queue = crawl_queue::dequeue_recrawl(&db, &settings).await.unwrap();
+        assert!(queue.is_some());
+        assert_eq!(queue.unwrap().url, url);
+    }
+
+    #[tokio::test]
+    async fn test_update_or_remove_task() {
+        let db = setup_test_db().await;
+
+        let model = crawl_queue::ActiveModel {
+            crawl_type: Set(CrawlType::Normal),
+            domain: Set("example.com".to_string()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            url: Set("https://example.com".to_string()),
+            ..Default::default()
+        };
+        let first = model.save(&db).await.expect("saved");
+
+        let model = crawl_queue::ActiveModel {
+            crawl_type: Set(CrawlType::Normal),
+            domain: Set("example.com".to_string()),
+            status: Set(crawl_queue::CrawlStatus::Completed),
+            url: Set("https://example.com/redirect".to_string()),
+            ..Default::default()
+        };
+        let task = model.save(&db).await.expect("saved");
+
+        let res = super::update_or_remove_task(&db, task.id.unwrap(), "https://example.com")
+            .await
+            .expect("success");
+
+        let all_tasks = crawl_queue::Entity::find().all(&db).await.expect("success");
+
+        // Should update the task URL, delete the duplicate, and return the first model
+        assert_eq!(res.url, "https://example.com");
+        assert_eq!(res.id, first.id.unwrap());
+        assert_eq!(1, all_tasks.len());
     }
 }

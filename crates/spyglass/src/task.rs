@@ -19,7 +19,7 @@ pub struct CrawlTask {
     pub id: i64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CollectTask {
     // Pull URLs from a CDX server
     Bootstrap {
@@ -42,15 +42,19 @@ pub enum ManagerCommand {
 }
 
 /// Send tasks to the worker
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WorkerCommand {
+    /// Enqueues the URLs needed to start crawl.
     Collect(CollectTask),
-    // Commit any changes that have been made to the index.
+    /// Commit any changes that have been made to the index.
     CommitIndex,
-    // Fetch, parses, & indexes a URI
-    // TODO: Split this up so that this work can be spread out.
+    /// Fetch, parses, & indexes a URI
+    /// TODO: Split this up so that this work can be spread out.
     Crawl { id: i64 },
-    // Applies tag information to an URI
+    /// Refetches, parses, & indexes a URI
+    /// If the URI no longer exists (file moved, 404 etc), delete from index.
+    Recrawl { id: i64 },
+    /// Applies tag information to an URI
     Tag,
 }
 
@@ -72,12 +76,12 @@ pub async fn manager_task(
     queue: mpsc::Sender<WorkerCommand>,
     manager_cmd_tx: mpsc::UnboundedSender<ManagerCommand>,
     mut manager_cmd_rx: mpsc::UnboundedReceiver<ManagerCommand>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("manager started");
 
     let mut queue_check_interval = tokio::time::interval(Duration::from_millis(100));
     let mut commit_check_interval = tokio::time::interval(Duration::from_secs(10));
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
         tokio::select! {
@@ -133,11 +137,11 @@ pub async fn worker_task(
     state: AppState,
     mut queue: mpsc::Receiver<WorkerCommand>,
     mut pause_rx: broadcast::Receiver<AppPause>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("worker started");
     let mut is_paused = false;
     let mut updated_docs = 0;
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
         // Run w/ a select on the shutdown signal otherwise we're stuck in an
@@ -160,14 +164,97 @@ pub async fn worker_task(
             continue;
         }
 
-        let next_cmd = tokio::select! {
-            res = queue.recv() => res,
+        tokio::select! {
+            res = queue.recv() => {
+                if let Some(cmd) = res {
+                    match cmd {
+                        WorkerCommand::Collect(task) => match task {
+                            CollectTask::Bootstrap {
+                                lens,
+                                seed_url,
+                                pipeline,
+                            } => {
+                                log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
+                                let state = state.clone();
+                                tokio::spawn(async move {
+                                    if let Some(lens_config) = &state.lenses.get(&lens) {
+                                        worker::handle_bootstrap(&state, lens_config, &seed_url, pipeline)
+                                            .await;
+                                    }
+                                });
+                            }
+                            CollectTask::ConnectionSync { api_id, account } => {
+                                log::debug!("handling ConnectionSync for {}", api_id);
+                                let state = state.clone();
+                                tokio::spawn(async move {
+                                    match load_connection(&state, &api_id, &account).await {
+                                        Ok(mut conn) => {
+                                            conn.as_mut().sync(&state).await;
+                                        }
+                                        Err(err) => log::error!(
+                                            "Unable to sync w/ connection: {} - {}",
+                                            api_id,
+                                            err.to_string()
+                                        ),
+                                    }
+                                });
+                            }
+                        },
+                        WorkerCommand::CommitIndex => {
+                            let state = state.clone();
+                            if updated_docs > 0 {
+                                log::debug!("committing {} new/updated docs in index", updated_docs);
+                                updated_docs = 0;
+                                tokio::spawn(async move {
+                                    match state.index.writer.lock() {
+                                        Ok(mut writer) => {
+                                            let _ = writer.commit();
+                                        }
+                                        Err(err) => {
+                                            log::debug!(
+                                                "Unable to acquire lock on index writer: {}",
+                                                err.to_string()
+                                            )
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                        WorkerCommand::Crawl { id } => {
+                            if let Ok(fetch_result) =
+                                tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                            {
+                                match fetch_result {
+                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                                    _ => {}
+                                }
+                            }
+                        }
+                        WorkerCommand::Recrawl { id } => {
+                            if let Ok(fetch_result) = tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
+                            {
+                                match fetch_result {
+                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                                    FetchResult::NotFound => {
+                                        // URL no longer exists, delete from index.
+                                        log::debug!("URI not found, deleting from index");
+                                        let _ = tokio::spawn(worker::handle_deletion(state.clone(), id)).await;
+                                    }
+                                    FetchResult::Error(err) => {
+                                        log::warn!("Unable to recrawl {} - {}", id, err);
+                                    },
+                                    FetchResult::Ignore => {}
+                                }
+                            }
+                        }
+                        WorkerCommand::Tag => {}
+                    }
+                }
+            },
             res = pause_rx.recv() => {
                 if let Ok(AppPause::Pause) = res {
                     is_paused = true;
                 }
-
-                None
             },
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down worker");
@@ -175,74 +262,6 @@ pub async fn worker_task(
                 return;
             }
         };
-
-        if let Some(cmd) = next_cmd {
-            match cmd {
-                WorkerCommand::Collect(task) => match task {
-                    CollectTask::Bootstrap {
-                        lens,
-                        seed_url,
-                        pipeline,
-                    } => {
-                        log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
-                        let state = state.clone();
-                        tokio::spawn(async move {
-                            if let Some(lens_config) = &state.lenses.get(&lens) {
-                                worker::handle_bootstrap(&state, lens_config, &seed_url, pipeline)
-                                    .await;
-                            }
-                        });
-                    }
-                    CollectTask::ConnectionSync { api_id, account } => {
-                        log::debug!("handling ConnectionSync for {}", api_id);
-                        let state = state.clone();
-                        tokio::spawn(async move {
-                            match load_connection(&state, &api_id, &account).await {
-                                Ok(mut conn) => {
-                                    conn.as_mut().sync(&state).await;
-                                }
-                                Err(err) => log::error!(
-                                    "Unable to sync w/ connection: {} - {}",
-                                    api_id,
-                                    err.to_string()
-                                ),
-                            }
-                        });
-                    }
-                },
-                WorkerCommand::CommitIndex => {
-                    let state = state.clone();
-                    if updated_docs > 0 {
-                        log::debug!("committing {} new/updated docs in index", updated_docs);
-                        updated_docs = 0;
-                        tokio::spawn(async move {
-                            match state.index.writer.lock() {
-                                Ok(mut writer) => {
-                                    let _ = writer.commit();
-                                }
-                                Err(err) => {
-                                    log::debug!(
-                                        "Unable to acquire lock on index writer: {}",
-                                        err.to_string()
-                                    )
-                                }
-                            }
-                        });
-                    }
-                }
-                WorkerCommand::Crawl { id } => {
-                    if let Ok(fetch_result) =
-                        tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
-                    {
-                        match fetch_result {
-                            FetchResult::New | FetchResult::Updated => updated_docs += 1,
-                            _ => {}
-                        }
-                    }
-                }
-                WorkerCommand::Tag => {}
-            }
-        }
     }
 }
 
@@ -251,9 +270,9 @@ pub async fn lens_watcher(
     state: AppState,
     config: Config,
     mut pause_rx: broadcast::Receiver<AppPause>,
-    mut shutdown_rx: broadcast::Receiver<AppShutdown>,
 ) {
     log::info!("👀 lens watcher started");
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     let mut is_paused = false;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
@@ -262,7 +281,7 @@ pub async fn lens_watcher(
         futures::executor::block_on(async {
             if !tx.is_closed() {
                 if let Err(err) = tx.send(res).await {
-                    log::error!("fseventwatcher channel error: {}", err.to_string());
+                    log::error!("fseventwatcher channel error: {}. If we're in shutdown mode, nothing to worry about.", err.to_string());
                 }
             }
         })
@@ -325,8 +344,9 @@ pub async fn lens_watcher(
                             EventKind::Create(_)
                             | EventKind::Modify(ModifyKind::Data(_))
                             | EventKind::Modify(ModifyKind::Name(_)) => {
-                                let _ = read_lenses(&state, &config).await;
-                                load_lenses(state.clone()).await;
+                                if read_lenses(&state, &config).await.is_ok() {
+                                    load_lenses(state.clone()).await;
+                                }
                             }
                             _ => {}
                         }
