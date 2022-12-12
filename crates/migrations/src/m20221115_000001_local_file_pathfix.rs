@@ -3,8 +3,6 @@ use entities::schema::{DocFields, SearchDocument};
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;
 
-use entities::models::{crawl_queue, indexed_document};
-use entities::sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::Config;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
@@ -125,7 +123,6 @@ impl MigrationName for Migration {
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let (mut iwriter, ireader) = self.open_index();
-        let db = manager.get_connection();
 
         println!("Updating crawl_queue");
         manager
@@ -136,44 +133,64 @@ impl MigrationTrait for Migration {
             ))
             .await?;
 
-        let queued = crawl_queue::Entity::find()
-            .filter(crawl_queue::Column::Url.starts_with("file://"))
-            .all(db)
-            .await
-            .expect("Unable to query crawl_queue table.");
+        let queued = manager
+            .get_connection()
+            .query_all(Statement::from_string(
+                manager.get_database_backend(),
+                "SELECT id, url FROM crawl_queue WHERE url like 'file://%'".to_owned(),
+            ))
+            .await?;
 
-        for doc in &queued {
-            if let Some(updated_url) = self.fix_url(&doc.url) {
-                let mut update: crawl_queue::ActiveModel = doc.to_owned().into();
-                update.domain = Set("localhost".to_string());
-                update.url = Set(updated_url);
-                let _ = update.save(db).await;
+        for row in &queued {
+            let id = row.try_get::<i64>("", "id");
+            let url = row.try_get::<String>("", "url");
+
+            if let (Ok(id), Ok(url)) = (id, url) {
+                if let Some(updated_url) = self.fix_url(&url) {
+                    manager
+                        .get_connection()
+                        .execute(Statement::from_sql_and_values(
+                            manager.get_database_backend(),
+                            "UPDATE crawl_queue SET domain = 'localhost', url = ? WHERE id = ?",
+                            vec![id.into(), updated_url.into()],
+                        ))
+                        .await?;
+                }
             }
         }
 
-        let docs = indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.starts_with("file://"))
-            .all(db)
-            .await
-            .expect("Unable to query indexed_document table.");
+        let docs = manager
+            .get_connection()
+            .query_all(Statement::from_string(
+                manager.get_database_backend(),
+                "SELECT id, doc_id, url FROM indexed_document WHERE url like 'file://%'".to_owned(),
+            ))
+            .await?;
 
         // No docs yet, nothing to migrate.
         if docs.is_empty() {
             return Ok(());
         }
 
-        println!("Updating index");
-        for doc in &docs {
-            if let Some(updated_url) = self.fix_url(&doc.url) {
-                // Update the document in the index
-                self.update_index(&iwriter, &ireader, &doc.doc_id, &updated_url);
+        for row in &docs {
+            let id = row.try_get::<i64>("", "id");
+            let doc_id = row.try_get::<String>("", "doc_id");
+            let url = row.try_get::<String>("", "url");
 
-                // Update document in the db
-                let mut update: indexed_document::ActiveModel = doc.to_owned().into();
-                update.domain = Set("localhost".to_string());
-                update.url = Set(updated_url.clone());
-                update.open_url = Set(Some(updated_url.clone()));
-                let _ = update.save(db).await;
+            if let (Ok(id), Ok(doc_id), Ok(url)) = (id, doc_id, url) {
+                if let Some(updated_url) = self.fix_url(&url) {
+                    // Update the document in the index
+                    self.update_index(&iwriter, &ireader, &doc_id, &updated_url);
+
+                    // Update document in the db
+                    manager.get_connection()
+                        .execute(Statement::from_sql_and_values(
+                            manager.get_database_backend(),
+                            "UPDATE indexed_document SET domain = 'localhost', open_url = ?, url = ? AND openWHERE id = ?",
+                            vec![id.into(), updated_url.clone().into(), updated_url.into()],
+                        ))
+                        .await?;
+                }
             }
         }
 
