@@ -1,4 +1,5 @@
 extern crate notify;
+use clap::Parser;
 use std::io;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
@@ -27,8 +28,17 @@ const SPYGLASS_LEVEL: &str = "spyglass=DEBUG";
 #[cfg(debug_assertions)]
 const LIBSPYGLASS_LEVEL: &str = "libspyglass=DEBUG";
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct CliArgs {
+    /// Run migrations & basic checks.
+    #[arg(short, long)]
+    check: bool,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
+    let args = CliArgs::parse();
 
     #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telemetry {
@@ -107,7 +117,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize/Load user preferences
     let mut state = rt.block_on(AppState::new(&config));
-    rt.block_on(start_backend(&mut state, &config));
+    if !args.check {
+        rt.block_on(start_backend(&mut state, &config));
+    }
 
     Ok(())
 }
