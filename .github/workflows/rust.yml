@@ -83,4 +83,7 @@ jobs:
       with:
         command: fmt
         args: --all --check
-
+    # Run spyglass backend in check mode to validate migrations & other basic startup
+    # procedures.
+    - name: run spyglass checks
+      run: cargo run -p spyglass -- --check

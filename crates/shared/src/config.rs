@@ -325,7 +325,7 @@ impl Config {
 
     pub fn new() -> Self {
         let prefs_dir = Config::prefs_dir();
-        fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
+        fs::create_dir_all(prefs_dir).expect("Unable to create config folder");
 
         // Gracefully handle issues loading user settings/lenses
         let user_settings = Self::load_user_settings().unwrap_or_else(|err| {
@@ -340,22 +340,22 @@ impl Config {
         };
 
         let data_dir = config.data_dir();
-        fs::create_dir_all(&data_dir).expect("Unable to create data folder");
+        fs::create_dir_all(data_dir).expect("Unable to create data folder");
 
         let index_dir = config.index_dir();
-        fs::create_dir_all(&index_dir).expect("Unable to create index folder");
+        fs::create_dir_all(index_dir).expect("Unable to create index folder");
 
         let logs_dir = config.logs_dir();
-        fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
+        fs::create_dir_all(logs_dir).expect("Unable to create logs folder");
 
         let lenses_dir = config.lenses_dir();
-        fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
+        fs::create_dir_all(lenses_dir).expect("Unable to create `lenses` folder");
 
         let pipelines_dir = config.pipelines_dir();
-        fs::create_dir_all(&pipelines_dir).expect("Unable to create `pipelines` folder");
+        fs::create_dir_all(pipelines_dir).expect("Unable to create `pipelines` folder");
 
         let plugins_dir = config.plugins_dir();
-        fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
+        fs::create_dir_all(plugins_dir).expect("Unable to create `plugin` folder");
 
         config
     }

@@ -41,7 +41,7 @@ pub fn filter_set(rules: &[ParsedRule], allow: bool) -> RegexSet {
         .map(|x| x.regex.clone())
         .collect();
 
-    RegexSet::new(&rules).expect("Invalid regex rules")
+    RegexSet::new(rules).expect("Invalid regex rules")
 }
 
 /// Parse a robots.txt file and return a vector of parsed rules

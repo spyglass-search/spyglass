@@ -166,7 +166,7 @@ fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     if let Some(file_name) = src.file_name() {
         let dst = env.data_dir.join(dst).join(file_name);
         // Attempt to copy file into plugin data directory
-        if let Err(e) = std::fs::copy(src, &dst) {
+        if let Err(e) = std::fs::copy(src, dst) {
             log::error!("Unable to copy into plugin data dir: {}", e);
         }
     } else {

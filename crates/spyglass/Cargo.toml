@@ -9,6 +9,7 @@ anyhow = "1.0"
 bytes = "1.2.1"
 calamine = "0.19.1"
 chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.0.32", features = ["derive"] }
 dashmap = "5.2"
 digest = "0.10"
 directories = "4.0"
@@ -17,13 +18,13 @@ docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
 ego-tree = "0.6.2"
 entities = { path = "../entities" }
 futures = "0.3"
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4" }
 hex = "0.4"
 hostname = "^0.3"
 html5ever = "0.25"
 http = "0.2"
 ignore = "0.4"
 jsonrpsee = { version = "0.15", features = ["http-server"] }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4" }
 log = "0.4"
 migration = { path = "../migrations" }
 notify = "5.0.0-pre.16"
