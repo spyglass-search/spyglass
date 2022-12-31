@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::PathBuf;
 
 use blake2::{Blake2s256, Digest};
@@ -20,6 +21,15 @@ pub enum LensRule {
     LimitURLDepth(String, u8),
     /// Skips are applied when bootstrapping & crawling
     SkipURL(String),
+}
+
+impl fmt::Display for LensRule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LimitURLDepth(url, depth) => write!(f, "LimitURLDepth(\"{}\", {})", url, depth),
+            Self::SkipURL(url) => write!(f, "SkipURL(\"{}\")", url,),
+        }
+    }
 }
 
 impl LensRule {
@@ -127,6 +137,8 @@ impl LensConfig {
 
 #[cfg(test)]
 mod test {
+    use crate::LensRule;
+
     use super::LensConfig;
 
     #[test]
@@ -141,13 +153,20 @@ mod test {
         assert_eq!(regexes.allowed.len(), 2);
         assert_eq!(regexes.skipped.len(), 0);
 
-        dbg!(&regexes.allowed);
-
         assert!(regexes
             .allowed
             .contains(&"^(http://|https://)paulgraham\\.com.*".to_string()));
         assert!(regexes
             .allowed
             .contains(&"^https://oldschool.runescape.wiki/w/.*".to_string()));
+    }
+
+    #[test]
+    fn test_rules_display() {
+        let rule = LensRule::SkipURL("http://example.com".to_string());
+        assert_eq!(rule.to_string(), "SkipURL(\"http://example.com\")");
+
+        let rule = LensRule::LimitURLDepth("http://example.com".to_string(), 2);
+        assert_eq!(rule.to_string(), "LimitURLDepth(\"http://example.com\", 2)");
     }
 }
