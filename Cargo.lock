@@ -5583,7 +5583,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "blake2",
