@@ -62,7 +62,7 @@ impl Component for StringList {
                 if let Some(el) = self.new_value_input.cast::<HtmlInputElement>() {
                     if el.value().is_empty() {
                         el.set_placeholder("Please enter a value");
-                        return false
+                        return false;
                     }
                     link.send_message(Msg::Add(el.value()));
                     el.set_value("");
