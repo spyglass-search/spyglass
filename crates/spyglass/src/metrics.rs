@@ -2,6 +2,7 @@ use reqwest::header;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+
 use strum_macros::{AsRefStr, Display};
 
 const ENDPOINT: &str = "https://api.mixpanel.com/track";
@@ -11,6 +12,7 @@ const PROJECT_TOKEN: &str = "51d84766a0838458d63998f1e4566d3b";
 pub struct Metrics {
     client: reqwest::Client,
     disabled: bool,
+    uid: String,
 }
 
 #[derive(AsRefStr, Display)]
@@ -35,6 +37,10 @@ impl EventProps {
         properties.insert("token".into(), PROJECT_TOKEN.into());
         properties.insert("time".into(), chrono::Utc::now().timestamp().into());
         properties.insert("distinct_id".into(), uid.into());
+        properties.insert(
+            "$insert_id".into(),
+            uuid::Uuid::new_v4().as_hyphenated().to_string().into(),
+        );
 
         EventProps {
             event: event.to_string(),
@@ -44,7 +50,7 @@ impl EventProps {
 }
 
 impl Metrics {
-    pub fn new(disabled: bool) -> Self {
+    pub fn new(uid: &str, disabled: bool) -> Self {
         let mut headers = header::HeaderMap::new();
         headers.insert("accept", header::HeaderValue::from_static("text/plain"));
         headers.insert(
@@ -57,7 +63,11 @@ impl Metrics {
             .build()
             .expect("Unable to create HTTP client");
 
-        Self { client, disabled }
+        Self {
+            client,
+            disabled,
+            uid: uid.to_owned(),
+        }
     }
 
     pub async fn track(&self, event: Event) -> anyhow::Result<()> {
@@ -66,7 +76,7 @@ impl Metrics {
             return Ok(());
         }
 
-        let mut data = EventProps::new("", event.as_ref());
+        let mut data = EventProps::new(&self.uid, event.as_ref());
         match &event {
             Event::Search { filters } => {
                 data.properties
@@ -82,7 +92,7 @@ impl Metrics {
             }
         }
 
-        self.client.post(ENDPOINT).json(&data).send().await?;
+        let _ = self.client.post(ENDPOINT).json(&vec![data]).send().await?;
 
         Ok(())
     }

@@ -69,7 +69,10 @@ impl AppState {
             db,
             app_state: Arc::new(app_state),
             user_settings: config.user_settings.clone(),
-            metrics: Metrics::new(config.user_settings.disable_telemetry),
+            metrics: Metrics::new(
+                &Config::machine_identifier(),
+                config.user_settings.disable_telemetry,
+            ),
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             index,
@@ -141,7 +144,10 @@ impl AppStateBuilder {
             index,
             lenses: Arc::new(lenses),
             manager_cmd_tx: Arc::new(Mutex::new(None)),
-            metrics: Metrics::new(user_settings.disable_telemetry),
+            metrics: Metrics::new(
+                &Config::machine_identifier(),
+                user_settings.disable_telemetry,
+            ),
             pause_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             pipelines: Arc::new(pipelines),

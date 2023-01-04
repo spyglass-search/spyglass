@@ -16,4 +16,5 @@ serde_json = "1.0"
 strum = "0.24"
 strum_macros = "0.24"
 spyglass-lens = { path = "../spyglass-lens" }
+uuid = { version = "1.0.0", features = ["serde", "v4", "js"], default-features = false }
 url = "2.2"

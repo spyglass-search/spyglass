@@ -5357,6 +5357,7 @@ dependencies = [
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "url",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -6814,6 +6815,7 @@ checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
 dependencies = [
  "getrandom 0.2.8",
  "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
