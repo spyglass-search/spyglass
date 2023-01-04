@@ -20,6 +20,7 @@ use shared::response::{
 use spyglass_plugin::SearchFilter;
 
 use libgoog::{ClientType, Credentials, GoogClient};
+use libspyglass::metrics;
 use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
@@ -361,6 +362,13 @@ pub async fn search(
     state: AppState,
     search_req: request::SearchParam,
 ) -> Result<SearchResults, Error> {
+    let _ = state
+        .metrics
+        .track(metrics::Event::Search {
+            filters: search_req.lenses.clone(),
+        })
+        .await;
+
     let start = SystemTime::now();
     let fields = DocFields::as_fields();
 
