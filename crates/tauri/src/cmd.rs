@@ -219,7 +219,11 @@ pub async fn install_lens<'r>(
         );
     } else {
         if let Some(metrics) = window.app_handle().try_state::<Metrics>() {
-            metrics.track(Event::InstallLens { lens: download_url.to_owned() }).await;
+            metrics
+                .track(Event::InstallLens {
+                    lens: download_url.to_owned(),
+                })
+                .await;
         }
 
         // Sleep for a second to let the app reload the lenses and then let the client know we're done.
