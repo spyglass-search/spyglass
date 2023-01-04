@@ -39,7 +39,7 @@ sentry-tracing = "0.29.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
-shared = { path = "../shared" }
+shared = { path = "../shared", features = ["metrics"] }
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"

@@ -7,7 +7,6 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::metrics::Metrics;
 use crate::task::AppShutdown;
 use crate::{
     pipeline::PipelineCommand,
@@ -16,6 +15,7 @@ use crate::{
     task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
+use shared::metrics::Metrics;
 
 #[derive(Clone)]
 pub struct AppState {

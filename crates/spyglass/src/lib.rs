@@ -3,7 +3,6 @@ extern crate html5ever;
 
 pub mod connection;
 pub mod crawler;
-pub mod metrics;
 pub mod oauth;
 pub mod parser;
 pub mod pipeline;

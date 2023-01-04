@@ -12,6 +12,7 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
     AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
@@ -20,7 +21,6 @@ use shared::response::{
 use spyglass_plugin::SearchFilter;
 
 use libgoog::{ClientType, Credentials, GoogClient};
-use libspyglass::metrics::{self, Event};
 use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::{lens::lens_to_filters, Searcher};
