@@ -5347,9 +5347,11 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "directories",
  "log",
  "regex",
+ "reqwest",
  "ron",
  "serde",
  "serde_json",
@@ -5357,6 +5359,7 @@ dependencies = [
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "url",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -5504,10 +5507,13 @@ dependencies = [
  "sentry",
  "sentry-tracing",
  "serde",
+ "serde_json",
  "sha2",
  "shared",
  "spyglass-plugin",
  "spyglass-rpc",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "tantivy",
  "tendril",
  "thiserror",
@@ -6811,6 +6817,7 @@ checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
 dependencies = [
  "getrandom 0.2.8",
  "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]

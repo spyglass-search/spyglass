@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
 pub use spyglass_lens::{LensConfig, LensRule, PipelineConfiguration};
 
 use crate::{
@@ -275,6 +277,18 @@ impl Config {
             "spyglass-dev".to_string()
         } else {
             "spyglass".to_string()
+        }
+    }
+
+    pub fn machine_identifier() -> String {
+        let uid_file = Self::prefs_dir().join("uid");
+        if uid_file.exists() {
+            std::fs::read_to_string(uid_file).unwrap_or_default()
+        } else {
+            // Generate a random ID and associate it with this machine for error/metrics.
+            let new_uid = Uuid::new_v4().as_hyphenated().to_string();
+            let _ = std::fs::write(uid_file, new_uid.clone());
+            new_uid
         }
     }
 

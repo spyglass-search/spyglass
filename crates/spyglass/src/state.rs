@@ -15,6 +15,7 @@ use crate::{
     task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
+use shared::metrics::Metrics;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -24,6 +25,7 @@ pub struct AppState {
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
     pub user_settings: UserSettings,
     pub index: Searcher,
+    pub metrics: Metrics,
     // Task scheduler command/control
     pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
     pub shutdown_cmd_tx: Arc<Mutex<broadcast::Sender<AppShutdown>>>,
@@ -67,6 +69,10 @@ impl AppState {
             db,
             app_state: Arc::new(app_state),
             user_settings: config.user_settings.clone(),
+            metrics: Metrics::new(
+                &Config::machine_identifier(),
+                config.user_settings.disable_telemetry,
+            ),
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             index,
@@ -135,16 +141,20 @@ impl AppStateBuilder {
         AppState {
             app_state: Arc::new(DashMap::new()),
             db: self.db.as_ref().expect("Must set db").to_owned(),
-            user_settings,
             index,
             lenses: Arc::new(lenses),
-            shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
-            pipelines: Arc::new(pipelines),
-            pause_cmd_tx: Arc::new(Mutex::new(None)),
-            plugin_cmd_tx: Arc::new(Mutex::new(None)),
-            pipeline_cmd_tx: Arc::new(Mutex::new(None)),
-            plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
             manager_cmd_tx: Arc::new(Mutex::new(None)),
+            metrics: Metrics::new(
+                &Config::machine_identifier(),
+                user_settings.disable_telemetry,
+            ),
+            pause_cmd_tx: Arc::new(Mutex::new(None)),
+            pipeline_cmd_tx: Arc::new(Mutex::new(None)),
+            pipelines: Arc::new(pipelines),
+            plugin_cmd_tx: Arc::new(Mutex::new(None)),
+            plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
+            shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
+            user_settings,
         }
     }
 
