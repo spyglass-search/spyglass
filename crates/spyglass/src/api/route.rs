@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use jsonrpsee::core::Error;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
@@ -12,6 +12,7 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
     AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
@@ -58,6 +59,12 @@ pub async fn add_queue(
 #[instrument(skip(state))]
 pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", api_id);
+    state
+        .metrics
+        .track(Event::AuthorizeConnection {
+            api_id: api_id.clone(),
+        })
+        .await;
 
     if let Some((client_id, client_secret, scopes)) = connection_secret(&api_id) {
         let mut listener = create_auth_listener().await;
@@ -361,6 +368,13 @@ pub async fn search(
     state: AppState,
     search_req: request::SearchParam,
 ) -> Result<SearchResults, Error> {
+    state
+        .metrics
+        .track(metrics::Event::Search {
+            filters: search_req.lenses.clone(),
+        })
+        .await;
+
     let start = SystemTime::now();
     let fields = DocFields::as_fields();
 
@@ -451,6 +465,16 @@ pub async fn search(
         num_docs: searcher.num_docs(),
         wall_time_ms,
     };
+
+    let domains: HashSet<String> = HashSet::from_iter(results.iter().map(|r| r.domain.clone()));
+    state
+        .metrics
+        .track(metrics::Event::SearchResult {
+            num_results: results.len(),
+            domains: domains.iter().cloned().collect(),
+            wall_time_ms,
+        })
+        .await;
 
     Ok(SearchResults { results, meta })
 }

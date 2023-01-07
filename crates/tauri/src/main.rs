@@ -25,6 +25,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use cocoa::appkit::NSWindow;
 
 use shared::config::Config;
+use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
 
 mod cmd;
@@ -53,7 +54,9 @@ type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
+    let current_version = format!("v20{}", &ctx.package_info().version);
     let config = Config::new();
+
     #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telemetry {
         None
@@ -183,11 +186,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Spawn a version checking background task. Check every couple hours
             // for a new version.
-            tauri::async_runtime::spawn(check_version_interval(window.clone()));
 
-            // Load user settings
+            tauri::async_runtime::spawn(check_version_interval(current_version, window.clone()));
+
             app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
+            app.manage(shared::metrics::Metrics::new(&Config::machine_identifier(), config.user_settings.disable_telemetry));
 
             // Register global shortcut
             let window_clone = window.clone();
@@ -335,13 +339,14 @@ fn open_folder(folder: PathBuf) {
         .expect("explorer cmd not available");
 }
 
-async fn check_version_interval(window: Window) {
+async fn check_version_interval(current_version: String, window: Window) {
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
     let app_handle = window.app_handle();
     let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
     let mut shutdown = shutdown_tx.subscribe();
+    let metrics = app_handle.try_state::<Metrics>();
 
     loop {
         tokio::select! {
@@ -351,6 +356,10 @@ async fn check_version_interval(window: Window) {
             },
             _ = interval.tick() => {
                 log::info!("checking for update...");
+                if let Some(ref metrics) = metrics {
+                    metrics.track(Event::UpdateCheck { current_version: current_version.clone() }).await;
+                }
+
                 if let Ok(response) = app_handle.updater().check().await {
                     if response.is_update_available() {
                         // show update dialog

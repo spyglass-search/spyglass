@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
+use shared::metrics::{Event, Metrics};
 use shared::response::SearchResults;
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
@@ -217,6 +218,14 @@ pub async fn install_lens<'r>(
             e
         );
     } else {
+        if let Some(metrics) = window.app_handle().try_state::<Metrics>() {
+            metrics
+                .track(Event::InstallLens {
+                    lens: download_url.to_owned(),
+                })
+                .await;
+        }
+
         // Sleep for a second to let the app reload the lenses and then let the client know we're done.
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         let _ = window.emit(ClientEvent::RefreshLensManager.as_ref(), true);
