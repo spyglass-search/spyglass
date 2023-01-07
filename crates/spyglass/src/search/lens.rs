@@ -1,6 +1,6 @@
-use std::fs;
 use entities::models::lens;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use std::fs;
 
 use shared::config::{Config, LensConfig};
 use spyglass_plugin::SearchFilter;

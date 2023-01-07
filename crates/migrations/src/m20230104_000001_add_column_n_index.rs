@@ -1,6 +1,9 @@
-use entities::models::{indexed_document, lens};
+use entities::{
+    models::{indexed_document, lens},
+    sea_orm::Statement,
+};
 use sea_orm_migration::prelude::*;
-
+use sea_orm_migration::sea_orm::{ConnectionTrait, TransactionTrait};
 pub struct Migration;
 
 impl MigrationName for Migration {
@@ -26,18 +29,93 @@ impl MigrationTrait for Migration {
             }
         }
 
+        let val = manager
+            .get_connection()
+            .query_all(Statement::from_string(
+                manager.get_database_backend(),
+                r#"with url_counts as (
+                select count(*) as cnt,url 
+                from indexed_document 
+                group by url
+            ) 
+            select * from url_counts where cnt > 1"#
+                    .into(),
+            ))
+            .await?;
+
+        // Running the duplicate delete is extremely slow without an index so added a temp one
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                "CREATE INDEX `tmp-idx-indexed_document-url` ON `indexed_document` (`url`);"
+                    .to_string(),
+            ))
+            .await?;
+
+        let txn = manager.get_connection().begin().await?;
+
+        for row in val {
+            let url_rslt = row.try_get::<String>("", "url");
+            if let Ok(url) = url_rslt {
+                // delete tags
+                txn.execute(Statement::from_sql_and_values(
+                    manager.get_database_backend(),
+                    r#"with id_list as (
+                        select id
+                        from indexed_document where url = ? 
+                        order by updated_at desc
+                        ),
+                     id_keep as (
+                        select id
+                        from indexed_document where url = ? 
+                        order by updated_at desc limit 1
+                        )
+                    delete from document_tag where indexed_document_id in id_list and indexed_document_id not in id_keep"#
+                        .into(), vec![url.clone().into()])).await?;
+
+                // delete indexed documents
+                txn.execute(Statement::from_sql_and_values(
+                    manager.get_database_backend(),
+                    r#"with id_list as (
+                        select id
+                        from indexed_document where url = ? 
+                        order by updated_at desc
+                        ),
+                     id_keep as (
+                        select id
+                        from indexed_document where url = ? 
+                        order by updated_at desc limit 1
+                        )
+                    delete from indexed_document where id in id_list and id not in id_keep"#
+                        .into(),
+                    vec![url.into()],
+                ))
+                .await?;
+            }
+        }
+
+        txn.commit().await?;
+
+        // removing temp index
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                "DROP INDEX `tmp-idx-indexed_document-url`;".to_string(),
+            ))
+            .await?;
+
         // Add unique index for url column, note altering the column
         // to make it unique is not allowed in sqlite, creating
         // a unique index is an alternative
         let rslt = manager
-            .create_index(
-                Index::create()
-                    .name("idx-indexed_document-url")
-                    .unique()
-                    .table(indexed_document::Entity)
-                    .col(indexed_document::Column::Url)
-                    .to_owned(),
-            )
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                "CREATE UNIQUE INDEX `idx-indexed_document-url` ON `indexed_document` (`url`);"
+                    .to_string(),
+            ))
             .await;
 
         // No need to fail, index may already exist

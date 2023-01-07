@@ -13,7 +13,7 @@ use crate::crawler::{CrawlError, CrawlResult, Crawler};
 use crate::search::Searcher;
 use crate::state::AppState;
 
-/// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache. 
+/// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache.
 /// If no cache is accessible then we run the standard bootstrap process. Local lenses use
 /// the standard bootstrap process
 #[tracing::instrument(skip(state, config, lens))]
@@ -87,7 +87,7 @@ async fn process_urls(lens: &LensConfig, state: &AppState) {
     }
 }
 
-// Processes the len rules 
+// Processes the len rules
 async fn process_lens_rules(lens: &LensConfig, state: &AppState) {
     // Rules will go through and remove crawl tasks AND indexed_documents that match.
     for rule in lens.rules.iter() {

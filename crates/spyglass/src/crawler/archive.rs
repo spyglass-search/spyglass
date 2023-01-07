@@ -1,3 +1,4 @@
+use libnetrunner::parser::ParseResult;
 use std::path::Path;
 use warc::{WarcHeader, WarcReader};
 
@@ -11,7 +12,7 @@ pub struct ArchiveRecord {
 
 /// Reads a WARC file from the provided path and provides a streaming record
 /// iterator
-pub fn read(path: &Path) -> anyhow::Result<impl Iterator<Item = Option<ArchiveRecord>>> {
+pub fn read_warc(path: &Path) -> anyhow::Result<impl Iterator<Item = Option<ArchiveRecord>>> {
     let reader = WarcReader::from_path(path)?;
     let record_itr = reader.iter_records().map(move |record_rslt| {
         if let Ok(record) = record_rslt {
@@ -34,6 +35,11 @@ pub fn read(path: &Path) -> anyhow::Result<impl Iterator<Item = Option<ArchiveRe
     });
 
     return Ok(record_itr);
+}
+
+// Reads the parsed cache file and provides the contents as an iterator
+pub fn read_parsed(path: &Path) -> anyhow::Result<impl Iterator<Item = ParseResult>> {
+    ParseResult::iter_from_gz(path)
 }
 
 // Helper used to parse the body string into headers and content

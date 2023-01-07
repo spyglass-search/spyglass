@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Instant;
 
-use crate::crawler::{CrawlResult, cache};
+use crate::crawler::{cache, CrawlResult};
 use crate::pipeline::collector::{CollectionResult, DefaultCollector};
 use crate::pipeline::PipelineContext;
 use crate::search::Searcher;
@@ -11,6 +11,7 @@ use crate::state::AppState;
 use crate::task::CrawlTask;
 
 use entities::models::{crawl_queue, indexed_document};
+use libnetrunner::parser::ParseResult;
 use shared::config::{Config, LensConfig, PipelineConfiguration};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -23,8 +24,8 @@ use url::Url;
 
 /// processes the cache for a lens. The cache is streamed in from the provided path
 /// and processed. After the process is complete the cache is deleted
-pub async fn process_update(state: AppState, cache_path: PathBuf) {
-    let records = archive::read(&cache_path);
+pub async fn process_update_warc(state: AppState, cache_path: PathBuf) {
+    let records = archive::read_warc(&cache_path);
     match records {
         Ok(mut record_iter) => {
             let mut record_list: Vec<JoinHandle<Option<CrawlResult>>> = Vec::new();
@@ -61,7 +62,7 @@ pub async fn process_update(state: AppState, cache_path: PathBuf) {
                                 results.push(result);
                             }
                         }
-                        process_records(&state, &mut results).await;
+                        // process_records(&state, &mut results).await;
                         record_list = Vec::new();
                     }
                 }
@@ -74,16 +75,44 @@ pub async fn process_update(state: AppState, cache_path: PathBuf) {
                         results.push(result);
                     }
                 }
-                process_records(&state, &mut results).await;
+                // process_records(&state, &mut results).await;
             }
         }
         Err(error) => {
             log::error!("Got an error reading archive {:?}", error);
         }
     }
-    
+
     // attempt to remove processed cache file
     let _ = cache::delete_cache(&cache_path);
+}
+
+/// processes the cache for a lens. The cache is streamed in from the provided path
+/// and processed. After the process is complete the cache is deleted
+pub async fn process_update(state: AppState, cache_path: PathBuf) {
+    let now = Instant::now();
+    let records = archive::read_parsed(&cache_path);
+    match records {
+        Ok(mut record_iter) => {
+            let mut record_list: Vec<ParseResult> = Vec::new();
+            while let Some(record) = record_iter.next() {
+                record_list.push(record);
+                if record_list.len() >= 5000 {
+                    process_records(&state, &mut record_list).await;
+                    record_list = Vec::new();
+                }
+            }
+
+            if record_list.len() > 0 {
+                process_records(&state, &mut record_list).await;
+            }
+        }
+        _ => {}
+    }
+
+    // attempt to remove processed cache file
+    let _ = cache::delete_cache(&cache_path);
+    log::debug!("Processing Cache Took: {:?}", now.elapsed().as_millis())
 }
 
 // Process a list of crawl results. The following steps will be taken:
@@ -91,12 +120,14 @@ pub async fn process_update(state: AppState, cache_path: PathBuf) {
 // 2. Remove any documents that already exist from the index
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
-async fn process_records(state: &AppState, results: &mut Vec<CrawlResult>) {
+async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
     let find = indexed_document::Entity::find();
     let mut condition = Condition::any();
 
     for result in &mut *results {
-        condition = condition.add(indexed_document::Column::Url.eq(result.url.as_str()));
+        if let Some(url) = &result.canonical_url {
+            condition = condition.add(indexed_document::Column::Url.eq(url.as_str()));
+        }
     }
     let existing: Vec<indexed_document::Model> = find
         .filter(condition)
@@ -117,42 +148,43 @@ async fn process_records(state: &AppState, results: &mut Vec<CrawlResult>) {
         Ok(transaction) => {
             let mut updates = Vec::new();
             for crawl_result in results {
-                if let Some(content) = &crawl_result.content {
-                    log::debug!("Cache Pipeline got content");
-                    let url = Url::parse(&crawl_result.url).expect("Invalid crawl URL");
-                    let url_host = url.host_str().expect("Invalid URL host");
+                let canonical_url = &crawl_result
+                    .canonical_url
+                    .clone()
+                    .unwrap_or(String::from(""));
+                let url = Url::parse(canonical_url).expect("Invalid crawl URL");
+                let url_host = url.host_str().expect("Invalid URL host");
 
-                    // Add document to index
-                    let doc_id: Option<String> = {
-                        if let Ok(mut index_writer) = state.index.writer.lock() {
-                            match Searcher::upsert_document(
-                                &mut index_writer,
-                                id_map.get(&crawl_result.url).cloned(),
-                                &crawl_result.title.clone().unwrap_or_default(),
-                                &crawl_result.description.clone().unwrap_or_default(),
-                                url_host,
-                                url.as_str(),
-                                &content,
-                            ) {
-                                Ok(new_doc_id) => Some(new_doc_id),
-                                _ => None,
-                            }
-                        } else {
-                            None
+                // Add document to index
+                let doc_id: Option<String> = {
+                    if let Ok(mut index_writer) = state.index.writer.lock() {
+                        match Searcher::upsert_document(
+                            &mut index_writer,
+                            id_map.get(canonical_url).cloned(),
+                            &crawl_result.title.clone().unwrap_or_default(),
+                            &crawl_result.description.clone(),
+                            url_host,
+                            url.as_str(),
+                            &crawl_result.content,
+                        ) {
+                            Ok(new_doc_id) => Some(new_doc_id),
+                            _ => None,
                         }
-                    };
+                    } else {
+                        None
+                    }
+                };
 
-                    if let Some(new_id) = doc_id {
-                        if id_map.contains_key(&new_id) == false {
-                            let update = indexed_document::ActiveModel {
-                                domain: Set(url_host.to_string()),
-                                url: Set(url.as_str().to_string()),
-                                doc_id: Set(new_id),
-                                ..Default::default()
-                            };
+                if let Some(new_id) = doc_id {
+                    if id_map.contains_key(&new_id) == false {
+                        let update = indexed_document::ActiveModel {
+                            domain: Set(url_host.to_string()),
+                            url: Set(url.as_str().to_string()),
+                            doc_id: Set(new_id),
+                            ..Default::default()
+                        };
 
-                            updates.push(update);
-                        }
+                        updates.push(update);
                     }
                 }
             }
@@ -160,7 +192,7 @@ async fn process_records(state: &AppState, results: &mut Vec<CrawlResult>) {
             let doc_insert = indexed_document::Entity::insert_many(updates)
                 .on_conflict(
                     entities::sea_orm::sea_query::OnConflict::columns(vec![
-                        indexed_document::Column::OpenUrl,
+                        indexed_document::Column::Url,
                     ])
                     .do_nothing()
                     .to_owned(),

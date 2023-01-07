@@ -40,6 +40,7 @@ sentry-tracing = "0.29.0"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 shared = { path = "../shared" }
+spyglass-netrunner = { git = "https://github.com/spyglass-search/netrunner.git", branch = "main" }
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 tantivy = "0.18"

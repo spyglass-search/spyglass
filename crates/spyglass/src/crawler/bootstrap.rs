@@ -128,7 +128,7 @@ pub async fn bootstrap_lens_cache(state: &AppState, config: &Config, lens: &Lens
                 }
             }
             true
-        },
+        }
         Ok((Option::None, Some(_))) => {
             // No new cache, but a cache has been processed in the past
             true
