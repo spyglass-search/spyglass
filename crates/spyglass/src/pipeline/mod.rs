@@ -1,3 +1,4 @@
+pub mod cache_pipeline;
 pub mod collector;
 pub mod default_pipeline;
 pub mod parser;
@@ -11,6 +12,7 @@ use shared::config::PipelineConfiguration;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
+use std::path::PathBuf;
 use tokio::sync::mpsc;
 
 // The pipeline context is a context object that is passed between
@@ -39,6 +41,7 @@ impl PipelineContext {
 #[derive(Debug, Clone)]
 pub enum PipelineCommand {
     ProcessUrl(String, CrawlTask),
+    ProcessCache(PathBuf),
 }
 
 // General pipeline initialize function. This function will read the lenses and pipelines
@@ -125,6 +128,9 @@ pub async fn initialize_pipelines(
                             fail_crawl_cmd(&app_state, task.id).await;
                         }
                     }
+                }
+                PipelineCommand::ProcessCache(cache_file) => {
+                    cache_pipeline::process_update(app_state.clone(), cache_file).await;
                 }
             }
         }

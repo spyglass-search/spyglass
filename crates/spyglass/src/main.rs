@@ -191,6 +191,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
+        config.clone(),
         worker_cmd_rx,
         pause_tx.subscribe(),
     ));

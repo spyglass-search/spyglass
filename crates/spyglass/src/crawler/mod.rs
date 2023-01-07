@@ -20,7 +20,9 @@ use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use crate::state::AppState;
 
+pub mod archive;
 pub mod bootstrap;
+pub mod cache;
 pub mod client;
 pub mod robots;
 

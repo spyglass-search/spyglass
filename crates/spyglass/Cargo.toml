@@ -32,6 +32,7 @@ open = "3.0"
 percent-encoding = "2.2"
 regex = "1"
 reqwest = "0.11"
+flate2 = "1.0.24"
 ron = "0.8"
 rusqlite = { version = "*", features = ["bundled"] }
 sentry = "0.29.0"
@@ -53,6 +54,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
 url = "2.2"
 uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
 warp = "0.3"
+warc = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
 

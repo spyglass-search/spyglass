@@ -53,6 +53,9 @@ pub async fn pipeline_loop(
                     );
                     start_crawl(state.clone(), &pipeline, &collector, &parser, crawl_task).await;
                 }
+                PipelineCommand::ProcessCache(_) => { 
+                    // noop 
+                }
             }
         }
 
@@ -77,7 +80,7 @@ async fn start_crawl(
 
     match collection_result {
         Ok(result) => {
-            let parse_result = parser.parse(&mut context, task.id, &result.content).await;
+            let parse_result = parser.parse(&mut context, &result.content).await;
 
             match parse_result {
                 Ok(parse_result) => {

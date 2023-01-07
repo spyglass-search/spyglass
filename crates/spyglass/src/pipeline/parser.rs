@@ -16,7 +16,6 @@ impl DefaultParser {
     pub async fn parse(
         &self,
         _context: &mut PipelineContext,
-        _task_id: i64,
         crawl_result: &CrawlResult,
     ) -> Result<ParseResult, String> {
         if let Some(raw_content) = &crawl_result.content {

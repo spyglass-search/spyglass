@@ -12,6 +12,7 @@ pub struct Model {
     /// Domain for this document, used to implement per domain crawl limits.
     pub domain: String,
     /// URL that was indexed.
+    #[sea_orm(unique)]
     pub url: String,
     /// URL used to open in a file/browser window.
     pub open_url: Option<String>,

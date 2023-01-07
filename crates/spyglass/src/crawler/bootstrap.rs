@@ -16,9 +16,12 @@ use url::Url;
 use entities::models::crawl_queue::{self, EnqueueSettings};
 use entities::models::tag::TagType;
 use entities::sea_orm::DatabaseConnection;
-use shared::config::{LensConfig, UserSettings};
+use shared::config::{Config, LensConfig, UserSettings};
 
+use crate::pipeline::PipelineCommand;
 use crate::state::AppState;
+
+use super::cache;
 
 // Using Internet Archive's CDX because it's faster & more reliable.
 const ARCHIVE_CDX_ENDPOINT: &str = "https://web.archive.org/cdx/search/cdx";
@@ -108,6 +111,33 @@ async fn fetch_cdx_page(
         }
     })
     .await
+}
+
+/// Bootstraps a lens using cache. If a cache file exists (either already existed or freshly downloaded) a process cache
+/// pipeline command will be kicked off. In the case that no cache exists and no cache has ever existed then false is
+/// returned.
+pub async fn bootstrap_lens_cache(state: &AppState, config: &Config, lens: &LensConfig) -> bool {
+    let cache_result = cache::update_cache(state, config, &lens.name).await;
+    match cache_result {
+        Ok((Some(cache_file), _)) => {
+            if let Some(pipeline_tx) = state.pipeline_cmd_tx.lock().await.as_mut() {
+                log::debug!("Sending cache task to pipeline");
+                let cmd = PipelineCommand::ProcessCache(cache_file);
+                if let Err(err) = pipeline_tx.send(cmd).await {
+                    log::error!("Unable to send cache task to pipeline {:?}", err);
+                }
+            }
+            true
+        },
+        Ok((Option::None, Some(_))) => {
+            // No new cache, but a cache has been processed in the past
+            true
+        }
+        _ => {
+            // Error accessing cache or no cache exists / was ever processed
+            false
+        }
+    }
 }
 
 /// Bootstraps a URL prefix by grabbing all the archived URLs from the past year
