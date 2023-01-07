@@ -67,11 +67,11 @@ pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<()> {
 
 // Finds the lens using the lens name
 pub async fn find_by_name(
-    lens_name: &String,
+    lens_name: &str,
     db: &DatabaseConnection,
 ) -> Result<Option<Model>, sea_orm::DbErr> {
     Entity::find()
-        .filter(Column::Name.eq(lens_name.clone()))
+        .filter(Column::Name.eq(lens_name.to_owned()))
         .one(db)
         .await
 }

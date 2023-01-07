@@ -127,7 +127,7 @@ async fn start_crawl(
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
                             let _ = Searcher::delete_by_id(&state, &doc.doc_id).await;
-                            let _ = Searcher::save(&state);
+                            let _ = Searcher::save(&state).await;
                         }
 
                         // Add document to index

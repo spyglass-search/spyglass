@@ -31,7 +31,7 @@ pub fn read_warc(path: &Path) -> anyhow::Result<impl Iterator<Item = Option<Arch
                 });
             }
         }
-        return Option::None;
+        Option::None
     });
 
     return Ok(record_itr);

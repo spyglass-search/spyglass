@@ -3,7 +3,7 @@ use notify::{EventKind, RecursiveMode, Watcher};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
-use shared::config::{Config, LensConfig};
+use shared::config::Config;
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;

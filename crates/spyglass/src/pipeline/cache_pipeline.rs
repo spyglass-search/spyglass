@@ -1,19 +1,15 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::thread;
 use std::time::Instant;
 
 use crate::crawler::{cache, CrawlResult};
-use crate::pipeline::collector::{CollectionResult, DefaultCollector};
+use crate::pipeline::collector::CollectionResult;
 use crate::pipeline::PipelineContext;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::task::CrawlTask;
 
-use entities::models::{crawl_queue, indexed_document};
+use entities::models::indexed_document;
 use libnetrunner::parser::ParseResult;
-use shared::config::{Config, LensConfig, PipelineConfiguration};
-use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use super::parser::DefaultParser;
@@ -29,46 +25,44 @@ pub async fn process_update_warc(state: AppState, cache_path: PathBuf) {
     match records {
         Ok(mut record_iter) => {
             let mut record_list: Vec<JoinHandle<Option<CrawlResult>>> = Vec::new();
-            while let Some(record) = record_iter.next() {
-                if let Some(archive_record) = record {
-                    let result = CollectionResult {
-                        content: CrawlResult {
-                            content: Some(archive_record.content),
-                            url: archive_record.url.clone(),
-                            open_url: Some(archive_record.url),
-                            ..Default::default()
-                        },
-                    };
-                    let new_state = state.clone();
-                    let parser = DefaultParser::new();
-                    record_list.push(tokio::spawn(async move {
-                        let mut context = PipelineContext::new("Cache Pipeline", new_state.clone());
+            for archive_record in record_iter.by_ref().flatten() {
+                let result = CollectionResult {
+                    content: CrawlResult {
+                        content: Some(archive_record.content),
+                        url: archive_record.url.clone(),
+                        open_url: Some(archive_record.url),
+                        ..Default::default()
+                    },
+                };
+                let new_state = state.clone();
+                let parser = DefaultParser::new();
+                record_list.push(tokio::spawn(async move {
+                    let mut context = PipelineContext::new("Cache Pipeline", new_state.clone());
 
-                        let parse_result = parser.parse(&mut context, &result.content).await;
+                    let parse_result = parser.parse(&mut context, &result.content).await;
 
-                        match parse_result {
-                            Ok(parse_result) => {
-                                let crawl_result = parse_result.content;
-                                return Some(crawl_result);
-                            }
-                            _ => Option::None,
+                    match parse_result {
+                        Ok(parse_result) => {
+                            let crawl_result = parse_result.content;
+                            Some(crawl_result)
                         }
-                    }));
-
-                    if record_list.len() >= 500 {
-                        let mut results: Vec<CrawlResult> = Vec::new();
-                        for task in record_list {
-                            if let Ok(Some(result)) = task.await {
-                                results.push(result);
-                            }
-                        }
-                        // process_records(&state, &mut results).await;
-                        record_list = Vec::new();
+                        _ => Option::None,
                     }
+                }));
+
+                if record_list.len() >= 500 {
+                    let mut results: Vec<CrawlResult> = Vec::new();
+                    for task in record_list {
+                        if let Ok(Some(result)) = task.await {
+                            results.push(result);
+                        }
+                    }
+                    // process_records(&state, &mut results).await;
+                    record_list = Vec::new();
                 }
             }
 
-            if record_list.len() > 0 {
+            if !record_list.is_empty() {
                 let mut results: Vec<CrawlResult> = Vec::new();
                 for task in record_list {
                     if let Ok(Some(result)) = task.await {
@@ -92,22 +86,19 @@ pub async fn process_update_warc(state: AppState, cache_path: PathBuf) {
 pub async fn process_update(state: AppState, cache_path: PathBuf) {
     let now = Instant::now();
     let records = archive::read_parsed(&cache_path);
-    match records {
-        Ok(mut record_iter) => {
-            let mut record_list: Vec<ParseResult> = Vec::new();
-            while let Some(record) = record_iter.next() {
-                record_list.push(record);
-                if record_list.len() >= 5000 {
-                    process_records(&state, &mut record_list).await;
-                    record_list = Vec::new();
-                }
-            }
-
-            if record_list.len() > 0 {
+    if let Ok(mut record_iter) = records {
+        let mut record_list: Vec<ParseResult> = Vec::new();
+        for record in record_iter.by_ref() {
+            record_list.push(record);
+            if record_list.len() >= 5000 {
                 process_records(&state, &mut record_list).await;
+                record_list = Vec::new();
             }
         }
-        _ => {}
+
+        if !record_list.is_empty() {
+            process_records(&state, &mut record_list).await;
+        }
     }
 
     // attempt to remove processed cache file
@@ -138,10 +129,10 @@ async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
 
     for model in &existing {
         let _ = id_map.insert(model.url.to_string(), model.doc_id.clone());
-        let _ = Searcher::delete_by_id(&state, model.doc_id.as_str()).await;
+        let _ = Searcher::delete_by_id(state, model.doc_id.as_str()).await;
     }
 
-    let _ = Searcher::save(&state);
+    let _ = Searcher::save(state).await;
 
     let transaction_rslt = state.db.begin().await;
     match transaction_rslt {
@@ -176,7 +167,7 @@ async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
                 };
 
                 if let Some(new_id) = doc_id {
-                    if id_map.contains_key(&new_id) == false {
+                    if !id_map.contains_key(&new_id) {
                         let update = indexed_document::ActiveModel {
                             domain: Set(url_host.to_string()),
                             url: Set(url.as_str().to_string()),

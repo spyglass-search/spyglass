@@ -1,7 +1,4 @@
-use entities::{
-    models::{indexed_document, lens},
-    sea_orm::Statement,
-};
+use entities::{models::lens, sea_orm::Statement};
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::{ConnectionTrait, TransactionTrait};
 pub struct Migration;
@@ -17,7 +14,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Add lens cache column if it doesn't exist
         if let Ok(has_col) = manager.has_column("lens", "last_cache_update").await {
-            if has_col == false {
+            if !has_col {
                 manager
                     .alter_table(
                         Table::alter()
@@ -71,8 +68,8 @@ impl MigrationTrait for Migration {
                         from indexed_document where url = ? 
                         order by updated_at desc limit 1
                         )
-                    delete from document_tag where indexed_document_id in id_list and indexed_document_id not in id_keep"#
-                        .into(), vec![url.clone().into()])).await?;
+                    delete from document_tag where indexed_document_id in id_list and indexed_document_id not in id_keep"#, 
+                    vec![url.clone().into()])).await?;
 
                 // delete indexed documents
                 txn.execute(Statement::from_sql_and_values(
@@ -87,8 +84,7 @@ impl MigrationTrait for Migration {
                         from indexed_document where url = ? 
                         order by updated_at desc limit 1
                         )
-                    delete from indexed_document where id in id_list and id not in id_keep"#
-                        .into(),
+                    delete from indexed_document where id in id_list and id not in id_keep"#,
                     vec![url.into()],
                 ))
                 .await?;

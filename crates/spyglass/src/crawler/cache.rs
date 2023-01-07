@@ -1,9 +1,7 @@
-use bytes::{Buf, Bytes};
 use chrono::{DateTime, ParseResult, TimeZone, Utc};
 use entities::models::lens;
 use entities::sea_orm::DatabaseConnection;
-use flate2::bufread::GzDecoder;
-use std::{io::Read, path::PathBuf};
+use std::path::PathBuf;
 
 use http::HeaderValue;
 use reqwest::header::{HeaderMap, IF_MODIFIED_SINCE, LAST_MODIFIED};
@@ -31,7 +29,7 @@ pub async fn update_cache(
     let update_time = get_last_cached(app_state, lens).await;
     let client = reqwest::Client::new();
 
-    let lens_cache_file = format!("{}/parsed.gz", lens);
+    let lens_cache_file = format!("{lens}/parsed.gz");
 
     // Add modified since header if a last update time exists
     let mut headers = HeaderMap::new();
@@ -44,7 +42,7 @@ pub async fn update_cache(
     }
 
     let req = client
-        .get(format!("{}{}", CACHE_ROOT, lens_cache_file))
+        .get(format!("{CACHE_ROOT}{lens_cache_file}"))
         .headers(headers);
     log::debug!("Requesting cache file {:?}", req);
     let resp = req.send().await;
@@ -55,17 +53,17 @@ pub async fn update_cache(
             let cache_file = cache_dir.join(lens).join("parsed.ron.gz");
             if resp.status().is_success() {
                 store_cache(lens, resp, &cache_file, &app_state.db).await?;
-                return Ok((Option::Some(cache_file), update_time));
+                Ok((Option::Some(cache_file), update_time))
             } else {
                 if cache_file.exists() {
                     return Ok((Option::Some(cache_file), update_time));
                 }
-                return Ok((Option::None, update_time));
+                Ok((Option::None, update_time))
             }
         }
         Err(err) => {
             log::error!("Error accessing cache - {:?}", err);
-            return Ok((Option::None, update_time));
+            Ok((Option::None, update_time))
         }
     }
 }

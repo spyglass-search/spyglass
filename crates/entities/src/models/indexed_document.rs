@@ -1,6 +1,6 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set, Condition};
+use sea_orm::{Condition, ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
 
 use super::tag::{get_or_create, TagPair};
 
@@ -157,7 +157,10 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
     if !removed.is_empty() {
         log::info!("removed {} docs due to '{}'", removed.len(), rule);
     }
-    Ok(removed.into_iter().map(|(id, doc_id)| doc_id).collect::<Vec<String>>())
+    Ok(removed
+        .into_iter()
+        .map(|(_id, doc_id)| doc_id)
+        .collect::<Vec<String>>())
 }
 
 #[cfg(test)]

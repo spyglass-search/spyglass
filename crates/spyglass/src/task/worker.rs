@@ -21,7 +21,7 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
     log::debug!("Bootstrapping Lens");
     match &lens.lens_source {
         LensSource::Remote(_) => {
-            if bootstrap::bootstrap_lens_cache(state, config, lens).await == false {
+            if !(bootstrap::bootstrap_lens_cache(state, config, lens).await) {
                 process_lens(state, lens).await;
             }
         }
@@ -36,7 +36,7 @@ async fn process_lens(state: &AppState, lens: &LensConfig) -> () {
     for domain in lens.domains.iter() {
         let pipeline_kind = lens.pipeline.as_ref().cloned();
 
-        let seed_url = format!("https://{}", domain);
+        let seed_url = format!("https://{domain}");
         let _ = state
             .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
                 lens: lens.name.clone(),
@@ -46,8 +46,8 @@ async fn process_lens(state: &AppState, lens: &LensConfig) -> () {
             .await;
     }
 
-    process_urls(&lens, &state).await;
-    process_lens_rules(&lens, &state).await;
+    process_urls(lens, state).await;
+    process_lens_rules(lens, state).await;
 }
 
 // Process the urls by adding them to the crawl queue or bootstrapping the urls
@@ -313,10 +313,7 @@ pub async fn process_crawl(
                 ) {
                     Ok(new_doc_id) => new_doc_id,
                     Err(err) => {
-                        return Err(CrawlError::Other(format!(
-                            "Unable to save document: {}",
-                            err
-                        )));
+                        return Err(CrawlError::Other(format!("Unable to save document: {err}")));
                     }
                 }
             } else {
@@ -364,7 +361,7 @@ pub async fn process_crawl(
                     Ok(FetchResult::New)
                 }
             }
-            Err(e) => Err(CrawlError::Other(format!("Unable to save document: {}", e))),
+            Err(e) => Err(CrawlError::Other(format!("Unable to save document: {e}"))),
         };
     }
 
