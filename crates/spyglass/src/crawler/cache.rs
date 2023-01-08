@@ -75,7 +75,7 @@ pub fn delete_cache(cache_path: &PathBuf) -> std::io::Result<()> {
 
 // Helper method used to return timestamp of the last time the lens cache was
 // downloaded
-async fn get_last_cached(state: &AppState, lens: &String) -> Option<DateTime<Utc>> {
+async fn get_last_cached(state: &AppState, lens: &str) -> Option<DateTime<Utc>> {
     let item = lens::find_by_name(lens, &state.db).await;
     match item {
         Ok(Some(model)) => model.last_cache_update,

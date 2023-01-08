@@ -142,7 +142,7 @@ async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
                 let canonical_url = &crawl_result
                     .canonical_url
                     .clone()
-                    .unwrap_or(String::from(""));
+                    .unwrap_or_else(|| String::from(""));
                 let url = Url::parse(canonical_url).expect("Invalid crawl URL");
                 let url_host = url.host_str().expect("Invalid URL host");
 

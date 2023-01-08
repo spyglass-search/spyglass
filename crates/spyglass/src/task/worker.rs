@@ -17,7 +17,7 @@ use crate::state::AppState;
 /// If no cache is accessible then we run the standard bootstrap process. Local lenses use
 /// the standard bootstrap process
 #[tracing::instrument(skip(state, config, lens))]
-pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &LensConfig) -> () {
+pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &LensConfig) {
     log::debug!("Bootstrapping Lens");
     match &lens.lens_source {
         LensSource::Remote(_) => {
@@ -32,7 +32,7 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
 }
 
 // Process lens by kicking off a bootstrap for the lens
-async fn process_lens(state: &AppState, lens: &LensConfig) -> () {
+async fn process_lens(state: &AppState, lens: &LensConfig) {
     for domain in lens.domains.iter() {
         let pipeline_kind = lens.pipeline.as_ref().cloned();
 

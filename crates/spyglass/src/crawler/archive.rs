@@ -34,7 +34,7 @@ pub fn read_warc(path: &Path) -> anyhow::Result<impl Iterator<Item = Option<Arch
         Option::None
     });
 
-    return Ok(record_itr);
+    Ok(record_itr)
 }
 
 // Reads the parsed cache file and provides the contents as an iterator
