@@ -124,7 +124,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE UNIQUE INDEX `idx-crawl-tag-doc-id-tag-id` ON `crawl_tag` (`crawl_queue_id`, `tag_id`);"
+                "CREATE UNIQUE INDEX IF NOT EXISTS `idx-crawl-tag-doc-id-tag-id` ON `crawl_tag` (`crawl_queue_id`, `tag_id`);"
                     .to_string(),
             ))
             .await?;
