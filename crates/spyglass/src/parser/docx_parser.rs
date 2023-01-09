@@ -67,7 +67,7 @@ pub fn parse(file_path: &Path) -> io::Result<String> {
             log::warn!("Error reading Docx file {:?}", doc_err);
             Err(Error::new(
                 ErrorKind::InvalidData,
-                format!("Error reading Docx file {:?}", doc_err),
+                format!("Error reading Docx file {doc_err:?}"),
             ))
         }
     }

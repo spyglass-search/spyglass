@@ -237,12 +237,12 @@ impl fmt::Debug for Node {
         match *self {
             Node::Document => write!(f, "Document"),
             Node::Fragment => write!(f, "Fragment"),
-            Node::Doctype(ref d) => write!(f, "Doctype({:?})", d),
-            Node::Comment(ref c) => write!(f, "Comment({:?})", c),
-            Node::Text(ref t) => write!(f, "Text({:?})", t),
-            Node::Element(ref e) => write!(f, "Element({:?})", e),
+            Node::Doctype(ref d) => write!(f, "Doctype({d:?})"),
+            Node::Comment(ref c) => write!(f, "Comment({c:?})"),
+            Node::Text(ref t) => write!(f, "Text({t:?})"),
+            Node::Element(ref e) => write!(f, "Element({e:?})"),
             Node::ProcessingInstruction(ref pi) => {
-                write!(f, "ProcessingInstruction({:?})", pi)
+                write!(f, "ProcessingInstruction({pi:?})")
             }
         }
     }

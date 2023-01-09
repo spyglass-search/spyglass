@@ -38,7 +38,7 @@ pub fn parse(file_path: &Path) -> io::Result<String> {
         }
         Err(error) => {
             log::error!("Error opening file {:?}. Error: {:?}", file_path, error);
-            Err(Error::new(ErrorKind::InvalidData, format!("{:?}", error)))
+            Err(Error::new(ErrorKind::InvalidData, format!("{error:?}")))
         }
     }
 }
