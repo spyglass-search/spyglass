@@ -6,7 +6,7 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub use spyglass_lens::{LensConfig, LensRule, PipelineConfiguration};
+pub use spyglass_lens::{LensConfig, LensRule, LensSource, PipelineConfiguration};
 
 use crate::{
     form::{FormType, SettingOpts},
@@ -331,6 +331,10 @@ impl Config {
 
     pub fn lenses_dir(&self) -> PathBuf {
         self.data_dir().join("lenses")
+    }
+
+    pub fn cache_dir(&self) -> PathBuf {
+        self.data_dir().join("cache")
     }
 
     pub fn pipelines_dir(&self) -> PathBuf {

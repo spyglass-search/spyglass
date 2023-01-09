@@ -53,6 +53,9 @@ pub async fn pipeline_loop(
                     );
                     start_crawl(state.clone(), &pipeline, &collector, &parser, crawl_task).await;
                 }
+                PipelineCommand::ProcessCache(_) => {
+                    // noop
+                }
             }
         }
 
@@ -77,7 +80,7 @@ async fn start_crawl(
 
     match collection_result {
         Ok(result) => {
-            let parse_result = parser.parse(&mut context, task.id, &result.content).await;
+            let parse_result = parser.parse(&mut context, &result.content).await;
 
             match parse_result {
                 Ok(parse_result) => {
@@ -124,7 +127,7 @@ async fn start_crawl(
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
                             let _ = Searcher::delete_by_id(&state, &doc.doc_id).await;
-                            let _ = Searcher::save(&state);
+                            let _ = Searcher::save(&state).await;
                         }
 
                         // Add document to index

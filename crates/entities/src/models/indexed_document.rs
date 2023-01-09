@@ -1,6 +1,6 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
+use sea_orm::{Condition, ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
 
 use super::tag::{get_or_create, TagPair};
 
@@ -12,6 +12,7 @@ pub struct Model {
     /// Domain for this document, used to implement per domain crawl limits.
     pub domain: String,
     /// URL that was indexed.
+    #[sea_orm(unique)]
     pub url: String,
     /// URL used to open in a file/browser window.
     pub open_url: Option<String>,
@@ -137,8 +138,16 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
 
     let removed = matching
         .iter()
-        .map(|x| x.doc_id.to_string())
-        .collect::<Vec<String>>();
+        .map(|x| (x.id, x.doc_id.to_string()))
+        .collect::<Vec<(i64, String)>>();
+
+    let tag_del = document_tag::Entity::delete_many();
+    let mut condition = Condition::any();
+
+    for (id, _) in &removed {
+        condition = condition.add(document_tag::Column::IndexedDocumentId.eq(*id));
+    }
+    tag_del.filter(condition).exec(db).await?;
 
     let _ = Entity::delete_many()
         .filter(Column::Url.like(rule))
@@ -148,7 +157,10 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
     if !removed.is_empty() {
         log::info!("removed {} docs due to '{}'", removed.len(), rule);
     }
-    Ok(removed)
+    Ok(removed
+        .into_iter()
+        .map(|(_id, doc_id)| doc_id)
+        .collect::<Vec<String>>())
 }
 
 #[cfg(test)]

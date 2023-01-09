@@ -17,6 +17,7 @@ dirs = "4.0"
 docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
 ego-tree = "0.6.2"
 entities = { path = "../entities" }
+flate2 = "1.0.24"
 futures = "0.3"
 google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4" }
 hex = "0.4"
@@ -40,6 +41,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 shared = { path = "../shared", features = ["metrics"] }
+spyglass-netrunner = { git = "https://github.com/spyglass-search/netrunner.git", branch = "main" }
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"
@@ -56,6 +58,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
 url = "2.2"
 uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
 warp = "0.3"
+warc = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
 

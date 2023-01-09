@@ -34,6 +34,8 @@ pub struct Model {
     // Trigger doesn't have to be unique, we can have multiple lenses contributing to
     // the same trigger. Can also be user updatable.
     pub trigger: Option<String>,
+    // Indicates the last time the cache was updated
+    pub last_cache_update: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -61,6 +63,38 @@ pub async fn reset(db: &DatabaseConnection) -> anyhow::Result<()> {
         .await?;
 
     Ok(())
+}
+
+// Finds the lens using the lens name
+pub async fn find_by_name(
+    lens_name: &str,
+    db: &DatabaseConnection,
+) -> Result<Option<Model>, sea_orm::DbErr> {
+    Entity::find()
+        .filter(Column::Name.eq(lens_name.to_owned()))
+        .one(db)
+        .await
+}
+
+// Updates the lens row in the database with the new cache time
+pub async fn update_cache_time(
+    lens_name: &String,
+    date: DateTimeUtc,
+    db: &DatabaseConnection,
+) -> anyhow::Result<bool> {
+    let exists = Entity::find()
+        .filter(Column::Name.eq(lens_name.clone()))
+        .one(db)
+        .await?;
+
+    if let Some(existing) = exists {
+        log::debug!("Updating lens: {} with new cache date {}", lens_name, date);
+        let mut updated: ActiveModel = existing.clone().into();
+        updated.last_cache_update = Set(Option::Some(date));
+        updated.update(db).await?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 /// True if the lens was added, False if it already exists.

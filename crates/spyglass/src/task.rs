@@ -21,6 +21,9 @@ pub struct CrawlTask {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CollectTask {
+    BootstrapLens {
+        lens: String,
+    },
     // Pull URLs from a CDX server
     Bootstrap {
         lens: String,
@@ -135,6 +138,7 @@ pub async fn manager_task(
 /// Grabs a task
 pub async fn worker_task(
     state: AppState,
+    config: Config,
     mut queue: mpsc::Receiver<WorkerCommand>,
     mut pause_rx: broadcast::Receiver<AppPause>,
 ) {
@@ -169,6 +173,19 @@ pub async fn worker_task(
                 if let Some(cmd) = res {
                     match cmd {
                         WorkerCommand::Collect(task) => match task {
+                            CollectTask::BootstrapLens {
+                                lens
+                            } => {
+                                log::debug!("Handling Bootstrap for {}", lens);
+                                let state = state.clone();
+                                let config = config.clone();
+                                tokio::spawn(async move {
+                                    if let Some(lens_config) = &state.lenses.get(&lens) {
+                                        worker::handle_bootstrap_lens(&state, &config, lens_config)
+                                            .await;
+                                    }
+                                });
+                            },
                             CollectTask::Bootstrap {
                                 lens,
                                 seed_url,

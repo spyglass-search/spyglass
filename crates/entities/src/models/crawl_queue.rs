@@ -623,6 +623,10 @@ pub async fn update_or_remove_task(
     // Task already exists w/ this URL, remove this one.
     if let Some(existing) = existing_task {
         if existing.id != id {
+            crawl_tag::Entity::delete_many()
+                .filter(crawl_tag::Column::CrawlQueueId.eq(id))
+                .exec(db)
+                .await?;
             Entity::delete_by_id(id).exec(db).await?;
         }
 

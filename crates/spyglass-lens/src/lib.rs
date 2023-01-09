@@ -23,6 +23,22 @@ pub enum LensRule {
     SkipURL(String),
 }
 
+/// The lens source is used to identify if the lens was provided by a remote
+/// lens provider or if it is a locally created lens. Depending on the
+/// provider different features might be available
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub enum LensSource {
+    /**
+     * Lens sourced locally
+     */
+    #[default]
+    Local,
+    /**
+     * Lens download from a remote source
+     */
+    Remote(String),
+}
+
 impl fmt::Display for LensRule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -71,6 +87,8 @@ pub struct LensConfig {
     pub trigger: String,
     #[serde(default)]
     pub pipeline: Option<String>,
+    #[serde(default)]
+    pub lens_source: LensSource,
     // Used internally & should not be serialized/deserialized
     #[serde(skip)]
     pub file_path: PathBuf,
