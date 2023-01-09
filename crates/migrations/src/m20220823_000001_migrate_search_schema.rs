@@ -159,9 +159,7 @@ impl MigrationTrait for Migration {
             }
         }
 
-        println!(
-            "Migrating index @ {old_index_path:?} to {new_index_path:?}"
-        );
+        println!("Migrating index @ {old_index_path:?} to {new_index_path:?}");
 
         let old_schema = mapping_to_schema(&self.before_schema());
         let new_schema = mapping_to_schema(&self.after_schema());

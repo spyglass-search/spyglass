@@ -43,9 +43,7 @@ impl FormType {
                 if existence_check.exists() {
                     Ok(value)
                 } else {
-                    Err(format!(
-                        "Path \"{value}\" is not accessible/does not exist"
-                    ))
+                    Err(format!("Path \"{value}\" is not accessible/does not exist"))
                 }
             }
             FormType::PathList => {
