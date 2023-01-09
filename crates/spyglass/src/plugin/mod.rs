@@ -552,7 +552,7 @@ fn wasi_write_string(env: &WasiEnv, buf: &str) -> anyhow::Result<()> {
         .stdin_mut()?
         .as_mut()
         .ok_or_else(|| anyhow::Error::msg("Unable to get stdin pipe"))?;
-    writeln!(stdin, "{}\r", buf)?;
+    writeln!(stdin, "{buf}\r")?;
     Ok(())
 }
 

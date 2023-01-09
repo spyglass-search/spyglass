@@ -86,7 +86,7 @@ async fn handle_plugin_cmd_request(
         PluginCommandRequest::SqliteQuery { path, query } => {
             let db_path = env.data_dir.join(path);
             if !db_path.exists() {
-                return Err(Error::msg(format!("Invalid sqlite db path: {}", path)));
+                return Err(Error::msg(format!("Invalid sqlite db path: {path}")));
             }
 
             let conn = Connection::open(db_path)?;

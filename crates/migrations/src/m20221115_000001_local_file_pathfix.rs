@@ -196,8 +196,7 @@ impl MigrationTrait for Migration {
 
         if let Err(err) = iwriter.commit() {
             return Err(DbErr::Custom(format!(
-                "Unable to save changes to index: {}",
-                err
+                "Unable to save changes to index: {err}"
             )));
         }
 

@@ -44,8 +44,7 @@ impl FormType {
                     Ok(value)
                 } else {
                     Err(format!(
-                        "Path \"{}\" is not accessible/does not exist",
-                        value
+                        "Path \"{value}\" is not accessible/does not exist"
                     ))
                 }
             }
@@ -59,8 +58,7 @@ impl FormType {
                             let check = Path::new(&path);
                             if !check.exists() {
                                 return Err(format!(
-                                    "Path \"{}\" is not accessible/does not exist",
-                                    path
+                                    "Path \"{path}\" is not accessible/does not exist"
                                 ));
                             }
                         }

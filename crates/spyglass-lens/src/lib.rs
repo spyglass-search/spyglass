@@ -42,8 +42,8 @@ pub enum LensSource {
 impl fmt::Display for LensRule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LimitURLDepth(url, depth) => write!(f, "LimitURLDepth(\"{}\", {})", url, depth),
-            Self::SkipURL(url) => write!(f, "SkipURL(\"{}\")", url,),
+            Self::LimitURLDepth(url, depth) => write!(f, "LimitURLDepth(\"{url}\", {depth})"),
+            Self::SkipURL(url) => write!(f, "SkipURL(\"{url}\")",),
         }
     }
 }
@@ -53,7 +53,7 @@ impl LensRule {
         match &self {
             LensRule::LimitURLDepth(prefix, max_depth) => {
                 let prefix = prefix.trim_end_matches('/');
-                let regex = format!("^{}/?(/[^/]+/?){{0, {}}}$", prefix, max_depth);
+                let regex = format!("^{prefix}/?(/[^/]+/?){{0, {max_depth}}}$");
                 regex
             }
             LensRule::SkipURL(rule_str) => {
