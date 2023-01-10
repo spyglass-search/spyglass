@@ -131,7 +131,7 @@ pub async fn indexed_stats(
 /// Inserts an entry into the tag table for each document and
 /// tag pair provided
 pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &Vec<Model>,
+    docs: &[Model],
     db: &C,
     tags: &[TagPair],
 ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
@@ -146,7 +146,7 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
     // create connections for each tag
     let doc_tags = docs
         .iter()
-        .map(|model| {
+        .flat_map(|model| {
             tag_models.iter().map(|t| document_tag::ActiveModel {
                 indexed_document_id: Set(model.id),
                 tag_id: Set(t.id),
@@ -155,7 +155,6 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
                 ..Default::default()
             })
         })
-        .flatten()
         .collect::<Vec<document_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates

@@ -112,7 +112,7 @@ pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) 
 // 2. Remove any documents that already exist from the index
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
-async fn process_records(state: &AppState, lens: &String, results: &mut Vec<ParseResult>) {
+async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseResult>) {
     let find = indexed_document::Entity::find();
     let mut condition = Condition::any();
 
@@ -213,7 +213,7 @@ async fn process_records(state: &AppState, lens: &String, results: &mut Vec<Pars
                         let result = indexed_document::insert_tags_many(
                             &added_entries,
                             &state.db,
-                            &vec![(TagType::Lens, lens.clone())],
+                            &[(TagType::Lens, lens.to_string())],
                         )
                         .await;
                         if let Err(error) = result {
