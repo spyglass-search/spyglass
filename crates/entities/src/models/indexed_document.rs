@@ -128,6 +128,49 @@ pub async fn indexed_stats(
     Ok(res)
 }
 
+/// Inserts an entry into the tag table for each document and
+/// tag pair provided
+pub async fn insert_tags_many<C: ConnectionTrait>(
+    docs: &[Model],
+    db: &C,
+    tags: &[TagPair],
+) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+    let mut tag_models: Vec<tag::Model> = Vec::new();
+    for (label, value) in tags.iter() {
+        match get_or_create(db, label.to_owned(), value).await {
+            Ok(tag) => tag_models.push(tag),
+            Err(err) => log::error!("{}", err),
+        }
+    }
+
+    // create connections for each tag
+    let doc_tags = docs
+        .iter()
+        .flat_map(|model| {
+            tag_models.iter().map(|t| document_tag::ActiveModel {
+                indexed_document_id: Set(model.id),
+                tag_id: Set(t.id),
+                created_at: Set(chrono::Utc::now()),
+                updated_at: Set(chrono::Utc::now()),
+                ..Default::default()
+            })
+        })
+        .collect::<Vec<document_tag::ActiveModel>>();
+
+    // Insert connections, ignoring duplicates
+    document_tag::Entity::insert_many(doc_tags)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![
+                document_tag::Column::IndexedDocumentId,
+                document_tag::Column::TagId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(db)
+        .await
+}
+
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected
 /// to be a SQL like statement.
 pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {

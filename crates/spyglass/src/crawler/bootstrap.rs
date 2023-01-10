@@ -122,7 +122,7 @@ pub async fn bootstrap_lens_cache(state: &AppState, config: &Config, lens: &Lens
         Ok((Some(cache_file), _)) => {
             if let Some(pipeline_tx) = state.pipeline_cmd_tx.lock().await.as_mut() {
                 log::debug!("Sending cache task to pipeline");
-                let cmd = PipelineCommand::ProcessCache(cache_file);
+                let cmd = PipelineCommand::ProcessCache(lens.name.clone(), cache_file);
                 if let Err(err) = pipeline_tx.send(cmd).await {
                     log::error!("Unable to send cache task to pipeline {:?}", err);
                 }
