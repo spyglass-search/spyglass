@@ -123,15 +123,18 @@ pub struct DefaultBtnProps {
 pub fn default_button(props: &DefaultBtnProps) -> Html {
     let styles = classes!(
         props.classes.clone(),
-        "cursor-pointer",
         "border-neutral-600",
         "border",
+        "cursor-pointer",
         "flex-row",
         "flex",
-        "p-2",
-        "rounded-lg",
-        "text-sm",
+        "font-semibold",
         "items-center",
+        "leading-5",
+        "px-3",
+        "py-2",
+        "rounded-md",
+        "text-sm",
         if props.disabled {
             classes!("text-stone-700")
         } else {

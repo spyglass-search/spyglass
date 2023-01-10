@@ -121,7 +121,7 @@ pub fn show_crawl_stats_window(app: &AppHandle) {
 }
 
 pub fn show_lens_manager_window(app: &AppHandle) {
-    _show_tab(app, "/settings/lenses");
+    _show_tab(app, "/settings/library");
 }
 
 pub fn show_plugin_manager(app: &AppHandle) {
