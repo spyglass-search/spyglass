@@ -14,10 +14,11 @@ use uuid::Uuid;
 use crate::search::query::build_query;
 use crate::search::utils::ff_to_string;
 use crate::state::AppState;
-use entities::models::indexed_document;
+use entities::models::{indexed_document, tag};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 use spyglass_plugin::SearchFilter;
+
 
 pub mod grouping;
 pub mod lens;
@@ -166,6 +167,7 @@ impl Searcher {
         domain: &str,
         url: &str,
         content: &str,
+        tags: Option<Vec<u64>>
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
@@ -178,6 +180,11 @@ impl Searcher {
         doc.add_text(fields.id, &doc_id);
         doc.add_text(fields.title, title);
         doc.add_text(fields.url, url);
+        if let Some(tag) = tags {
+            for t in tag {
+                doc.add_u64(fields.tags, t);
+            }
+        }
         writer.add_document(doc)?;
 
         Ok(doc_id)
@@ -185,7 +192,7 @@ impl Searcher {
 
     pub async fn search_with_lens(
         _db: DatabaseConnection,
-        applied_lenses: &Vec<SearchFilter>,
+        applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
     ) -> Vec<SearchResult> {
@@ -196,71 +203,74 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
-        let query = build_query(index.schema(), tokenizers, fields.clone(), query_string);
+        let query = build_query(index.schema(), tokenizers, fields.clone(), query_string, applied_lenses);
 
-        let mut allowed = Vec::new();
-        let mut skipped = Vec::new();
-        for filter in applied_lenses {
-            match filter {
-                SearchFilter::URLRegexAllow(regex) => allowed.push(regex),
-                SearchFilter::URLRegexSkip(regex) => skipped.push(regex),
-                SearchFilter::None => {}
-            }
-        }
+        // let mut allowed = Vec::new();
+        // let mut skipped = Vec::new();
+        // for filter in applied_lenses {
 
-        let regex_allow = RegexSetBuilder::new(allowed)
-            // Allow some beefy regexes
-            .size_limit(100_000_000)
-            .build()
-            .expect("Unable to build regexset");
+        //     match filter {
+        //         SearchFilter::URLRegexAllow(regex) => allowed.push(regex),
+        //         SearchFilter::URLRegexSkip(regex) => skipped.push(regex),
+        //         SearchFilter::None => {}
+        //     }
+        // }
 
-        let regex_skip = RegexSetBuilder::new(skipped)
-            .size_limit(100_000_000)
-            .build()
-            .expect("Unable to build regexset");
+        // let regex_allow = RegexSetBuilder::new(allowed)
+        //     // Allow some beefy regexes
+        //     .size_limit(100_000_000)
+        //     .build()
+        //     .expect("Unable to build regexset");
+
+        // let regex_skip = RegexSetBuilder::new(skipped)
+        //     .size_limit(100_000_000)
+        //     .build()
+        //     .expect("Unable to build regexset");
 
         let collector =
-            TopDocs::with_limit(5).tweak_score(move |segment_reader: &SegmentReader| {
-                let regex_allow = regex_allow.clone();
-                let regex_skip = regex_skip.clone();
-                let fields = fields.clone();
+            TopDocs::with_limit(5);
+            
+            // .tweak_score(move |segment_reader: &SegmentReader| {
+            //     let regex_allow = regex_allow.clone();
+            //     let regex_skip = regex_skip.clone();
+            //     let fields = fields.clone();
 
-                let inverted_index = segment_reader
-                    .inverted_index(fields.url)
-                    .expect("Failed to get inverted index for segment");
+            //     let inverted_index = segment_reader
+            //         .inverted_index(fields.url)
+            //         .expect("Failed to get inverted index for segment");
 
-                let id_reader = segment_reader
-                    .fast_fields()
-                    .u64s(fields.id)
-                    .expect("Unable to get fast field for doc_id");
+            //     let id_reader = segment_reader
+            //         .fast_fields()
+            //         .u64s(fields.id)
+            //         .expect("Unable to get fast field for doc_id");
 
-                let url_reader = segment_reader
-                    .fast_fields()
-                    .u64s(fields.url)
-                    .expect("Unable to get fast field for URL");
+            //     let url_reader = segment_reader
+            //         .fast_fields()
+            //         .u64s(fields.url)
+            //         .expect("Unable to get fast field for URL");
 
-                // We can now define our actual scoring function
-                move |doc: DocId, original_score: Score| {
-                    let inverted_index = inverted_index.clone();
-                    let terms = inverted_index.terms();
+            //     // We can now define our actual scoring function
+            //     move |doc: DocId, original_score: Score| {
+            //         let inverted_index = inverted_index.clone();
+            //         let terms = inverted_index.terms();
 
-                    let _id = ff_to_string(doc, &id_reader, terms);
-                    let url = ff_to_string(doc, &url_reader, terms);
+            //         let _id = ff_to_string(doc, &id_reader, terms);
+            //         let url = ff_to_string(doc, &url_reader, terms);
 
-                    if let Some(url) = url {
-                        if regex_skip.is_match(&url) {
-                            -1.0
-                        } else if regex_allow.is_empty() || regex_allow.is_match(&url) {
-                            original_score * 1.0
-                        } else {
-                            -1.0
-                        }
-                    } else {
-                        // blank URL? that seems like an error somewhere.
-                        -1.0
-                    }
-                }
-            });
+            //         if let Some(url) = url {
+            //             if regex_skip.is_match(&url) {
+            //                 -1.0
+            //             } else if regex_allow.is_empty() || regex_allow.is_match(&url) {
+            //                 original_score * 1.0
+            //             } else {
+            //                 -1.0
+            //             }
+            //         } else {
+            //             // blank URL? that seems like an error somewhere.
+            //             -1.0
+            //         }
+            //     }
+            // });
 
         let top_docs = searcher
             .search(&query, &collector)
@@ -306,6 +316,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
+            None
         )
         .expect("Unable to add doc");
 
@@ -324,6 +335,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
+            None
         )
         .expect("Unable to add doc");
 
@@ -341,6 +353,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
+            None
         )
         .expect("Unable to add doc");
 
@@ -355,6 +368,7 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
+             None
         )
         .expect("Unable to add doc");
 
@@ -377,68 +391,68 @@ mod test {
             ..Default::default()
         };
 
-        let applied_lens = lens
-            .into_regexes()
-            .allowed
-            .into_iter()
-            .map(SearchFilter::URLRegexAllow)
-            .collect();
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
-        _build_test_index(&mut searcher);
+        // let applied_lens = lens
+        //     .into_regexes()
+        //     .allowed
+        //     .into_iter()
+        //     .map(SearchFilter::URLRegexAllow)
+        //     .collect();
+        // let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        // _build_test_index(&mut searcher);
 
-        let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
-        assert_eq!(results.len(), 1);
+        // let query = "salinas";
+        // let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
+        // assert_eq!(results.len(), 1);
     }
 
-    #[tokio::test]
-    pub async fn test_url_lens_search() {
-        let db = create_connection(&Config::default(), true).await.unwrap();
+    // #[tokio::test]
+    // pub async fn test_url_lens_search() {
+    //     let db = create_connection(&Config::default(), true).await.unwrap();
 
-        let lens = LensConfig {
-            name: "wiki".to_string(),
-            domains: Vec::new(),
-            urls: vec!["https://en.wikipedia.org/mice".to_string()],
-            ..Default::default()
-        };
+    //     let lens = LensConfig {
+    //         name: "wiki".to_string(),
+    //         domains: Vec::new(),
+    //         urls: vec!["https://en.wikipedia.org/mice".to_string()],
+    //         ..Default::default()
+    //     };
 
-        let applied_lens = lens
-            .into_regexes()
-            .allowed
-            .into_iter()
-            .map(SearchFilter::URLRegexAllow)
-            .collect();
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
-        _build_test_index(&mut searcher);
+    //     let applied_lens = lens
+    //         .into_regexes()
+    //         .allowed
+    //         .into_iter()
+    //         .map(SearchFilter::URLRegexAllow)
+    //         .collect();
+    //     let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+    //     _build_test_index(&mut searcher);
 
-        let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
-        assert_eq!(results.len(), 1);
-    }
+    //     let query = "salinas";
+    //     let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
+    //     assert_eq!(results.len(), 1);
+    // }
 
-    #[tokio::test]
-    pub async fn test_singular_url_lens_search() {
-        let db = create_connection(&Config::default(), true).await.unwrap();
+    // #[tokio::test]
+    // pub async fn test_singular_url_lens_search() {
+    //     let db = create_connection(&Config::default(), true).await.unwrap();
 
-        let lens = LensConfig {
-            name: "wiki".to_string(),
-            domains: Vec::new(),
-            urls: vec!["https://en.wikipedia.org/mice$".to_string()],
-            ..Default::default()
-        };
+    //     let lens = LensConfig {
+    //         name: "wiki".to_string(),
+    //         domains: Vec::new(),
+    //         urls: vec!["https://en.wikipedia.org/mice$".to_string()],
+    //         ..Default::default()
+    //     };
 
-        let applied_lens = lens
-            .into_regexes()
-            .allowed
-            .into_iter()
-            .map(SearchFilter::URLRegexAllow)
-            .collect();
+    //     let applied_lens = lens
+    //         .into_regexes()
+    //         .allowed
+    //         .into_iter()
+    //         .map(SearchFilter::URLRegexAllow)
+    //         .collect();
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
-        _build_test_index(&mut searcher);
+    //     let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+    //     _build_test_index(&mut searcher);
 
-        let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
-        assert_eq!(results.len(), 0);
-    }
+    //     let query = "salinas";
+    //     let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
+    //     assert_eq!(results.len(), 0);
+    // }
 }

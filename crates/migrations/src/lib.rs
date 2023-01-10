@@ -22,6 +22,7 @@ mod m20221123_000001_add_document_tag_constraint;
 mod m20221124_000001_add_tags_for_existing_lenses;
 mod m20221210_000001_add_crawl_tags_table;
 mod m20230104_000001_add_column_n_index;
+mod m20230110_000001_migrate_search_schema;
 mod utils;
 
 pub struct Migrator;
@@ -49,6 +50,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20221124_000001_add_tags_for_existing_lenses::Migration),
             Box::new(m20221210_000001_add_crawl_tags_table::Migration),
             Box::new(m20230104_000001_add_column_n_index::Migration),
+            Box::new(m20230110_000001_migrate_search_schema::Migration)
         ]
     }
 }

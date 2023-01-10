@@ -380,25 +380,27 @@ pub async fn search(
     let index = &state.index;
     let searcher = index.reader.searcher();
 
-    let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
-        .filter_map(|trigger| async {
-            let vec = lens_to_filters(state.clone(), trigger).await;
-            if vec.is_empty() {
-                None
-            } else {
-                Some(vec)
-            }
-        })
-        // Gather search filters
-        .collect::<Vec<Vec<SearchFilter>>>()
-        .await
-        // Flatten
-        .into_iter()
-        .flatten()
-        .collect::<Vec<SearchFilter>>();
+    let tags = tag::Entity::find().filter(tag::Column::Label.eq("lens")).filter(tag::Column::Value.is_in(search_req.lenses)).all(&state.db).await.unwrap_or_default();
+    let tag_ids = tags.iter().map(|model| model.id as u64).collect::<Vec<u64>>();
+    // let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
+    //     .filter_map(|trigger| async {
+    //         let vec = lens_to_filters(state.clone(), trigger).await;
+    //         if vec.is_empty() {
+    //             None
+    //         } else {
+    //             Some(vec)
+    //         }
+    //     })
+    //     // Gather search filters
+    //     .collect::<Vec<Vec<SearchFilter>>>()
+    //     .await
+    //     // Flatten
+    //     .into_iter()
+    //     .flatten()
+    //     .collect::<Vec<SearchFilter>>();
 
     let docs =
-        Searcher::search_with_lens(state.db.clone(), &applied, index, &search_req.query).await;
+        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &search_req.query).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {

@@ -159,6 +159,7 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
                             url_host,
                             url.as_str(),
                             &crawl_result.content,
+                            None
                         ) {
                             Ok(new_doc_id) => Some(new_doc_id),
                             _ => None,

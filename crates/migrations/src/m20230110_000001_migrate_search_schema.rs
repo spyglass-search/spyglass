@@ -24,17 +24,16 @@ impl Migration {
     pub fn before_schema(&self) -> SchemaMapping {
         SchemaMapping {
         text_fields: Some(vec![
-            // Used to reference this document
-            ("id".into(), STRING | STORED),
-            // Document contents
-            ("domain".into(), STRING | STORED),
-            ("title".into(), TEXT | STORED),
-            ("description".into(), TEXT | STORED),
-            ("url".into(), STRING | STORED),
-            // Indexed but don't store for retreival
-            ("content".into(), TEXT),
-            // Stored but not indexed
-            ("raw".into(), STORED.into()),
+             // Used to reference this document
+             ("id".into(), STRING | STORED | FAST),
+             // Document contents
+             ("domain".into(), STRING | STORED | FAST),
+             ("title".into(), TEXT | STORED | FAST),
+             // Used for display purposes
+             ("description".into(), TEXT | STORED),
+             ("url".into(), STRING | STORED | FAST),
+             // Indexed
+             ("content".into(), TEXT | STORED)
         ]),
         unsigned_fields: None
         }
@@ -53,16 +52,18 @@ impl Migration {
     pub fn after_schema(&self) -> SchemaMapping {
         SchemaMapping {
             text_fields: Some(vec![
-            ("id".into(), STRING | STORED | FAST),
-            // Document contents
-            ("domain".into(), STRING | STORED | FAST),
-            ("title".into(), TEXT | STORED | FAST),
-            ("description".into(), TEXT | STORED),
-            ("url".into(), STRING | STORED | FAST),
-            // Indexed
-            ("content".into(), TEXT | STORED),
-        ]),
-        unsigned_fields: None
+                // Used to reference this document
+                ("id".into(), STRING | STORED | FAST),
+                // Document contents
+                ("domain".into(), STRING | STORED | FAST),
+                ("title".into(), TEXT | STORED | FAST),
+                // Used for display purposes
+                ("description".into(), TEXT | STORED),
+                ("url".into(), STRING | STORED | FAST),
+                // Indexed
+                ("content".into(), TEXT | STORED)
+            ]),
+           unsigned_fields: Some(vec![("tags".into(), NumericOptions::default().set_fast(Cardinality::MultiValues).set_indexed().set_stored())])
             }
     }
 
@@ -90,8 +91,8 @@ impl Migration {
             ("description", "description"),
             // No content was saved previous, so we'll use the description as a stopgap
             // and recrawl stuff
-            ("description", "content"),
-            ("url", "url"),
+            ("content", "content"),
+            ("url", "url")
         ] {
             let new_field = new_schema.get_field(new_field).unwrap();
             let old_value = old_doc
@@ -109,7 +110,7 @@ impl Migration {
 
 impl MigrationName for Migration {
     fn name(&self) -> &str {
-        "m20220823_000001_migrate_search_schema"
+        "m20230110_000001_migrate_search_schema"
     }
 }
 
@@ -146,6 +147,8 @@ impl MigrationTrait for Migration {
                 "SELECT id, doc_id, url FROM indexed_document".to_owned(),
             ))
             .await?;
+
+
 
         // No docs yet, nothing to migrate.
         if result.is_empty() {
@@ -207,26 +210,7 @@ impl MigrationTrait for Migration {
             })
             .collect::<Vec<DbErr>>();
 
-        // Recrawl indexed docs to refresh them
-        let overrides = crawl_queue::EnqueueSettings {
-            force_allow: true,
-            is_recrawl: true,
-            ..Default::default()
-        };
-
-        if let Err(e) = crawl_queue::enqueue_all(
-            manager.get_connection(),
-            &recrawl_urls,
-            &[],
-            &config.user_settings,
-            &overrides,
-            Option::None,
-        )
-        .await
-        {
-            return Err(DbErr::Custom(format!("Unable to requeue URLs: {e}")));
-        }
-
+       
         // Save change to new index
         if let Err(e) = new_writer.commit() {
             return Err(DbErr::Custom(format!("Unable to commit changes: {e}")));

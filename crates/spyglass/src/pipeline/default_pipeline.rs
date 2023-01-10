@@ -141,6 +141,7 @@ async fn start_crawl(
                                     url_host,
                                     url.as_str(),
                                     &content,
+                                    None
                                 ) {
                                     Ok(new_doc_id) => Some(new_doc_id),
                                     _ => None,
