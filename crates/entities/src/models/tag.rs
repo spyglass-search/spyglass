@@ -142,8 +142,7 @@ where
         Ok(Some(model)) => Ok(model),
         Err(err) => Err(err),
         _ => Err(DbErr::RecordNotFound(format!(
-            "label: {}, value: {}",
-            label, value
+            "label: {label}, value: {value}"
         ))),
     }
 }

@@ -134,8 +134,7 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
         Ok(())
     } else {
         Err(Error::Custom(format!(
-            "Connection <{}> not supported",
-            api_id
+            "Connection <{api_id}> not supported"
         )))
     }
 }
@@ -200,7 +199,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-    let _ = Searcher::save(&state);
+    let _ = Searcher::save(&state).await;
     Ok(())
 }
 
@@ -209,7 +208,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
 pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error> {
     // Remove domain from bootstrap queue
     if let Err(err) =
-        bootstrap_queue::dequeue(&state.db, format!("https://{}", domain).as_str()).await
+        bootstrap_queue::dequeue(&state.db, format!("https://{domain}").as_str()).await
     {
         log::error!("Error deleting seed_url {} from DB: {}", &domain, &err);
     }
@@ -236,7 +235,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
         for result in indexed {
             let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
         }
-        let _ = Searcher::save(&state);
+        let _ = Searcher::save(&state).await;
 
         log::debug!("removed {} items from index", indexed_count);
     }

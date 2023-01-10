@@ -9,15 +9,15 @@ pub fn regex_for_domain(domain: &str) -> String {
         }
     }
 
-    format!("^(http://|https://){}.*", regex)
+    format!("^(http://|https://){regex}.*")
 }
 
 pub fn regex_for_prefix(prefix: &str) -> String {
     if prefix.ends_with('$') {
-        return format!("^{}", prefix);
+        return format!("^{prefix}");
     }
 
-    format!("^{}.*", prefix)
+    format!("^{prefix}.*")
 }
 
 /// Convert a robots.txt rule into a proper regex string

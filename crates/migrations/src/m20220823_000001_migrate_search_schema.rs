@@ -155,21 +155,18 @@ impl MigrationTrait for Migration {
 
         if !new_index_path.exists() {
             if let Err(e) = std::fs::create_dir(new_index_path.clone()) {
-                return Err(DbErr::Custom(format!("Can't create new index: {}", e)));
+                return Err(DbErr::Custom(format!("Can't create new index: {e}")));
             }
         }
 
-        println!(
-            "Migrating index @ {:?} to {:?}",
-            old_index_path, new_index_path
-        );
+        println!("Migrating index @ {old_index_path:?} to {new_index_path:?}");
 
         let old_schema = mapping_to_schema(&self.before_schema());
         let new_schema = mapping_to_schema(&self.after_schema());
         let old_reader_res = self.before_reader(&old_index_path);
         if let Err(err) = old_reader_res {
             // Potentially already migrated?
-            println!("Error opening index: {}", err);
+            println!("Error opening index: {err}");
             return Ok(());
         }
         let old_reader = old_reader_res.expect("Unable to open index for migration");
@@ -196,7 +193,7 @@ impl MigrationTrait for Migration {
                         &old_schema,
                         &new_schema,
                     )) {
-                        return Some(DbErr::Custom(format!("Unable to migrate doc: {}", e)));
+                        return Some(DbErr::Custom(format!("Unable to migrate doc: {e}")));
                     }
                 }
 
@@ -221,23 +218,22 @@ impl MigrationTrait for Migration {
         )
         .await
         {
-            return Err(DbErr::Custom(format!("Unable to requeue URLs: {}", e)));
+            return Err(DbErr::Custom(format!("Unable to requeue URLs: {e}")));
         }
 
         // Save change to new index
         if let Err(e) = new_writer.commit() {
-            return Err(DbErr::Custom(format!("Unable to commit changes: {}", e)));
+            return Err(DbErr::Custom(format!("Unable to commit changes: {e}")));
         }
 
         if let Err(e) = migration_utils::backup_dir(&old_index_path) {
-            return Err(DbErr::Custom(format!("Unable to backup old index: {}", e)));
+            return Err(DbErr::Custom(format!("Unable to backup old index: {e}")));
         }
 
         // Move new index into place.
         if let Err(e) = migration_utils::replace_dir(&new_index_path, &old_index_path) {
             return Err(DbErr::Custom(format!(
-                "Unable to move new index into place: {}",
-                e
+                "Unable to move new index into place: {e}"
             )));
         }
 

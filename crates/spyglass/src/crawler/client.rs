@@ -35,7 +35,7 @@ impl HTTPClient {
     pub async fn head(&self, url: &Url) -> anyhow::Result<Response> {
         let mut url = url.clone();
         if url.scheme() != "http" && url.scheme() != "https" {
-            return Err(anyhow::Error::msg(format!("Invalid HTTP url: {}", url)));
+            return Err(anyhow::Error::msg(format!("Invalid HTTP url: {url}")));
         }
 
         url.set_scheme("https")
@@ -58,7 +58,7 @@ impl HTTPClient {
     pub async fn get(&self, url: &Url) -> anyhow::Result<Response> {
         let mut url = url.clone();
         if url.scheme() != "http" && url.scheme() != "https" {
-            return Err(anyhow::Error::msg(format!("Invalid HTTP url: {}", url)));
+            return Err(anyhow::Error::msg(format!("Invalid HTTP url: {url}")));
         }
 
         // Attempt HTTPS first, if that fails switch to HTTP
@@ -106,7 +106,7 @@ impl HTTPClient {
         match res {
             Some(Ok(res)) => Ok(res),
             Some(Err(e)) => Err(anyhow::Error::from(e)),
-            None => Err(anyhow::Error::msg(format!("Unable to query <{}>", url))),
+            None => Err(anyhow::Error::msg(format!("Unable to query <{url}>"))),
         }
     }
 }
