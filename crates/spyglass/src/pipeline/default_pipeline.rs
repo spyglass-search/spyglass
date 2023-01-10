@@ -53,7 +53,7 @@ pub async fn pipeline_loop(
                     );
                     start_crawl(state.clone(), &pipeline, &collector, &parser, crawl_task).await;
                 }
-                PipelineCommand::ProcessCache(_) => {
+                PipelineCommand::ProcessCache(_, _) => {
                     // noop
                 }
             }

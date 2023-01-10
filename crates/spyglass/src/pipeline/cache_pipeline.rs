@@ -9,6 +9,7 @@ use crate::search::Searcher;
 use crate::state::AppState;
 
 use entities::models::indexed_document;
+use entities::models::tag::TagType;
 use libnetrunner::parser::ParseResult;
 use tokio::task::JoinHandle;
 
@@ -83,7 +84,7 @@ pub async fn process_update_warc(state: AppState, cache_path: PathBuf) {
 
 /// processes the cache for a lens. The cache is streamed in from the provided path
 /// and processed. After the process is complete the cache is deleted
-pub async fn process_update(state: AppState, cache_path: PathBuf) {
+pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) {
     let now = Instant::now();
     let records = archive::read_parsed(&cache_path);
     if let Ok(mut record_iter) = records {
@@ -91,13 +92,13 @@ pub async fn process_update(state: AppState, cache_path: PathBuf) {
         for record in record_iter.by_ref() {
             record_list.push(record);
             if record_list.len() >= 5000 {
-                process_records(&state, &mut record_list).await;
+                process_records(&state, &lens, &mut record_list).await;
                 record_list = Vec::new();
             }
         }
 
         if !record_list.is_empty() {
-            process_records(&state, &mut record_list).await;
+            process_records(&state, &lens, &mut record_list).await;
         }
     }
 
@@ -111,7 +112,7 @@ pub async fn process_update(state: AppState, cache_path: PathBuf) {
 // 2. Remove any documents that already exist from the index
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
-async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
+async fn process_records(state: &AppState, lens: &String, results: &mut Vec<ParseResult>) {
     let find = indexed_document::Entity::find();
     let mut condition = Condition::any();
 
@@ -138,6 +139,7 @@ async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
     match transaction_rslt {
         Ok(transaction) => {
             let mut updates = Vec::new();
+            let mut added_docs = Vec::new();
             for crawl_result in results {
                 let canonical_url = &crawl_result
                     .canonical_url
@@ -168,9 +170,11 @@ async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
 
                 if let Some(new_id) = doc_id {
                     if !id_map.contains_key(&new_id) {
+                        added_docs.push(url.to_string());
                         let update = indexed_document::ActiveModel {
                             domain: Set(url_host.to_string()),
-                            url: Set(url.as_str().to_string()),
+                            url: Set(url.to_string()),
+                            open_url: Set(Some(url.to_string())),
                             doc_id: Set(new_id),
                             ..Default::default()
                         };
@@ -192,12 +196,34 @@ async fn process_records(state: &AppState, results: &mut Vec<ParseResult>) {
                 .await;
 
             if let Err(error) = doc_insert {
-                log::error!("Insert many failed {:?}", error);
+                log::error!("Docs failed to insert {:?}", error);
             }
 
             let commit = transaction.commit().await;
-            if let Err(error) = commit {
-                log::error!("Failed to commit transaction {:?}", error);
+            match commit {
+                Ok(_) => {
+                    let added_entries: Vec<indexed_document::Model> =
+                        indexed_document::Entity::find()
+                            .filter(indexed_document::Column::Url.is_in(added_docs))
+                            .all(&state.db)
+                            .await
+                            .unwrap_or_default();
+
+                    if !added_entries.is_empty() {
+                        let result = indexed_document::insert_tags_many(
+                            &added_entries,
+                            &state.db,
+                            &vec![(TagType::Lens, lens.clone())],
+                        )
+                        .await;
+                        if let Err(error) = result {
+                            log::error!("Error inserting tags {:?}", error);
+                        }
+                    }
+                }
+                Err(error) => {
+                    log::error!("Failed to commit transaction {:?}", error);
+                }
             }
         }
         Err(err) => log::error!("Transaction failed {:?}", err),

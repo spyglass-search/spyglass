@@ -41,7 +41,7 @@ impl PipelineContext {
 #[derive(Debug, Clone)]
 pub enum PipelineCommand {
     ProcessUrl(String, CrawlTask),
-    ProcessCache(PathBuf),
+    ProcessCache(String, PathBuf),
 }
 
 // General pipeline initialize function. This function will read the lenses and pipelines
@@ -129,8 +129,8 @@ pub async fn initialize_pipelines(
                         }
                     }
                 }
-                PipelineCommand::ProcessCache(cache_file) => {
-                    cache_pipeline::process_update(app_state.clone(), cache_file).await;
+                PipelineCommand::ProcessCache(lens, cache_file) => {
+                    cache_pipeline::process_update(app_state.clone(), lens, cache_file).await;
                 }
             }
         }
