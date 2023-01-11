@@ -15,7 +15,6 @@ use tokio::task::JoinHandle;
 
 use super::parser::DefaultParser;
 use crate::crawler::archive;
-use entities::sea_orm::query::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use url::Url;
 
@@ -113,7 +112,6 @@ pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) 
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
 async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseResult>) {
-
     // get a list of all urls
     let parsed_urls = results
         .iter()
@@ -149,46 +147,59 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
             let mut updates = Vec::new();
             let mut added_docs = Vec::new();
             for crawl_result in results {
-                let canonical_url = &crawl_result
-                    .canonical_url
-                    .clone()
-                    .unwrap_or_else(|| String::from(""));
-                let url = Url::parse(canonical_url).expect("Invalid crawl URL");
-                let url_host = url.host_str().expect("Invalid URL host");
+                let canonical_url = crawl_result.canonical_url.clone();
+                match canonical_url {
+                    Some(canonical_url_str) => {
+                        let url_rslt = Url::parse(canonical_url_str.as_str());
+                        match url_rslt {
+                            Ok(url) => {
+                                let url_host = url.host_str().unwrap_or("");
+                                // Add document to index
+                                let doc_id: Option<String> = {
+                                    if let Ok(mut index_writer) = state.index.writer.lock() {
+                                        match Searcher::upsert_document(
+                                            &mut index_writer,
+                                            id_map.get(&canonical_url_str).cloned(),
+                                            &crawl_result.title.clone().unwrap_or_default(),
+                                            &crawl_result.description.clone(),
+                                            url_host,
+                                            url.as_str(),
+                                            &crawl_result.content,
+                                        ) {
+                                            Ok(new_doc_id) => Some(new_doc_id),
+                                            _ => None,
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                };
 
-                // Add document to index
-                let doc_id: Option<String> = {
-                    if let Ok(mut index_writer) = state.index.writer.lock() {
-                        match Searcher::upsert_document(
-                            &mut index_writer,
-                            id_map.get(canonical_url).cloned(),
-                            &crawl_result.title.clone().unwrap_or_default(),
-                            &crawl_result.description.clone(),
-                            url_host,
-                            url.as_str(),
-                            &crawl_result.content,
-                        ) {
-                            Ok(new_doc_id) => Some(new_doc_id),
-                            _ => None,
+                                if let Some(new_id) = doc_id {
+                                    if !id_map.contains_key(&new_id) {
+                                        added_docs.push(url.to_string());
+                                        let update = indexed_document::ActiveModel {
+                                            domain: Set(url_host.to_string()),
+                                            url: Set(url.to_string()),
+                                            open_url: Set(Some(url.to_string())),
+                                            doc_id: Set(new_id),
+                                            ..Default::default()
+                                        };
+
+                                        updates.push(update);
+                                    }
+                                }
+                            }
+                            Err(error) => log::error!(
+                                "Error processing url: {:?} error: {:?}",
+                                canonical_url_str,
+                                error
+                            ),
                         }
-                    } else {
-                        None
                     }
-                };
-
-                if let Some(new_id) = doc_id {
-                    if !id_map.contains_key(&new_id) {
-                        added_docs.push(url.to_string());
-                        let update = indexed_document::ActiveModel {
-                            domain: Set(url_host.to_string()),
-                            url: Set(url.to_string()),
-                            open_url: Set(Some(url.to_string())),
-                            doc_id: Set(new_id),
-                            ..Default::default()
-                        };
-
-                        updates.push(update);
-                    }
+                    None => log::error!(
+                        "None url is not value for content {:?}",
+                        crawl_result.content.truncate(80)
+                    ),
                 }
             }
 
