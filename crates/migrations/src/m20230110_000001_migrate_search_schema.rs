@@ -23,19 +23,19 @@ pub struct Migration;
 impl Migration {
     pub fn before_schema(&self) -> SchemaMapping {
         SchemaMapping {
-        text_fields: Some(vec![
-             // Used to reference this document
-             ("id".into(), STRING | STORED | FAST),
-             // Document contents
-             ("domain".into(), STRING | STORED | FAST),
-             ("title".into(), TEXT | STORED | FAST),
-             // Used for display purposes
-             ("description".into(), TEXT | STORED),
-             ("url".into(), STRING | STORED | FAST),
-             // Indexed
-             ("content".into(), TEXT | STORED)
-        ]),
-        unsigned_fields: None
+            text_fields: Some(vec![
+                // Used to reference this document
+                ("id".into(), STRING | STORED | FAST),
+                // Document contents
+                ("domain".into(), STRING | STORED | FAST),
+                ("title".into(), TEXT | STORED | FAST),
+                // Used for display purposes
+                ("description".into(), TEXT | STORED),
+                ("url".into(), STRING | STORED | FAST),
+                // Indexed
+                ("content".into(), TEXT | STORED),
+            ]),
+            unsigned_fields: None,
         }
     }
 
@@ -61,10 +61,16 @@ impl Migration {
                 ("description".into(), TEXT | STORED),
                 ("url".into(), STRING | STORED | FAST),
                 // Indexed
-                ("content".into(), TEXT | STORED)
+                ("content".into(), TEXT | STORED),
             ]),
-           unsigned_fields: Some(vec![("tags".into(), NumericOptions::default().set_fast(Cardinality::MultiValues).set_indexed().set_stored())])
-            }
+            unsigned_fields: Some(vec![(
+                "tags".into(),
+                NumericOptions::default()
+                    .set_fast(Cardinality::MultiValues)
+                    .set_indexed()
+                    .set_stored(),
+            )]),
+        }
     }
 
     pub fn after_writer(&self, path: &PathBuf) -> IndexWriter {
@@ -92,7 +98,7 @@ impl Migration {
             // No content was saved previous, so we'll use the description as a stopgap
             // and recrawl stuff
             ("content", "content"),
-            ("url", "url")
+            ("url", "url"),
         ] {
             let new_field = new_schema.get_field(new_field).unwrap();
             let old_value = old_doc
@@ -147,8 +153,6 @@ impl MigrationTrait for Migration {
                 "SELECT id, doc_id, url FROM indexed_document".to_owned(),
             ))
             .await?;
-
-
 
         // No docs yet, nothing to migrate.
         if result.is_empty() {
@@ -210,7 +214,6 @@ impl MigrationTrait for Migration {
             })
             .collect::<Vec<DbErr>>();
 
-       
         // Save change to new index
         if let Err(e) = new_writer.commit() {
             return Err(DbErr::Custom(format!("Unable to commit changes: {e}")));

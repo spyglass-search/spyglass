@@ -23,7 +23,7 @@ pub fn mapping_to_schema(mapping: &SchemaMapping) -> Schema {
             schema_builder.add_text_field(name, opts.clone());
         }
     }
-    
+
     if let Some(fields) = &mapping.unsigned_fields {
         for (name, opts) in fields {
             schema_builder.add_u64_field(name, opts.clone());
@@ -40,7 +40,7 @@ pub struct DocFields {
     pub description: Field,
     pub title: Field,
     pub url: Field,
-    pub tags: Field
+    pub tags: Field,
 }
 
 impl SearchDocument for DocFields {
@@ -65,9 +65,15 @@ impl SearchDocument for DocFields {
                 ("description".into(), TEXT | STORED),
                 ("url".into(), STRING | STORED | FAST),
                 // Indexed
-                ("content".into(), TEXT | STORED)
+                ("content".into(), TEXT | STORED),
             ]),
-           unsigned_fields: Some(vec![("tags".into(), NumericOptions::default().set_fast(Cardinality::MultiValues).set_indexed().set_stored())])
+            unsigned_fields: Some(vec![(
+                "tags".into(),
+                NumericOptions::default()
+                    .set_fast(Cardinality::MultiValues)
+                    .set_indexed()
+                    .set_stored(),
+            )]),
         }
     }
 
@@ -82,7 +88,7 @@ impl SearchDocument for DocFields {
                 .expect("No description in schema"),
             title: schema.get_field("title").expect("No title in schema"),
             url: schema.get_field("url").expect("No url in schema"),
-            tags: schema.get_field("tags").expect("No tags in schema")
+            tags: schema.get_field("tags").expect("No tags in schema"),
         }
     }
 }

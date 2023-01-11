@@ -184,13 +184,13 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .map(|x| (x.id, x.doc_id.to_string()))
         .collect::<Vec<(i64, String)>>();
 
-    let tag_del = document_tag::Entity::delete_many();
-    let mut condition = Condition::any();
+    let id_list = removed.iter().map(|(id, _)| *id).collect::<Vec<i64>>();
 
-    for (id, _) in &removed {
-        condition = condition.add(document_tag::Column::IndexedDocumentId.eq(*id));
-    }
-    tag_del.filter(condition).exec(db).await?;
+    log::error!("deleting document tags: {:?}", id_list);
+    document_tag::Entity::delete_many()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(id_list))
+        .exec(db)
+        .await?;
 
     let _ = Entity::delete_many()
         .filter(Column::Url.like(rule))

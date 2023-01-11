@@ -299,15 +299,12 @@ pub async fn process_crawl(
             }
         }
         let task_tags = task
-        .find_related(tag::Entity)
-        .all(&state.db)
-        .await
-        .unwrap_or_default();
+            .find_related(tag::Entity)
+            .all(&state.db)
+            .await
+            .unwrap_or_default();
 
-        let tags: Vec<u64> = task_tags
-        .iter()
-        .map(|tag| tag.id as u64)
-        .collect();
+        let tags: Vec<u64> = task_tags.iter().map(|tag| tag.id as u64).collect();
         // Add document to index
         let doc_id: String = {
             if let Ok(mut index_writer) = state.index.writer.lock() {
@@ -318,9 +315,8 @@ pub async fn process_crawl(
                     &crawl_result.description.clone().unwrap_or_default(),
                     url_host,
                     url.as_str(),
-
                     &content,
-                    Some(tags)
+                    &Some(tags),
                 ) {
                     Ok(new_doc_id) => new_doc_id,
                     Err(err) => {

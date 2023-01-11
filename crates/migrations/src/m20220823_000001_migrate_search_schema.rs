@@ -23,20 +23,20 @@ pub struct Migration;
 impl Migration {
     pub fn before_schema(&self) -> SchemaMapping {
         SchemaMapping {
-        text_fields: Some(vec![
-            // Used to reference this document
-            ("id".into(), STRING | STORED),
-            // Document contents
-            ("domain".into(), STRING | STORED),
-            ("title".into(), TEXT | STORED),
-            ("description".into(), TEXT | STORED),
-            ("url".into(), STRING | STORED),
-            // Indexed but don't store for retreival
-            ("content".into(), TEXT),
-            // Stored but not indexed
-            ("raw".into(), STORED.into()),
-        ]),
-        unsigned_fields: None
+            text_fields: Some(vec![
+                // Used to reference this document
+                ("id".into(), STRING | STORED),
+                // Document contents
+                ("domain".into(), STRING | STORED),
+                ("title".into(), TEXT | STORED),
+                ("description".into(), TEXT | STORED),
+                ("url".into(), STRING | STORED),
+                // Indexed but don't store for retreival
+                ("content".into(), TEXT),
+                // Stored but not indexed
+                ("raw".into(), STORED.into()),
+            ]),
+            unsigned_fields: None,
         }
     }
 
@@ -53,17 +53,17 @@ impl Migration {
     pub fn after_schema(&self) -> SchemaMapping {
         SchemaMapping {
             text_fields: Some(vec![
-            ("id".into(), STRING | STORED | FAST),
-            // Document contents
-            ("domain".into(), STRING | STORED | FAST),
-            ("title".into(), TEXT | STORED | FAST),
-            ("description".into(), TEXT | STORED),
-            ("url".into(), STRING | STORED | FAST),
-            // Indexed
-            ("content".into(), TEXT | STORED),
-        ]),
-        unsigned_fields: None
-            }
+                ("id".into(), STRING | STORED | FAST),
+                // Document contents
+                ("domain".into(), STRING | STORED | FAST),
+                ("title".into(), TEXT | STORED | FAST),
+                ("description".into(), TEXT | STORED),
+                ("url".into(), STRING | STORED | FAST),
+                // Indexed
+                ("content".into(), TEXT | STORED),
+            ]),
+            unsigned_fields: None,
+        }
     }
 
     pub fn after_writer(&self, path: &PathBuf) -> IndexWriter {

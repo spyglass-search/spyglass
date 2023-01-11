@@ -50,7 +50,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20221124_000001_add_tags_for_existing_lenses::Migration),
             Box::new(m20221210_000001_add_crawl_tags_table::Migration),
             Box::new(m20230104_000001_add_column_n_index::Migration),
-            Box::new(m20230110_000001_migrate_search_schema::Migration)
+            Box::new(m20230110_000001_migrate_search_schema::Migration),
         ]
     }
 }

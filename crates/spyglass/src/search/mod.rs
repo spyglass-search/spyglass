@@ -19,7 +19,6 @@ use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 use spyglass_plugin::SearchFilter;
 
-
 pub mod grouping;
 pub mod lens;
 mod query;
@@ -80,6 +79,27 @@ impl Searcher {
         Ok(())
     }
 
+    pub async fn delete_many_by_id(
+        state: &AppState,
+        doc_ids: &Vec<&str>,
+        remove_documents: bool,
+    ) -> anyhow::Result<()> {
+        // Remove from search index, immediately.
+        if let Ok(mut writer) = state.index.writer.lock() {
+            Searcher::remove_many_from_index(&mut writer, doc_ids)?;
+        };
+
+        if remove_documents {
+            // Remove from indexed_doc table
+            let doc_refs: Vec<&str> = doc_ids.iter().map(AsRef::as_ref).collect();
+            indexed_document::Entity::delete_many()
+                .filter(indexed_document::Column::DocId.is_in(doc_refs))
+                .exec(&state.db)
+                .await?;
+        }
+        Ok(())
+    }
+
     pub async fn delete_by_url(state: &AppState, url: &str) -> anyhow::Result<()> {
         if let Some(model) = indexed_document::Entity::find()
             .filter(indexed_document::Column::Url.eq(url))
@@ -97,6 +117,19 @@ impl Searcher {
     pub fn remove_from_index(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
         let fields = DocFields::as_fields();
         writer.delete_term(Term::from_field_text(fields.id, doc_id));
+        Ok(())
+    }
+
+    pub fn remove_many_from_index(
+        writer: &mut IndexWriter,
+        doc_ids: &Vec<&str>,
+    ) -> anyhow::Result<()> {
+        let fields = DocFields::as_fields();
+
+        for doc_id in doc_ids {
+            writer.delete_term(Term::from_field_text(fields.id, doc_id));
+        }
+
         Ok(())
     }
 
@@ -167,7 +200,7 @@ impl Searcher {
         domain: &str,
         url: &str,
         content: &str,
-        tags: Option<Vec<u64>>
+        tags: &Option<Vec<u64>>,
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
@@ -182,7 +215,7 @@ impl Searcher {
         doc.add_text(fields.url, url);
         if let Some(tag) = tags {
             for t in tag {
-                doc.add_u64(fields.tags, t);
+                doc.add_u64(fields.tags, *t);
             }
         }
         writer.add_document(doc)?;
@@ -203,7 +236,13 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
-        let query = build_query(index.schema(), tokenizers, fields.clone(), query_string, applied_lenses);
+        let query = build_query(
+            index.schema(),
+            tokenizers,
+            fields.clone(),
+            query_string,
+            applied_lenses,
+        );
 
         // let mut allowed = Vec::new();
         // let mut skipped = Vec::new();
@@ -227,50 +266,49 @@ impl Searcher {
         //     .build()
         //     .expect("Unable to build regexset");
 
-        let collector =
-            TopDocs::with_limit(5);
-            
-            // .tweak_score(move |segment_reader: &SegmentReader| {
-            //     let regex_allow = regex_allow.clone();
-            //     let regex_skip = regex_skip.clone();
-            //     let fields = fields.clone();
+        let collector = TopDocs::with_limit(5);
 
-            //     let inverted_index = segment_reader
-            //         .inverted_index(fields.url)
-            //         .expect("Failed to get inverted index for segment");
+        // .tweak_score(move |segment_reader: &SegmentReader| {
+        //     let regex_allow = regex_allow.clone();
+        //     let regex_skip = regex_skip.clone();
+        //     let fields = fields.clone();
 
-            //     let id_reader = segment_reader
-            //         .fast_fields()
-            //         .u64s(fields.id)
-            //         .expect("Unable to get fast field for doc_id");
+        //     let inverted_index = segment_reader
+        //         .inverted_index(fields.url)
+        //         .expect("Failed to get inverted index for segment");
 
-            //     let url_reader = segment_reader
-            //         .fast_fields()
-            //         .u64s(fields.url)
-            //         .expect("Unable to get fast field for URL");
+        //     let id_reader = segment_reader
+        //         .fast_fields()
+        //         .u64s(fields.id)
+        //         .expect("Unable to get fast field for doc_id");
 
-            //     // We can now define our actual scoring function
-            //     move |doc: DocId, original_score: Score| {
-            //         let inverted_index = inverted_index.clone();
-            //         let terms = inverted_index.terms();
+        //     let url_reader = segment_reader
+        //         .fast_fields()
+        //         .u64s(fields.url)
+        //         .expect("Unable to get fast field for URL");
 
-            //         let _id = ff_to_string(doc, &id_reader, terms);
-            //         let url = ff_to_string(doc, &url_reader, terms);
+        //     // We can now define our actual scoring function
+        //     move |doc: DocId, original_score: Score| {
+        //         let inverted_index = inverted_index.clone();
+        //         let terms = inverted_index.terms();
 
-            //         if let Some(url) = url {
-            //             if regex_skip.is_match(&url) {
-            //                 -1.0
-            //             } else if regex_allow.is_empty() || regex_allow.is_match(&url) {
-            //                 original_score * 1.0
-            //             } else {
-            //                 -1.0
-            //             }
-            //         } else {
-            //             // blank URL? that seems like an error somewhere.
-            //             -1.0
-            //         }
-            //     }
-            // });
+        //         let _id = ff_to_string(doc, &id_reader, terms);
+        //         let url = ff_to_string(doc, &url_reader, terms);
+
+        //         if let Some(url) = url {
+        //             if regex_skip.is_match(&url) {
+        //                 -1.0
+        //             } else if regex_allow.is_empty() || regex_allow.is_match(&url) {
+        //                 original_score * 1.0
+        //             } else {
+        //                 -1.0
+        //             }
+        //         } else {
+        //             // blank URL? that seems like an error somewhere.
+        //             -1.0
+        //         }
+        //     }
+        // });
 
         let top_docs = searcher
             .search(&query, &collector)
@@ -287,7 +325,10 @@ impl Searcher {
         top_docs
             .into_iter()
             // Filter out negative scores
-            .filter(|(score, _)| *score >= 0.0)
+            .filter(|(score, _)| {
+                log::error!("Score for doc {:?}", score);
+                *score >= 0.0
+            })
             .collect()
     }
 }
@@ -316,7 +357,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            None
+            &None,
         )
         .expect("Unable to add doc");
 
@@ -335,7 +376,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            None
+            &None,
         )
         .expect("Unable to add doc");
 
@@ -353,7 +394,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-            None
+            &None,
         )
         .expect("Unable to add doc");
 
@@ -368,7 +409,7 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-             None
+            &None,
         )
         .expect("Unable to add doc");
 

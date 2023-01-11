@@ -380,8 +380,16 @@ pub async fn search(
     let index = &state.index;
     let searcher = index.reader.searcher();
 
-    let tags = tag::Entity::find().filter(tag::Column::Label.eq("lens")).filter(tag::Column::Value.is_in(search_req.lenses)).all(&state.db).await.unwrap_or_default();
-    let tag_ids = tags.iter().map(|model| model.id as u64).collect::<Vec<u64>>();
+    let tags = tag::Entity::find()
+        .filter(tag::Column::Label.eq("lens"))
+        .filter(tag::Column::Value.is_in(search_req.lenses))
+        .all(&state.db)
+        .await
+        .unwrap_or_default();
+    let tag_ids = tags
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
     // let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
     //     .filter_map(|trigger| async {
     //         let vec = lens_to_filters(state.clone(), trigger).await;
@@ -421,6 +429,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
+            log::error!("doc id {:?}", doc_id);
             if let Some(doc_id) = doc_id.as_text() {
                 let indexed = indexed_document::Entity::find()
                     .filter(indexed_document::Column::DocId.eq(doc_id))
@@ -429,6 +438,7 @@ pub async fn search(
 
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
 
+                log::error!("indexed {:?} url: {:?}", indexed, url);
                 if let Ok(Some(indexed)) = indexed {
                     let tags = indexed
                         .find_related(tag::Entity)
@@ -438,6 +448,8 @@ pub async fn search(
                         .iter()
                         .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                         .collect::<Vec<(String, String)>>();
+
+                    log::error!("Found tags {:?}", tags);
 
                     let mut result = SearchResult {
                         doc_id: doc_id.to_string(),

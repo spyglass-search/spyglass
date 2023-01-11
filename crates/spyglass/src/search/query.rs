@@ -27,7 +27,7 @@ pub fn build_query(
     tokenizers: TokenizerManager,
     fields: DocFields,
     query_string: &str,
-    applied_lenses: &Vec<u64>
+    applied_lenses: &Vec<u64>,
 ) -> BooleanQuery {
     let content_terms = terms_for_field(&schema, &tokenizers, query_string, fields.content);
     let title_terms: Vec<Term> = terms_for_field(&schema, &tokenizers, query_string, fields.title);
@@ -60,10 +60,12 @@ pub fn build_query(
     }
 
     for id in applied_lenses {
-        term_query.push((Occur::Must, _boosted_term(Term::from_field_u64(fields.tags, *id), 1.0)))
+        term_query.push((
+            Occur::Must,
+            _boosted_term(Term::from_field_u64(fields.tags, *id), 1.0),
+        ))
     }
 
-    
     BooleanQuery::new(vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))])
 }
 
