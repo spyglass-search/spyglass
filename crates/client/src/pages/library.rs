@@ -1,5 +1,3 @@
-use shared::event::ClientInvoke;
-use shared::response::LensResult;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
@@ -10,12 +8,12 @@ use crate::invoke;
 use crate::listen;
 use crate::utils::RequestState;
 use shared::event::ClientEvent;
+use shared::event::ClientInvoke;
+use shared::response::{LensResult, InstallStatus};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct LensProps {
     pub result: LensResult,
-    #[prop_or_default]
-    pub is_installed: bool,
 }
 
 async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
@@ -37,23 +35,53 @@ async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
 #[function_component(Lens)]
 pub fn lens_component(props: &LensProps) -> Html {
     let component_styles = classes!(
-        "rounded-md", "bg-neutral-700", "p-4", "text-white", "shadow",
+        "rounded-md",
+        "bg-neutral-700",
+        "p-4",
+        "text-white",
+        "shadow-md",
         "overflow-hidden"
     );
     let result = &props.result;
 
+    let detail_bar = match &result.progress {
+        InstallStatus::Finished => {
+            html! {
+                <div class="mt-2 text-sm flex flex-row gap-2 items-center">
+                    <a href="https://example.com" class="border-neutral-600 border cursor-pointer font-semibold px-2 py-1 rounded-md text-xs inline-block hover:bg-neutral-600">
+                        {"Details"}
+                    </a>
+                    <a href="https://example.com" class="bg-red-700 cursor-pointer font-semibold px-2 py-1 rounded-md text-xs inline-block hover:bg-red-900">
+                        {"Uninstall"}
+                    </a>
+                </div>
+            }
+        },
+        InstallStatus::Installing { percent, status } => {
+            html! {
+                <div class="mt-2 text-sm">
+                    <div class="text-xs pb-1">{status.clone()}</div>
+                    <div class="w-full bg-stone-800 h-1 rounded-3xl text-xs">
+                        <div class="bg-cyan-400 h-1 rounded-lg pl-2 flex items-center animate-pulse" style={format!("width: {percent}%")}></div>
+                    </div>
+              </div>
+            }
+        }
+    };
+
     html! {
         <div class={component_styles}>
-            <h2 class="text-base truncate">
-                {result.title.clone()}
-            </h2>
-            <h2 class="text-xs truncate pb-2 text-neutral-400">
-                {"Crafted By:"}
-                <a href={format!("https://github.com/{}", result.author)} target="_blank" class="text-cyan-400">
-                    {format!(" @{}", result.author)}
-                </a>
-            </h2>
+            <div class="mb-1">
+                <div class="text-lg font-semibold">{result.title.to_string()}</div>
+                <div class="text-sm text-neutral-400">
+                    {"Crafted By:"}
+                    <a href={format!("https://github.com/{}", result.author)} target="_blank" class="text-cyan-400">
+                        {format!(" @{}", result.author)}
+                    </a>
+                </div>
+            </div>
             <div class="text-sm text-neutral-400">{result.description.clone()}</div>
+            {detail_bar}
         </div>
     }
 }
@@ -83,9 +111,7 @@ impl LensManagerPage {
         } else {
             self.user_installed
                 .iter()
-                .map(|data| {
-                    html! {<Lens result={data.clone()} is_installed={true} /> }
-                })
+                .map(|data| html! {<Lens result={data.clone()} /> })
                 .collect::<Html>()
         }
     }
@@ -200,9 +226,13 @@ impl Component for LensManagerPage {
             html! { <icons::ArrowDownOnSquares width="w-3.5" height="h-3.5"  /> }
         };
 
+        let header_icon = html! {
+            <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
+        };
+
         html! {
             <div>
-                <Header label="My Library">
+                <Header label="My Library" icon={header_icon}>
                     <Btn onclick={link.callback(|_| Msg::RunOpenFolder)}>
                         <icons::FolderOpenIcon width="w-3.5" height="h-3.5" />
                         <div class="ml-2">{"Lens folder"}</div>
@@ -212,7 +242,7 @@ impl Component for LensManagerPage {
                         <div class="ml-2">{"Update"}</div>
                     </Btn>
                 </Header>
-                <div class="grid grid-cols-1 gap-4 p-4">{contents}</div>
+                <div class="flex flex-col gap-4 p-4">{contents}</div>
             </div>
         }
     }

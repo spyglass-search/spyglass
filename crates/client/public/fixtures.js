@@ -129,17 +129,50 @@ export let invoke = async (func_name, params) => {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense",
+            title: "Stardew Valley",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: {
+                "Installing": {
+                    percent: 45,
+                    status: 'Downloading...',
+                }
+            }
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense_2_boogaloo",
+            title: "Dungeons & Dragons",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: "Finished",
+        }, {
+            author: "a5huynh",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            title: "Old School Runescape",
+            hash: "",
+            html_url: null,
+            download_url: null,
+            progress: {
+                "Installing": {
+                    percent: 45,
+                    status: 'Crawling 10,123 of 20,454 (45%)',
+                }
+            }
+        }, {
+            author: "Spyglass",
+            description: "",
+            title: "Google Docs",
+            hash: "",
+            html_url: null,
+            download_url: null,
+            progress: {
+                "Installing": {
+                    percent: 100,
+                    status: 'Crawled 12,334 of many',
+                }
+            }
         }];
     } else if (func_name == "plugin:lens-updater|list_installable_lenses") {
         return [{

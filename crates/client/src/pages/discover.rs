@@ -10,7 +10,7 @@ use crate::components::{icons, Header};
 use crate::utils::RequestState;
 use crate::{install_lens, invoke};
 // use shared::event::ClientEvent;
-use shared::response::InstallableLens;
+use shared::response::{InstallStatus, InstallableLens};
 
 async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
@@ -26,6 +26,7 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                         file_path: None,
                         html_url: Some(lens.html_url.clone()),
                         download_url: Some(lens.download_url.clone()),
+                        progress: InstallStatus::default(),
                     })
                     .collect();
 

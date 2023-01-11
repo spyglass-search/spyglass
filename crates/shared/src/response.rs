@@ -54,6 +54,21 @@ pub struct InstallableLens {
     pub html_url: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub enum InstallStatus {
+    Finished,
+    Installing { percent: u8, status: String },
+}
+
+impl Default for InstallStatus {
+    fn default() -> Self {
+        Self::Installing {
+            percent: 0,
+            status: "Calculating...".into(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LensResult {
     pub author: String,
@@ -66,6 +81,7 @@ pub struct LensResult {
     // Only relevant for installable lenses
     pub html_url: Option<String>,
     pub download_url: Option<String>,
+    pub progress: InstallStatus,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
