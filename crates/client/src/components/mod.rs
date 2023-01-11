@@ -1,6 +1,7 @@
 pub mod btn;
 pub mod forms;
 pub mod icons;
+pub mod lens;
 pub mod result;
 pub mod tooltip;
 
