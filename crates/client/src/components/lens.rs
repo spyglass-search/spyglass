@@ -1,10 +1,23 @@
+use crate::components::{
+    btn::{Btn, BtnSize, BtnType},
+    icons,
+};
 use shared::response::{InstallStatus, LensResult};
 use yew::function_component;
 use yew::prelude::*;
 
-#[derive(Properties, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
+pub enum LensEvent {
+    ShowDetails { name: String },
+    Install { name: String },
+    Uninstall { name: String },
+}
+
+#[derive(Properties, PartialEq)]
 pub struct LensProps {
     pub result: LensResult,
+    #[prop_or_default]
+    pub onclick: Callback<LensEvent>,
 }
 
 #[function_component(LibraryLens)]
@@ -17,18 +30,44 @@ pub fn lens_component(props: &LensProps) -> Html {
         "shadow-md",
         "overflow-hidden"
     );
+
     let result = &props.result;
 
+    let lens_name = result.title.clone();
+    let onclick = props.onclick.clone();
+
     let detail_bar = match &result.progress {
-        InstallStatus::Finished => {
+        InstallStatus::NotInstalled => {
+            let install_cb = Callback::from(move |_| {
+                onclick.emit(LensEvent::Install {
+                    name: lens_name.clone(),
+                })
+            });
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                    <a href="https://example.com" class="border-neutral-600 border cursor-pointer font-semibold px-2 py-1 rounded-md text-xs inline-block hover:bg-neutral-600">
-                        {"Details"}
-                    </a>
-                    <a href="https://example.com" class="bg-red-700 cursor-pointer font-semibold px-2 py-1 rounded-md text-xs inline-block hover:bg-red-900">
-                        {"Uninstall"}
-                    </a>
+                    <Btn _type={BtnType::Success} size={BtnSize::Xs} onclick={install_cb}>
+                        <icons::DocumentDownloadIcon width="w-3.5" height="h-3.5" />
+                        {"Install"}
+                    </Btn>
+                </div>
+            }
+        }
+        InstallStatus::Finished => {
+            let name = lens_name.clone();
+            let show_onclick = onclick.clone();
+            let show_cb = Callback::from(move |_| {
+                show_onclick.emit(LensEvent::ShowDetails { name: name.clone() })
+            });
+
+            let uninstall_cb = Callback::from(move |_| {
+                onclick.emit(LensEvent::Uninstall {
+                    name: lens_name.clone(),
+                })
+            });
+            html! {
+                <div class="mt-2 text-sm flex flex-row gap-2 items-center">
+                    <Btn size={BtnSize::Xs} onclick={show_cb}>{"Details"}</Btn>
+                    <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb}>{"Uninstall"}</Btn>
                 </div>
             }
         }

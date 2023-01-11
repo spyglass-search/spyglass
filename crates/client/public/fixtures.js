@@ -182,6 +182,7 @@ export let invoke = async (func_name, params) => {
             sha: "fake-sha",
             html_url: "https://example.com",
             download_url: "https://example.com",
+            progress: "NotInstalled"
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
@@ -189,6 +190,7 @@ export let invoke = async (func_name, params) => {
             sha: "fake-sha-1",
             html_url: "https://example.com",
             download_url: "https://example.com",
+            progress: "NotInstalled"
         }];
     } else if (func_name == "install_lens") {
         window.setTimeout(() => {

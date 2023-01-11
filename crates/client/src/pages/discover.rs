@@ -5,7 +5,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
 use yew::prelude::*;
 
-use crate::components::{icons, Header};
+use crate::components::{icons, lens::LibraryLens, Header};
 // use crate::listen;
 use crate::utils::RequestState;
 use crate::{install_lens, invoke};
@@ -42,13 +42,6 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
             None
         }
     }
-}
-
-#[derive(Properties, PartialEq, Eq)]
-pub struct LensProps {
-    pub result: LensResult,
-    #[prop_or_default]
-    pub is_installed: bool,
 }
 
 #[derive(Properties, PartialEq, Eq)]
@@ -94,55 +87,6 @@ pub fn install_btn(props: &InstallBtnProps) -> Html {
     }
 }
 
-#[function_component(Lens)]
-pub fn lens_component(props: &LensProps) -> Html {
-    let component_styles = classes!("px-8", "py-4", "pr-0");
-    let result = &props.result;
-
-    let installed_el = if props.is_installed {
-        html! {
-            <div class="flex flex-row text-green-400 text-sm">
-                <icons::BadgeCheckIcon />
-                <div class="ml-2">{"Installed"}</div>
-            </div>
-        }
-    } else {
-        html! { <InstallButton download_url={result.download_url.clone().expect("Invalid lens download URL")} /> }
-    };
-
-    let view_link = if result.html_url.is_some() {
-        html! {
-            <a href={result.html_url.clone()} target="_blank" class="flex flex-row text-neutral-400 text-sm cursor-pointer hover:text-white">
-                <icons::EyeIcon />
-                <div class="ml-2">{"View Source"}</div>
-            </a>
-        }
-    } else {
-        html! {}
-    };
-
-    html! {
-        <div class={component_styles}>
-            <h2 class="text-xl truncate p-0">
-                {result.title.clone()}
-            </h2>
-            <h2 class="text-xs truncate py-1 text-neutral-400">
-                {"Crafted By:"}
-                <a href={format!("https://github.com/{}", result.author)} target="_blank" class="ml-2 text-cyan-400">
-                    {format!("@{}", result.author)}
-                </a>
-            </h2>
-            <div class="leading-relaxed text-neutral-400 h-6 overflow-hidden text-ellipsis">
-                {result.description.clone()}
-            </div>
-            <div class="pt-2 flex flex-row gap-8">
-                {installed_el}
-                {view_link}
-            </div>
-        </div>
-    }
-}
-
 pub struct DiscoverPage {
     req_available: RequestState,
     installable: Vec<LensResult>,
@@ -180,7 +124,16 @@ impl Component for DiscoverPage {
 
                 false
             }
-            Msg::SetAvailable(_results) => false,
+            Msg::SetAvailable(results) => {
+                if let Some(results) = results {
+                    self.req_available = RequestState::Finished;
+                    self.installable = results;
+                    true
+                } else {
+                    self.req_available = RequestState::Error;
+                    false
+                }
+            }
         }
     }
 
@@ -191,21 +144,24 @@ impl Component for DiscoverPage {
             self.installable
                 .iter()
                 .map(|data| {
-                    html! {<Lens result={data.clone()} is_installed={false} /> }
+                    html! {<LibraryLens result={data.clone()} /> }
                 })
                 .collect::<Html>()
         } else {
             html! {
                 <div class="flex justify-center">
-                    {"to be completed"}
+                    <div class="p-16">
+                        <icons::RefreshIcon width="w-16" height="h-16" animate_spin={true} />
+                    </div>
                 </div>
             }
         };
 
+        let header_icon = html!{ <icons::GlobeIcon classes="mr-2" height="h-5" width="h-5" /> };
         html! {
             <div>
-                <Header label="Discover" />
-                <div>{contents}</div>
+                <Header label="Discover" icon={header_icon}/>
+                <div class="flex flex-col gap-4 p-4">{contents}</div>
             </div>
         }
     }

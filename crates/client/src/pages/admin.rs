@@ -106,7 +106,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     <ul>
                         <li class="mb-2">
                             <NavLink tab={Tab::Discover} current={props.tab.clone()}>
-                                <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
+                                <icons::GlobeIcon classes="mr-2" height="h-4" width="h-4" />
                                 {"Discover"}
                             </NavLink>
                         </li>

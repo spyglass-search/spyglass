@@ -56,16 +56,14 @@ pub struct InstallableLens {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum InstallStatus {
+    NotInstalled,
     Finished,
     Installing { percent: u8, status: String },
 }
 
 impl Default for InstallStatus {
     fn default() -> Self {
-        Self::Installing {
-            percent: 0,
-            status: "Calculating...".into(),
-        }
+        Self::NotInstalled
     }
 }
 
