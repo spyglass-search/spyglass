@@ -113,26 +113,34 @@ pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) 
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
 async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseResult>) {
-    let find = indexed_document::Entity::find();
-    let mut condition = Condition::any();
 
-    for result in &mut *results {
-        if let Some(url) = &result.canonical_url {
-            condition = condition.add(indexed_document::Column::Url.eq(url.as_str()));
-        }
-    }
-    let existing: Vec<indexed_document::Model> = find
-        .filter(condition)
+    // get a list of all urls
+    let parsed_urls = results
+        .iter()
+        .map(|val| val.canonical_url.clone().unwrap_or_default())
+        .collect::<Vec<String>>();
+
+    // find all documents that already exist with that url
+    let existing: Vec<indexed_document::Model> = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Url.is_in(parsed_urls))
         .all(&state.db)
         .await
         .unwrap_or_default();
-    let mut id_map = HashMap::new();
 
+    // build a hash map of Url to the doc id
+    let mut id_map = HashMap::new();
     for model in &existing {
         let _ = id_map.insert(model.url.to_string(), model.doc_id.clone());
-        let _ = Searcher::delete_by_id(state, model.doc_id.as_str()).await;
     }
 
+    // build a list of doc ids to delete from the index
+    let doc_id_list = id_map
+        .values()
+        .into_iter()
+        .map(AsRef::as_ref)
+        .collect::<Vec<&str>>();
+
+    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;
 
     let transaction_rslt = state.db.begin().await;
