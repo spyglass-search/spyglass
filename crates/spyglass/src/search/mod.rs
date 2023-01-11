@@ -79,6 +79,30 @@ impl Searcher {
         Ok(())
     }
 
+    /// Deletes multiple ids from the searcher at one time. The caller can decide if the
+    /// documents should also be removed from the database by setting the remove_documents
+    /// flag.
+    pub async fn delete_many_by_id(
+        state: &AppState,
+        doc_ids: &Vec<&str>,
+        remove_documents: bool,
+    ) -> anyhow::Result<()> {
+        // Remove from search index, immediately.
+        if let Ok(mut writer) = state.index.writer.lock() {
+            Searcher::remove_many_from_index(&mut writer, doc_ids)?;
+        };
+
+        if remove_documents {
+            // Remove from indexed_doc table
+            let doc_refs: Vec<&str> = doc_ids.iter().map(AsRef::as_ref).collect();
+            indexed_document::Entity::delete_many()
+                .filter(indexed_document::Column::DocId.is_in(doc_refs))
+                .exec(&state.db)
+                .await?;
+        }
+        Ok(())
+    }
+
     pub async fn delete_by_url(state: &AppState, url: &str) -> anyhow::Result<()> {
         if let Some(model) = indexed_document::Entity::find()
             .filter(indexed_document::Column::Url.eq(url))
@@ -96,6 +120,20 @@ impl Searcher {
     pub fn remove_from_index(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
         let fields = DocFields::as_fields();
         writer.delete_term(Term::from_field_text(fields.id, doc_id));
+        Ok(())
+    }
+
+    /// Removes multiple documents from the index
+    pub fn remove_many_from_index(
+        writer: &mut IndexWriter,
+        doc_ids: &Vec<&str>,
+    ) -> anyhow::Result<()> {
+        let fields = DocFields::as_fields();
+
+        for doc_id in doc_ids {
+            writer.delete_term(Term::from_field_text(fields.id, doc_id));
+        }
+
         Ok(())
     }
 
