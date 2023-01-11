@@ -1,6 +1,6 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{Condition, ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
+use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
 
 use super::tag::{get_or_create, TagPair};
 
