@@ -500,12 +500,12 @@ pub async fn search_lenses(
                             label
                         }
                     })
-                    .unwrap_or(lens.name.clone());
+                    .unwrap_or_else(|| lens.name.clone());
 
                 results.push(LensResult {
                     author: lens.author,
                     name: lens.name,
-                    label: label,
+                    label,
                     description: lens.description.unwrap_or_default(),
                     ..Default::default()
                 });
