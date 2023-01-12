@@ -1,4 +1,4 @@
-use shared::event::ClientInvoke;
+use shared::event::{ClientInvoke, InstallLensParams};
 use shared::response::LensResult;
 use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
@@ -108,7 +108,12 @@ impl Component for DiscoverPage {
                 if let LensEvent::Install { name } = event {
                     self.installing.insert(name.clone());
                     spawn_local(async move {
-                        if let Err(e) = crate::install_lens(name.clone()).await {
+                        if let Err(e) = crate::tauri_invoke::<_, ()>(
+                            ClientInvoke::InstallLens,
+                            &InstallLensParams { name: name.clone() },
+                        )
+                        .await
+                        {
                             log::error!("Error installing lens: {} - {:?}", name.clone(), e);
                         }
                     });

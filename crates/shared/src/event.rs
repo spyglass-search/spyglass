@@ -34,6 +34,8 @@ pub enum ClientInvoke {
     GetCrawlStats,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
+    #[strum(serialize = "plugin:lens-updater|install_lens")]
+    InstallLens,
     #[strum(serialize = "list_connections")]
     ListConnections,
     #[strum(serialize = "plugin:lens-updater|list_installed_lenses")]
@@ -71,6 +73,11 @@ pub struct AuthorizeConnectionParams {
 pub struct ResyncConnectionParams {
     pub id: String,
     pub account: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct InstallLensParams {
+    pub name: String,
 }
 
 #[derive(Deserialize, Serialize)]

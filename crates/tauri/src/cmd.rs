@@ -2,13 +2,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
-use shared::metrics::{Event, Metrics};
 use shared::response::SearchResults;
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
-use crate::plugins::lens_updater;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, Limit, UserSettings};
@@ -179,32 +177,6 @@ pub async fn delete_domain<'r>(window: tauri::Window, domain: &str) -> Result<()
                 log::error!("delete_domain err: {}", err);
             }
         }
-    }
-
-    Ok(())
-}
-
-/// Install a lens (assumes correct format) from a URL
-#[tauri::command]
-pub async fn install_lens<'r>(
-    window: tauri::Window,
-    _config: State<'_, Config>,
-    name: &str,
-) -> Result<(), String> {
-    if let Err(e) = lens_updater::install_lens(&window.app_handle(), &name.to_string()).await {
-        log::error!("Unable to install lens {}, due to error: {}", name, e);
-    } else {
-        if let Some(metrics) = window.app_handle().try_state::<Metrics>() {
-            metrics
-                .track(Event::InstallLens {
-                    lens: name.to_owned(),
-                })
-                .await;
-        }
-
-        // Sleep for a second to let the app reload the lenses and then let the client know we're done.
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        let _ = window.emit(ClientEvent::RefreshLensManager.as_ref(), true);
     }
 
     Ok(())

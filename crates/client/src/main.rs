@@ -32,9 +32,6 @@ extern "C" {
     pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
-    pub async fn install_lens(name: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
     pub async fn save_user_settings(settings: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "searchDocs", catch)]
@@ -84,9 +81,6 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
-    pub async fn install_lens(name: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn save_user_settings(settings: JsValue) -> Result<JsValue, JsValue>;

@@ -13,10 +13,6 @@ export async function delete_domain(domain) {
     return await invoke('delete_domain', { domain });
 }
 
-export async function install_lens(name) {
-    return await invoke('install_lens', { name })
-}
-
 export async function network_change(isOffline) {
     return await invoke('network_change', { isOffline });
 }

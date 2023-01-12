@@ -200,7 +200,7 @@ export let invoke = async (func_name, params) => {
             download_url: "https://example.com",
             progress: "NotInstalled"
         }];
-    } else if (func_name == "install_lens") {
+    } else if (func_name == "plugin:lens-updater|install_lens") {
         window.setTimeout(() => {
             CALLBACKS["RefreshLensManager"]();
         }, 5000);
@@ -289,10 +289,6 @@ export async function deleteDoc(id) {
 
 export async function delete_domain(domain) {
     return await invoke('delete_domain', { domain });
-}
-
-export async function install_lens(name) {
-    return await invoke('install_lens', { name })
 }
 
 export async function network_change(isOffline) {

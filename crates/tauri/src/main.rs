@@ -116,7 +116,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
-            cmd::install_lens,
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
