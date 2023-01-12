@@ -50,7 +50,7 @@ pub fn wizard_page() -> Html {
                         <div>{"Star on GitHub"}</div>
                     </a>
                     <a href={constants::DISCORD_JOIN_URL} target="_blank" class="block text-center bg-neutral-900 rounded-lg p-4 hover:bg-indigo-900">
-                        <img src="discord-logo.png" class="h-8 mx-auto mb-2"/>
+                        <img src="discord-logo.png" alt="Discord Logo" class="h-8 mx-auto mb-2"/>
                         <div>{"Join our Discord"}</div>
                     </a>
                     <a href={constants::PAYMENT_URL} target="_blank" class="text-center bg-neutral-900 rounded-lg border-neutral-700 p-4 hover:bg-green-900">

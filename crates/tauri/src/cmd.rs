@@ -437,7 +437,7 @@ pub async fn load_user_settings(
                 opts.value = value.to_string();
             }
 
-            list.push((format!("{}.{}", pname, setting_name), opts));
+            list.push((format!("{pname}.{setting_name}"), opts));
         }
     }
 

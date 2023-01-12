@@ -63,7 +63,7 @@ impl SpyglassPlugin for Plugin {
             let diff = now - *last_processed_time;
             if diff.num_days() > 1 {
                 if let Err(e) = walk_and_enqueue_dir(path.to_path_buf(), &self.extensions) {
-                    log(format!("Unable to process dir: {}", e));
+                    log(format!("Unable to process dir: {e}"));
                 } else {
                     *last_processed_time = now;
                 }

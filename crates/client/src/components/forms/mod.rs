@@ -141,7 +141,7 @@ impl Component for FormElement {
         let label = if parent != "_" {
             html! {
                 <>
-                    <span class="text-white">{format!("{}: ", parent)}</span>
+                    <span class="text-white">{format!("{parent}: ")}</span>
                     <span>{props.opts.label.clone()}</span>
                 </>
             }
