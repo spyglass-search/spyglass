@@ -2,10 +2,10 @@ use entities::models::crawl_queue::EnqueueSettings;
 use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
-use entities::models::{bootstrap_queue, crawl_queue, indexed_document, tag};
+use entities::models::{bootstrap_queue, crawl_queue, lens, indexed_document, tag};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::{Config, LensConfig, LensRule, LensSource};
+use shared::config::{Config, LensConfig, LensRule};
 
 use super::CrawlTask;
 use super::{bootstrap, CollectTask, ManagerCommand};
@@ -18,17 +18,28 @@ use crate::state::AppState;
 /// the standard bootstrap process
 #[tracing::instrument(skip(state, config, lens))]
 pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &LensConfig) {
-    log::debug!("Bootstrapping Lens");
-    match &lens.lens_source {
-        LensSource::Remote(_) => {
-            if !(bootstrap::bootstrap_lens_cache(state, config, lens).await) {
-                process_lens(state, lens).await;
+    log::debug!("BOOTSTRAPING LENS {} - {:?}", lens.name, lens.lens_source);
+
+    // Grab the latest info about this lens
+    let lens_update_info = lens::Entity::find()
+        .filter(lens::Column::Name.eq(lens.name.clone()))
+        .one(&state.db)
+        .await
+        .unwrap_or_default();
+
+    if let Some(lens_update_info) = lens_update_info {
+        match lens_update_info.remote_url {
+            Some(_) => {
+                log::debug!("HANDLING REMOTE LENS!!!!!!");
+                if !(bootstrap::bootstrap_lens_cache(state, config, lens).await) {
+                    // process_lens(state, lens).await;
+                }
+            }
+            _ => {
+                // process_lens(state, lens).await;
             }
         }
-        _ => {
-            process_lens(state, lens).await;
-        }
-    }
+    }  // Delete or no longer exists?
 }
 
 // Process lens by kicking off a bootstrap for the lens

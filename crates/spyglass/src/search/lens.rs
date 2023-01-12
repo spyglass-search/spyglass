@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use entities::models::lens;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use shared::response::InstallableLens;
@@ -203,37 +202,27 @@ async fn install_lens_to_path(
         .get(installable_lens.download_url.as_str())
         .send()
         .await?;
+
     let file_contents = resp.text().await?;
-    let config_rslt = LensConfig::from_string(&file_contents);
-    match config_rslt {
-        Ok(config) => {
-            // File name should match lens name for consistency
-            let file_name = format!("{}.ron", config.name);
+    let config = LensConfig::from_string(&file_contents)?;
+    // File name should match lens name for consistency
+    let file_name = format!("{}.ron", config.name);
 
-            let update = lens::install_or_update(
-                &state.db,
-                &config,
-                lens::LensType::Simple,
-                Some(installable_lens.html_url.clone()),
-            )
-            .await;
+    // Add to database
+    let (is_new, model) = lens::install_or_update(
+        &state.db,
+        &config,
+        lens::LensType::Simple,
+        Some(installable_lens.html_url.clone()),
+    )
+    .await?;
 
-            match update {
-                Ok((new, model)) => {
-                    log::info!(
-                        "Installed new lens {}, new? {}, model? {:?}",
-                        config.name,
-                        new,
-                        model
-                    );
-                    fs::write(lens_folder.join(file_name), file_contents)?;
-                    Ok(())
-                }
-                Err(error) => Err(error),
-            }
-        }
-        Err(error) => Err(anyhow!("Invalid len file configuration {:?}", error)),
-    }
+    log::debug!("add {} to db: {:?}", config.name, model);
+    log::info!("Installed new lens {}, new? {}", config.name, is_new);
+
+    // Write to disk if we've successfully add to the database
+    fs::write(lens_folder.join(file_name), file_contents)?;
+    Ok(())
 }
 
 #[cfg(test)]

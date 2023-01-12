@@ -208,7 +208,7 @@ pub async fn install_or_update(
     }
 
     // Otherwise add the lens & enable it.
-    log::info!("Installing lens: {}", lens.name);
+    log::debug!("adding <{}> to database.", lens.name);
     let new_lens = ActiveModel {
         name: Set(lens.name.to_owned()),
         author: Set(lens.author.to_owned()),

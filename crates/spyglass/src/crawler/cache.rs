@@ -41,9 +41,9 @@ pub async fn update_cache(
         }
     }
 
-    let req = client
-        .get(format!("{CACHE_ROOT}{lens_cache_file}"))
-        .headers(headers);
+    let cache_url = format!("{CACHE_ROOT}{lens_cache_file}");
+    log::debug!("checking for cache @ {}", cache_url);
+    let req = client.get(cache_url).headers(headers);
     log::debug!("Requesting cache file {:?}", req);
     let resp = req.send().await;
     log::debug!("Cache file response {:?}", resp);
