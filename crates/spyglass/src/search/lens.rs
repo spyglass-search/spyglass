@@ -159,13 +159,14 @@ pub async fn install_lens(
         .get(constants::LENS_DIRECTORY_INDEX_URL)
         .send()
         .await?;
-    let file_contents = resp.text().await?;
 
+    let file_contents = resp.text().await?;
     let available_lens = ron::from_str::<Vec<InstallableLens>>(&file_contents)?;
 
     let lens_data = available_lens
         .iter()
         .find(|installable_lens| installable_lens.name.eq(&lens_name));
+
     if let Some(installable_lens) = lens_data {
         let current_lens_ref = app_state
             .lenses

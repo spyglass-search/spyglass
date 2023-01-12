@@ -13,7 +13,10 @@ pub enum ClientEvent {
     FolderChosen,
     Navigate,
     RefreshConnections,
-    RefreshLensManager,
+    /// Request a refresh of the discover lens page when a lens is succesfully installed.
+    RefreshDiscover,
+    /// Request a refresh of the user lens library .
+    RefreshLensLibrary,
     RefreshPluginManager,
     RefreshSearchResults,
     StartupProgress,

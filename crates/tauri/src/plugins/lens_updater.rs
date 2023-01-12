@@ -9,6 +9,7 @@ use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
 use crate::{constants, rpc, AppShutdown};
+use serde_json::Value;
 use shared::response::{InstallableLens, LensResult};
 use shared::{
     event::ClientEvent,
@@ -173,6 +174,7 @@ pub async fn handle_install_lens(app_handle: &AppHandle, name: &str) -> anyhow::
 pub async fn install_lens(win: tauri::Window, name: &str) -> Result<(), String> {
     let app_handle = win.app_handle();
     let _ = handle_install_lens(&app_handle, name).await;
+    let _ = app_handle.emit_all(ClientEvent::RefreshDiscover.as_ref(), Value::Null);
     Ok(())
 }
 
@@ -225,9 +227,18 @@ pub async fn run_lens_updater(win: tauri::Window) -> Result<(), String> {
     }
 }
 
+/// Uninstall lens from the backend
 #[tauri::command]
-pub async fn uninstall_lens(_: tauri::Window, name: &str) -> Result<(), String> {
-    // uninstall a lens from the backend.
-    log::info!("uninstalling {}", name);
+pub async fn uninstall_lens(win: tauri::Window, name: &str) -> Result<(), String> {
+    let app_handle = win.app_handle();
+    if let Some(rpc) = app_handle.try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc.client.uninstall_lens(name.to_string()).await {
+            log::error!("Unable to uninstall lens: {}", err.to_string());
+        } else {
+            let _ = app_handle.emit_all(ClientEvent::RefreshLensLibrary.as_ref(), Value::Null);
+        }
+    }
+
     Ok(())
 }

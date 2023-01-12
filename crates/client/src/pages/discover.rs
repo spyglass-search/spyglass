@@ -1,5 +1,5 @@
-use shared::event::{ClientInvoke, InstallLensParams};
-use shared::response::LensResult;
+use shared::event::{ClientEvent, ClientInvoke, InstallLensParams};
+use shared::response::{InstallStatus, InstallableLens, LensResult};
 use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -10,7 +10,6 @@ use crate::components::lens::LensEvent;
 use crate::components::{icons, lens::LibraryLens, Header};
 use crate::invoke;
 use crate::utils::RequestState;
-use shared::response::{InstallStatus, InstallableLens};
 
 async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstallableLenses.as_ref(), JsValue::NULL).await {
@@ -68,6 +67,19 @@ impl Component for DiscoverPage {
         let link = ctx.link();
         link.send_message(Msg::FetchAvailable);
 
+        // Handle refreshing the list when a lens is installed.
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |_| {
+                    link.send_message(Msg::FetchAvailable);
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = crate::listen(ClientEvent::RefreshDiscover.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
         Self {
             req_available: RequestState::NotStarted,
             installable: Vec::new(),
@@ -108,21 +120,19 @@ impl Component for DiscoverPage {
                 if let LensEvent::Install { name } = event {
                     self.installing.insert(name.clone());
                     spawn_local(async move {
-                        if let Err(e) = crate::tauri_invoke::<_, ()>(
+                        let _ = crate::tauri_invoke::<_, ()>(
                             ClientInvoke::InstallLens,
                             &InstallLensParams { name: name.clone() },
                         )
-                        .await
-                        {
-                            log::error!("Error installing lens: {} - {:?}", name.clone(), e);
-                        }
+                        .await;
                     });
                 }
 
-                false
+                true
             }
             Msg::SetAvailable(results) => {
                 if let Some(results) = results {
+                    self.installing.clear();
                     self.req_available = RequestState::Finished;
                     self.installable = results;
                     true

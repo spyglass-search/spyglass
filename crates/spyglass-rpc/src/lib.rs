@@ -25,14 +25,14 @@ pub trait Rpc {
     #[method(name = "delete_domain")]
     async fn delete_domain(&self, domain: String) -> Result<(), Error>;
 
+    #[method(name = "install_lens")]
+    async fn install_lens(&self, lens_name: String) -> Result<(), Error>;
+
     #[method(name = "list_connections")]
     async fn list_connections(&self) -> Result<ListConnectionResult, Error>;
 
     #[method(name = "list_installed_lenses")]
     async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error>;
-
-    #[method(name = "install_lens")]
-    async fn install_lens(&self, lens_name: String) -> Result<(), Error>;
 
     #[method(name = "list_plugins")]
     async fn list_plugins(&self) -> Result<Vec<PluginResult>, Error>;
@@ -57,4 +57,7 @@ pub trait Rpc {
 
     #[method(name = "toggle_plugin")]
     async fn toggle_plugin(&self, name: String) -> Result<(), Error>;
+
+    #[method(name = "uninstall_lens")]
+    async fn uninstall_lens(&self, name: String) -> Result<(), Error>;
 }

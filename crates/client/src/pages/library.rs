@@ -63,7 +63,7 @@ impl Component for LensManagerPage {
                     link.send_message(Msg::RunRefresher);
                 }) as Box<dyn Fn(JsValue)>);
 
-                let _ = listen(ClientEvent::RefreshLensManager.as_ref(), &cb).await;
+                let _ = listen(ClientEvent::RefreshLensLibrary.as_ref(), &cb).await;
                 cb.forget();
             });
         }
@@ -141,6 +141,7 @@ impl Component for LensManagerPage {
             }
             Msg::SetUserInstalled(lenses) => {
                 if let Some(lenses) = lenses {
+                    self.uninstalling.clear();
                     self.req_user_installed = RequestState::Finished;
                     self.user_installed = lenses;
                     true
