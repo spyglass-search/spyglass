@@ -34,14 +34,11 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
 // Process lens by kicking off a bootstrap for the lens
 async fn process_lens(state: &AppState, lens: &LensConfig) {
     for domain in lens.domains.iter() {
-        let pipeline_kind = lens.pipeline.as_ref().cloned();
-
-        let seed_url = format!("https://{domain}");
         let _ = state
-            .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
+            .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
                 lens: lens.name.clone(),
-                seed_url,
-                pipeline: pipeline_kind.clone(),
+                seed_url: format!("https://{domain}"),
+                pipeline: lens.pipeline.as_ref().cloned(),
             }))
             .await;
     }
@@ -77,7 +74,7 @@ async fn process_urls(lens: &LensConfig, state: &AppState) {
         } else {
             // Otherwise, bootstrap using this as a prefix.
             let _ = state
-                .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
+                .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
                     lens: lens.name.clone(),
                     seed_url: prefix.to_string(),
                     pipeline: pipeline_kind.clone(),
