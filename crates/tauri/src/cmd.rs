@@ -103,26 +103,6 @@ pub async fn resize_window(window: tauri::Window, height: f64) {
 }
 
 #[tauri::command]
-pub async fn crawl_stats<'r>(win: tauri::Window) -> Result<response::CrawlStats, String> {
-    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        match rpc.client.crawl_stats().await {
-            Ok(resp) => Ok(resp),
-            Err(err) => {
-                log::error!("Error sending RPC: {}", err);
-                Ok(response::CrawlStats {
-                    by_domain: Vec::new(),
-                })
-            }
-        }
-    } else {
-        Ok(response::CrawlStats {
-            by_domain: Vec::new(),
-        })
-    }
-}
-
-#[tauri::command]
 pub async fn search_docs<'r>(
     win: tauri::Window,
     lenses: Vec<String>,

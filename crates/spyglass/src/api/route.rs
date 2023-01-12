@@ -1,7 +1,8 @@
+use entities::get_library_stats;
 use futures::StreamExt;
 use jsonrpsee::core::Error;
 use shared::config::Config;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
@@ -17,8 +18,8 @@ use libspyglass::search;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
+    AppStatus, InstallStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
+    SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 use spyglass_plugin::SearchFilter;
 
@@ -153,47 +154,6 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
     })
 }
 
-#[instrument(skip(state))]
-pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
-    let queue_stats = crawl_queue::queue_stats(&state.db).await;
-    if let Err(err) = queue_stats {
-        log::error!("queue_stats {:?}", err);
-        return Err(Error::Custom(err.to_string()));
-    }
-
-    let indexed_stats = indexed_document::indexed_stats(&state.db).await;
-    if let Err(err) = indexed_stats {
-        log::error!("index_stats {:?}", err);
-        return Err(Error::Custom(err.to_string()));
-    }
-
-    let mut by_domain = HashMap::new();
-    let queue_stats = queue_stats.expect("Invalid queue_stats");
-    for stat in queue_stats {
-        let entry = by_domain
-            .entry(stat.domain)
-            .or_insert_with(QueueStatus::default);
-        match stat.status.as_str() {
-            "Queued" => entry.num_queued += stat.count as u64,
-            "Processing" => entry.num_processing += stat.count as u64,
-            "Completed" => entry.num_completed += stat.count as u64,
-            _ => {}
-        }
-    }
-
-    let indexed_stats = indexed_stats.expect("Invalid indexed_stats");
-    for stat in indexed_stats {
-        let entry = by_domain
-            .entry(stat.domain)
-            .or_insert_with(QueueStatus::default);
-        entry.num_indexed += stat.count as u64;
-    }
-
-    let by_domain = by_domain.into_iter().collect();
-
-    Ok(CrawlStats { by_domain })
-}
-
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
@@ -277,20 +237,40 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
 /// List of installed lenses
 #[instrument(skip(state))]
 pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, Error> {
+    let stats = get_library_stats(state.db).await.unwrap_or_default();
     let mut lenses: Vec<LensResult> = state
         .lenses
         .iter()
-        .map(|lens| LensResult {
-            author: lens.author.clone(),
-            title: lens.name.clone(),
-            description: lens.description.clone().unwrap_or_else(|| "".into()),
-            hash: lens.hash.clone(),
-            file_path: Some(lens.file_path.clone()),
-            ..Default::default()
+        .map(|lens| {
+            let progress = if let Some(lens_stats) = stats.get(&lens.name) {
+                if lens_stats.enqueued == 0 {
+                    InstallStatus::Finished {
+                        num_docs: lens_stats.indexed as u64,
+                    }
+                } else {
+                    InstallStatus::Installing {
+                        percent: lens_stats.percent_done(),
+                        status: lens_stats.status_string(),
+                    }
+                }
+            } else {
+                InstallStatus::Finished { num_docs: 0 }
+            };
+
+            LensResult {
+                author: lens.author.clone(),
+                title: lens.name.clone(),
+                description: lens.description.clone().unwrap_or_else(|| "".into()),
+                hash: lens.hash.clone(),
+                file_path: Some(lens.file_path.clone()),
+                progress,
+                html_url: None,
+                download_url: None,
+            }
         })
         .collect();
 
-    lenses.sort_by(|x, y| x.title.cmp(&y.title));
+    lenses.sort_by(|x, y| x.title.to_lowercase().cmp(&y.title.to_lowercase()));
 
     Ok(lenses)
 }

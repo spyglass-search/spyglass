@@ -57,8 +57,8 @@ pub struct InstallableLens {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum InstallStatus {
     NotInstalled,
-    Finished,
-    Installing { percent: u8, status: String },
+    Finished { num_docs: u64 },
+    Installing { percent: i64, status: String },
 }
 
 impl Default for InstallStatus {

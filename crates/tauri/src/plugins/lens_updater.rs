@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tauri::{
     async_runtime::JoinHandle,
@@ -155,9 +155,20 @@ pub async fn install_lens(app_handle: &AppHandle, lens_name: &String) -> anyhow:
 }
 
 #[tauri::command]
-pub async fn list_installable_lenses(_: tauri::Window) -> Result<Vec<InstallableLens>, String> {
+pub async fn list_installable_lenses(win: tauri::Window) -> Result<Vec<InstallableLens>, String> {
+    let app_handle = win.app_handle();
+    let installed: HashSet<String> = get_installed_lenses(&app_handle)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|lens| lens.title.to_string())
+        .collect();
+
     match get_lens_index().await {
-        Ok(index) => Ok(index),
+        Ok(mut index) => {
+            index.retain(|lens| !installed.contains(&lens.name));
+            Ok(index)
+        }
         Err(err) => {
             log::error!("Unable to get lens index: {}", err);
             Ok(Vec::new())

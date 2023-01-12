@@ -3,8 +3,7 @@ use jsonrpsee::proc_macros::rpc;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
-    SearchResults,
+    AppStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp, SearchResults,
 };
 
 /// Rpc trait
@@ -19,9 +18,6 @@ pub trait Rpc {
 
     #[method(name = "app_status")]
     async fn app_status(&self) -> Result<AppStatus, Error>;
-
-    #[method(name = "crawl_stats")]
-    async fn crawl_stats(&self) -> Result<CrawlStats, Error>;
 
     #[method(name = "delete_doc")]
     async fn delete_doc(&self, id: String) -> Result<(), Error>;

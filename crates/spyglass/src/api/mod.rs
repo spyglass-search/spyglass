@@ -34,10 +34,6 @@ impl RpcServer for SpyglassRpc {
         route::app_status(self.state.clone()).await
     }
 
-    async fn crawl_stats(&self) -> Result<resp::CrawlStats, Error> {
-        route::crawl_stats(self.state.clone()).await
-    }
-
     async fn delete_doc(&self, id: String) -> Result<(), Error> {
         route::delete_doc(self.state.clone(), id).await
     }

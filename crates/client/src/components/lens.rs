@@ -2,6 +2,7 @@ use crate::components::{
     btn::{Btn, BtnSize, BtnType},
     icons,
 };
+use num_format::{Buffer, Locale};
 use shared::response::{InstallStatus, LensResult};
 use yew::function_component;
 use yew::prelude::*;
@@ -52,22 +53,25 @@ pub fn lens_component(props: &LensProps) -> Html {
                 </div>
             }
         }
-        InstallStatus::Finished => {
+        InstallStatus::Finished { num_docs } => {
             let name = lens_name.clone();
             let show_onclick = onclick.clone();
             let show_cb = Callback::from(move |_| {
                 show_onclick.emit(LensEvent::ShowDetails { name: name.clone() })
             });
 
-            let uninstall_cb = Callback::from(move |_| {
-                onclick.emit(LensEvent::Uninstall {
-                    name: lens_name.clone(),
-                })
-            });
+            let name = lens_name.clone();
+            let uninstall_cb =
+                Callback::from(move |_| onclick.emit(LensEvent::Uninstall { name: name.clone() }));
+
+            let mut buf = Buffer::default();
+            buf.write_formatted(num_docs, &Locale::en);
+
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                    <Btn size={BtnSize::Xs} onclick={show_cb}>{"Details"}</Btn>
+                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase())} size={BtnSize::Xs} onclick={show_cb}>{"Details"}</Btn>
                     <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb}>{"Uninstall"}</Btn>
+                    <div class="ml-auto text-neutral-400">{format!("Indexed {} docs", buf)}</div>
                 </div>
             }
         }
@@ -94,7 +98,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                     </a>
                 </div>
             </div>
-            <div class="text-sm text-neutral-400">{result.description.clone()}</div>
+            <div class="text-sm text-neutral-200">{result.description.clone()}</div>
             {detail_bar}
         </div>
     }

@@ -157,7 +157,7 @@ impl Component for DiscoverPage {
             }
         };
 
-        let header_icon = html!{ <icons::GlobeIcon classes="mr-2" height="h-5" width="h-5" /> };
+        let header_icon = html! { <icons::GlobeIcon classes="mr-2" height="h-5" width="h-5" /> };
         html! {
             <div>
                 <Header label="Discover" icon={header_icon}/>
