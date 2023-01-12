@@ -78,7 +78,7 @@ pub async fn get_library_stats(
     for count in counts {
         let entry = stats
             .entry(count.name.clone())
-            .or_insert(LibraryStats::new(&count.name));
+            .or_insert_with(|| LibraryStats::new(&count.name));
         match count.status.as_str() {
             "Completed" | "Failed" => {
                 entry.crawled += count.count;

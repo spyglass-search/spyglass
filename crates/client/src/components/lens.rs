@@ -9,7 +9,6 @@ use yew::prelude::*;
 
 #[derive(PartialEq, Eq)]
 pub enum LensEvent {
-    ShowDetails { name: String },
     Install { name: String },
     Uninstall { name: String },
 }
@@ -55,12 +54,6 @@ pub fn lens_component(props: &LensProps) -> Html {
         }
         InstallStatus::Finished { num_docs } => {
             let name = lens_name.clone();
-            let show_onclick = onclick.clone();
-            let show_cb = Callback::from(move |_| {
-                show_onclick.emit(LensEvent::ShowDetails { name: name.clone() })
-            });
-
-            let name = lens_name.clone();
             let uninstall_cb =
                 Callback::from(move |_| onclick.emit(LensEvent::Uninstall { name: name.clone() }));
 
@@ -69,9 +62,15 @@ pub fn lens_component(props: &LensProps) -> Html {
 
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase())} size={BtnSize::Xs} onclick={show_cb}>{"Details"}</Btn>
-                    <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb}>{"Uninstall"}</Btn>
-                    <div class="ml-auto text-neutral-400">{format!("Indexed {} docs", buf)}</div>
+                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase())} size={BtnSize::Xs}>
+                        <icons::LinkIcon width="w-3.5" height="h-3.5" />
+                        {"View Details"}
+                    </Btn>
+                    <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb}>
+                        <icons::TrashIcon width="w-3.5" height="h-3.5" />
+                        {"Uninstall"}
+                    </Btn>
+                    <div class="ml-auto text-neutral-200">{format!("{} docs", buf)}</div>
                 </div>
             }
         }

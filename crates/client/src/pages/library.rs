@@ -2,12 +2,16 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::{btn::Btn, icons, lens::LibraryLens, Header};
-use crate::invoke;
-use crate::listen;
+use crate::components::{
+    btn::Btn,
+    icons,
+    lens::{LensEvent, LibraryLens},
+    Header,
+};
 use crate::utils::RequestState;
-use shared::event::ClientEvent;
+use crate::{invoke, listen, tauri_invoke};
 use shared::event::ClientInvoke;
+use shared::event::{ClientEvent, UninstallLensParams};
 use shared::response::LensResult;
 
 async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
@@ -32,29 +36,12 @@ pub struct LensManagerPage {
     user_installed: Vec<LensResult>,
 }
 pub enum Msg {
+    HandleLensEvent(LensEvent),
     RunLensUpdate,
     RunOpenFolder,
     RunRefresher,
     UpdaterFinished,
     SetUserInstalled(Option<Vec<LensResult>>),
-}
-
-impl LensManagerPage {
-    fn user_installed_tabview(&self) -> Html {
-        if self.user_installed.is_empty() {
-            html! {
-                <div class="grid place-content-center h-48 w-full text-neutral-500">
-                    <icons::EmojiSadIcon height="h-20" width="w-20" classes={classes!("mx-auto")}/>
-                    <div class="mt-4">{"Install some lenses to get started!"}</div>
-                </div>
-            }
-        } else {
-            self.user_installed
-                .iter()
-                .map(|data| html! {<LibraryLens result={data.clone()} /> })
-                .collect::<Html>()
-        }
-    }
 }
 
 impl Component for LensManagerPage {
@@ -100,6 +87,19 @@ impl Component for LensManagerPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::HandleLensEvent(event) => {
+                spawn_local(async {
+                    if let LensEvent::Uninstall { name } = event {
+                        let _ = tauri_invoke::<_, ()>(
+                            ClientInvoke::UninstallLens,
+                            &UninstallLensParams { name },
+                        )
+                        .await;
+                    }
+                });
+
+                false
+            }
             Msg::RunOpenFolder => {
                 spawn_local(async {
                     let _ = invoke(ClientInvoke::OpenLensFolder.as_ref(), JsValue::NULL).await;
@@ -149,7 +149,19 @@ impl Component for LensManagerPage {
         let link = ctx.link();
 
         let contents = if self.req_user_installed.is_done() {
-            self.user_installed_tabview()
+            if self.user_installed.is_empty() {
+                html! {
+                    <div class="grid place-content-center h-48 w-full text-neutral-500">
+                        <icons::EmojiSadIcon height="h-20" width="w-20" classes={classes!("mx-auto")}/>
+                        <div class="mt-4">{"Install some lenses to get started!"}</div>
+                    </div>
+                }
+            } else {
+                self.user_installed
+                    .iter()
+                    .map(|data| html! {<LibraryLens onclick={link.callback(Msg::HandleLensEvent)} result={data.clone()} /> })
+                    .collect::<Html>()
+            }
         } else {
             html! {
                 <div class="flex justify-center">

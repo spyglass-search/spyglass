@@ -160,7 +160,13 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
             "hover:bg-neutral-600",
             "active:bg-neutral-700"
         ),
-        BtnType::Danger => classes!("bg-red-700", "hover:bg-red-900"),
+        BtnType::Danger => classes!(
+            "border",
+            "border-red-700",
+            "hover:bg-red-700",
+            "text-red-500",
+            "hover:text-white"
+        ),
         BtnType::Success => classes!("bg-green-700", "hover:bg-green-900"),
     };
 

@@ -20,7 +20,8 @@ pub fn init() -> TauriPlugin<Wry> {
         .invoke_handler(tauri::generate_handler![
             list_installable_lenses,
             list_installed_lenses,
-            run_lens_updater
+            run_lens_updater,
+            uninstall_lens,
         ])
         .on_event(|app_handle, event| match event {
             RunEvent::Ready => {
@@ -201,4 +202,11 @@ pub async fn run_lens_updater(win: tauri::Window) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+#[tauri::command]
+pub async fn uninstall_lens(_: tauri::Window, name: &str) -> Result<(), String> {
+    // uninstall a lens from the backend.
+    log::info!("uninstalling {}", name);
+    Ok(())
 }

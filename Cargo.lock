@@ -6081,7 +6081,8 @@ dependencies = [
 [[package]]
 name = "spyglass-netrunner"
 version = "0.1.9"
-source = "git+https://github.com/spyglass-search/netrunner.git?branch=main#092af775dd191f16de864c966dd7b50edfdd9376"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08dbfddb4dfac3003641cc9268c2a956f350ea1edf85124fed9f5010a21ba241"
 dependencies = [
  "anyhow",
  "async-recursion",
