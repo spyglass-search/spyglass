@@ -165,7 +165,9 @@ impl Component for DiscoverPage {
                 .iter()
                 .filter_map(|data| {
                     if let Some(filter) = &self.filter_string {
-                        if !data.name.to_lowercase().contains(filter) && !data.description.to_lowercase().contains(filter) {
+                        if !data.name.to_lowercase().contains(filter)
+                            && !data.description.to_lowercase().contains(filter)
+                        {
                             return None;
                         }
                     }
