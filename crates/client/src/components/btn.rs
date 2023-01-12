@@ -171,7 +171,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     };
 
     if props.disabled {
-        colors.push("text-stone-700");
+        colors.push("text-stone-400");
     }
 
     let sizes = match props.size {

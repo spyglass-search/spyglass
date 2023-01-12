@@ -18,6 +18,8 @@ pub struct LensProps {
     pub result: LensResult,
     #[prop_or_default]
     pub onclick: Callback<LensEvent>,
+    #[prop_or_default]
+    pub in_progress: bool,
 }
 
 #[function_component(LibraryLens)]
@@ -45,8 +47,12 @@ pub fn lens_component(props: &LensProps) -> Html {
             });
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                    <Btn _type={BtnType::Success} size={BtnSize::Xs} onclick={install_cb}>
-                        <icons::DocumentDownloadIcon width="w-3.5" height="h-3.5" />
+                    <Btn _type={BtnType::Success} size={BtnSize::Xs} onclick={install_cb} disabled={props.in_progress}>
+                        {if props.in_progress {
+                            html! { <icons::RefreshIcon animate_spin={true} width="w-3.5" height="h-3.5" /> }
+                        } else {
+                            html!{ <icons::DocumentDownloadIcon width="w-3.5" height="h-3.5" /> }
+                        }}
                         {"Install"}
                     </Btn>
                 </div>
@@ -66,8 +72,12 @@ pub fn lens_component(props: &LensProps) -> Html {
                         <icons::LinkIcon width="w-3.5" height="h-3.5" />
                         {"View Details"}
                     </Btn>
-                    <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb}>
-                        <icons::TrashIcon width="w-3.5" height="h-3.5" />
+                    <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb} disabled={props.in_progress}>
+                        {if props.in_progress {
+                            html! { <icons::RefreshIcon animate_spin={true} width="w-3.5" height="h-3.5" /> }
+                        } else {
+                            html!{ <icons::TrashIcon width="w-3.5" height="h-3.5" /> }
+                        }}
                         {"Uninstall"}
                     </Btn>
                     <div class="ml-auto text-neutral-200">{format!("{} docs", buf)}</div>

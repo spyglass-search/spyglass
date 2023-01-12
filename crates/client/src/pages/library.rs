@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::window;
 use yew::prelude::*;
 
 use crate::components::{
@@ -34,6 +36,7 @@ pub struct LensManagerPage {
     lens_updater: RequestState,
     req_user_installed: RequestState,
     user_installed: Vec<LensResult>,
+    uninstalling: HashSet<String>,
 }
 pub enum Msg {
     HandleLensEvent(LensEvent),
@@ -81,6 +84,7 @@ impl Component for LensManagerPage {
             lens_updater: RequestState::NotStarted,
             req_user_installed: RequestState::NotStarted,
             user_installed: Vec::new(),
+            uninstalling: HashSet::new(),
         }
     }
 
@@ -88,17 +92,24 @@ impl Component for LensManagerPage {
         let link = ctx.link();
         match msg {
             Msg::HandleLensEvent(event) => {
-                spawn_local(async {
-                    if let LensEvent::Uninstall { name } = event {
-                        let _ = tauri_invoke::<_, ()>(
-                            ClientInvoke::UninstallLens,
-                            &UninstallLensParams { name },
-                        )
-                        .await;
+                if let LensEvent::Uninstall { name } = event {
+                    if let Some(window) = window() {
+                        if let Ok(true) = window.confirm_with_message(
+                            "Delete lens? This will remove all data associated with this lens.",
+                        ) {
+                            self.uninstalling.insert(name.clone());
+                            spawn_local(async move {
+                                let _ = tauri_invoke::<_, ()>(
+                                    ClientInvoke::UninstallLens,
+                                    &UninstallLensParams { name },
+                                )
+                                .await;
+                            });
+                        }
                     }
-                });
+                }
 
-                false
+                true
             }
             Msg::RunOpenFolder => {
                 spawn_local(async {
@@ -159,7 +170,14 @@ impl Component for LensManagerPage {
             } else {
                 self.user_installed
                     .iter()
-                    .map(|data| html! {<LibraryLens onclick={link.callback(Msg::HandleLensEvent)} result={data.clone()} /> })
+                    .map(|data| {
+                        html! {
+                            <LibraryLens onclick={link.callback(Msg::HandleLensEvent)}
+                                result={data.clone()}
+                                in_progress={self.uninstalling.contains(&data.name)}
+                            />
+                        }
+                    })
                     .collect::<Html>()
             }
         } else {

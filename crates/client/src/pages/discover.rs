@@ -1,16 +1,15 @@
 use shared::event::ClientInvoke;
 use shared::response::LensResult;
+use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
-use yew::function_component;
 use yew::prelude::*;
 
+use crate::components::lens::LensEvent;
 use crate::components::{icons, lens::LibraryLens, Header};
-// use crate::listen;
+use crate::invoke;
 use crate::utils::RequestState;
-use crate::{install_lens, invoke};
-// use shared::event::ClientEvent;
 use shared::response::{InstallStatus, InstallableLens};
 
 async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
@@ -46,59 +45,18 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
     }
 }
 
-#[derive(Properties, PartialEq, Eq)]
-pub struct InstallBtnProps {
-    pub download_url: String,
-}
-
-#[function_component(InstallButton)]
-pub fn install_btn(props: &InstallBtnProps) -> Html {
-    let is_installing = use_state_eq(|| false);
-    let download_url = props.download_url.clone();
-
-    let onclick = {
-        let is_installing = is_installing.clone();
-        Callback::from(move |_| {
-            let download_url = download_url.clone();
-            is_installing.set(true);
-            // Download to lens directory
-            spawn_local(async move {
-                if let Err(e) = install_lens(download_url.clone()).await {
-                    log::error!("error installing lens: {} {:?}", download_url.clone(), e);
-                }
-            });
-        })
-    };
-
-    if *is_installing {
-        html! {
-            <div class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white">
-                <icons::RefreshIcon animate_spin={true} />
-                <div class="ml-2">{"Installing"}</div>
-            </div>
-        }
-    } else {
-        html! {
-            <button
-                {onclick}
-                class="flex flex-row text-cyan-400 text-sm cursor-pointer hover:text-white">
-                <icons::DocumentDownloadIcon />
-                <div class="ml-2">{"Install"}</div>
-            </button>
-        }
-    }
-}
-
 pub struct DiscoverPage {
     req_available: RequestState,
     installable: Vec<LensResult>,
     filter_string: Option<String>,
     filter_input: NodeRef,
+    installing: HashSet<String>,
 }
 
 pub enum Msg {
     FetchAvailable,
     HandleFilter,
+    HandleLensEvent(LensEvent),
     SetAvailable(Option<Vec<LensResult>>),
 }
 
@@ -115,6 +73,7 @@ impl Component for DiscoverPage {
             installable: Vec::new(),
             filter_string: None,
             filter_input: NodeRef::default(),
+            installing: HashSet::new(),
         }
     }
 
@@ -145,6 +104,18 @@ impl Component for DiscoverPage {
                     false
                 }
             }
+            Msg::HandleLensEvent(event) => {
+                if let LensEvent::Install { name } = event {
+                    self.installing.insert(name.clone());
+                    spawn_local(async move {
+                        if let Err(e) = crate::install_lens(name.clone()).await {
+                            log::error!("Error installing lens: {} - {:?}", name.clone(), e);
+                        }
+                    });
+                }
+
+                false
+            }
             Msg::SetAvailable(results) => {
                 if let Some(results) = results {
                     self.req_available = RequestState::Finished;
@@ -172,7 +143,11 @@ impl Component for DiscoverPage {
                         }
                     }
 
-                    Some(html! {<LibraryLens result={data.clone()} /> })
+                    Some(html! { <LibraryLens
+                        result={data.clone()}
+                        onclick={link.callback(Msg::HandleLensEvent)}
+                        in_progress={self.installing.contains(&data.name)}
+                    /> })
                 })
                 .collect::<Html>()
         } else {
