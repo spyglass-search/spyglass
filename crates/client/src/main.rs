@@ -11,7 +11,7 @@ mod constants;
 mod pages;
 mod utils;
 
-use crate::pages::{SearchPage, SettingsPage, StartupPage, StatsPage, UpdaterPage, WizardPage};
+use crate::pages::{SearchPage, SettingsPage, StartupPage, UpdaterPage, WizardPage};
 
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
@@ -126,8 +126,6 @@ pub enum Route {
     // aka DB migrations.
     #[at("/startup")]
     Startup,
-    #[at("/stats")]
-    Status,
     #[at("/updater")]
     Updater,
     #[at("/wizard")]
@@ -195,8 +193,6 @@ fn switch(routes: &Route) -> Html {
         Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
         #[allow(clippy::let_unit_value)]
         Route::Startup => html! { <StartupPage /> },
-        #[allow(clippy::let_unit_value)]
-        Route::Status => html! { <StatsPage /> },
         #[allow(clippy::let_unit_value)]
         Route::Updater => html! { <UpdaterPage /> },
         #[allow(clippy::let_unit_value)]

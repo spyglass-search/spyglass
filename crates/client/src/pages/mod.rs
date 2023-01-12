@@ -1,6 +1,5 @@
 mod admin;
 mod connection_manager;
-mod crawl_stats;
 mod discover;
 mod library;
 mod plugin_manager;
@@ -12,7 +11,6 @@ mod wizard;
 
 pub use admin::*;
 pub use connection_manager::*;
-pub use crawl_stats::*;
 pub use discover::*;
 pub use library::*;
 pub use plugin_manager::*;
