@@ -1,5 +1,6 @@
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
+use libspyglass::search;
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -51,7 +52,10 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
-        route::install_lens(self.state.clone(), self.config.clone(), lens_name).await
+        if let Err(error) = search::lens::install_lens(&self.state, &self.config, lens_name).await {
+            return Err(Error::Custom(error.to_string()));
+        }
+        Ok(())
     }
 
     async fn list_plugins(&self) -> Result<Vec<resp::PluginResult>, Error> {
