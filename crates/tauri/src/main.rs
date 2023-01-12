@@ -206,11 +206,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let window = window_clone.clone();
                                 window::show_search_bar(&window);
                             }) {
-                            window::alert(&window, "Error registering global shortcut", &format!("{}", e));
+                            window::alert(&window, "Error registering global shortcut", &format!("{e}"));
                         }
                     }
                 }
-                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
+                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{e}"))
             }
 
             Ok(())

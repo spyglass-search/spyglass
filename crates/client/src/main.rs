@@ -32,7 +32,7 @@ extern "C" {
     pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
-    pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
+    pub async fn install_lens(name: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn save_user_settings(settings: JsValue) -> Result<JsValue, JsValue>;
@@ -86,7 +86,7 @@ extern "C" {
     pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
-    pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
+    pub async fn install_lens(name: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn save_user_settings(settings: JsValue) -> Result<JsValue, JsValue>;

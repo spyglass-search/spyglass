@@ -87,7 +87,7 @@ fn stats_bar(props: &StatsBarProps) -> Html {
     );
 
     html! {
-        <div class={bar_style} style={format!("width: {}%", percent)}>
+        <div class={bar_style} style={format!("width: {percent}%")}>
             <span class="text-xs">{buf.as_str()}</span>
         </div>
     }

@@ -6,6 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 
+use shared::config::Config;
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response as resp;
 use spyglass_rpc::RpcServer;
@@ -16,6 +17,7 @@ mod route;
 
 pub struct SpyglassRpc {
     state: AppState,
+    config: Config,
 }
 
 #[async_trait]
@@ -50,6 +52,10 @@ impl RpcServer for SpyglassRpc {
 
     async fn list_installed_lenses(&self) -> Result<Vec<resp::LensResult>, Error> {
         route::list_installed_lenses(self.state.clone()).await
+    }
+
+    async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
+        route::install_lens(self.state.clone(), self.config.clone(), lens_name).await
     }
 
     async fn list_plugins(&self) -> Result<Vec<resp::PluginResult>, Error> {
@@ -107,12 +113,16 @@ impl RpcServer for SpyglassRpc {
     }
 }
 
-pub async fn start_api_server(state: AppState) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+pub async fn start_api_server(
+    state: AppState,
+    config: Config,
+) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), state.user_settings.port);
     let server = HttpServerBuilder::default().build(server_addr).await?;
 
     let rpc_module = SpyglassRpc {
         state: state.clone(),
+        config: config.clone(),
     };
     let addr = server.local_addr()?;
     let server_handle = server.start(rpc_module.into_rpc())?;

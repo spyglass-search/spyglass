@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
 
 use tauri::{
     async_runtime::JoinHandle,
@@ -9,10 +7,8 @@ use tauri::{
 };
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
-use url::Url;
 
 use crate::{constants, rpc, AppShutdown};
-use shared::config::Config;
 use shared::event::ClientEvent;
 use shared::response::{InstallableLens, LensResult};
 use spyglass_rpc::RpcClient;
@@ -66,8 +62,6 @@ pub fn init() -> TauriPlugin<Wry> {
 }
 
 async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
-    let config = app_handle.state::<Config>();
-
     // Get the latest lens index
     let lens_index = get_lens_index().await?;
     // Create a map from the index
@@ -92,14 +86,7 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
                     latest.download_url
                 );
 
-                // Remove old lens
-                if let Some(old_file) = lens.file_path {
-                    fs::remove_file(old_file)?;
-                }
-
-                if let Err(e) =
-                    install_lens_to_path(&latest.download_url, config.lenses_dir()).await
-                {
+                if let Err(e) = install_lens(app_handle, &latest.name).await {
                     log::error!("Unable to install lens: {}", e);
                 } else {
                     lenses_updated += 1;
@@ -115,43 +102,22 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
 
 fn http_client() -> reqwest::Client {
     reqwest::Client::builder()
-        .user_agent(constants::APP_USER_AGENT)
+        .user_agent(shared::constants::APP_USER_AGENT)
         .build()
         .expect("Unable to create reqwest client")
-}
-
-pub async fn install_lens_to_path(download_url: &str, lens_folder: PathBuf) -> anyhow::Result<()> {
-    log::info!("installing lens from <{}>", download_url);
-
-    let client = http_client();
-    let resp = client.get(download_url).send().await?;
-    let file_contents = resp.text().await?;
-
-    // Grab the file name from the end of the URL
-    let url = Url::parse(download_url)?;
-    let file_name = url
-        .path_segments()
-        .map(|c| c.collect::<Vec<_>>())
-        .and_then(|mut segs| segs.pop())
-        .expect("Unable to determine filename from lens path");
-
-    // Write file out to lens folder
-    fs::write(lens_folder.join(file_name), file_contents)?;
-
-    Ok(())
 }
 
 async fn get_lens_index() -> anyhow::Result<Vec<InstallableLens>> {
     let client = http_client();
     let resp = client
-        .get(constants::LENS_DIRECTORY_INDEX_URL)
+        .get(shared::constants::LENS_DIRECTORY_INDEX_URL)
         .send()
         .await?;
     let file_contents = resp.text().await?;
 
     match ron::from_str::<Vec<InstallableLens>>(&file_contents) {
         Ok(json) => Ok(json),
-        Err(e) => Err(anyhow::anyhow!(format!("Unable to parse index: {}", e))),
+        Err(e) => Err(anyhow::anyhow!(format!("Unable to parse index: {e}"))),
     }
 }
 
@@ -166,6 +132,24 @@ async fn get_installed_lenses(app_handle: &AppHandle) -> anyhow::Result<Vec<Lens
         Err(err) => {
             log::error!("Unable to list installed lenses: {}", err.to_string());
             Ok(Vec::new())
+        }
+    }
+}
+
+/// Helper to install the lens with the specified name. A request to the server
+/// will be made to install the lens.
+pub async fn install_lens(app_handle: &AppHandle, lens_name: &String) -> anyhow::Result<()> {
+    log::debug!("Lens install requested {}", lens_name);
+    let mutex = app_handle
+        .try_state::<rpc::RpcMutex>()
+        .ok_or_else(|| anyhow::anyhow!("Unable to get RpcMutex"))?;
+
+    let rpc = mutex.lock().await;
+    match rpc.client.install_lens(lens_name.clone()).await {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            log::error!("Unable to install lens: {} {}", lens_name, err.to_string());
+            Ok(())
         }
     }
 }
