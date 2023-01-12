@@ -37,13 +37,13 @@ fn render_icon(result: &SearchResult) -> Html {
                     html! { <icons::FileExtIcon ext={ext.to_string()} class={icon_size} /> }
                 } else {
                     html! {
-                        <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+                        <img class={icon_size} alt="File" src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
                     }
                 }
             }
             _ => {
                 html! {
-                    <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+                    <img class={icon_size} alt="Website" src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
                 }
             }
         }

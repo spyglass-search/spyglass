@@ -55,6 +55,9 @@ pub async fn update_cache(
                 store_cache(lens, resp, &cache_file, &app_state.db).await?;
                 Ok((Option::Some(cache_file), update_time))
             } else {
+                // Allow for manual processing without the need to download a cache file,
+                // can be used for archived data or testing
+                let cache_file = cache_dir.join(lens).join("parsed.manual.ron.gz");
                 if cache_file.exists() {
                     return Ok((Option::Some(cache_file), update_time));
                 }

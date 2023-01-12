@@ -248,8 +248,8 @@ export async function delete_domain(domain) {
     return await invoke('delete_domain', { domain });
 }
 
-export async function install_lens(downloadUrl) {
-    return await invoke('install_lens', { downloadUrl })
+export async function install_lens(name) {
+    return await invoke('install_lens', { name })
 }
 
 export async function network_change(isOffline) {

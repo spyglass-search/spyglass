@@ -103,7 +103,7 @@ impl SearchPage {
 
     fn scroll_to_result(&self, idx: usize) {
         let document = gloo::utils::document();
-        if let Some(el) = document.get_element_by_id(&format!("result-{}", idx)) {
+        if let Some(el) = document.get_element_by_id(&format!("result-{idx}")) {
             if let Ok(el) = el.dyn_into::<HtmlElement>() {
                 el.scroll_into_view();
             }
@@ -349,7 +349,7 @@ impl Component for SearchPage {
                         Ok(results) => Msg::UpdateLensResults(
                             serde_wasm_bindgen::from_value(results).unwrap_or_default(),
                         ),
-                        Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                        Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
                 false
@@ -363,11 +363,11 @@ impl Component for SearchPage {
                         Ok(lenses) => match search_docs(lenses, query).await {
                             Ok(results) => match serde_wasm_bindgen::from_value(results) {
                                 Ok(deser) => Msg::UpdateDocsResults(deser),
-                                Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                                Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                             },
-                            Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                            Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                         },
-                        Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                        Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
 
@@ -428,7 +428,7 @@ impl Component for SearchPage {
                         let open_msg = Msg::OpenResult(res.to_owned());
                         html! {
                             <SearchResultItem
-                                 id={format!("result-{}", idx)}
+                                 id={format!("result-{idx}")}
                                  onclick={link.callback(move |_| open_msg.clone())}
                                  result={res.clone()}
                                  {is_selected}
@@ -444,7 +444,7 @@ impl Component for SearchPage {
                     .map(|(idx, res)| {
                         let is_selected = idx == self.selected_idx;
                         html! {
-                            <LensResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                            <LensResultItem id={format!("result-{idx}")} result={res.clone()} {is_selected} />
                         }
                     })
                     .collect::<Html>()

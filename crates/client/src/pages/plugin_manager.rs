@@ -109,9 +109,9 @@ impl Component for PluginManagerPage {
                     match invoke(ClientInvoke::ListPlugins.as_ref(), JsValue::NULL).await {
                         Ok(results) => match serde_wasm_bindgen::from_value(results) {
                             Ok(plugins) => Msg::SetPlugins(plugins),
-                            Err(e) => Msg::SetError(format!("Error fetching plugins: {:?}", e)),
+                            Err(e) => Msg::SetError(format!("Error fetching plugins: {e:?}")),
                         },
-                        Err(e) => Msg::SetError(format!("Error fetching plugins: {:?}", e)),
+                        Err(e) => Msg::SetError(format!("Error fetching plugins: {e:?}")),
                     }
                 });
                 false

@@ -79,6 +79,9 @@ impl Searcher {
         Ok(())
     }
 
+    /// Deletes multiple ids from the searcher at one time. The caller can decide if the
+    /// documents should also be removed from the database by setting the remove_documents
+    /// flag.
     pub async fn delete_many_by_id(
         state: &AppState,
         doc_ids: &Vec<&str>,
@@ -120,6 +123,7 @@ impl Searcher {
         Ok(())
     }
 
+    /// Removes multiple documents from the index
     pub fn remove_many_from_index(
         writer: &mut IndexWriter,
         doc_ids: &Vec<&str>,

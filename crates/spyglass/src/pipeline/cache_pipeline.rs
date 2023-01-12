@@ -15,7 +15,6 @@ use tokio::task::JoinHandle;
 
 use super::parser::DefaultParser;
 use crate::crawler::archive;
-use entities::sea_orm::query::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use url::Url;
 
@@ -113,22 +112,21 @@ pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) 
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
 async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseResult>) {
-    let now = Instant::now();
-    let parsed_ids = results
+    // get a list of all urls
+    let parsed_urls = results
         .iter()
         .map(|val| val.canonical_url.clone().unwrap_or_default())
         .collect::<Vec<String>>();
 
+    // find all documents that already exist with that url
     let existing: Vec<indexed_document::Model> = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.is_in(parsed_ids))
+        .filter(indexed_document::Column::Url.is_in(parsed_urls))
         .all(&state.db)
         .await
         .unwrap_or_default();
 
-    log::error!("Took {:?} to find urls", now.elapsed().as_millis());
-    let now = Instant::now();
+    // build a hash map of Url to the doc id
     let mut id_map = HashMap::new();
-
     for model in &existing {
         let _ = id_map.insert(model.url.to_string(), model.doc_id.clone());
     }
@@ -139,11 +137,14 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
         .collect::<Vec<&str>>();
     let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
 
-    log::error!(
-        "Took {:?} delete before save save",
-        now.elapsed().as_millis()
-    );
-    let now = Instant::now();
+    // build a list of doc ids to delete from the index
+    let doc_id_list = id_map
+        .values()
+        .into_iter()
+        .map(AsRef::as_ref)
+        .collect::<Vec<&str>>();
+
+    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;
     log::error!("Took {:?} to save delete", now.elapsed().as_millis());
     let now = Instant::now();
@@ -166,25 +167,24 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
             let mut updates = Vec::new();
             let mut added_docs = Vec::new();
             for crawl_result in results {
-                let canonical_url = &crawl_result.canonical_url.clone();
+                let canonical_url = crawl_result.canonical_url.clone();
                 match canonical_url {
-                    Some(url_str) => {
-                        let url_rslt = Url::parse(url_str);
+                    Some(canonical_url_str) => {
+                        let url_rslt = Url::parse(canonical_url_str.as_str());
                         match url_rslt {
                             Ok(url) => {
-                                let url_host = url.host_str().expect("Invalid URL host");
+                                let url_host = url.host_str().unwrap_or("");
                                 // Add document to index
                                 let doc_id: Option<String> = {
                                     if let Ok(mut index_writer) = state.index.writer.lock() {
                                         match Searcher::upsert_document(
                                             &mut index_writer,
-                                            id_map.get(url.as_str()).cloned(),
+                                            id_map.get(&canonical_url_str).cloned(),
                                             &crawl_result.title.clone().unwrap_or_default(),
                                             &crawl_result.description.clone(),
                                             url_host,
                                             url.as_str(),
                                             &crawl_result.content,
-                                            &tag_list,
                                         ) {
                                             Ok(new_doc_id) => Some(new_doc_id),
                                             _ => None,
@@ -209,17 +209,17 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
                                     }
                                 }
                             }
-                            Err(error) => {
-                                log::error!("Error processing {:?} {:?}", canonical_url, error);
-                            }
-                        };
+                            Err(error) => log::error!(
+                                "Error processing url: {:?} error: {:?}",
+                                canonical_url_str,
+                                error
+                            ),
+                        }
                     }
-                    None => {
-                        log::error!(
-                            "None is an invalid url for entry with content {:?}",
-                            crawl_result.content.truncate(80)
-                        );
-                    }
+                    None => log::error!(
+                        "None url is not value for content {:?}",
+                        crawl_result.content.truncate(80)
+                    ),
                 }
             }
 

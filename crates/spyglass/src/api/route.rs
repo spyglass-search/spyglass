@@ -1,5 +1,6 @@
 use futures::StreamExt;
 use jsonrpsee::core::Error;
+use shared::config::Config;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use tracing::instrument;
@@ -12,6 +13,7 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use libspyglass::search;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
@@ -291,6 +293,15 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
     lenses.sort_by(|x, y| x.title.cmp(&y.title));
 
     Ok(lenses)
+}
+
+/// Install or update the specified lens
+#[instrument(skip(state, config))]
+pub async fn install_lens(state: AppState, config: Config, lens_name: String) -> Result<(), Error> {
+    if let Err(error) = search::lens::install_lens(&state, &config, lens_name).await {
+        return Err(Error::Custom(error.to_string()));
+    }
+    Ok(())
 }
 
 pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {

@@ -35,6 +35,9 @@ pub trait Rpc {
     #[method(name = "list_installed_lenses")]
     async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error>;
 
+    #[method(name = "install_lens")]
+    async fn install_lens(&self, lens_name: String) -> Result<(), Error>;
+
     #[method(name = "list_plugins")]
     async fn list_plugins(&self) -> Result<Vec<PluginResult>, Error>;
 

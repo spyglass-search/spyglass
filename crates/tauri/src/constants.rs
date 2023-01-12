@@ -10,10 +10,6 @@ pub const VERSION_CHECK_INTERVAL_S: u64 = 60 * 60 * 6;
 // Check on start & every hour for new lenses
 pub const LENS_UPDATE_CHECK_INTERVAL_S: u64 = 60 * 60;
 
-pub const APP_USER_AGENT: &str = "spyglass (github.com/a5huynh/spyglass)";
-pub const LENS_DIRECTORY_INDEX_URL: &str =
-    "https://raw.githubusercontent.com/spyglass-search/lens-box/main/index.ron";
-
 pub const SEARCH_WIN_NAME: &str = "main";
 pub const SETTINGS_WIN_NAME: &str = "settings_window";
 pub const STARTUP_WIN_NAME: &str = "startup_window";

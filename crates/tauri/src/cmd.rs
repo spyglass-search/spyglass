@@ -8,7 +8,7 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
-use crate::plugins::lens_updater::install_lens_to_path;
+use crate::plugins::lens_updater;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, Limit, UserSettings};
@@ -82,8 +82,8 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
             {
                 use shared::url_to_file_path;
                 let path = url_to_file_path(url.path(), true);
-                if let Err(err) = open::that(format!("file://{}", path)) {
-                    log::error!("Unable to open file://{} due to: {}", path, err);
+                if let Err(err) = open::that(format!("file://{path}")) {
+                    log::error!("Unable to open file://{path} due to: {err}");
                 }
 
                 return Ok(());
@@ -208,20 +208,16 @@ pub async fn delete_domain<'r>(window: tauri::Window, domain: &str) -> Result<()
 #[tauri::command]
 pub async fn install_lens<'r>(
     window: tauri::Window,
-    config: State<'_, Config>,
-    download_url: &str,
+    _config: State<'_, Config>,
+    name: &str,
 ) -> Result<(), String> {
-    if let Err(e) = install_lens_to_path(download_url, config.lenses_dir()).await {
-        log::error!(
-            "Unable to install lens {}, due to error: {}",
-            download_url,
-            e
-        );
+    if let Err(e) = lens_updater::install_lens(&window.app_handle(), &name.to_string()).await {
+        log::error!("Unable to install lens {}, due to error: {}", name, e);
     } else {
         if let Some(metrics) = window.app_handle().try_state::<Metrics>() {
             metrics
                 .track(Event::InstallLens {
-                    lens: download_url.to_owned(),
+                    lens: name.to_owned(),
                 })
                 .await;
         }
@@ -398,7 +394,7 @@ pub async fn save_user_settings(
                             }
                         }
                     } else {
-                        errors.insert(key.to_string(), format!("Config not found for {}", key));
+                        errors.insert(key.to_string(), format!("Config not found for {key}"));
                     }
                 }
             }
@@ -441,7 +437,7 @@ pub async fn load_user_settings(
                 opts.value = value.to_string();
             }
 
-            list.push((format!("{}.{}", pname, setting_name), opts));
+            list.push((format!("{pname}.{setting_name}"), opts));
         }
     }
 

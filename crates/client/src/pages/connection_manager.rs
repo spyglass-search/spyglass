@@ -50,7 +50,7 @@ impl ConnectionsManagerPage {
     pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
         match tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await {
             Ok(results) => Ok(results),
-            Err(e) => Err(format!("Error fetching connections: {:?}", e)),
+            Err(e) => Err(format!("Error fetching connections: {e:?}")),
         }
     }
 
