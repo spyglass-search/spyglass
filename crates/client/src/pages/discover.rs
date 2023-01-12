@@ -2,6 +2,7 @@ use shared::event::ClientInvoke;
 use shared::response::LensResult;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::HtmlInputElement;
 use yew::function_component;
 use yew::prelude::*;
 
@@ -20,7 +21,8 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                     .iter()
                     .map(|lens| LensResult {
                         author: lens.author.clone(),
-                        title: lens.name.clone(),
+                        name: lens.name.clone(),
+                        label: lens.label(),
                         description: lens.description.clone(),
                         hash: lens.sha.clone(),
                         file_path: None,
@@ -90,10 +92,13 @@ pub fn install_btn(props: &InstallBtnProps) -> Html {
 pub struct DiscoverPage {
     req_available: RequestState,
     installable: Vec<LensResult>,
+    filter_string: Option<String>,
+    filter_input: NodeRef,
 }
 
 pub enum Msg {
     FetchAvailable,
+    HandleFilter,
     SetAvailable(Option<Vec<LensResult>>),
 }
 
@@ -108,6 +113,8 @@ impl Component for DiscoverPage {
         Self {
             req_available: RequestState::NotStarted,
             installable: Vec::new(),
+            filter_string: None,
+            filter_input: NodeRef::default(),
         }
     }
 
@@ -124,6 +131,20 @@ impl Component for DiscoverPage {
 
                 false
             }
+            Msg::HandleFilter => {
+                if let Some(el) = self.filter_input.cast::<HtmlInputElement>() {
+                    let filter = el.value();
+                    if filter.is_empty() {
+                        self.filter_string = None;
+                    } else {
+                        self.filter_string = Some(filter.trim().to_string());
+                    }
+
+                    true
+                } else {
+                    false
+                }
+            }
             Msg::SetAvailable(results) => {
                 if let Some(results) = results {
                     self.req_available = RequestState::Finished;
@@ -138,13 +159,18 @@ impl Component for DiscoverPage {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let _link = ctx.link();
-
+        let link = ctx.link();
         let contents = if self.req_available.is_done() {
             self.installable
                 .iter()
-                .map(|data| {
-                    html! {<LibraryLens result={data.clone()} /> }
+                .filter_map(|data| {
+                    if let Some(filter) = &self.filter_string {
+                        if !data.name.to_lowercase().contains(filter) && !data.description.to_lowercase().contains(filter) {
+                            return None;
+                        }
+                    }
+
+                    Some(html! {<LibraryLens result={data.clone()} /> })
                 })
                 .collect::<Html>()
         } else {
@@ -161,7 +187,17 @@ impl Component for DiscoverPage {
         html! {
             <div>
                 <Header label="Discover" icon={header_icon}/>
-                <div class="flex flex-col gap-4 p-4">{contents}</div>
+                <div class="flex flex-col gap-4 p-4">
+                    <div>
+                        <input type="text"
+                            placeholder="filter lenses"
+                            class="w-full rounded p-2 text-black text-sm"
+                            onkeyup={link.callback(|_| Msg::HandleFilter)}
+                            ref={self.filter_input.clone()}
+                        />
+                    </div>
+                    {contents}
+                </div>
             </div>
         }
     }

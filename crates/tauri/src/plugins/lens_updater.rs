@@ -77,13 +77,13 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
     // Loop through each one and check if it needs an update
     let mut lenses_updated = 0;
     for lens in installed {
-        if lens_index_map.contains_key(&lens.title) {
+        if lens_index_map.contains_key(&lens.name) {
             // Compare hash from index to local hash
-            let latest = lens_index_map.get(&lens.title).expect("already checked");
+            let latest = lens_index_map.get(&lens.name).expect("already checked");
             if latest.sha != lens.hash {
                 log::info!(
                     "Found newer version of: {}, updating from: {}",
-                    lens.title,
+                    lens.name,
                     latest.download_url
                 );
 
@@ -162,7 +162,7 @@ pub async fn list_installable_lenses(win: tauri::Window) -> Result<Vec<Installab
         .await
         .unwrap_or_default()
         .iter()
-        .map(|lens| lens.title.to_string())
+        .map(|lens| lens.name.to_string())
         .collect();
 
     match get_lens_index().await {

@@ -259,7 +259,8 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
 
             LensResult {
                 author: lens.author.clone(),
-                title: lens.name.clone(),
+                name: lens.name.clone(),
+                label: lens.label(),
                 description: lens.description.clone().unwrap_or_else(|| "".into()),
                 hash: lens.hash.clone(),
                 file_path: Some(lens.file_path.clone()),
@@ -270,7 +271,7 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
         })
         .collect();
 
-    lenses.sort_by(|x, y| x.title.to_lowercase().cmp(&y.title.to_lowercase()));
+    lenses.sort_by(|x, y| x.label.to_lowercase().cmp(&y.label.to_lowercase()));
 
     Ok(lenses)
 }
@@ -499,11 +500,12 @@ pub async fn search_lenses(
                             label
                         }
                     })
-                    .unwrap_or(lens.name);
+                    .unwrap_or(lens.name.clone());
 
                 results.push(LensResult {
                     author: lens.author,
-                    title: label,
+                    name: lens.name,
+                    label: label,
                     description: lens.description.unwrap_or_default(),
                     ..Default::default()
                 });

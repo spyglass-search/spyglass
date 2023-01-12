@@ -221,7 +221,7 @@ pub fn lens_result_component(props: &LensResultProps) -> Html {
     html! {
         <div id={props.id.clone()} class={component_styles}>
             <h2 class="text-2xl truncate py-1">
-                {result.title.clone()}
+                {result.label.clone()}
             </h2>
             <div class="text-sm leading-relaxed text-neutral-400">
                 {result.description.clone()}

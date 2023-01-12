@@ -33,7 +33,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
     let result = &props.result;
 
-    let lens_name = result.title.clone();
+    let lens_name = result.name.clone();
     let onclick = props.onclick.clone();
 
     let detail_bar = match &result.progress {
@@ -89,7 +89,7 @@ pub fn lens_component(props: &LensProps) -> Html {
     html! {
         <div class={component_styles}>
             <div class="mb-1">
-                <div class="text-lg font-semibold">{result.title.to_string()}</div>
+                <div class="text-lg font-semibold">{result.label.to_string()}</div>
                 <div class="text-sm text-neutral-400">
                     {"Crafted By:"}
                     <a href={format!("https://github.com/{}", result.author)} target="_blank" class="text-cyan-400">
