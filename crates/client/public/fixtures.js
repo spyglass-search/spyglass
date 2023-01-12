@@ -202,7 +202,11 @@ export let invoke = async (func_name, params) => {
         }];
     } else if (func_name == "plugin:lens-updater|install_lens") {
         window.setTimeout(() => {
-            CALLBACKS["RefreshLensManager"]();
+            CALLBACKS["RefreshDiscover"]();
+        }, 5000);
+    } else if (func_name == "plugin:lens-updater|uninstall_lens") {
+        window.setTimeout(() => {
+            CALLBACKS["RefreshLensLibrary"]();
         }, 5000);
     } else if (func_name == "list_plugins") {
         return [{
