@@ -10,6 +10,7 @@ use tauri::{
 pub enum MenuID {
     CRAWL_STATUS,
     DEV_SHOW_CONSOLE,
+    DISCOVER,
     JOIN_DISCORD,
     OPEN_CONNECTION_MANAGER,
     OPEN_LENS_MANAGER,
@@ -59,6 +60,10 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
+        .add_item(CustomMenuItem::new(
+            MenuID::DISCOVER.to_string(),
+            "Discover Lenses",
+        ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_LENS_MANAGER.to_string(),
             "My Library",

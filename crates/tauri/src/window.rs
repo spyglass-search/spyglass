@@ -116,6 +116,10 @@ pub fn show_connection_manager_window(app: &AppHandle) {
     _show_tab(app, "/settings/connections");
 }
 
+pub fn show_discover_window(app: &AppHandle) {
+    _show_tab(app, "/settings/discover");
+}
+
 pub fn show_lens_manager_window(app: &AppHandle) {
     _show_tab(app, "/settings/library");
 }

@@ -232,6 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = item_handle.set_enabled(false);
                                 tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                             }
+                            MenuID::DISCOVER => { window::show_discover_window(app); }
                             MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
                             MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                             MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
