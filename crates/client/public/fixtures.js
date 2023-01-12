@@ -129,7 +129,8 @@ export let invoke = async (func_name, params) => {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "Stardew Valley",
+            name: "stardew",
+            label: "Stardew Valley",
             hash: "",
             html_url: null,
             download_url: null,
@@ -142,7 +143,8 @@ export let invoke = async (func_name, params) => {
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "Dungeons & Dragons",
+            name: "dnd",
+            label: "Dungeons & Dragons",
             hash: "",
             html_url: null,
             download_url: null,
@@ -154,7 +156,8 @@ export let invoke = async (func_name, params) => {
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "Old School Runescape",
+            name: "2007scape",
+            label: "Old School Runescape",
             hash: "",
             html_url: null,
             download_url: null,
@@ -167,7 +170,8 @@ export let invoke = async (func_name, params) => {
         }, {
             author: "Spyglass",
             description: "",
-            title: "Google Docs",
+            name: "docs.google.com",
+            label: "Google Docs",
             hash: "",
             html_url: null,
             download_url: null,
