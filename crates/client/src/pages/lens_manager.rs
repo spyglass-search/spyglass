@@ -69,23 +69,23 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct InstallBtnProps {
-    pub download_url: String,
+    pub name: String,
 }
 
 #[function_component(InstallButton)]
 pub fn install_btn(props: &InstallBtnProps) -> Html {
     let is_installing = use_state_eq(|| false);
-    let download_url = props.download_url.clone();
+    let name = props.name.clone();
 
     let onclick = {
         let is_installing = is_installing.clone();
         Callback::from(move |_| {
-            let download_url = download_url.clone();
+            let name = name.clone();
             is_installing.set(true);
             // Download to lens directory
             spawn_local(async move {
-                if let Err(e) = install_lens(download_url.clone()).await {
-                    log::error!("error installing lens: {} {:?}", download_url.clone(), e);
+                if let Err(e) = install_lens(name.clone()).await {
+                    log::error!("error installing lens: {} {:?}", name.clone(), e);
                 }
             });
         })
@@ -123,7 +123,7 @@ pub fn lens_component(props: &LensProps) -> Html {
             </div>
         }
     } else {
-        html! { <InstallButton download_url={result.download_url.clone().expect("Invalid lens download URL")} /> }
+        html! { <InstallButton name={result.title.clone()} /> }
     };
 
     let view_link = if result.html_url.is_some() {

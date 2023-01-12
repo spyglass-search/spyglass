@@ -219,7 +219,7 @@ async fn start_backend(state: &mut AppState, config: &Config) {
     ));
 
     // API server
-    let api_server = tokio::spawn(api::start_api_server(state.clone()));
+    let api_server = tokio::spawn(api::start_api_server(state.clone(), config.clone()));
 
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
