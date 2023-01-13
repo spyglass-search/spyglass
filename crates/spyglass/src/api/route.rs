@@ -257,7 +257,6 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                         status: lens_stats.status_string(),
                     }
                 }
-
             } else {
                 InstallStatus::Finished { num_docs: 0 }
             };

@@ -46,7 +46,7 @@ pub async fn load_lenses(state: AppState) {
         match lens::add_or_enable(&state.db, &lens, lens::LensType::Simple).await {
             Ok((is_new, model)) => {
                 log::debug!("model? {:?}", model);
-                log::info!("loaded lens {}, new? {}",lens.name, is_new);
+                log::info!("loaded lens {}, new? {}", lens.name, is_new);
                 match model.remote_url {
                     Some(url) => {
                         lens.lens_source = LensSource::Remote(url);
