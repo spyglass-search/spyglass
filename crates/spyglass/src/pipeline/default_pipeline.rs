@@ -1,6 +1,6 @@
 use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
-use crate::search::Searcher;
+use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
 use crate::task::CrawlTask;
 
@@ -135,13 +135,15 @@ async fn start_crawl(
                             if let Ok(mut index_writer) = state.index.writer.lock() {
                                 match Searcher::upsert_document(
                                     &mut index_writer,
-                                    existing.clone().map(|f| f.doc_id),
-                                    &crawl_result.title.unwrap_or_default(),
-                                    &crawl_result.description.unwrap_or_default(),
-                                    url_host,
-                                    url.as_str(),
-                                    &content,
-                                    &None,
+                                    DocumentUpdate {
+                                        doc_id: existing.clone().map(|f| f.doc_id),
+                                        title: &crawl_result.title.unwrap_or_default(),
+                                        description: &crawl_result.description.unwrap_or_default(),
+                                        domain: url_host,
+                                        url: url.as_str(),
+                                        content: &content,
+                                        tags: &None,
+                                    },
                                 ) {
                                     Ok(new_doc_id) => Some(new_doc_id),
                                     _ => None,

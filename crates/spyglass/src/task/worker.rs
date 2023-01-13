@@ -10,7 +10,7 @@ use shared::config::{Config, LensConfig, LensRule, LensSource};
 use super::CrawlTask;
 use super::{bootstrap, CollectTask, ManagerCommand};
 use crate::crawler::{CrawlError, CrawlResult, Crawler};
-use crate::search::Searcher;
+use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
 
 /// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache.
@@ -307,13 +307,16 @@ pub async fn process_crawl(
             if let Ok(mut index_writer) = state.index.writer.lock() {
                 match Searcher::upsert_document(
                     &mut index_writer,
-                    existing.clone().map(|d| d.doc_id),
-                    &crawl_result.title.clone().unwrap_or_default(),
-                    &crawl_result.description.clone().unwrap_or_default(),
-                    url_host,
-                    url.as_str(),
-                    &content,
-                    &Some(tags),
+                    DocumentUpdate {
+                        doc_id: existing.clone().map(|d| d.doc_id),
+
+                        title: &crawl_result.title.clone().unwrap_or_default(),
+                        description: &crawl_result.description.clone().unwrap_or_default(),
+                        domain: url_host,
+                        url: url.as_str(),
+                        content: &content,
+                        tags: &Some(tags),
+                    },
                 ) {
                     Ok(new_doc_id) => new_doc_id,
                     Err(err) => {

@@ -38,6 +38,17 @@ pub struct Searcher {
     pub writer: Arc<Mutex<IndexWriter>>,
 }
 
+#[derive(Clone)]
+pub struct DocumentUpdate<'a> {
+    pub doc_id: Option<String>,
+    pub title: &'a str,
+    pub description: &'a str,
+    pub domain: &'a str,
+    pub url: &'a str,
+    pub content: &'a str,
+    pub tags: &'a Option<Vec<u64>>,
+}
+
 impl Debug for Searcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Searcher")
@@ -206,26 +217,22 @@ impl Searcher {
 
     pub fn upsert_document(
         writer: &mut IndexWriter,
-        doc_id: Option<String>,
-        title: &str,
-        description: &str,
-        domain: &str,
-        url: &str,
-        content: &str,
-        tags: &Option<Vec<u64>>,
+        doc_update: DocumentUpdate,
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
-        let doc_id = doc_id.map_or_else(|| Uuid::new_v4().as_hyphenated().to_string(), |s| s);
+        let doc_id = doc_update
+            .doc_id
+            .map_or_else(|| Uuid::new_v4().as_hyphenated().to_string(), |s| s);
 
         let mut doc = Document::default();
-        doc.add_text(fields.content, content);
-        doc.add_text(fields.description, description);
-        doc.add_text(fields.domain, domain);
+        doc.add_text(fields.content, doc_update.content);
+        doc.add_text(fields.description, doc_update.description);
+        doc.add_text(fields.domain, doc_update.domain);
         doc.add_text(fields.id, &doc_id);
-        doc.add_text(fields.title, title);
-        doc.add_text(fields.url, url);
-        if let Some(tag) = tags {
+        doc.add_text(fields.title, doc_update.title);
+        doc.add_text(fields.url, doc_update.url);
+        if let Some(tag) = doc_update.tags {
             for t in tag {
                 doc.add_u64(fields.tags, *t);
             }
@@ -280,7 +287,7 @@ impl Searcher {
 
 #[cfg(test)]
 mod test {
-    use crate::search::{IndexPath, Searcher};
+    use crate::search::{DocumentUpdate, IndexPath, Searcher};
     use entities::models::create_connection;
     use shared::config::{Config, LensConfig};
 
@@ -288,12 +295,14 @@ mod test {
         let writer = &mut searcher.writer.lock().unwrap();
         Searcher::upsert_document(
             writer,
-            None,
-            "Of Mice and Men",
-            "Of Mice and Men passage",
-            "example.com",
-            "https://example.com/mice_and_men",
-            "A few miles south of Soledad, the Salinas River drops in close to the hillside
+            DocumentUpdate {
+                doc_id: None,
+                title: "Of Mice and Men",
+                description: "Of Mice and Men passage",
+                domain: "example.com",
+                url: "https://example.com/mice_and_men",
+                content:
+                    "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
             side of the river the golden foothill slopes curve up to the strong and rocky
@@ -301,18 +310,21 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            &Some(vec![1 as u64]),
+                tags: &Some(vec![1 as u64]),
+            },
         )
         .expect("Unable to add doc");
 
         Searcher::upsert_document(
             writer,
-            None,
-            "Of Mice and Men",
-            "Of Mice and Men passage",
-            "en.wikipedia.org",
-            "https://en.wikipedia.org/mice_and_men",
-            "A few miles south of Soledad, the Salinas River drops in close to the hillside
+            DocumentUpdate {
+                doc_id: None,
+                title: "Of Mice and Men",
+                description: "Of Mice and Men passage",
+                domain: "en.wikipedia.org",
+                url: "https://en.wikipedia.org/mice_and_men",
+                content:
+                    "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
             side of the river the golden foothill slopes curve up to the strong and rocky
@@ -320,40 +332,44 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-            &Some(vec![2 as u64]),
+                tags: &Some(vec![2 as u64]),
+            },
         )
         .expect("Unable to add doc");
 
         Searcher::upsert_document(
             writer,
-            None,
-            "Of Cheese and Crackers",
-            "Of Cheese and Crackers Passage",
-            "en.wikipedia.org",
-            "https://en.wikipedia.org/cheese_and_crackers",
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
+            DocumentUpdate {
+                doc_id: None,
+                title: "Of Cheese and Crackers",
+                description: "Of Cheese and Crackers Passage",
+                domain: "en.wikipedia.org",
+                url: "https://en.wikipedia.org/cheese_and_crackers",
+                content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
             tellus tortor, varius sit amet fermentum a, finibus porttitor erat. Proin
             suscipit, dui ac posuere vulputate, justo est faucibus est, a bibendum
             nulla nulla sed elit. Vivamus et libero a tortor ultricies feugiat in vel
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-            &Some(vec![2 as u64]),
+                tags: &Some(vec![2 as u64]),
+            },
         )
         .expect("Unable to add doc");
 
         Searcher::upsert_document(
             writer,
-            None,
-            "Frankenstein: The Modern Prometheus",
-            "A passage from Frankenstein",
-            "monster.com",
-            "https://example.com/frankenstein",
-            "You will rejoice to hear that no disaster has accompanied the commencement of an
+            DocumentUpdate {
+            doc_id: None,
+            title:"Frankenstein: The Modern Prometheus",
+            description: "A passage from Frankenstein",
+            domain:"monster.com",
+            url:"https://example.com/frankenstein",
+            content:"You will rejoice to hear that no disaster has accompanied the commencement of an
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-            &Some(vec![1 as u64]),
+             tags: &Some(vec![1 as u64]),}
         )
         .expect("Unable to add doc");
 

@@ -5,7 +5,7 @@ use std::time::Instant;
 use crate::crawler::{cache, CrawlResult};
 use crate::pipeline::collector::CollectionResult;
 use crate::pipeline::PipelineContext;
-use crate::search::Searcher;
+use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
 
 use entities::models::tag::TagType;
@@ -169,13 +169,18 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
                                     if let Ok(mut index_writer) = state.index.writer.lock() {
                                         match Searcher::upsert_document(
                                             &mut index_writer,
-                                            id_map.get(&canonical_url_str).cloned(),
-                                            &crawl_result.title.clone().unwrap_or_default(),
-                                            &crawl_result.description.clone(),
-                                            url_host,
-                                            url.as_str(),
-                                            &crawl_result.content,
-                                            &tag_list,
+                                            DocumentUpdate {
+                                                doc_id: id_map.get(&canonical_url_str).cloned(),
+                                                title: &crawl_result
+                                                    .title
+                                                    .clone()
+                                                    .unwrap_or_default(),
+                                                description: &crawl_result.description.clone(),
+                                                domain: url_host,
+                                                url: url.as_str(),
+                                                content: &crawl_result.content,
+                                                tags: &tag_list,
+                                            },
                                         ) {
                                             Ok(new_doc_id) => Some(new_doc_id),
                                             _ => None,

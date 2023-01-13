@@ -609,7 +609,7 @@ mod test {
         models::{crawl_queue, indexed_document},
         test::setup_test_db,
     };
-    use libspyglass::search::Searcher;
+    use libspyglass::search::{DocumentUpdate, Searcher};
     use libspyglass::state::AppState;
     use shared::config::{Config, LensConfig};
 
@@ -628,12 +628,15 @@ mod test {
         if let Ok(mut writer) = state.index.writer.lock() {
             Searcher::upsert_document(
                 &mut writer,
-                Some("test_id".into()),
-                "test title",
-                "test desc",
-                "example.com",
-                "https://example.com/test",
-                "test content",
+                DocumentUpdate {
+                    doc_id: Some("test_id".into()),
+                    title: "test title",
+                    description: "test desc",
+                    domain: "example.com",
+                    url: "https://example.com/test",
+                    content: "test content",
+                    tags: &None,
+                },
             )
             .expect("Unable to add doc");
         }
