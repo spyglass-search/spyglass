@@ -130,26 +130,15 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
     for model in &existing {
         let _ = id_map.insert(model.url.to_string(), model.doc_id.clone());
     }
-    let doc_id_list = id_map
-        .values()
-        .into_iter()
-        .map(AsRef::as_ref)
-        .collect::<Vec<&str>>();
-    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
 
     // build a list of doc ids to delete from the index
-    let doc_id_list = id_map
-        .values()
-        .into_iter()
-        .map(AsRef::as_ref)
-        .collect::<Vec<&str>>();
+    let doc_id_list = id_map.values().map(AsRef::as_ref).collect::<Vec<&str>>();
 
     let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;
-    log::error!("Took {:?} to save delete", now.elapsed().as_millis());
-    let now = Instant::now();
 
-    let tag = tag::get_or_create(&state.db, TagType::Lens, &lens.to_string()).await;
+    // Access tag for this lens and build id list
+    let tag = tag::get_or_create(&state.db, TagType::Lens, lens).await;
     let tag_list = match tag {
         Ok(model) => Some(vec![model.id as u64]),
         Err(error) => {
@@ -158,10 +147,7 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
         }
     };
 
-    log::error!("Took {:?} to get tags", now.elapsed().as_millis());
-    let now = Instant::now();
     let transaction_rslt = state.db.begin().await;
-
     match transaction_rslt {
         Ok(transaction) => {
             let mut updates = Vec::new();
@@ -185,6 +171,7 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
                                             url_host,
                                             url.as_str(),
                                             &crawl_result.content,
+                                            &tag_list,
                                         ) {
                                             Ok(new_doc_id) => Some(new_doc_id),
                                             _ => None,
@@ -267,5 +254,4 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
         }
         Err(err) => log::error!("Transaction failed {:?}", err),
     }
-    log::error!("Took {:?} To do everyting else", now.elapsed().as_millis());
 }

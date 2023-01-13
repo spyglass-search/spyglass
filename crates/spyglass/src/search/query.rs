@@ -62,7 +62,7 @@ pub fn build_query(
     for id in applied_lenses {
         term_query.push((
             Occur::Must,
-            _boosted_term(Term::from_field_u64(fields.tags, *id), 1.0),
+            _boosted_term(Term::from_field_u64(fields.tags, *id), 0.0),
         ))
     }
 

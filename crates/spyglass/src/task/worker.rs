@@ -18,7 +18,7 @@ use crate::state::AppState;
 /// the standard bootstrap process
 #[tracing::instrument(skip(state, config, lens))]
 pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &LensConfig) {
-    log::debug!("Bootstrapping Lens");
+    log::debug!("Bootstrapping Lens {:?}", lens);
     match &lens.lens_source {
         LensSource::Remote(_) => {
             if !(bootstrap::bootstrap_lens_cache(state, config, lens).await) {
