@@ -18,8 +18,7 @@ use crate::state::AppState;
 /// the standard bootstrap process
 #[tracing::instrument(skip(state, config, lens))]
 pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &LensConfig) {
-    log::debug!("BOOTSTRAPING LENS {} - {:?}", lens.name, lens.lens_source);
-
+    log::debug!("bootstrapping lens {} - {:?}", lens.name, lens.lens_source);
     // Grab the latest info about this lens
     let lens_update_info = lens::Entity::find()
         .filter(lens::Column::Name.eq(lens.name.clone()))
@@ -30,7 +29,6 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
     if let Some(lens_update_info) = lens_update_info {
         match lens_update_info.remote_url {
             Some(_) => {
-                log::debug!("HANDLING REMOTE LENS!!!!!!");
                 if !(bootstrap::bootstrap_lens_cache(state, config, lens).await) {
                     // process_lens(state, lens).await;
                 }

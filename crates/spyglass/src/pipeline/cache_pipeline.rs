@@ -221,6 +221,10 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
             let commit = transaction.commit().await;
             match commit {
                 Ok(_) => {
+                    if let Ok(mut writer) = state.index.writer.lock() {
+                        let _ = writer.commit();
+                    }
+
                     let added_entries: Vec<indexed_document::Model> =
                         indexed_document::Entity::find()
                             .filter(indexed_document::Column::Url.is_in(added_docs))

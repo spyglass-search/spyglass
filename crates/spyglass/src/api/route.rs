@@ -241,7 +241,13 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
         .iter()
         .map(|lens| {
             let progress = if let Some(lens_stats) = stats.get(&lens.name) {
-                if lens_stats.enqueued == 0 {
+                // In the middle of installing the lens if no stats are available.
+                if lens_stats.enqueued == 0 && lens_stats.indexed == 0 {
+                    InstallStatus::Installing {
+                        percent: 100,
+                        status: "Installing...".to_string(),
+                    }
+                } else if lens_stats.enqueued == 0 {
                     InstallStatus::Finished {
                         num_docs: lens_stats.indexed as u64,
                     }
@@ -251,6 +257,7 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                         status: lens_stats.status_string(),
                     }
                 }
+
             } else {
                 InstallStatus::Finished { num_docs: 0 }
             };
