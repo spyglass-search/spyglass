@@ -1,7 +1,6 @@
 use entities::get_library_stats;
 use jsonrpsee::core::Error;
-use shared::config::Config;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
@@ -13,14 +12,12 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
-use futures::StreamExt;
-use jsonrpsee::core::Error;
-use libspyglass::search;
+use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
+    AppStatus, InstallStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
+    SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 
 use libgoog::{ClientType, Credentials, GoogClient};
@@ -29,18 +26,6 @@ use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
-use shared::config::Config;
-use shared::metrics::{self, Event};
-use shared::request;
-use shared::response::{
-    AppStatus, InstallStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
-    SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
-};
-use spyglass_plugin::SearchFilter;
-use std::collections::HashSet;
-use std::time::SystemTime;
-use tracing::instrument;
-use url::Url;
 
 use super::auth::create_auth_listener;
 use super::response;

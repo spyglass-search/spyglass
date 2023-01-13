@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use dashmap::DashMap;
 use entities::models::lens;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};

@@ -2,10 +2,10 @@ use entities::models::crawl_queue::EnqueueSettings;
 use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
-use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens, tag};
+use entities::models::{bootstrap_queue, crawl_queue, indexed_document, tag};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::{Config, LensConfig, LensRule};
+use shared::config::{Config, LensConfig, LensRule, LensSource};
 
 use super::CrawlTask;
 use super::{bootstrap, CollectTask, ManagerCommand};
@@ -25,8 +25,9 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
                 process_lens(state, lens).await;
             }
         }
-
-        process_lens(state, lens).await;
+        _ => {
+            process_lens(state, lens).await;
+        }
     } // Deleted or no longer exists?
 }
 
