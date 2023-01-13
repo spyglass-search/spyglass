@@ -257,7 +257,10 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                     }
                 }
             } else {
-                InstallStatus::Finished { num_docs: 0 }
+                InstallStatus::Installing {
+                    percent: 100,
+                    status: "Installing...".to_string(),
+                }
             };
 
             LensResult {
