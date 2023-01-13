@@ -1,5 +1,6 @@
 use tantivy::{fastfield::MultiValuedFastFieldReader, termdict::TermDictionary, DocId};
 
+#[allow(dead_code)]
 pub fn ff_to_string(
     doc_id: DocId,
     reader: &MultiValuedFastFieldReader<u64>,
