@@ -141,7 +141,7 @@ pub async fn add_or_enable(
         let changed = !existing
             .hash
             .clone()
-            .unwrap_or(String::from(""))
+            .unwrap_or_else(|| String::from(""))
             .eq(&lens.hash);
 
         updated.update(db).await?;
