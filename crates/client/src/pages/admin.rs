@@ -71,10 +71,10 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
             if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
-                    "/discover" => history.push(Route::SettingsPage {
+                    "/settings/discover" => history.push(Route::SettingsPage {
                         tab: pages::Tab::Discover,
                     }),
-                    "/library" => history.push(Route::SettingsPage {
+                    "/settings/library" => history.push(Route::SettingsPage {
                         tab: pages::Tab::LensManager,
                     }),
                     "/settings/connections" => history.push(Route::SettingsPage {
