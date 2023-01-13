@@ -5,7 +5,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
 use sea_orm::{
     sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
-    QueryOrder, QueryTrait, Set, Statement,
+    QueryOrder, QuerySelect, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -576,15 +576,18 @@ pub async fn mark_failed(db: &DatabaseConnection, id: i64, retry: bool) {
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected
 /// to be a SQL like statement.
 pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<u64> {
-    let res = Entity::delete_many()
+    let dbids: Vec<i64> = Entity::find()
+        .select_only()
+        .column(Column::Id)
         .filter(Column::Url.like(rule))
-        .exec(db)
-        .await?;
+        .all(db)
+        .await?
+        .iter()
+        .map(|x| x.id)
+        .collect();
 
-    if res.rows_affected > 0 {
-        log::info!("removed {} tasks due to '{}'", res.rows_affected, rule);
-    }
-    Ok(res.rows_affected)
+    let rows_affected = delete_many_by_id(db.clone(), &dbids).await?;
+    Ok(rows_affected)
 }
 
 /// Update the URL of a task. Typically used after a crawl to set the canonical URL
@@ -630,19 +633,28 @@ pub async fn update_or_remove_task(
 pub async fn delete_by_lens(db: DatabaseConnection, name: &str) -> Result<(), sea_orm::DbErr> {
     if let Ok(ids) = find_by_lens(db.clone(), name).await {
         let dbids: Vec<i64> = ids.iter().map(|item| item.id).collect();
-        // Delete all associated tags
-        crawl_tag::Entity::delete_many()
-            .filter(crawl_tag::Column::CrawlQueueId.is_in(dbids.clone()))
-            .exec(&db)
-            .await?;
-
-        // Delete item
-        Entity::delete_many()
-            .filter(Column::Id.is_in(dbids))
-            .exec(&db)
-            .await?;
+        delete_many_by_id(db, &dbids).await?;
     }
     Ok(())
+}
+
+pub async fn delete_many_by_id(
+    db: DatabaseConnection,
+    dbids: &[i64],
+) -> Result<u64, sea_orm::DbErr> {
+    // Delete all associated tags
+    crawl_tag::Entity::delete_many()
+        .filter(crawl_tag::Column::CrawlQueueId.is_in(dbids.to_owned()))
+        .exec(&db)
+        .await?;
+
+    // Delete item
+    let res = Entity::delete_many()
+        .filter(Column::Id.is_in(dbids.to_owned()))
+        .exec(&db)
+        .await?;
+
+    Ok(res.rows_affected)
 }
 
 #[derive(Debug, FromQueryResult)]
