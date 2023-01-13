@@ -25,7 +25,7 @@ pub enum CollectTask {
         lens: String,
     },
     // Pull URLs from a CDX server
-    Bootstrap {
+    CDXCollection {
         lens: String,
         seed_url: String,
         pipeline: Option<String>,
@@ -176,7 +176,7 @@ pub async fn worker_task(
                             CollectTask::BootstrapLens {
                                 lens
                             } => {
-                                log::debug!("Handling Bootstrap for {}", lens);
+                                log::debug!("Handling BootstrapLens for {}", lens);
                                 let state = state.clone();
                                 let config = config.clone();
                                 tokio::spawn(async move {
@@ -188,12 +188,12 @@ pub async fn worker_task(
                                     }
                                 });
                             },
-                            CollectTask::Bootstrap {
+                            CollectTask::CDXCollection {
                                 lens,
                                 seed_url,
                                 pipeline,
                             } => {
-                                log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
+                                log::debug!("handling CDXCollection for {} - {}", lens, seed_url);
                                 let state = state.clone();
                                 tokio::spawn(async move {
                                     if let Some(lens_config) = &state.lenses.get(&lens) {

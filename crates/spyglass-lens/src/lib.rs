@@ -75,6 +75,8 @@ pub struct LensConfig {
     #[serde(default = "LensConfig::default_author")]
     pub author: String,
     pub name: String,
+    #[serde(default)]
+    pub label: String,
     pub description: Option<String>,
     pub domains: Vec<String>,
     pub urls: Vec<String>,
@@ -103,6 +105,14 @@ impl LensConfig {
 
     fn default_is_enabled() -> bool {
         true
+    }
+
+    pub fn label(&self) -> String {
+        if self.label.is_empty() {
+            self.name.clone()
+        } else {
+            self.label.clone()
+        }
     }
 
     pub fn into_regexes(&self) -> LensFilters {

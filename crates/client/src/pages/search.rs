@@ -71,7 +71,7 @@ impl SearchPage {
             }
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
-            self.lens.push(selected.title.to_string());
+            self.lens.push(selected.label.to_string());
             // Clear query string
             link.send_message(Msg::ClearQuery);
         }

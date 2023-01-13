@@ -3,8 +3,7 @@ use jsonrpsee::proc_macros::rpc;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
-    SearchResults,
+    AppStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp, SearchResults,
 };
 
 /// Rpc trait
@@ -20,23 +19,20 @@ pub trait Rpc {
     #[method(name = "app_status")]
     async fn app_status(&self) -> Result<AppStatus, Error>;
 
-    #[method(name = "crawl_stats")]
-    async fn crawl_stats(&self) -> Result<CrawlStats, Error>;
-
     #[method(name = "delete_doc")]
     async fn delete_doc(&self, id: String) -> Result<(), Error>;
 
     #[method(name = "delete_domain")]
     async fn delete_domain(&self, domain: String) -> Result<(), Error>;
 
+    #[method(name = "install_lens")]
+    async fn install_lens(&self, lens_name: String) -> Result<(), Error>;
+
     #[method(name = "list_connections")]
     async fn list_connections(&self) -> Result<ListConnectionResult, Error>;
 
     #[method(name = "list_installed_lenses")]
     async fn list_installed_lenses(&self) -> Result<Vec<LensResult>, Error>;
-
-    #[method(name = "install_lens")]
-    async fn install_lens(&self, lens_name: String) -> Result<(), Error>;
 
     #[method(name = "list_plugins")]
     async fn list_plugins(&self) -> Result<Vec<PluginResult>, Error>;
@@ -61,4 +57,7 @@ pub trait Rpc {
 
     #[method(name = "toggle_plugin")]
     async fn toggle_plugin(&self, name: String) -> Result<(), Error>;
+
+    #[method(name = "uninstall_lens")]
+    async fn uninstall_lens(&self, name: String) -> Result<(), Error>;
 }

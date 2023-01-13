@@ -2,10 +2,10 @@ use entities::models::crawl_queue::EnqueueSettings;
 use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
-use entities::models::{bootstrap_queue, crawl_queue, indexed_document, tag};
+use entities::models::{bootstrap_queue, crawl_queue, indexed_document, lens, tag};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::{Config, LensConfig, LensRule, LensSource};
+use shared::config::{Config, LensConfig, LensRule};
 
 use super::CrawlTask;
 use super::{bootstrap, CollectTask, ManagerCommand};
@@ -25,23 +25,19 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
                 process_lens(state, lens).await;
             }
         }
-        _ => {
-            process_lens(state, lens).await;
-        }
-    }
+
+        process_lens(state, lens).await;
+    } // Deleted or no longer exists?
 }
 
 // Process lens by kicking off a bootstrap for the lens
 async fn process_lens(state: &AppState, lens: &LensConfig) {
     for domain in lens.domains.iter() {
-        let pipeline_kind = lens.pipeline.as_ref().cloned();
-
-        let seed_url = format!("https://{domain}");
         let _ = state
-            .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
+            .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
                 lens: lens.name.clone(),
-                seed_url,
-                pipeline: pipeline_kind.clone(),
+                seed_url: format!("https://{domain}"),
+                pipeline: lens.pipeline.as_ref().cloned(),
             }))
             .await;
     }
@@ -77,7 +73,7 @@ async fn process_urls(lens: &LensConfig, state: &AppState) {
         } else {
             // Otherwise, bootstrap using this as a prefix.
             let _ = state
-                .schedule_work(ManagerCommand::Collect(CollectTask::Bootstrap {
+                .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
                     lens: lens.name.clone(),
                     seed_url: prefix.to_string(),
                     pipeline: pipeline_kind.clone(),

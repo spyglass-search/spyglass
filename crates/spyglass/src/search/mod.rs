@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::search::query::build_query;
 use crate::state::AppState;
-use entities::models::indexed_document;
+use entities::models::{document_tag, indexed_document};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
@@ -81,7 +81,7 @@ impl Searcher {
     /// flag.
     pub async fn delete_many_by_id(
         state: &AppState,
-        doc_ids: &Vec<&str>,
+        doc_ids: &[String],
         remove_documents: bool,
     ) -> anyhow::Result<()> {
         // Remove from search index, immediately.
@@ -92,6 +92,18 @@ impl Searcher {
         if remove_documents {
             // Remove from indexed_doc table
             let doc_refs: Vec<&str> = doc_ids.iter().map(AsRef::as_ref).collect();
+            let docs = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.is_in(doc_refs.clone()))
+                .all(&state.db)
+                .await?;
+
+            let dbids: Vec<i64> = docs.iter().map(|x| x.id).collect();
+            // Remove tags
+            document_tag::Entity::delete_many()
+                .filter(document_tag::Column::IndexedDocumentId.is_in(dbids))
+                .exec(&state.db)
+                .await?;
+
             indexed_document::Entity::delete_many()
                 .filter(indexed_document::Column::DocId.is_in(doc_refs))
                 .exec(&state.db)
@@ -123,10 +135,9 @@ impl Searcher {
     /// Removes multiple documents from the index
     pub fn remove_many_from_index(
         writer: &mut IndexWriter,
-        doc_ids: &Vec<&str>,
+        doc_ids: &[String],
     ) -> anyhow::Result<()> {
         let fields = DocFields::as_fields();
-
         for doc_id in doc_ids {
             writer.delete_term(Term::from_field_text(fields.id, doc_id));
         }

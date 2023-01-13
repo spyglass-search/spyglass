@@ -1,6 +1,8 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
+use sea_orm::{
+    ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, Set, Statement,
+};
 
 use super::tag::{get_or_create, TagPair};
 
@@ -203,6 +205,32 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .into_iter()
         .map(|(_id, doc_id)| doc_id)
         .collect::<Vec<String>>())
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct IndexedDocumentId {
+    pub id: i64,
+    pub doc_id: String,
+}
+
+pub async fn find_by_lens(
+    db: DatabaseConnection,
+    name: &str,
+) -> Result<Vec<IndexedDocumentId>, sea_orm::DbErr> {
+    IndexedDocumentId::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite,
+        r#"
+        SELECT
+            indexed_document.id,
+            indexed_document.doc_id
+        FROM indexed_document
+        LEFT JOIN document_tag on indexed_document.id = document_tag.indexed_document_id
+        LEFT JOIN tags on tags.id = document_tag.tag_id
+        WHERE tags.label = "lens" AND tags.value = $1"#,
+        vec![name.into()],
+    ))
+    .all(&db)
+    .await
 }
 
 #[cfg(test)]

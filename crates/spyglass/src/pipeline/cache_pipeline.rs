@@ -132,7 +132,11 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
     }
 
     // build a list of doc ids to delete from the index
-    let doc_id_list = id_map.values().map(AsRef::as_ref).collect::<Vec<&str>>();
+    let doc_id_list = id_map
+        .values()
+        .into_iter()
+        .map(|x| x.to_owned())
+        .collect::<Vec<String>>();
 
     let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;
@@ -228,6 +232,10 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
             let commit = transaction.commit().await;
             match commit {
                 Ok(_) => {
+                    if let Ok(mut writer) = state.index.writer.lock() {
+                        let _ = writer.commit();
+                    }
+
                     let added_entries: Vec<indexed_document::Model> =
                         indexed_document::Entity::find()
                             .filter(indexed_document::Column::Url.is_in(added_docs))
