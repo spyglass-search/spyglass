@@ -1,7 +1,10 @@
 use tantivy::schema::*;
 
 pub type FieldName = String;
-pub type SchemaMapping = Vec<(FieldName, TextOptions)>;
+pub struct SchemaMapping {
+    pub text_fields: Option<Vec<(FieldName, TextOptions)>>,
+    pub unsigned_fields: Option<Vec<(FieldName, NumericOptions)>>,
+}
 
 pub trait SearchDocument {
     fn as_field_vec() -> SchemaMapping;
@@ -15,8 +18,16 @@ pub trait SearchDocument {
 
 pub fn mapping_to_schema(mapping: &SchemaMapping) -> Schema {
     let mut schema_builder = Schema::builder();
-    for (name, opts) in mapping {
-        schema_builder.add_text_field(name, opts.clone());
+    if let Some(fields) = &mapping.text_fields {
+        for (name, opts) in fields {
+            schema_builder.add_text_field(name, opts.clone());
+        }
+    }
+
+    if let Some(fields) = &mapping.unsigned_fields {
+        for (name, opts) in fields {
+            schema_builder.add_u64_field(name, opts.clone());
+        }
     }
     schema_builder.build()
 }
@@ -29,6 +40,7 @@ pub struct DocFields {
     pub description: Field,
     pub title: Field,
     pub url: Field,
+    pub tags: Field,
 }
 
 impl SearchDocument for DocFields {
@@ -42,18 +54,27 @@ impl SearchDocument for DocFields {
         // STORED:  Means that the field will also be saved in a compressed, row oriented
         //          key-value store. This store is useful to reconstruct the documents that
         //          were selected during the search phase.
-        vec![
-            // Used to reference this document
-            ("id".into(), STRING | STORED | FAST),
-            // Document contents
-            ("domain".into(), STRING | STORED | FAST),
-            ("title".into(), TEXT | STORED | FAST),
-            // Used for display purposes
-            ("description".into(), TEXT | STORED),
-            ("url".into(), STRING | STORED | FAST),
-            // Indexed
-            ("content".into(), TEXT | STORED),
-        ]
+        SchemaMapping {
+            text_fields: Some(vec![
+                // Used to reference this document
+                ("id".into(), STRING | STORED | FAST),
+                // Document contents
+                ("domain".into(), STRING | STORED | FAST),
+                ("title".into(), TEXT | STORED | FAST),
+                // Used for display purposes
+                ("description".into(), TEXT | STORED),
+                ("url".into(), STRING | STORED | FAST),
+                // Indexed
+                ("content".into(), TEXT | STORED),
+            ]),
+            unsigned_fields: Some(vec![(
+                "tags".into(),
+                NumericOptions::default()
+                    .set_fast(Cardinality::MultiValues)
+                    .set_indexed()
+                    .set_stored(),
+            )]),
+        }
     }
 
     fn as_fields() -> Self {
@@ -67,6 +88,7 @@ impl SearchDocument for DocFields {
                 .expect("No description in schema"),
             title: schema.get_field("title").expect("No title in schema"),
             url: schema.get_field("url").expect("No url in schema"),
+            tags: schema.get_field("tags").expect("No tags in schema"),
         }
     }
 }

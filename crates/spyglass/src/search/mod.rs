@@ -3,21 +3,18 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use regex::RegexSetBuilder;
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::TermQuery;
-use tantivy::{schema::*, DocAddress, DocId, SegmentReader};
+use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
 use crate::search::query::build_query;
-use crate::search::utils::ff_to_string;
 use crate::state::AppState;
 use entities::models::{document_tag, indexed_document};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
-use spyglass_plugin::SearchFilter;
 
 pub mod grouping;
 pub mod lens;
@@ -39,6 +36,17 @@ pub struct Searcher {
     pub index: Index,
     pub reader: IndexReader,
     pub writer: Arc<Mutex<IndexWriter>>,
+}
+
+#[derive(Clone)]
+pub struct DocumentUpdate<'a> {
+    pub doc_id: Option<String>,
+    pub title: &'a str,
+    pub description: &'a str,
+    pub domain: &'a str,
+    pub url: &'a str,
+    pub content: &'a str,
+    pub tags: &'a Option<Vec<u64>>,
 }
 
 impl Debug for Searcher {
@@ -209,24 +217,26 @@ impl Searcher {
 
     pub fn upsert_document(
         writer: &mut IndexWriter,
-        doc_id: Option<String>,
-        title: &str,
-        description: &str,
-        domain: &str,
-        url: &str,
-        content: &str,
+        doc_update: DocumentUpdate,
     ) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
-        let doc_id = doc_id.map_or_else(|| Uuid::new_v4().as_hyphenated().to_string(), |s| s);
+        let doc_id = doc_update
+            .doc_id
+            .map_or_else(|| Uuid::new_v4().as_hyphenated().to_string(), |s| s);
 
         let mut doc = Document::default();
-        doc.add_text(fields.content, content);
-        doc.add_text(fields.description, description);
-        doc.add_text(fields.domain, domain);
+        doc.add_text(fields.content, doc_update.content);
+        doc.add_text(fields.description, doc_update.description);
+        doc.add_text(fields.domain, doc_update.domain);
         doc.add_text(fields.id, &doc_id);
-        doc.add_text(fields.title, title);
-        doc.add_text(fields.url, url);
+        doc.add_text(fields.title, doc_update.title);
+        doc.add_text(fields.url, doc_update.url);
+        if let Some(tag) = doc_update.tags {
+            for t in tag {
+                doc.add_u64(fields.tags, *t);
+            }
+        }
         writer.add_document(doc)?;
 
         Ok(doc_id)
@@ -234,7 +244,7 @@ impl Searcher {
 
     pub async fn search_with_lens(
         _db: DatabaseConnection,
-        applied_lenses: &Vec<SearchFilter>,
+        applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
     ) -> Vec<SearchResult> {
@@ -245,71 +255,15 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
-        let query = build_query(index.schema(), tokenizers, fields.clone(), query_string);
+        let query = build_query(
+            index.schema(),
+            tokenizers,
+            fields,
+            query_string,
+            applied_lenses,
+        );
 
-        let mut allowed = Vec::new();
-        let mut skipped = Vec::new();
-        for filter in applied_lenses {
-            match filter {
-                SearchFilter::URLRegexAllow(regex) => allowed.push(regex),
-                SearchFilter::URLRegexSkip(regex) => skipped.push(regex),
-                SearchFilter::None => {}
-            }
-        }
-
-        let regex_allow = RegexSetBuilder::new(allowed)
-            // Allow some beefy regexes
-            .size_limit(100_000_000)
-            .build()
-            .expect("Unable to build regexset");
-
-        let regex_skip = RegexSetBuilder::new(skipped)
-            .size_limit(100_000_000)
-            .build()
-            .expect("Unable to build regexset");
-
-        let collector =
-            TopDocs::with_limit(5).tweak_score(move |segment_reader: &SegmentReader| {
-                let regex_allow = regex_allow.clone();
-                let regex_skip = regex_skip.clone();
-                let fields = fields.clone();
-
-                let inverted_index = segment_reader
-                    .inverted_index(fields.url)
-                    .expect("Failed to get inverted index for segment");
-
-                let id_reader = segment_reader
-                    .fast_fields()
-                    .u64s(fields.id)
-                    .expect("Unable to get fast field for doc_id");
-
-                let url_reader = segment_reader
-                    .fast_fields()
-                    .u64s(fields.url)
-                    .expect("Unable to get fast field for URL");
-
-                // We can now define our actual scoring function
-                move |doc: DocId, original_score: Score| {
-                    let inverted_index = inverted_index.clone();
-                    let terms = inverted_index.terms();
-
-                    let _id = ff_to_string(doc, &id_reader, terms);
-                    let url = ff_to_string(doc, &url_reader, terms);
-
-                    if let Some(url) = url {
-                        if regex_skip.is_match(&url) {
-                            -1.0
-                        } else if regex_allow.is_empty() || regex_allow.is_match(&url) {
-                            original_score * 1.0
-                        } else {
-                            -1.0
-                        }
-                    } else {
-                        // blank URL? that seems like an error somewhere.
-                        -1.0
-                    }
-                }
-            });
+        let collector = TopDocs::with_limit(5);
 
         let top_docs = searcher
             .search(&query, &collector)
@@ -326,28 +280,29 @@ impl Searcher {
         top_docs
             .into_iter()
             // Filter out negative scores
-            .filter(|(score, _)| *score >= 0.0)
+            .filter(|(score, _)| *score > 0.0)
             .collect()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::search::{IndexPath, Searcher};
+    use crate::search::{DocumentUpdate, IndexPath, Searcher};
     use entities::models::create_connection;
     use shared::config::{Config, LensConfig};
-    use spyglass_plugin::SearchFilter;
 
     fn _build_test_index(searcher: &mut Searcher) {
         let writer = &mut searcher.writer.lock().unwrap();
         Searcher::upsert_document(
             writer,
-            None,
-            "Of Mice and Men",
-            "Of Mice and Men passage",
-            "example.com",
-            "https://example.com/mice_and_men",
-            "A few miles south of Soledad, the Salinas River drops in close to the hillside
+            DocumentUpdate {
+                doc_id: None,
+                title: "Of Mice and Men",
+                description: "Of Mice and Men passage",
+                domain: "example.com",
+                url: "https://example.com/mice_and_men",
+                content:
+                    "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
             side of the river the golden foothill slopes curve up to the strong and rocky
@@ -355,17 +310,21 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
+                tags: &Some(vec![1 as u64]),
+            },
         )
         .expect("Unable to add doc");
 
         Searcher::upsert_document(
             writer,
-            None,
-            "Of Mice and Men",
-            "Of Mice and Men passage",
-            "en.wikipedia.org",
-            "https://en.wikipedia.org/mice_and_men",
-            "A few miles south of Soledad, the Salinas River drops in close to the hillside
+            DocumentUpdate {
+                doc_id: None,
+                title: "Of Mice and Men",
+                description: "Of Mice and Men passage",
+                domain: "en.wikipedia.org",
+                url: "https://en.wikipedia.org/mice_and_men",
+                content:
+                    "A few miles south of Soledad, the Salinas River drops in close to the hillside
             bank and runs deep and green. The water is warm too, for it has slipped twinkling
             over the yellow sands in the sunlight before reaching the narrow pool. On one
             side of the river the golden foothill slopes curve up to the strong and rocky
@@ -373,37 +332,44 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
+                tags: &Some(vec![2 as u64]),
+            },
         )
         .expect("Unable to add doc");
 
         Searcher::upsert_document(
             writer,
-            None,
-            "Of Cheese and Crackers",
-            "Of Cheese and Crackers Passage",
-            "en.wikipedia.org",
-            "https://en.wikipedia.org/cheese_and_crackers",
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
+            DocumentUpdate {
+                doc_id: None,
+                title: "Of Cheese and Crackers",
+                description: "Of Cheese and Crackers Passage",
+                domain: "en.wikipedia.org",
+                url: "https://en.wikipedia.org/cheese_and_crackers",
+                content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
             tellus tortor, varius sit amet fermentum a, finibus porttitor erat. Proin
             suscipit, dui ac posuere vulputate, justo est faucibus est, a bibendum
             nulla nulla sed elit. Vivamus et libero a tortor ultricies feugiat in vel
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
+                tags: &Some(vec![2 as u64]),
+            },
         )
         .expect("Unable to add doc");
 
         Searcher::upsert_document(
             writer,
-            None,
-            "Frankenstein: The Modern Prometheus",
-            "A passage from Frankenstein",
-            "monster.com",
-            "https://example.com/frankenstein",
-            "You will rejoice to hear that no disaster has accompanied the commencement of an
+            DocumentUpdate {
+            doc_id: None,
+            title:"Frankenstein: The Modern Prometheus",
+            description: "A passage from Frankenstein",
+            domain:"monster.com",
+            url:"https://example.com/frankenstein",
+            content:"You will rejoice to hear that no disaster has accompanied the commencement of an
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
+             tags: &Some(vec![1 as u64]),}
         )
         .expect("Unable to add doc");
 
@@ -419,24 +385,19 @@ mod test {
     #[tokio::test]
     pub async fn test_basic_lense_search() {
         let db = create_connection(&Config::default(), true).await.unwrap();
-        let lens = LensConfig {
+        let _lens = LensConfig {
             name: "wiki".to_string(),
             domains: vec!["en.wikipedia.org".to_string()],
             urls: Vec::new(),
             ..Default::default()
         };
 
-        let applied_lens = lens
-            .into_regexes()
-            .allowed
-            .into_iter()
-            .map(SearchFilter::URLRegexAllow)
-            .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+
         assert_eq!(results.len(), 1);
     }
 
@@ -444,24 +405,19 @@ mod test {
     pub async fn test_url_lens_search() {
         let db = create_connection(&Config::default(), true).await.unwrap();
 
-        let lens = LensConfig {
+        let _lens = LensConfig {
             name: "wiki".to_string(),
             domains: Vec::new(),
             urls: vec!["https://en.wikipedia.org/mice".to_string()],
             ..Default::default()
         };
 
-        let applied_lens = lens
-            .into_regexes()
-            .allowed
-            .into_iter()
-            .map(SearchFilter::URLRegexAllow)
-            .collect();
         let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
-        _build_test_index(&mut searcher);
 
+        _build_test_index(&mut searcher);
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+
         assert_eq!(results.len(), 1);
     }
 
@@ -469,25 +425,18 @@ mod test {
     pub async fn test_singular_url_lens_search() {
         let db = create_connection(&Config::default(), true).await.unwrap();
 
-        let lens = LensConfig {
+        let _lens = LensConfig {
             name: "wiki".to_string(),
             domains: Vec::new(),
             urls: vec!["https://en.wikipedia.org/mice$".to_string()],
             ..Default::default()
         };
 
-        let applied_lens = lens
-            .into_regexes()
-            .allowed
-            .into_iter()
-            .map(SearchFilter::URLRegexAllow)
-            .collect();
-
         let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
-        let query = "salinas";
-        let results = Searcher::search_with_lens(db, &applied_lens, &searcher, query).await;
+        let query = "salinasd";
+        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
         assert_eq!(results.len(), 0);
     }
 }

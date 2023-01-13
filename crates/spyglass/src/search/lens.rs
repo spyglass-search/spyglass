@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use entities::models::lens;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use shared::response::InstallableLens;
@@ -12,10 +13,9 @@ use crate::task::{CollectTask, ManagerCommand};
 use reqwest::Client;
 use shared::constants;
 
-/// Read lenses into the AppState
-pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()> {
-    state.lenses.clear();
-
+/// Reads lens directly from disk and provides the map lenses
+pub async fn read_lenses(config: &Config) -> anyhow::Result<DashMap<String, LensConfig>> {
+    let lens_map = DashMap::new();
     let lense_dir = config.lenses_dir();
 
     // Keep track of failures and report to user?
@@ -26,21 +26,21 @@ pub async fn read_lenses(state: &AppState, config: &Config) -> anyhow::Result<()
                 Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
                 Ok(lens) => {
                     if lens.is_enabled {
-                        state.lenses.insert(lens.name.clone(), lens);
+                        lens_map.insert(lens.name.clone(), lens);
                     }
                 }
             }
         }
     }
 
-    Ok(())
+    Ok(lens_map)
 }
 
 /// Loop through lenses in the AppState. Update our internal db & bootstrap anything
 /// that hasn't been bootstrapped.
-pub async fn load_lenses(state: AppState) {
+pub async fn load_lenses(lens_map: &DashMap<String, LensConfig>, state: AppState) {
     let mut new_lenses: Vec<LensConfig> = Vec::new();
-    for entry in state.lenses.iter() {
+    for entry in lens_map.iter() {
         let mut lens = entry.value().clone();
         // Have we added this lens to the database?
         match lens::add_or_enable(&state.db, &lens, lens::LensType::Simple).await {
@@ -56,6 +56,7 @@ pub async fn load_lenses(state: AppState) {
                     }
                 }
                 if is_new {
+                    state.lenses.insert(lens.name.to_owned(), lens.clone());
                     new_lenses.push(lens);
                 }
             }
@@ -68,13 +69,9 @@ pub async fn load_lenses(state: AppState) {
     // if we have not already done so.
     for lens in new_lenses {
         log::debug!("Scheduling lens bootstrap {:?}", lens);
-
-        let lens_name = lens.name.to_owned();
-        //Since we reset the lens source update the lenses
-        state.lenses.insert(lens_name.to_owned(), lens);
         let _ = state
             .schedule_work(ManagerCommand::Collect(CollectTask::BootstrapLens {
-                lens: lens_name,
+                lens: lens.name.to_owned(),
             }))
             .await;
     }

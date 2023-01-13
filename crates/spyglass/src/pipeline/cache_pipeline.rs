@@ -5,11 +5,11 @@ use std::time::Instant;
 use crate::crawler::{cache, CrawlResult};
 use crate::pipeline::collector::CollectionResult;
 use crate::pipeline::PipelineContext;
-use crate::search::Searcher;
+use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
 
-use entities::models::indexed_document;
 use entities::models::tag::TagType;
+use entities::models::{indexed_document, tag};
 use libnetrunner::parser::ParseResult;
 use tokio::task::JoinHandle;
 
@@ -141,6 +141,16 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
     let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;
 
+    // Access tag for this lens and build id list
+    let tag = tag::get_or_create(&state.db, TagType::Lens, lens).await;
+    let tag_list = match tag {
+        Ok(model) => Some(vec![model.id as u64]),
+        Err(error) => {
+            log::error!("Error accessing tag for lens {:?}", error);
+            None
+        }
+    };
+
     let transaction_rslt = state.db.begin().await;
     match transaction_rslt {
         Ok(transaction) => {
@@ -159,12 +169,18 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
                                     if let Ok(mut index_writer) = state.index.writer.lock() {
                                         match Searcher::upsert_document(
                                             &mut index_writer,
-                                            id_map.get(&canonical_url_str).cloned(),
-                                            &crawl_result.title.clone().unwrap_or_default(),
-                                            &crawl_result.description.clone(),
-                                            url_host,
-                                            url.as_str(),
-                                            &crawl_result.content,
+                                            DocumentUpdate {
+                                                doc_id: id_map.get(&canonical_url_str).cloned(),
+                                                title: &crawl_result
+                                                    .title
+                                                    .clone()
+                                                    .unwrap_or_default(),
+                                                description: &crawl_result.description.clone(),
+                                                domain: url_host,
+                                                url: url.as_str(),
+                                                content: &crawl_result.content,
+                                                tags: &tag_list,
+                                            },
                                         ) {
                                             Ok(new_doc_id) => Some(new_doc_id),
                                             _ => None,

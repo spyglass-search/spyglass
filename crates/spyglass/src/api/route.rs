@@ -1,4 +1,10 @@
 use entities::get_library_stats;
+use jsonrpsee::core::Error;
+use std::collections::HashSet;
+use std::time::SystemTime;
+use tracing::instrument;
+use url::Url;
+
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
 use entities::models::{
@@ -6,14 +12,6 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
-use futures::StreamExt;
-use jsonrpsee::core::Error;
-use libgoog::{ClientType, Credentials, GoogClient};
-use libspyglass::oauth::{self, connection_secret};
-use libspyglass::plugin::PluginCommand;
-use libspyglass::search::{lens::lens_to_filters, Searcher};
-use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
 use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
@@ -21,11 +19,13 @@ use shared::response::{
     AppStatus, InstallStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
     SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
-use spyglass_plugin::SearchFilter;
-use std::collections::HashSet;
-use std::time::SystemTime;
-use tracing::instrument;
-use url::Url;
+
+use libgoog::{ClientType, Credentials, GoogClient};
+use libspyglass::oauth::{self, connection_secret};
+use libspyglass::plugin::PluginCommand;
+use libspyglass::search::Searcher;
+use libspyglass::state::AppState;
+use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -369,25 +369,19 @@ pub async fn search(
     let index = &state.index;
     let searcher = index.reader.searcher();
 
-    let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
-        .filter_map(|trigger| async {
-            let vec = lens_to_filters(state.clone(), trigger).await;
-            if vec.is_empty() {
-                None
-            } else {
-                Some(vec)
-            }
-        })
-        // Gather search filters
-        .collect::<Vec<Vec<SearchFilter>>>()
+    let tags = tag::Entity::find()
+        .filter(tag::Column::Label.eq(tag::TagType::Lens))
+        .filter(tag::Column::Value.is_in(search_req.lenses))
+        .all(&state.db)
         .await
-        // Flatten
-        .into_iter()
-        .flatten()
-        .collect::<Vec<SearchFilter>>();
+        .unwrap_or_default();
+    let tag_ids = tags
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
 
     let docs =
-        Searcher::search_with_lens(state.db.clone(), &applied, index, &search_req.query).await;
+        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &search_req.query).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     for (score, doc_addr) in docs {
@@ -415,7 +409,6 @@ pub async fn search(
                     .await;
 
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
-
                 if let Ok(Some(indexed)) = indexed {
                     let tags = indexed
                         .find_related(tag::Entity)
@@ -616,7 +609,7 @@ mod test {
         models::{crawl_queue, indexed_document},
         test::setup_test_db,
     };
-    use libspyglass::search::Searcher;
+    use libspyglass::search::{DocumentUpdate, Searcher};
     use libspyglass::state::AppState;
     use shared::config::{Config, LensConfig};
 
@@ -635,12 +628,15 @@ mod test {
         if let Ok(mut writer) = state.index.writer.lock() {
             Searcher::upsert_document(
                 &mut writer,
-                Some("test_id".into()),
-                "test title",
-                "test desc",
-                "example.com",
-                "https://example.com/test",
-                "test content",
+                DocumentUpdate {
+                    doc_id: Some("test_id".into()),
+                    title: "test title",
+                    description: "test desc",
+                    domain: "example.com",
+                    url: "https://example.com/test",
+                    content: "test content",
+                    tags: &None,
+                },
             )
             .expect("Unable to add doc");
         }
