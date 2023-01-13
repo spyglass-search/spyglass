@@ -113,8 +113,7 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
-        log::debug!("UNINSTALL LENS {}", name);
-        Ok(())
+        route::uninstall_lens(self.state.clone(), &self.config, &name).await
     }
 }
 

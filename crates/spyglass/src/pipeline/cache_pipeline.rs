@@ -135,8 +135,8 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
     let doc_id_list = id_map
         .values()
         .into_iter()
-        .map(AsRef::as_ref)
-        .collect::<Vec<&str>>();
+        .map(|x| x.to_owned())
+        .collect::<Vec<String>>();
 
     let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;

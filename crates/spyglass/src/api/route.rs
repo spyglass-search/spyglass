@@ -1,11 +1,4 @@
 use entities::get_library_stats;
-use futures::StreamExt;
-use jsonrpsee::core::Error;
-use std::collections::HashSet;
-use std::time::SystemTime;
-use tracing::instrument;
-use url::Url;
-
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
 use entities::models::{
@@ -13,6 +6,15 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use futures::StreamExt;
+use jsonrpsee::core::Error;
+use libgoog::{ClientType, Credentials, GoogClient};
+use libspyglass::oauth::{self, connection_secret};
+use libspyglass::plugin::PluginCommand;
+use libspyglass::search::{lens::lens_to_filters, Searcher};
+use libspyglass::state::AppState;
+use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
+use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
@@ -20,13 +22,10 @@ use shared::response::{
     SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 use spyglass_plugin::SearchFilter;
-
-use libgoog::{ClientType, Credentials, GoogClient};
-use libspyglass::oauth::{self, connection_secret};
-use libspyglass::plugin::PluginCommand;
-use libspyglass::search::{lens::lens_to_filters, Searcher};
-use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
+use std::collections::HashSet;
+use std::time::SystemTime;
+use tracing::instrument;
+use url::Url;
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -560,4 +559,108 @@ pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Result<(), Error> {
+    // Remove from filesystem
+    let lens_path = config.lenses_dir().join(format!("{name}.ron"));
+    let _config = state.lenses.get(name);
+    let _ = std::fs::remove_file(lens_path);
+
+    // Remove from database
+    // - remove from lens table
+    let _ = lens::Entity::delete_many()
+        .filter(lens::Column::Name.eq(name))
+        .exec(&state.db)
+        .await;
+
+    // - find relevant doc ids to remove
+    if let Ok(ids) = indexed_document::find_by_lens(state.db.clone(), name).await {
+        // - remove from db & index
+        let doc_ids: Vec<String> = ids.iter().map(|x| x.doc_id.to_owned()).collect();
+        if let Err(err) = Searcher::delete_many_by_id(&state, &doc_ids, true).await {
+            return Err(Error::Custom(err.to_string()));
+        }
+    }
+
+    // -- remove from crawl queue & bootstrap table
+    if let Err(err) = crawl_queue::delete_by_lens(state.db.clone(), name).await {
+        return Err(Error::Custom(err.to_string()));
+    }
+
+    // - remove from bootstrap queue table
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::uninstall_lens;
+    use entities::models::tag::TagType;
+    use entities::sea_orm::{ActiveModelTrait, EntityTrait, Set};
+    use entities::{
+        models::{crawl_queue, indexed_document},
+        test::setup_test_db,
+    };
+    use libspyglass::search::Searcher;
+    use libspyglass::state::AppState;
+    use shared::config::{Config, LensConfig};
+
+    #[tokio::test]
+    async fn test_uninstall_lens() {
+        let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db.clone()).build();
+
+        let mut config = Config::new();
+        let lens = LensConfig {
+            name: "test".to_string(),
+            urls: vec!["https://example.com".into()],
+            ..Default::default()
+        };
+
+        if let Ok(mut writer) = state.index.writer.lock() {
+            Searcher::upsert_document(
+                &mut writer,
+                Some("test_id".into()),
+                "test title",
+                "test desc",
+                "example.com",
+                "https://example.com/test",
+                "test content",
+            )
+            .expect("Unable to add doc");
+        }
+        let _ = Searcher::save(&state).await;
+
+        let doc = indexed_document::ActiveModel {
+            domain: Set("example.com".into()),
+            url: Set("https://example.com/test".into()),
+            doc_id: Set("test_id".into()),
+            ..Default::default()
+        };
+
+        let model = doc.insert(&db).await.expect("Unable to insert doc");
+        let doc: indexed_document::ActiveModel = model.into();
+        doc.insert_tags(&db, &vec![(TagType::Lens, lens.name.clone())])
+            .await
+            .expect("Unable to insert tags");
+
+        config.lenses.insert(lens.name.clone(), lens.clone());
+        uninstall_lens(state.clone(), &config, &lens.name)
+            .await
+            .expect("Unable to uninstall");
+
+        let cqs = crawl_queue::Entity::find()
+            .all(&state.db)
+            .await
+            .expect("Unable to find crawl tasks");
+        assert_eq!(cqs.len(), 0);
+
+        let indexed = indexed_document::Entity::find()
+            .all(&state.db)
+            .await
+            .expect("Unable to find indexed docs");
+        assert_eq!(indexed.len(), 0);
+        assert_eq!(state.index.reader.searcher().num_docs(), 0);
+    }
 }

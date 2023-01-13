@@ -4,8 +4,8 @@ use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
 use sea_orm::{
-    sea_query, ConnectionTrait, DbBackend, FromQueryResult, InsertResult, QueryOrder, QueryTrait,
-    Set, Statement,
+    sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
+    QueryOrder, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -182,22 +182,6 @@ impl ActiveModel {
     }
 }
 
-pub async fn queue_stats(
-    db: &DatabaseConnection,
-) -> anyhow::Result<Vec<QueueCountByStatus>, sea_orm::DbErr> {
-    let res = Entity::find()
-        .from_raw_sql(Statement::from_string(
-            DbBackend::Sqlite,
-            "SELECT count(*) as count, domain, status FROM crawl_queue GROUP BY domain, status"
-                .into(),
-        ))
-        .into_model::<QueueCountByStatus>()
-        .all(db)
-        .await?;
-
-    Ok(res)
-}
-
 pub async fn reset_processing(db: &DatabaseConnection) -> anyhow::Result<()> {
     Entity::update_many()
         .col_expr(Column::Status, sea_query::Expr::value(CrawlStatus::Queued))
@@ -206,13 +190,6 @@ pub async fn reset_processing(db: &DatabaseConnection) -> anyhow::Result<()> {
         .await?;
 
     Ok(())
-}
-
-#[derive(Debug, FromQueryResult)]
-pub struct QueueCountByStatus {
-    pub count: i64,
-    pub domain: String,
-    pub status: String,
 }
 
 pub async fn num_queued(
@@ -647,6 +624,49 @@ pub async fn update_or_remove_task(
             Err(DbErr::Custom("Task not found".to_owned()))
         }
     }
+}
+
+/// Delete all crawl tasks associated with a lens.
+pub async fn delete_by_lens(db: DatabaseConnection, name: &str) -> Result<(), sea_orm::DbErr> {
+    if let Ok(ids) = find_by_lens(db.clone(), name).await {
+        let dbids: Vec<i64> = ids.iter().map(|item| item.id).collect();
+        // Delete all associated tags
+        crawl_tag::Entity::delete_many()
+            .filter(crawl_tag::Column::CrawlQueueId.is_in(dbids.clone()))
+            .exec(&db)
+            .await?;
+
+        // Delete item
+        Entity::delete_many()
+            .filter(Column::Id.is_in(dbids))
+            .exec(&db)
+            .await?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct CrawlTaskId {
+    pub id: i64,
+}
+
+pub async fn find_by_lens(
+    db: DatabaseConnection,
+    name: &str,
+) -> Result<Vec<CrawlTaskId>, sea_orm::DbErr> {
+    CrawlTaskId::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite,
+        r#"
+        SELECT
+            crawl_queue.id
+        FROM crawl_queue
+        LEFT JOIN crawl_tag on crawl_queue.id = crawl_tag.crawl_queue_id
+        LEFT JOIN tags on tags.id = crawl_tag.tag_id
+        WHERE tags.label = "lens" AND tags.value = $1"#,
+        vec![name.into()],
+    ))
+    .all(&db)
+    .await
 }
 
 #[cfg(test)]
