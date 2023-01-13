@@ -58,6 +58,8 @@ pub async fn load_lenses(lens_map: &DashMap<String, LensConfig>, state: AppState
                 if is_new {
                     state.lenses.insert(lens.name.to_owned(), lens.clone());
                     new_lenses.push(lens);
+                } else if !state.lenses.contains_key(&lens.name) {
+                    state.lenses.insert(lens.name.to_owned(), lens.clone());
                 }
             }
             Err(e) => log::error!("error loading lens {}", e),
