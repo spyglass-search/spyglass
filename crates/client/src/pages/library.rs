@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::window;
 use yew::prelude::*;
 
 use crate::components::{
@@ -93,20 +92,15 @@ impl Component for LensManagerPage {
         match msg {
             Msg::HandleLensEvent(event) => {
                 if let LensEvent::Uninstall { name } = event {
-                    if let Some(window) = window() {
-                        if let Ok(true) = window.confirm_with_message(
-                            "Delete lens? This will remove all data associated with this lens.",
-                        ) {
-                            self.uninstalling.insert(name.clone());
-                            spawn_local(async move {
-                                let _ = tauri_invoke::<_, ()>(
-                                    ClientInvoke::UninstallLens,
-                                    &UninstallLensParams { name },
-                                )
-                                .await;
-                            });
-                        }
-                    }
+                    self.uninstalling.insert(name.clone());
+                    spawn_local(async move {
+                        let res = tauri_invoke::<_, ()>(
+                            ClientInvoke::UninstallLens,
+                            &UninstallLensParams { name },
+                        )
+                        .await;
+                        log::info!("{:?}", res);
+                    });
                 }
 
                 true

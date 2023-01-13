@@ -13,6 +13,7 @@ pub struct CountByStatus {
     status: String,
 }
 
+#[derive(Debug)]
 pub struct LibraryStats {
     pub lens_name: String,
     pub crawled: i64,
