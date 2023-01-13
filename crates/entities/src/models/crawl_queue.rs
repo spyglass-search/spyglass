@@ -5,7 +5,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
 use sea_orm::{
     sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
-    QueryOrder, QuerySelect, QueryTrait, Set, Statement,
+    QueryOrder, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -577,8 +577,6 @@ pub async fn mark_failed(db: &DatabaseConnection, id: i64, retry: bool) {
 /// to be a SQL like statement.
 pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<u64> {
     let dbids: Vec<i64> = Entity::find()
-        .select_only()
-        .column(Column::Id)
         .filter(Column::Url.like(rule))
         .all(db)
         .await?

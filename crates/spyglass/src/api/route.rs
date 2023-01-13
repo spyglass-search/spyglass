@@ -584,6 +584,8 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
         let doc_ids: Vec<String> = ids.iter().map(|x| x.doc_id.to_owned()).collect();
         if let Err(err) = Searcher::delete_many_by_id(&state, &doc_ids, true).await {
             return Err(Error::Custom(err.to_string()));
+        } else {
+            let _ = Searcher::save(&state).await;
         }
     }
 
