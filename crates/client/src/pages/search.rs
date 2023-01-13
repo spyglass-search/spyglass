@@ -346,9 +346,19 @@ impl Component for SearchPage {
                 let query = self.query.trim_start_matches('/').to_string();
                 link.send_future(async move {
                     match search_lenses(query).await {
-                        Ok(results) => Msg::UpdateLensResults(
-                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
-                        ),
+                        Ok(results) => {
+                            let lens_results = {
+                                match serde_wasm_bindgen::from_value(results) {
+                                    Ok(results) => results,
+                                    Err(err) => {
+                                        log::error!("Unable to deserialize search_lenses result: {:?}", err);
+                                        Vec::new()
+                                    }
+                                }
+                            };
+
+                            Msg::UpdateLensResults(lens_results)
+                        },
                         Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
