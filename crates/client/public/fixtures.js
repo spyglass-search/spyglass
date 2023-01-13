@@ -83,17 +83,21 @@ export let invoke = async (func_name, params) => {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense",
+            name: "fake_lense",
+            label: "Fake Lense",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: { "Finished": { num_docs: 100 } },
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense_2_boogaloo",
+            name: "fake_lense_2_boogaloo",
+            label: "Fake Lense 2: Boogaloo",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: { "Finished": { num_docs: 100 } },
         }];
     } else if (func_name == "list_connections") {
         return {
