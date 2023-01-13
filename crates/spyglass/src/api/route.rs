@@ -565,7 +565,7 @@ pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
 pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Result<(), Error> {
     // Remove from filesystem
     let lens_path = config.lenses_dir().join(format!("{name}.ron"));
-    let _config = state.lenses.get(name);
+    let config = state.lenses.get(name);
     let _ = std::fs::remove_file(lens_path);
 
     // Remove from database
@@ -589,7 +589,16 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
         return Err(Error::Custom(err.to_string()));
     }
 
-    // - remove from bootstrap queue table
+    // - remove seed urls from bootstrap queue table
+    if let Some(config) = config {
+        for url in &config.urls {
+            let _ = bootstrap_queue::dequeue(&state.db, &url).await;
+        }
+
+        for url in &config.domains {
+            let _ = bootstrap_queue::dequeue(&state.db, &url).await;
+        }
+    }
     Ok(())
 }
 
