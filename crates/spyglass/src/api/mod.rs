@@ -1,5 +1,6 @@
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
+use libspyglass::search;
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -34,10 +35,6 @@ impl RpcServer for SpyglassRpc {
         route::app_status(self.state.clone()).await
     }
 
-    async fn crawl_stats(&self) -> Result<resp::CrawlStats, Error> {
-        route::crawl_stats(self.state.clone()).await
-    }
-
     async fn delete_doc(&self, id: String) -> Result<(), Error> {
         route::delete_doc(self.state.clone(), id).await
     }
@@ -55,7 +52,10 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
-        route::install_lens(self.state.clone(), self.config.clone(), lens_name).await
+        if let Err(error) = search::lens::install_lens(&self.state, &self.config, lens_name).await {
+            return Err(Error::Custom(error.to_string()));
+        }
+        Ok(())
     }
 
     async fn list_plugins(&self) -> Result<Vec<resp::PluginResult>, Error> {
@@ -110,6 +110,10 @@ impl RpcServer for SpyglassRpc {
 
     async fn toggle_plugin(&self, name: String) -> Result<(), Error> {
         route::toggle_plugin(self.state.clone(), name).await
+    }
+
+    async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
+        route::uninstall_lens(self.state.clone(), &self.config, &name).await
     }
 }
 

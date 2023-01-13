@@ -49,23 +49,58 @@ pub struct InstallableLens {
     pub author: String,
     pub description: String,
     pub name: String,
+    #[serde(default)]
+    label: String,
     pub sha: String,
     pub download_url: String,
     pub html_url: String,
 }
 
+impl InstallableLens {
+    pub fn identifier(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn label(&self) -> String {
+        if self.label.is_empty() {
+            self.name.clone()
+        } else {
+            self.label.clone()
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub enum InstallStatus {
+    NotInstalled,
+    Finished { num_docs: u64 },
+    Installing { percent: i64, status: String },
+}
+
+impl Default for InstallStatus {
+    fn default() -> Self {
+        Self::NotInstalled
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LensResult {
+    /// Author of this lens
     pub author: String,
-    pub title: String,
+    /// Unique identifier
+    pub name: String,
+    /// Human readable label
+    pub label: String,
+    /// Huamn readable description of the lens
     pub description: String,
-    // Used to determine whether a lens needs an update
+    /// Used to determine whether a lens needs an update
     pub hash: String,
-    // For installed lenses.
+    /// For installed lenses.
     pub file_path: Option<PathBuf>,
     // Only relevant for installable lenses
     pub html_url: Option<String>,
     pub download_url: Option<String>,
+    pub progress: InstallStatus,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]

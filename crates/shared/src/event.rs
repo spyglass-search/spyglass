@@ -13,7 +13,10 @@ pub enum ClientEvent {
     FolderChosen,
     Navigate,
     RefreshConnections,
-    RefreshLensManager,
+    /// Request a refresh of the discover lens page when a lens is succesfully installed.
+    RefreshDiscover,
+    /// Request a refresh of the user lens library .
+    RefreshLensLibrary,
     RefreshPluginManager,
     RefreshSearchResults,
     StartupProgress,
@@ -34,6 +37,8 @@ pub enum ClientInvoke {
     GetCrawlStats,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
+    #[strum(serialize = "plugin:lens-updater|install_lens")]
+    InstallLens,
     #[strum(serialize = "list_connections")]
     ListConnections,
     #[strum(serialize = "plugin:lens-updater|list_installed_lenses")]
@@ -56,6 +61,8 @@ pub enum ClientInvoke {
     OpenLensFolder,
     #[strum(serialize = "open_settings_folder")]
     OpenSettingsFolder,
+    #[strum(serialize = "plugin:lens-updater|uninstall_lens")]
+    UninstallLens,
     #[strum(serialize = "update_and_restart")]
     UpdateAndRestart,
 }
@@ -69,4 +76,14 @@ pub struct AuthorizeConnectionParams {
 pub struct ResyncConnectionParams {
     pub id: String,
     pub account: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct InstallLensParams {
+    pub name: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct UninstallLensParams {
+    pub name: String,
 }

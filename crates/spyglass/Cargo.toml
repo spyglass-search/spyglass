@@ -41,7 +41,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 shared = { path = "../shared", features = ["metrics"] }
-spyglass-netrunner = { git = "https://github.com/spyglass-search/netrunner.git", branch = "main" }
+spyglass-netrunner = "0.1.9"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"

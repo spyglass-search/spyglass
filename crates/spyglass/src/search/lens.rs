@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use entities::models::lens;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use shared::response::InstallableLens;
@@ -10,7 +9,7 @@ use spyglass_plugin::SearchFilter;
 
 use crate::state::AppState;
 use crate::task::{CollectTask, ManagerCommand};
-use reqwest::{Client, Url};
+use reqwest::Client;
 use shared::constants;
 
 /// Read lenses into the AppState
@@ -46,12 +45,8 @@ pub async fn load_lenses(state: AppState) {
         // Have we added this lens to the database?
         match lens::add_or_enable(&state.db, &lens, lens::LensType::Simple).await {
             Ok((is_new, model)) => {
-                log::info!(
-                    "loaded lens {}, new? {}, model? {:?}",
-                    lens.name,
-                    is_new,
-                    model
-                );
+                log::debug!("model? {:?}", model);
+                log::info!("loaded lens {}, new? {}", lens.name, is_new);
                 match model.remote_url {
                     Some(url) => {
                         lens.lens_source = LensSource::Remote(url);
@@ -159,18 +154,21 @@ pub async fn install_lens(
         .get(constants::LENS_DIRECTORY_INDEX_URL)
         .send()
         .await?;
-    let file_contents = resp.text().await?;
 
+    let file_contents = resp.text().await?;
     let available_lens = ron::from_str::<Vec<InstallableLens>>(&file_contents)?;
 
     let lens_data = available_lens
         .iter()
         .find(|installable_lens| installable_lens.name.eq(&lens_name));
+
     if let Some(installable_lens) = lens_data {
+        // Check if there's an existing lens, and remove the old file.
         let current_lens_ref = app_state
             .lenses
             .iter()
             .find(|lens| lens.value().name.eq(&lens_name));
+
         if let Some(current_lens) = current_lens_ref {
             let path = &current_lens.value().file_path;
             if path.exists() {
@@ -204,48 +202,27 @@ async fn install_lens_to_path(
         .get(installable_lens.download_url.as_str())
         .send()
         .await?;
-    let file_contents = resp.text().await?;
-    let config_rslt = LensConfig::from_string(&file_contents);
-    match config_rslt {
-        Ok(config) => {
-            // Grab the file name from the end of the URL
-            let url = Url::parse(installable_lens.download_url.as_str())?;
-            let file_name = url
-                .path_segments()
-                .map(|c| c.collect::<Vec<_>>())
-                .and_then(|mut segs| segs.pop());
 
-            match file_name {
-                Some(name) => {
-                    let update = lens::install_or_update(
-                        &state.db,
-                        &config,
-                        lens::LensType::Simple,
-                        Some(installable_lens.html_url.clone()),
-                    )
-                    .await;
-                    match update {
-                        Ok((new, model)) => {
-                            log::info!(
-                                "Installed new lens {}, new? {}, model? {:?}",
-                                config.name,
-                                new,
-                                model
-                            );
-                            fs::write(lens_folder.join(name), file_contents)?;
-                            Ok(())
-                        }
-                        Err(error) => Err(error),
-                    }
-                }
-                None => Err(anyhow!(
-                    "Unable to write lens file due to unexpected url format {:?}",
-                    url
-                )),
-            }
-        }
-        Err(error) => Err(anyhow!("Invalid len file configuration {:?}", error)),
-    }
+    let file_contents = resp.text().await?;
+    let config = LensConfig::from_string(&file_contents)?;
+    // File name should match lens name for consistency
+    let file_name = format!("{}.ron", config.name);
+
+    // Add to database
+    let (is_new, model) = lens::install_or_update(
+        &state.db,
+        &config,
+        lens::LensType::Simple,
+        Some(installable_lens.html_url.clone()),
+    )
+    .await?;
+
+    log::debug!("add {} to db: {:?}", config.name, model);
+    log::info!("Installed new lens {}, new? {}", config.name, is_new);
+
+    // Write to disk if we've successfully add to the database
+    fs::write(lens_folder.join(file_name), file_contents)?;
+    Ok(())
 }
 
 #[cfg(test)]

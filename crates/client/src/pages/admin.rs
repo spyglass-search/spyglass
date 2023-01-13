@@ -14,12 +14,12 @@ use shared::event::{ClientEvent, ListenPayload};
 pub enum Tab {
     #[strum(serialize = "connections")]
     ConnectionsManager,
-    #[strum(serialize = "lenses")]
+    #[strum(serialize = "discover")]
+    Discover,
+    #[strum(serialize = "library")]
     LensManager,
     #[strum(serialize = "plugins")]
     PluginsManager,
-    #[strum(serialize = "stats")]
-    Stats,
     #[strum(serialize = "user")]
     UserSettings,
 }
@@ -71,23 +71,23 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
             if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
+                    "/settings/discover" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::Discover,
+                    }),
+                    "/settings/library" => history.push(Route::SettingsPage {
+                        tab: pages::Tab::LensManager,
+                    }),
                     "/settings/connections" => history.push(Route::SettingsPage {
                         tab: pages::Tab::ConnectionsManager,
                     }),
-                    "/settings/lenses" => history.push(Route::SettingsPage {
-                        tab: pages::Tab::LensManager,
-                    }),
                     "/settings/plugins" => history.push(Route::SettingsPage {
                         tab: pages::Tab::PluginsManager,
-                    }),
-                    "/settings/stats" => history.push(Route::SettingsPage {
-                        tab: pages::Tab::Stats,
                     }),
                     "/settings/user" => history.push(Route::SettingsPage {
                         tab: pages::Tab::UserSettings,
                     }),
                     _ => history.push(Route::SettingsPage {
-                        tab: pages::Tab::Stats,
+                        tab: pages::Tab::LensManager,
                     }),
                 }
             }
@@ -105,9 +105,15 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     </div>
                     <ul>
                         <li class="mb-2">
-                            <NavLink tab={Tab::Stats} current={props.tab.clone()}>
-                                <icons::ChartBarIcon classes="mr-2" height="h-4" width="h-4" />
-                                {"Crawl Status"}
+                            <NavLink tab={Tab::Discover} current={props.tab.clone()}>
+                                <icons::GlobeIcon classes="mr-2" height="h-4" width="h-4" />
+                                {"Discover"}
+                            </NavLink>
+                        </li>
+                        <li class="mb-2">
+                            <NavLink tab={Tab::LensManager} current={props.tab.clone()}>
+                                <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
+                                {"My Library"}
                             </NavLink>
                         </li>
                     </ul>
@@ -122,12 +128,6 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                             <NavLink tab={Tab::ConnectionsManager} current={props.tab.clone()}>
                                 <icons::ShareIcon classes="mr-2" height="h-4" width="h-4" />
                                 {"Connections"}
-                            </NavLink>
-                        </li>
-                        <li class="mb-2">
-                            <NavLink tab={Tab::LensManager} current={props.tab.clone()}>
-                                <icons::FilterIcon classes="mr-2" height="h-4" width="h-4" />
-                                {"Lenses"}
                             </NavLink>
                         </li>
                         <li class="mb-2">
@@ -151,11 +151,11 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     #[allow(clippy::let_unit_value)]
                     Tab::ConnectionsManager => html! { <pages::ConnectionsManagerPage /> },
                     #[allow(clippy::let_unit_value)]
+                    Tab::Discover => html! { <pages::DiscoverPage /> },
+                    #[allow(clippy::let_unit_value)]
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
                     #[allow(clippy::let_unit_value)]
                     Tab::PluginsManager => html! { <pages::PluginManagerPage /> },
-                    #[allow(clippy::let_unit_value)]
-                    Tab::Stats => html!{ <pages::StatsPage /> },
                     #[allow(clippy::let_unit_value)]
                     Tab::UserSettings => html! { <pages::UserSettingsPage /> },
                 }

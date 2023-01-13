@@ -37,9 +37,8 @@ mod plugins;
 mod rpc;
 mod window;
 use window::{
-    show_connection_manager_window, show_crawl_stats_window, show_lens_manager_window,
-    show_plugin_manager, show_search_bar, show_update_window, show_user_settings,
-    show_wizard_window,
+    show_connection_manager_window, show_lens_manager_window, show_plugin_manager, show_search_bar,
+    show_update_window, show_user_settings, show_wizard_window,
 };
 
 const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
@@ -114,11 +113,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
-            cmd::crawl_stats,
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
-            cmd::install_lens,
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
@@ -235,13 +232,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = item_handle.set_enabled(false);
                                 tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                             }
+                            MenuID::DISCOVER => { window::show_discover_window(app); }
                             MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
                             MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                             MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                             MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
                             MenuID::OPEN_WIZARD => { show_wizard_window(app); }
-                            MenuID::SHOW_CRAWL_STATUS => { show_crawl_stats_window(app); }
                             MenuID::SHOW_SEARCHBAR => { window::show_search_bar(&window); }
                             MenuID::QUIT => app.exit(0),
                             MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),

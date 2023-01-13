@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tauri::{
     async_runtime::JoinHandle,
@@ -9,8 +9,12 @@ use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
 use crate::{constants, rpc, AppShutdown};
-use shared::event::ClientEvent;
+use serde_json::Value;
 use shared::response::{InstallableLens, LensResult};
+use shared::{
+    event::ClientEvent,
+    metrics::{Event, Metrics},
+};
 use spyglass_rpc::RpcClient;
 
 pub struct LensWatcherHandle(JoinHandle<()>);
@@ -18,9 +22,11 @@ pub struct LensWatcherHandle(JoinHandle<()>);
 pub fn init() -> TauriPlugin<Wry> {
     Builder::new("lens-updater")
         .invoke_handler(tauri::generate_handler![
+            install_lens,
             list_installable_lenses,
             list_installed_lenses,
-            run_lens_updater
+            run_lens_updater,
+            uninstall_lens,
         ])
         .on_event(|app_handle, event| match event {
             RunEvent::Ready => {
@@ -76,17 +82,17 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
     // Loop through each one and check if it needs an update
     let mut lenses_updated = 0;
     for lens in installed {
-        if lens_index_map.contains_key(&lens.title) {
+        if lens_index_map.contains_key(&lens.name) {
             // Compare hash from index to local hash
-            let latest = lens_index_map.get(&lens.title).expect("already checked");
+            let latest = lens_index_map.get(&lens.name).expect("already checked");
             if latest.sha != lens.hash {
                 log::info!(
                     "Found newer version of: {}, updating from: {}",
-                    lens.title,
+                    lens.name,
                     latest.download_url
                 );
 
-                if let Err(e) = install_lens(app_handle, &latest.name).await {
+                if let Err(e) = handle_install_lens(app_handle, &latest.name).await {
                     log::error!("Unable to install lens: {}", e);
                 } else {
                     lenses_updated += 1;
@@ -138,26 +144,55 @@ async fn get_installed_lenses(app_handle: &AppHandle) -> anyhow::Result<Vec<Lens
 
 /// Helper to install the lens with the specified name. A request to the server
 /// will be made to install the lens.
-pub async fn install_lens(app_handle: &AppHandle, lens_name: &String) -> anyhow::Result<()> {
-    log::debug!("Lens install requested {}", lens_name);
+pub async fn handle_install_lens(app_handle: &AppHandle, name: &str) -> anyhow::Result<()> {
+    log::debug!("Lens install requested {}", name);
     let mutex = app_handle
         .try_state::<rpc::RpcMutex>()
         .ok_or_else(|| anyhow::anyhow!("Unable to get RpcMutex"))?;
 
     let rpc = mutex.lock().await;
-    match rpc.client.install_lens(lens_name.clone()).await {
-        Ok(_) => Ok(()),
+    match rpc.client.install_lens(name.to_string()).await {
+        Ok(_) => {
+            if let Some(metrics) = app_handle.try_state::<Metrics>() {
+                metrics
+                    .track(Event::InstallLens {
+                        lens: name.to_owned(),
+                    })
+                    .await;
+            }
+            Ok(())
+        }
         Err(err) => {
-            log::error!("Unable to install lens: {} {}", lens_name, err.to_string());
+            log::error!("Unable to install lens: {} {}", name, err.to_string());
             Ok(())
         }
     }
 }
 
+/// Install a lens (assumes correct format) from a URL
 #[tauri::command]
-pub async fn list_installable_lenses(_: tauri::Window) -> Result<Vec<InstallableLens>, String> {
+pub async fn install_lens(win: tauri::Window, name: &str) -> Result<(), String> {
+    let app_handle = win.app_handle();
+    let _ = handle_install_lens(&app_handle, name).await;
+    let _ = app_handle.emit_all(ClientEvent::RefreshDiscover.as_ref(), Value::Null);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn list_installable_lenses(win: tauri::Window) -> Result<Vec<InstallableLens>, String> {
+    let app_handle = win.app_handle();
+    let installed: HashSet<String> = get_installed_lenses(&app_handle)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|lens| lens.name.to_string())
+        .collect();
+
     match get_lens_index().await {
-        Ok(index) => Ok(index),
+        Ok(mut index) => {
+            index.retain(|lens| !installed.contains(&lens.name));
+            Ok(index)
+        }
         Err(err) => {
             log::error!("Unable to get lens index: {}", err);
             Ok(Vec::new())
@@ -190,4 +225,20 @@ pub async fn run_lens_updater(win: tauri::Window) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+/// Uninstall lens from the backend
+#[tauri::command]
+pub async fn uninstall_lens(win: tauri::Window, name: &str) -> Result<(), String> {
+    let app_handle = win.app_handle();
+    if let Some(rpc) = app_handle.try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc.client.uninstall_lens(name.to_string()).await {
+            log::error!("Unable to uninstall lens: {}", err.to_string());
+        } else {
+            let _ = app_handle.emit_all(ClientEvent::RefreshLensLibrary.as_ref(), Value::Null);
+        }
+    }
+
+    Ok(())
 }
