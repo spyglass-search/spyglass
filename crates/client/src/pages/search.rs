@@ -506,13 +506,13 @@ impl Component for SearchPage {
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
                 onclick={link.callback(|_| Msg::Focus)}
             >
-                <div class="flex flex-nowrap w-full">
+                <div class="flex flex-nowrap w-full bg-neutral-800">
                     <SelectedLens lens={self.lens.clone()} />
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+                        class="bg-neutral-800 text-white text-5xl py-4 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
                         placeholder="Search"
                         onkeyup={link.callback(Msg::KeyboardEvent)}
                         onkeydown={link.callback(Msg::KeyboardEvent)}
