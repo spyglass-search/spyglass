@@ -280,6 +280,15 @@ export let invoke = async (func_name, params) => {
             await new Promise(r => setTimeout(r, 5000));
         }
         return [];
+    } else if (func_name == "get_library_stats") {
+        return {
+            "test_lens": {
+                lens_name: "test_lens",
+                crawled: 52358,
+                enqueued: 1,
+                indexed: 52357
+            }
+        }
     }
 
     return [];

@@ -616,7 +616,7 @@ impl Component for SearchPage {
                 <div class="overflow-y-auto overflow-x-hidden h-full">
                     {results}
                 </div>
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center">
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
                     {search_meta}
                 </div>
             </div>
