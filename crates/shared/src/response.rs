@@ -1,20 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct QueueStatus {
-    pub num_queued: u64,
-    pub num_processing: u64,
-    pub num_completed: u64,
-    pub num_indexed: u64,
-}
-
-impl QueueStatus {
-    pub fn total(&self) -> u64 {
-        self.num_completed + self.num_indexed + self.num_processing + self.num_queued
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
@@ -37,11 +23,6 @@ pub struct UserConnection {
 pub struct ListConnectionResult {
     pub supported: Vec<SupportedConnection>,
     pub user_connections: Vec<UserConnection>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CrawlStats {
-    pub by_domain: Vec<(String, QueueStatus)>,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -141,4 +122,39 @@ pub struct SearchResults {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LibraryStats {
+    pub lens_name: String,
+    pub crawled: i64,
+    pub enqueued: i64,
+    pub indexed: i64,
+}
+
+impl LibraryStats {
+    pub fn new(name: &str) -> Self {
+        LibraryStats {
+            lens_name: name.to_owned(),
+            crawled: 0,
+            enqueued: 0,
+            indexed: 0,
+        }
+    }
+
+    pub fn total_docs(&self) -> i64 {
+        if self.enqueued == 0 {
+            self.indexed
+        } else {
+            self.crawled + self.enqueued
+        }
+    }
+
+    pub fn percent_done(&self) -> i64 {
+        self.crawled * 100 / (self.crawled + self.enqueued)
+    }
+
+    pub fn status_string(&self) -> String {
+        format!("Crawling {} of {}", self.enqueued, self.total_docs())
+    }
 }

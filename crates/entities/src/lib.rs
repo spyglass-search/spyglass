@@ -5,47 +5,12 @@ pub mod test;
 
 pub use sea_orm;
 use sea_orm::{DatabaseConnection, DbBackend, DbErr, FromQueryResult, Statement};
-
+use shared::response::LibraryStats;
 #[derive(Debug, FromQueryResult)]
 pub struct CountByStatus {
     count: i64,
     name: String,
     status: String,
-}
-
-#[derive(Debug)]
-pub struct LibraryStats {
-    pub lens_name: String,
-    pub crawled: i64,
-    pub enqueued: i64,
-    pub indexed: i64,
-}
-
-impl LibraryStats {
-    pub fn new(name: &str) -> Self {
-        LibraryStats {
-            lens_name: name.to_owned(),
-            crawled: 0,
-            enqueued: 0,
-            indexed: 0,
-        }
-    }
-
-    pub fn total_docs(&self) -> i64 {
-        if self.enqueued == 0 {
-            self.indexed
-        } else {
-            self.crawled + self.enqueued
-        }
-    }
-
-    pub fn percent_done(&self) -> i64 {
-        self.crawled * 100 / (self.crawled + self.enqueued)
-    }
-
-    pub fn status_string(&self) -> String {
-        format!("Crawling {} of {}", self.enqueued, self.total_docs())
-    }
 }
 
 pub async fn get_library_stats(
