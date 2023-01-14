@@ -565,6 +565,11 @@ pub async fn mark_done(
 ) -> Option<Model> {
     if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = crawl.clone().into();
+        if let Some(tags) = tags {
+            if !tags.is_empty() {
+                let _ = updated.insert_tags(db, &tags).await;
+            }
+        }
         updated.status = Set(CrawlStatus::Completed);
         updated.update(db).await.ok()
     } else {
