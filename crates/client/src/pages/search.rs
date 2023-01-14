@@ -131,6 +131,7 @@ impl Component for SearchPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
+        link.send_message(Msg::UpdateLibraryStats);
 
         // Listen to onblur events so we can hide the search bar
         if let Some(wind) = window() {
@@ -552,11 +553,14 @@ impl Component for SearchPage {
                     }
                 }
 
+                let mut num_docs_formatted = Buffer::default();
+                num_docs_formatted.write_formatted(&num_docs, &Locale::en);
+
                 total_docs = html! {
                     <div>
                         {"Searching "}
-                        <span class="text-cyan-600">{num_docs}</span>
-                        {"documents."}
+                        <span class="text-cyan-600">{num_docs_formatted}</span>
+                        {" documents."}
                     </div>
                 };
 
