@@ -210,7 +210,7 @@ impl Component for SearchPage {
             blur_timeout: None,
             library_stats: None,
             library_update_interval: Some(interval),
-            is_searching: false
+            is_searching: false,
         }
     }
 
