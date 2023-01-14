@@ -83,15 +83,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());
+    let num_cores = usize::from(std::thread::available_parallelism().expect("Unable to get number of cores"));
     let indexer_rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-backend")
+        .worker_threads(num_cores / 2)
         .build()
         .expect("Unable to create tokio runtime");
 
     let api_rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-api")
+        .worker_threads(num_cores / 2)
         .build()
         .expect("Unable to create tokio runtime");
 
