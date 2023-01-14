@@ -511,12 +511,12 @@ impl Component for SearchPage {
             wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
 
             html! {
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2 flex flex-row items-center">
+                <>
                     <div>
                         {"Searched "}
                         <span class="text-cyan-600">{num_docs}</span>
                         {" documents in "}
-                        <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                        <span class="text-cyan-600">{wall_time}{" ms."}</span>
                     </div>
                     <div class="ml-auto flex flex-row align-middle items-center">
                         {"Use"}
@@ -537,7 +537,7 @@ impl Component for SearchPage {
                         </div>
                         {"to open."}
                     </div>
-                </div>
+                </>
             }
         } else {
             let mut total_docs = html! {};
@@ -575,7 +575,7 @@ impl Component for SearchPage {
             }
 
             html! {
-                <div class="gap-2 flex flex-row items-center bg-neutral-900 px-4 py-2 text-xs text-neutral-500">
+                <>
                     {total_docs}
                     {crawling_progress}
                     <div class="ml-auto flex flex-row items-center align-middle">
@@ -589,7 +589,7 @@ impl Component for SearchPage {
                     </div>
                     {"to search."}
                     </div>
-                </div>
+                </>
             }
         };
 
@@ -604,7 +604,7 @@ impl Component for SearchPage {
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-5xl py-4 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+                        class="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
                         placeholder="Search"
                         onkeyup={link.callback(Msg::KeyboardEvent)}
                         onkeydown={link.callback(Msg::KeyboardEvent)}
@@ -616,7 +616,9 @@ impl Component for SearchPage {
                 <div class="overflow-y-auto overflow-x-hidden h-full">
                     {results}
                 </div>
-                {search_meta}
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center">
+                    {search_meta}
+                </div>
             </div>
         }
     }
