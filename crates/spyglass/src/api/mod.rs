@@ -137,7 +137,7 @@ pub async fn start_api_server(
     let server = HttpServerBuilder::default().build(server_addr).await?;
 
     let rpc_module = SpyglassRpc {
-        state: state.clone(),
+        state,
         config: config.clone(),
     };
     let addr = server.local_addr()?;
