@@ -1,6 +1,7 @@
-use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
+use gloo::{events::EventListener, timers::callback::Interval};
 use num_format::{Buffer, Locale};
+use std::collections::HashMap;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlElement, HtmlInputElement};
@@ -8,14 +9,15 @@ use yew::{html::Scope, prelude::*};
 
 use shared::{
     event::{ClientEvent, ClientInvoke},
-    response::{self, SearchMeta, SearchResult, SearchResults},
+    response::{self, LibraryStats, SearchMeta, SearchResult, SearchResults},
 };
 
 use crate::components::{
+    icons,
     result::{LensResultItem, SearchResultItem},
     SelectedLens,
 };
-use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
+use crate::{invoke, listen, open, resize_window, search_docs, search_lenses, tauri_invoke};
 
 #[wasm_bindgen]
 extern "C" {
@@ -47,6 +49,8 @@ pub enum Msg {
     UpdateLensResults(Vec<response::LensResult>),
     UpdateQuery(String),
     UpdateDocsResults(SearchResults),
+    SetLibraryStats(HashMap<String, LibraryStats>),
+    UpdateLibraryStats,
 }
 pub struct SearchPage {
     lens: Vec<String>,
@@ -60,6 +64,8 @@ pub struct SearchPage {
     query: String,
     query_debounce: Option<i32>,
     blur_timeout: Option<i32>,
+    library_stats: Option<HashMap<String, LibraryStats>>,
+    library_update_interval: Option<Interval>,
 }
 
 impl SearchPage {
@@ -183,6 +189,11 @@ impl Component for SearchPage {
             });
         }
 
+        let interval = {
+            let link = link.clone();
+            Interval::new(10_000, move || link.send_message(Msg::UpdateLibraryStats))
+        };
+
         Self {
             lens: Vec::new(),
             docs_results: Vec::new(),
@@ -195,6 +206,14 @@ impl Component for SearchPage {
             query: String::new(),
             query_debounce: None,
             blur_timeout: None,
+            library_stats: None,
+            library_update_interval: Some(interval),
+        }
+    }
+
+    fn destroy(&mut self, _ctx: &Context<Self>) {
+        if let Some(handle) = self.library_update_interval.take() {
+            handle.cancel();
         }
     }
 
@@ -424,6 +443,25 @@ impl Component for SearchPage {
 
                 false
             }
+            Msg::SetLibraryStats(stats) => {
+                self.library_stats = Some(stats);
+                true
+            }
+            Msg::UpdateLibraryStats => {
+                link.send_future_batch(async move {
+                    if let Ok(res) = tauri_invoke::<_, HashMap<String, LibraryStats>>(
+                        ClientInvoke::GetLibraryStats,
+                        "",
+                    )
+                    .await
+                    {
+                        vec![Msg::SetLibraryStats(res)]
+                    } else {
+                        Vec::new()
+                    }
+                });
+                false
+            }
         }
     }
 
@@ -501,7 +539,54 @@ impl Component for SearchPage {
                 </div>
             }
         } else {
-            html! {}
+            let mut total_docs = html! {};
+            let mut crawling_progress = html! {};
+
+            if let Some(stats_map) = &self.library_stats {
+                let mut num_docs = 0;
+                let mut is_crawling = false;
+                for (_, stats) in stats_map.iter() {
+                    num_docs += stats.indexed;
+                    if stats.enqueued > 0 {
+                        is_crawling = true;
+                    }
+                }
+
+                total_docs = html! {
+                    <div>
+                        {"Searching "}
+                        <span class="text-cyan-600">{num_docs}</span>
+                        {"documents."}
+                    </div>
+                };
+
+                if is_crawling {
+                    crawling_progress = html! {
+                        <div class="flex flex-row gap-1 items-center">
+                            <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                            {"Crawling..."}
+                        </div>
+                    };
+                }
+            }
+
+            html! {
+                <div class="gap-2 flex flex-row items-center bg-neutral-900 px-4 py-2 text-xs text-neutral-500">
+                    {total_docs}
+                    {crawling_progress}
+                    <div class="ml-auto flex flex-row items-center align-middle">
+                    {"Use"}
+                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-1 text-black text-[8px]">
+                        {"/"}
+                    </div>
+                    {"to select a lens."}
+                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
+                        {"Enter"}
+                    </div>
+                    {"to search."}
+                    </div>
+                </div>
+            }
         };
 
         html! {

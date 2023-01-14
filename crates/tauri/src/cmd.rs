@@ -218,6 +218,24 @@ pub async fn recrawl_domain(win: tauri::Window, domain: &str) -> Result<(), Stri
 }
 
 #[tauri::command]
+pub async fn get_library_stats(
+    win: tauri::Window,
+) -> Result<HashMap<String, response::LibraryStats>, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.get_library_stats().await {
+            Ok(res) => Ok(res),
+            Err(err) => {
+                log::error!("get_library_stats err: {}", err.to_string());
+                Err(err.to_string())
+            }
+        }
+    } else {
+        Err("Unable to communicate w/ backend".to_string())
+    }
+}
+
+#[tauri::command]
 pub async fn list_connections(
     win: tauri::Window,
 ) -> Result<response::ListConnectionResult, String> {

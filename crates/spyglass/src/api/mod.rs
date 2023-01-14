@@ -1,15 +1,17 @@
+use entities::get_library_stats;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
 use libspyglass::search;
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
 
 use shared::config::Config;
 use shared::request::{SearchLensesParam, SearchParam};
-use shared::response as resp;
+use shared::response::{self as resp, LibraryStats};
 use spyglass_rpc::RpcServer;
 
 mod auth;
@@ -41,6 +43,16 @@ impl RpcServer for SpyglassRpc {
 
     async fn delete_domain(&self, domain: String) -> Result<(), Error> {
         route::delete_domain(self.state.clone(), domain).await
+    }
+
+    async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
+        match get_library_stats(self.state.db.clone()).await {
+            Ok(stats) => Ok(stats),
+            Err(err) => {
+                log::error!("Unable to get library stats: {}", err);
+                Ok(HashMap::new())
+            }
+        }
     }
 
     async fn list_connections(&self) -> Result<resp::ListConnectionResult, Error> {

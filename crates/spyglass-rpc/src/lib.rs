@@ -1,9 +1,11 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
+use std::collections::HashMap;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp, SearchResults,
+    AppStatus, LensResult, LibraryStats, ListConnectionResult, PluginResult, SearchLensesResp,
+    SearchResults,
 };
 
 /// Rpc trait
@@ -24,6 +26,9 @@ pub trait Rpc {
 
     #[method(name = "delete_domain")]
     async fn delete_domain(&self, domain: String) -> Result<(), Error>;
+
+    #[method(name = "get_library_stats")]
+    async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error>;
 
     #[method(name = "install_lens")]
     async fn install_lens(&self, lens_name: String) -> Result<(), Error>;

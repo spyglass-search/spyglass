@@ -33,8 +33,8 @@ pub enum ClientInvoke {
     Escape,
     #[strum(serialize = "open_plugins_folder")]
     EditPluginSettings,
-    #[strum(serialize = "crawl_stats")]
-    GetCrawlStats,
+    #[strum(serialize = "get_library_stats")]
+    GetLibraryStats,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
     #[strum(serialize = "plugin:lens-updater|install_lens")]
