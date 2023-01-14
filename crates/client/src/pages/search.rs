@@ -547,7 +547,7 @@ impl Component for SearchPage {
                 let mut num_docs = 0;
                 let mut is_crawling = false;
                 for (_, stats) in stats_map.iter() {
-                    num_docs += stats.indexed;
+                    num_docs += stats.total_docs();
                     if stats.enqueued > 0 {
                         is_crawling = true;
                     }
