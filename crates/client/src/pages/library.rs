@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use gloo::timers::callback::Interval;
+use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -91,7 +91,7 @@ impl Component for LensManagerPage {
             req_user_installed: RequestState::NotStarted,
             user_installed: Vec::new(),
             uninstalling: HashSet::new(),
-            update_interval_handle: Some(interval)
+            update_interval_handle: Some(interval),
         }
     }
 

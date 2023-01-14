@@ -351,14 +351,17 @@ impl Component for SearchPage {
                                 match serde_wasm_bindgen::from_value(results) {
                                     Ok(results) => results,
                                     Err(err) => {
-                                        log::error!("Unable to deserialize search_lenses result: {:?}", err);
+                                        log::error!(
+                                            "Unable to deserialize search_lenses result: {:?}",
+                                            err
+                                        );
                                         Vec::new()
                                     }
                                 }
                             };
 
                             Msg::UpdateLensResults(lens_results)
-                        },
+                        }
                         Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
