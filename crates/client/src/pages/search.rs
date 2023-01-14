@@ -25,7 +25,7 @@ extern "C" {
     fn clear_timeout(handle: i32);
 }
 
-const QUERY_DEBOUNCE_MS: u32 = 256;
+const QUERY_DEBOUNCE_MS: u32 = 196;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum ResultDisplay {
@@ -66,6 +66,7 @@ pub struct SearchPage {
     blur_timeout: Option<i32>,
     library_stats: Option<HashMap<String, LibraryStats>>,
     library_update_interval: Option<Interval>,
+    is_searching: bool,
 }
 
 impl SearchPage {
@@ -209,6 +210,7 @@ impl Component for SearchPage {
             blur_timeout: None,
             library_stats: None,
             library_update_interval: Some(interval),
+            is_searching: false
         }
     }
 
@@ -364,6 +366,7 @@ impl Component for SearchPage {
             }
             Msg::SearchLenses => {
                 let query = self.query.trim_start_matches('/').to_string();
+                self.is_searching = true;
                 link.send_future(async move {
                     match search_lenses(query).await {
                         Ok(results) => {
@@ -390,7 +393,7 @@ impl Component for SearchPage {
             Msg::SearchDocs => {
                 let lenses = self.lens.clone();
                 let query = self.query.clone();
-
+                self.is_searching = true;
                 link.send_future(async move {
                     match serde_wasm_bindgen::to_value(&lenses) {
                         Ok(lenses) => match search_docs(lenses, query).await {
@@ -411,6 +414,7 @@ impl Component for SearchPage {
                 self.docs_results.clear();
                 self.result_display = ResultDisplay::Lens;
                 self.request_resize();
+                self.is_searching = false;
                 true
             }
             Msg::UpdateDocsResults(results) => {
@@ -419,6 +423,7 @@ impl Component for SearchPage {
                 self.lens_results.clear();
                 self.result_display = ResultDisplay::Docs;
                 self.request_resize();
+                self.is_searching = false;
                 true
             }
             Msg::UpdateQuery(query) => {
@@ -556,21 +561,30 @@ impl Component for SearchPage {
                 let mut num_docs_formatted = Buffer::default();
                 num_docs_formatted.write_formatted(&num_docs, &Locale::en);
 
-                total_docs = html! {
-                    <div>
-                        {"Searching "}
-                        <span class="text-cyan-600">{num_docs_formatted}</span>
-                        {" documents."}
-                    </div>
-                };
-
-                if is_crawling {
-                    crawling_progress = html! {
+                if self.is_searching {
+                    total_docs = html! {
                         <div class="flex flex-row gap-1 items-center">
                             <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
-                            {"Crawling..."}
+                            {"Searching..."}
                         </div>
                     };
+                } else {
+                    total_docs = html! {
+                        <div>
+                            {"Searching "}
+                            <span class="text-cyan-600">{num_docs_formatted}</span>
+                            {" documents."}
+                        </div>
+                    };
+
+                    if is_crawling {
+                        crawling_progress = html! {
+                            <div class="flex flex-row gap-1 items-center">
+                                <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                                {"Crawling..."}
+                            </div>
+                        };
+                    }
                 }
             }
 
