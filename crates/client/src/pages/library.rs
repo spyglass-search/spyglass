@@ -1,3 +1,4 @@
+use gloo::timers::callback::Interval;
 use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -36,6 +37,7 @@ pub struct LensManagerPage {
     req_user_installed: RequestState,
     user_installed: Vec<LensResult>,
     uninstalling: HashSet<String>,
+    update_interval_handle: Option<Interval>,
 }
 pub enum Msg {
     HandleLensEvent(LensEvent),
@@ -79,11 +81,23 @@ impl Component for LensManagerPage {
             });
         }
 
+        let interval = {
+            let link = link.clone();
+            Interval::new(5_000, move || link.send_message(Msg::RunRefresher))
+        };
+
         Self {
             lens_updater: RequestState::NotStarted,
             req_user_installed: RequestState::NotStarted,
             user_installed: Vec::new(),
             uninstalling: HashSet::new(),
+            update_interval_handle: Some(interval),
+        }
+    }
+
+    fn destroy(&mut self, _ctx: &Context<Self>) {
+        if let Some(handle) = self.update_interval_handle.take() {
+            handle.cancel();
         }
     }
 

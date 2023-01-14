@@ -7,6 +7,9 @@ PLUGINS := chrome-importer firefox-importer local-file-indexer
 # Set this up if you're working on the plugins
 PLUGINS_DEV_FOLDER := ~/Library/Application\ Support/com.athlabs.spyglass-dev/
 
+# By default just run fmt & clippy
+default: fmt clippy
+
 build-backend:
 	cargo build -p spyglass
 	mkdir -p crates/tauri/binaries
@@ -67,6 +70,7 @@ setup-dev:
 # Install tailwind
 	cd ./crates/client && npm install
 
+# Specifically for debian based distros
 setup-dev-linux:
 	sudo apt install libwebkit2gtk-4.0-dev \
 		build-essential \

@@ -116,6 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
+            cmd::get_library_stats,
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
@@ -153,9 +154,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             let default_height = if cfg!(target_os = "windows") {
-                98.0
+                99.0
             } else {
-                96.0
+                101.0
             };
 
             let window = WindowBuilder::new(

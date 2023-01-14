@@ -1,6 +1,7 @@
-use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
+use gloo::{events::EventListener, timers::callback::Interval};
 use num_format::{Buffer, Locale};
+use std::collections::HashMap;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlElement, HtmlInputElement};
@@ -8,14 +9,15 @@ use yew::{html::Scope, prelude::*};
 
 use shared::{
     event::{ClientEvent, ClientInvoke},
-    response::{self, SearchMeta, SearchResult, SearchResults},
+    response::{self, LibraryStats, SearchMeta, SearchResult, SearchResults},
 };
 
 use crate::components::{
+    icons,
     result::{LensResultItem, SearchResultItem},
     SelectedLens,
 };
-use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
+use crate::{invoke, listen, open, resize_window, search_docs, search_lenses, tauri_invoke};
 
 #[wasm_bindgen]
 extern "C" {
@@ -47,6 +49,8 @@ pub enum Msg {
     UpdateLensResults(Vec<response::LensResult>),
     UpdateQuery(String),
     UpdateDocsResults(SearchResults),
+    SetLibraryStats(HashMap<String, LibraryStats>),
+    UpdateLibraryStats,
 }
 pub struct SearchPage {
     lens: Vec<String>,
@@ -60,6 +64,8 @@ pub struct SearchPage {
     query: String,
     query_debounce: Option<i32>,
     blur_timeout: Option<i32>,
+    library_stats: Option<HashMap<String, LibraryStats>>,
+    library_update_interval: Option<Interval>,
 }
 
 impl SearchPage {
@@ -125,6 +131,7 @@ impl Component for SearchPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
+        link.send_message(Msg::UpdateLibraryStats);
 
         // Listen to onblur events so we can hide the search bar
         if let Some(wind) = window() {
@@ -183,6 +190,11 @@ impl Component for SearchPage {
             });
         }
 
+        let interval = {
+            let link = link.clone();
+            Interval::new(10_000, move || link.send_message(Msg::UpdateLibraryStats))
+        };
+
         Self {
             lens: Vec::new(),
             docs_results: Vec::new(),
@@ -195,6 +207,14 @@ impl Component for SearchPage {
             query: String::new(),
             query_debounce: None,
             blur_timeout: None,
+            library_stats: None,
+            library_update_interval: Some(interval),
+        }
+    }
+
+    fn destroy(&mut self, _ctx: &Context<Self>) {
+        if let Some(handle) = self.library_update_interval.take() {
+            handle.cancel();
         }
     }
 
@@ -346,9 +366,22 @@ impl Component for SearchPage {
                 let query = self.query.trim_start_matches('/').to_string();
                 link.send_future(async move {
                     match search_lenses(query).await {
-                        Ok(results) => Msg::UpdateLensResults(
-                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
-                        ),
+                        Ok(results) => {
+                            let lens_results = {
+                                match serde_wasm_bindgen::from_value(results) {
+                                    Ok(results) => results,
+                                    Err(err) => {
+                                        log::error!(
+                                            "Unable to deserialize search_lenses result: {:?}",
+                                            err
+                                        );
+                                        Vec::new()
+                                    }
+                                }
+                            };
+
+                            Msg::UpdateLensResults(lens_results)
+                        }
                         Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
@@ -411,6 +444,25 @@ impl Component for SearchPage {
 
                 false
             }
+            Msg::SetLibraryStats(stats) => {
+                self.library_stats = Some(stats);
+                true
+            }
+            Msg::UpdateLibraryStats => {
+                link.send_future_batch(async move {
+                    if let Ok(res) = tauri_invoke::<_, HashMap<String, LibraryStats>>(
+                        ClientInvoke::GetLibraryStats,
+                        "",
+                    )
+                    .await
+                    {
+                        vec![Msg::SetLibraryStats(res)]
+                    } else {
+                        Vec::new()
+                    }
+                });
+                false
+            }
         }
     }
 
@@ -459,12 +511,12 @@ impl Component for SearchPage {
             wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
 
             html! {
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2 flex flex-row items-center">
+                <>
                     <div>
                         {"Searched "}
                         <span class="text-cyan-600">{num_docs}</span>
                         {" documents in "}
-                        <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                        <span class="text-cyan-600">{wall_time}{" ms."}</span>
                     </div>
                     <div class="ml-auto flex flex-row align-middle items-center">
                         {"Use"}
@@ -485,10 +537,60 @@ impl Component for SearchPage {
                         </div>
                         {"to open."}
                     </div>
-                </div>
+                </>
             }
         } else {
-            html! {}
+            let mut total_docs = html! {};
+            let mut crawling_progress = html! {};
+
+            if let Some(stats_map) = &self.library_stats {
+                let mut num_docs = 0;
+                let mut is_crawling = false;
+                for (_, stats) in stats_map.iter() {
+                    num_docs += stats.total_docs();
+                    if stats.enqueued > 0 {
+                        is_crawling = true;
+                    }
+                }
+
+                let mut num_docs_formatted = Buffer::default();
+                num_docs_formatted.write_formatted(&num_docs, &Locale::en);
+
+                total_docs = html! {
+                    <div>
+                        {"Searching "}
+                        <span class="text-cyan-600">{num_docs_formatted}</span>
+                        {" documents."}
+                    </div>
+                };
+
+                if is_crawling {
+                    crawling_progress = html! {
+                        <div class="flex flex-row gap-1 items-center">
+                            <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                            {"Crawling..."}
+                        </div>
+                    };
+                }
+            }
+
+            html! {
+                <>
+                    {total_docs}
+                    {crawling_progress}
+                    <div class="ml-auto flex flex-row items-center align-middle">
+                    {"Use"}
+                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-1 text-black text-[8px]">
+                        {"/"}
+                    </div>
+                    {"to select a lens."}
+                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
+                        {"Enter"}
+                    </div>
+                    {"to search."}
+                    </div>
+                </>
+            }
         };
 
         html! {
@@ -496,13 +598,13 @@ impl Component for SearchPage {
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
                 onclick={link.callback(|_| Msg::Focus)}
             >
-                <div class="flex flex-nowrap w-full">
+                <div class="flex flex-nowrap w-full bg-neutral-800">
                     <SelectedLens lens={self.lens.clone()} />
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+                        class="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
                         placeholder="Search"
                         onkeyup={link.callback(Msg::KeyboardEvent)}
                         onkeydown={link.callback(Msg::KeyboardEvent)}
@@ -514,7 +616,9 @@ impl Component for SearchPage {
                 <div class="overflow-y-auto overflow-x-hidden h-full">
                     {results}
                 </div>
-                {search_meta}
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
+                    {search_meta}
+                </div>
             </div>
         }
     }

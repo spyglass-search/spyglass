@@ -20,15 +20,15 @@ pub fn selected_lens_list(props: &SelectLensProps) -> Html {
         .iter()
         .map(|lens_name: &String| {
             html! {
-                <li class="flex bg-cyan-700 rounded-lg my-3 ml-3">
-                    <span class="text-4xl text-white p-3">{lens_name}</span>
+                <li class="flex bg-cyan-700 rounded-lg px-2 py-1 text-4xl text-white">
+                    {lens_name}
                 </li>
             }
         })
         .collect::<Html>();
 
     html! {
-        <ul class="flex bg-neutral-800">
+        <ul class="flex bg-neutral-800 gap-2 items-center mx-3">
             {items}
         </ul>
     }

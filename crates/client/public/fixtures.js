@@ -83,17 +83,21 @@ export let invoke = async (func_name, params) => {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense",
+            name: "fake_lense",
+            label: "Fake Lense",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: { "Finished": { num_docs: 100 } },
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense_2_boogaloo",
+            name: "fake_lense_2_boogaloo",
+            label: "Fake Lense 2: Boogaloo",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: { "Finished": { num_docs: 100 } },
         }];
     } else if (func_name == "list_connections") {
         return {
@@ -276,6 +280,15 @@ export let invoke = async (func_name, params) => {
             await new Promise(r => setTimeout(r, 5000));
         }
         return [];
+    } else if (func_name == "get_library_stats") {
+        return {
+            "test_lens": {
+                lens_name: "test_lens",
+                crawled: 52358,
+                enqueued: 1,
+                indexed: 52357
+            }
+        }
     }
 
     return [];
