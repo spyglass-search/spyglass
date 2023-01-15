@@ -83,25 +83,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());
-    let num_cores = usize::from(std::thread::available_parallelism().expect("Unable to get number of cores"));
-    let indexer_rt = tokio::runtime::Builder::new_multi_thread()
+    let backend_rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-backend")
-        .worker_threads(num_cores / 2)
         .build()
         .expect("Unable to create tokio runtime");
 
-    let api_rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name("spyglass-api")
-        .worker_threads(num_cores / 2)
-        .build()
-        .expect("Unable to create tokio runtime");
+    // In case we need to split the runtimes for some reason:
+    // let num_cores = usize::from(std::thread::available_parallelism().expect("Unable to get number of cores"));
+    // let api_rt = tokio::runtime::Builder::new_multi_thread()
+    //     .enable_all()
+    //     .thread_name("spyglass-api")
+    //     .worker_threads((num_cores / 2).max(1))
+    //     .build()
+    //     .expect("Unable to create tokio runtime");
 
     // Run any migrations, only on headless mode.
     #[cfg(debug_assertions)]
     {
-        let migration_status = indexer_rt.block_on(async {
+        let migration_status = backend_rt.block_on(async {
             match Migrator::run_migrations().await {
                 Ok(_) => Ok(()),
                 Err(e) => {
@@ -125,13 +125,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Initialize/Load user preferences
-    let state = indexer_rt.block_on(AppState::new(&config));
+    let state = backend_rt.block_on(AppState::new(&config));
     if !args.check {
-        let indexer_handle = indexer_rt.spawn(start_backend(state.clone(), config.clone()));
+        let indexer_handle = backend_rt.spawn(start_backend(state.clone(), config.clone()));
         // API server
-        let api_handle = api_rt.spawn(api::start_api_server(state, config));
+        let api_handle = backend_rt.spawn(api::start_api_server(state, config));
 
-        api_rt.block_on(async move {
+        backend_rt.block_on(async move {
             let _ = tokio::join!(indexer_handle, api_handle);
         });
     }
