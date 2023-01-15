@@ -25,7 +25,7 @@ pub async fn get_library_stats(
             LEFT JOIN crawl_tag on crawl_queue.id = crawl_tag.crawl_queue_id
             LEFT JOIN tags on tags.id = crawl_tag.tag_id
             WHERE tags.label = "lens"
-            GROUP BY tags.value, status
+            GROUP BY lower(tags.value), lower(status)
             UNION
             SELECT
                 count(*) as "count", tags.value as "name", "Indexed" as status
@@ -33,7 +33,7 @@ pub async fn get_library_stats(
             LEFT JOIN document_tag on indexed_document.id = document_tag.indexed_document_id
             LEFT JOIN tags on tags.id = document_tag.tag_id
             WHERE tags.label = "lens"
-            group by tags.value, status;
+            group by lower(tags.value), lower(status);
         "#
         .to_string(),
     ))
