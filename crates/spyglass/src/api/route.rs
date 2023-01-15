@@ -248,7 +248,7 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                     }
                 } else if lens_stats.enqueued == 0 {
                     InstallStatus::Finished {
-                        num_docs: lens_stats.indexed as u64,
+                        num_docs: lens_stats.indexed as u32,
                     }
                 } else {
                     InstallStatus::Installing {
@@ -443,8 +443,8 @@ pub async fn search(
 
     let meta = SearchMeta {
         query: search_req.query,
-        num_docs: searcher.num_docs(),
-        wall_time_ms,
+        num_docs: searcher.num_docs() as u32,
+        wall_time_ms: wall_time_ms as u32,
     };
 
     let domains: HashSet<String> = HashSet::from_iter(results.iter().map(|r| r.domain.clone()));

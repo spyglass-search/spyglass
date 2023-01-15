@@ -8,7 +8,7 @@ use sea_orm::{DatabaseConnection, DbBackend, DbErr, FromQueryResult, Statement};
 use shared::response::LibraryStats;
 #[derive(Debug, FromQueryResult)]
 pub struct CountByStatus {
-    count: i64,
+    count: i32,
     name: String,
     status: String,
 }
