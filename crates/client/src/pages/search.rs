@@ -25,7 +25,7 @@ extern "C" {
     fn clear_timeout(handle: i32);
 }
 
-const QUERY_DEBOUNCE_MS: u32 = 196;
+const QUERY_DEBOUNCE_MS: u32 = 256;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum ResultDisplay {
