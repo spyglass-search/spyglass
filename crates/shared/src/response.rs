@@ -54,8 +54,8 @@ impl InstallableLens {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum InstallStatus {
     NotInstalled,
-    Finished { num_docs: u64 },
-    Installing { percent: i64, status: String },
+    Finished { num_docs: u32 },
+    Installing { percent: i32, status: String },
 }
 
 impl Default for InstallStatus {
@@ -95,8 +95,8 @@ pub struct PluginResult {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,
-    pub num_docs: u64,
-    pub wall_time_ms: u64,
+    pub num_docs: u32,
+    pub wall_time_ms: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -127,9 +127,9 @@ pub struct SearchLensesResp {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LibraryStats {
     pub lens_name: String,
-    pub crawled: i64,
-    pub enqueued: i64,
-    pub indexed: i64,
+    pub crawled: i32,
+    pub enqueued: i32,
+    pub indexed: i32,
 }
 
 impl LibraryStats {
@@ -142,7 +142,7 @@ impl LibraryStats {
         }
     }
 
-    pub fn total_docs(&self) -> i64 {
+    pub fn total_docs(&self) -> i32 {
         if self.enqueued == 0 {
             self.indexed
         } else {
@@ -150,7 +150,7 @@ impl LibraryStats {
         }
     }
 
-    pub fn percent_done(&self) -> i64 {
+    pub fn percent_done(&self) -> i32 {
         self.crawled * 100 / (self.crawled + self.enqueued)
     }
 
