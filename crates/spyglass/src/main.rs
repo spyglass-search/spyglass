@@ -83,16 +83,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let backend_rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("spyglass-backend")
         .build()
         .expect("Unable to create tokio runtime");
 
+    // In case we need to split the runtimes for some reason:
+    // let num_cores = usize::from(std::thread::available_parallelism().expect("Unable to get number of cores"));
+    // let api_rt = tokio::runtime::Builder::new_multi_thread()
+    //     .enable_all()
+    //     .thread_name("spyglass-api")
+    //     .worker_threads((num_cores / 2).max(1))
+    //     .build()
+    //     .expect("Unable to create tokio runtime");
+
     // Run any migrations, only on headless mode.
     #[cfg(debug_assertions)]
     {
-        let migration_status = rt.block_on(async {
+        let migration_status = backend_rt.block_on(async {
             match Migrator::run_migrations().await {
                 Ok(_) => Ok(()),
                 Err(e) => {
@@ -116,15 +125,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Initialize/Load user preferences
-    let mut state = rt.block_on(AppState::new(&config));
+    let state = backend_rt.block_on(AppState::new(&config));
     if !args.check {
-        rt.block_on(start_backend(&mut state, &config));
+        let indexer_handle = backend_rt.spawn(start_backend(state.clone(), config.clone()));
+        // API server
+        let api_handle = backend_rt.spawn(api::start_api_server(state, config));
+
+        backend_rt.block_on(async move {
+            let _ = tokio::join!(indexer_handle, api_handle);
+        });
     }
 
     Ok(())
 }
 
-async fn start_backend(state: &mut AppState, config: &Config) {
+async fn start_backend(state: AppState, config: Config) {
     // Initialize crawl_queue, requeue all in-flight tasks.
     let _ = crawl_queue::reset_processing(&state.db).await;
     if let Err(e) = lens::reset(&state.db).await {
@@ -218,9 +233,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         plugin_cmd_rx,
     ));
 
-    // API server
-    let api_server = tokio::spawn(api::start_api_server(state.clone(), config.clone()));
-
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
@@ -247,7 +259,6 @@ async fn start_backend(state: &mut AppState, config: &Config) {
         manager_handle,
         worker_handle,
         pm_handle,
-        api_server,
         lens_watcher_handle
     );
 }

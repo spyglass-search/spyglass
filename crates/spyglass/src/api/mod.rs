@@ -7,7 +7,7 @@ use libspyglass::task::{CollectTask, ManagerCommand};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
+use jsonrpsee::server::{ServerBuilder, ServerHandle};
 
 use shared::config::Config;
 use shared::request::{SearchLensesParam, SearchParam};
@@ -132,12 +132,12 @@ impl RpcServer for SpyglassRpc {
 pub async fn start_api_server(
     state: AppState,
     config: Config,
-) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+) -> anyhow::Result<(SocketAddr, ServerHandle)> {
     let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), state.user_settings.port);
-    let server = HttpServerBuilder::default().build(server_addr).await?;
+    let server = ServerBuilder::default().build(server_addr).await?;
 
     let rpc_module = SpyglassRpc {
-        state: state.clone(),
+        state,
         config: config.clone(),
     };
     let addr = server.local_addr()?;

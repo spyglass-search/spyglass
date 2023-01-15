@@ -1,7 +1,6 @@
+use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
-use gloo::{events::EventListener, timers::callback::Interval};
 use num_format::{Buffer, Locale};
-use std::collections::HashMap;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlElement, HtmlInputElement};
@@ -9,7 +8,7 @@ use yew::{html::Scope, prelude::*};
 
 use shared::{
     event::{ClientEvent, ClientInvoke},
-    response::{self, LibraryStats, SearchMeta, SearchResult, SearchResults},
+    response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
 use crate::components::{
@@ -17,7 +16,7 @@ use crate::components::{
     result::{LensResultItem, SearchResultItem},
     SelectedLens,
 };
-use crate::{invoke, listen, open, resize_window, search_docs, search_lenses, tauri_invoke};
+use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
 
 #[wasm_bindgen]
 extern "C" {
@@ -49,8 +48,6 @@ pub enum Msg {
     UpdateLensResults(Vec<response::LensResult>),
     UpdateQuery(String),
     UpdateDocsResults(SearchResults),
-    SetLibraryStats(HashMap<String, LibraryStats>),
-    UpdateLibraryStats,
 }
 pub struct SearchPage {
     lens: Vec<String>,
@@ -64,8 +61,7 @@ pub struct SearchPage {
     query: String,
     query_debounce: Option<i32>,
     blur_timeout: Option<i32>,
-    library_stats: Option<HashMap<String, LibraryStats>>,
-    library_update_interval: Option<Interval>,
+    is_searching: bool,
 }
 
 impl SearchPage {
@@ -131,7 +127,6 @@ impl Component for SearchPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
-        link.send_message(Msg::UpdateLibraryStats);
 
         // Listen to onblur events so we can hide the search bar
         if let Some(wind) = window() {
@@ -190,11 +185,6 @@ impl Component for SearchPage {
             });
         }
 
-        let interval = {
-            let link = link.clone();
-            Interval::new(10_000, move || link.send_message(Msg::UpdateLibraryStats))
-        };
-
         Self {
             lens: Vec::new(),
             docs_results: Vec::new(),
@@ -207,14 +197,7 @@ impl Component for SearchPage {
             query: String::new(),
             query_debounce: None,
             blur_timeout: None,
-            library_stats: None,
-            library_update_interval: Some(interval),
-        }
-    }
-
-    fn destroy(&mut self, _ctx: &Context<Self>) {
-        if let Some(handle) = self.library_update_interval.take() {
-            handle.cancel();
+            is_searching: false,
         }
     }
 
@@ -364,6 +347,7 @@ impl Component for SearchPage {
             }
             Msg::SearchLenses => {
                 let query = self.query.trim_start_matches('/').to_string();
+                self.is_searching = true;
                 link.send_future(async move {
                     match search_lenses(query).await {
                         Ok(results) => {
@@ -390,7 +374,7 @@ impl Component for SearchPage {
             Msg::SearchDocs => {
                 let lenses = self.lens.clone();
                 let query = self.query.clone();
-
+                self.is_searching = true;
                 link.send_future(async move {
                     match serde_wasm_bindgen::to_value(&lenses) {
                         Ok(lenses) => match search_docs(lenses, query).await {
@@ -411,6 +395,7 @@ impl Component for SearchPage {
                 self.docs_results.clear();
                 self.result_display = ResultDisplay::Lens;
                 self.request_resize();
+                self.is_searching = false;
                 true
             }
             Msg::UpdateDocsResults(results) => {
@@ -419,6 +404,7 @@ impl Component for SearchPage {
                 self.lens_results.clear();
                 self.result_display = ResultDisplay::Docs;
                 self.request_resize();
+                self.is_searching = false;
                 true
             }
             Msg::UpdateQuery(query) => {
@@ -442,25 +428,6 @@ impl Component for SearchPage {
                     self.query_debounce = Some(id);
                 }
 
-                false
-            }
-            Msg::SetLibraryStats(stats) => {
-                self.library_stats = Some(stats);
-                true
-            }
-            Msg::UpdateLibraryStats => {
-                link.send_future_batch(async move {
-                    if let Ok(res) = tauri_invoke::<_, HashMap<String, LibraryStats>>(
-                        ClientInvoke::GetLibraryStats,
-                        "",
-                    )
-                    .await
-                    {
-                        vec![Msg::SetLibraryStats(res)]
-                    } else {
-                        Vec::new()
-                    }
-                });
                 false
             }
         }
@@ -540,44 +507,20 @@ impl Component for SearchPage {
                 </>
             }
         } else {
-            let mut total_docs = html! {};
-            let mut crawling_progress = html! {};
-
-            if let Some(stats_map) = &self.library_stats {
-                let mut num_docs = 0;
-                let mut is_crawling = false;
-                for (_, stats) in stats_map.iter() {
-                    num_docs += stats.total_docs();
-                    if stats.enqueued > 0 {
-                        is_crawling = true;
-                    }
-                }
-
-                let mut num_docs_formatted = Buffer::default();
-                num_docs_formatted.write_formatted(&num_docs, &Locale::en);
-
-                total_docs = html! {
-                    <div>
-                        {"Searching "}
-                        <span class="text-cyan-600">{num_docs_formatted}</span>
-                        {" documents."}
+            let is_searching_indicator = if self.is_searching {
+                html! {
+                    <div class="flex flex-row gap-1 items-center">
+                        <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                        {"Searching..."}
                     </div>
-                };
-
-                if is_crawling {
-                    crawling_progress = html! {
-                        <div class="flex flex-row gap-1 items-center">
-                            <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
-                            {"Crawling..."}
-                        </div>
-                    };
                 }
-            }
+            } else {
+                html! {}
+            };
 
             html! {
                 <>
-                    {total_docs}
-                    {crawling_progress}
+                    {is_searching_indicator}
                     <div class="ml-auto flex flex-row items-center align-middle">
                     {"Use"}
                     <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-1 text-black text-[8px]">
