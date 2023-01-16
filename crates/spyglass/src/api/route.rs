@@ -25,7 +25,7 @@ use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
+use libspyglass::task::{AppPause, CleanupTask, CollectTask, ManagerCommand};
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -384,6 +384,7 @@ pub async fn search(
         Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &search_req.query).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
+    let mut missing: Vec<(String, String)> = Vec::new();
     for (score, doc_addr) in docs {
         if let Ok(retrieved) = searcher.doc(doc_addr) {
             let doc_id = retrieved
@@ -402,6 +403,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
+            log::error!("Got id with url {:?} {:?}", doc_id, url);
             if let Some(doc_id) = doc_id.as_text() {
                 let indexed = indexed_document::Entity::find()
                     .filter(indexed_document::Column::DocId.eq(doc_id))
@@ -409,29 +411,34 @@ pub async fn search(
                     .await;
 
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
-                if let Ok(Some(indexed)) = indexed {
-                    let tags = indexed
-                        .find_related(tag::Entity)
-                        .all(&state.db)
-                        .await
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
-                        .collect::<Vec<(String, String)>>();
+                match indexed {
+                    Ok(Some(indexed)) => {
+                        let tags = indexed
+                            .find_related(tag::Entity)
+                            .all(&state.db)
+                            .await
+                            .unwrap_or_default()
+                            .iter()
+                            .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
+                            .collect::<Vec<(String, String)>>();
 
-                    let mut result = SearchResult {
-                        doc_id: doc_id.to_string(),
-                        domain: domain.as_text().unwrap_or_default().to_string(),
-                        title: title.as_text().unwrap_or_default().to_string(),
-                        crawl_uri: crawl_uri.clone(),
-                        description: description.as_text().unwrap_or_default().to_string(),
-                        url: indexed.open_url.unwrap_or(crawl_uri),
-                        tags,
-                        score,
-                    };
+                        let mut result = SearchResult {
+                            doc_id: doc_id.to_string(),
+                            domain: domain.as_text().unwrap_or_default().to_string(),
+                            title: title.as_text().unwrap_or_default().to_string(),
+                            crawl_uri: crawl_uri.clone(),
+                            description: description.as_text().unwrap_or_default().to_string(),
+                            url: indexed.open_url.unwrap_or(crawl_uri),
+                            tags,
+                            score,
+                        };
 
-                    result.description.truncate(256);
-                    results.push(result);
+                        result.description.truncate(256);
+                        results.push(result);
+                    }
+                    _ => {
+                        missing.push((doc_id.to_owned(), crawl_uri.to_owned()));
+                    }
                 }
             }
         }
@@ -456,6 +463,19 @@ pub async fn search(
             wall_time_ms,
         })
         .await;
+
+    // Send cleanup task for any missing docs
+    if !missing.is_empty() {
+        let mut cmd_tx = state.manager_cmd_tx.lock().await;
+        match &mut *cmd_tx {
+            Some(cmd_tx) => {
+                let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
+                    missing_docs: missing,
+                }));
+            }
+            None => {}
+        }
+    }
 
     Ok(SearchResults { results, meta })
 }
