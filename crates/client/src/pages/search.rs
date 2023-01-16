@@ -399,12 +399,14 @@ impl Component for SearchPage {
                 true
             }
             Msg::UpdateDocsResults(results) => {
-                self.docs_results = results.results;
-                self.search_meta = Some(results.meta);
-                self.lens_results.clear();
-                self.result_display = ResultDisplay::Docs;
-                self.request_resize();
-                self.is_searching = false;
+                if self.query == results.meta.query {
+                    self.docs_results = results.results;
+                    self.search_meta = Some(results.meta);
+                    self.lens_results.clear();
+                    self.result_display = ResultDisplay::Docs;
+                    self.request_resize();
+                    self.is_searching = false;
+                }
                 true
             }
             Msg::UpdateQuery(query) => {
