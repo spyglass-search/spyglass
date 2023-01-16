@@ -60,18 +60,20 @@ pub fn hide_search_bar(window: &Window) {
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
-    let window_height = {
+    let monitor_height = {
         if let Some(monitor) = find_monitor(window) {
             let size = monitor.size();
             let scale = monitor.scale_factor();
-            Some((size.height as f64) / scale - constants::INPUT_Y)
+            Some((size.height as f64) / scale - (constants::INPUT_Y * 3.0))
         } else {
             None
         }
     };
 
-    let height = if let Some(window_height) = window_height {
-        window_height.min(height)
+    // If the requested height is greater than the monitor size, use the monitor
+    // height so we don't go offscreen.
+    let height = if let Some(monitor_height) = monitor_height {
+        monitor_height.min(height)
     } else {
         height
     };
