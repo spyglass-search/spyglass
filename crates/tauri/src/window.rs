@@ -64,7 +64,7 @@ pub async fn resize_window(window: &Window, height: f64) {
         if let Some(monitor) = find_monitor(window) {
             let size = monitor.size();
             let scale = monitor.scale_factor();
-            Some((size.height as f64) / scale - (constants::INPUT_Y * 3.0))
+            Some((size.height as f64) / scale - (constants::INPUT_Y * 2.0))
         } else {
             None
         }
