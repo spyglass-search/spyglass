@@ -153,12 +153,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
-            let default_height = if cfg!(target_os = "windows") {
-                99.0
-            } else {
-                101.0
-            };
-
+            let default_height = 101.0;
             let window = WindowBuilder::new(
                 app,
                 constants::SEARCH_WIN_NAME,
