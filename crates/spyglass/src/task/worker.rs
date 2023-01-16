@@ -7,8 +7,8 @@ use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, LensRule, LensSource};
 
-use super::CrawlTask;
 use super::{bootstrap, CollectTask, ManagerCommand};
+use super::{CleanupTask, CrawlTask};
 use crate::crawler::{CrawlError, CrawlResult, Crawler};
 use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
@@ -160,6 +160,75 @@ async fn process_lens_rules(lens: &LensConfig, state: &AppState) {
             }
         }
     }
+}
+
+/// Helper used to cleanup the database when documents are in the index, but are missing from
+/// the database. This typically happens when a cache has invalid content. Currently the
+/// cleanup is minimal, but can be expanded in the future.
+pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> anyhow::Result<()> {
+    log::debug!(
+        "Running database cleanup for the following {:?}",
+        cleanup_task
+    );
+    let mut changed = false;
+    if !&cleanup_task.missing_docs.is_empty() {
+        for (doc_id, url) in cleanup_task.missing_docs {
+            let doc = indexed_document::Entity::find()
+                .filter(indexed_document::Column::Url.eq(url.clone()))
+                .one(&state.db)
+                .await;
+            match doc {
+                Ok(Some(doc_model)) => {
+                    log::debug!("Found document for url {}", url);
+                    if !doc_model.doc_id.eq(&doc_id) {
+                        // Found document for the url, but it has a different doc id.
+                        // check if this document exists in the index to see if we
+                        // had a duplicate
+                        let indexed_result =
+                            Searcher::get_by_id(&state.index.reader, doc_model.doc_id.as_str());
+                        match indexed_result {
+                            Some(_doc) => {
+                                log::debug!(
+                                    "Found duplicate for url: {}, removing duplicate doc {}",
+                                    url,
+                                    doc_id
+                                );
+                                // Found indexed document, so we must have had duplicates, remove dup
+                                let _ = Searcher::delete_by_id(state, doc_id.as_str()).await;
+                                changed = true;
+                            }
+                            None => {
+                                log::error!("No document found in index, db doc id is different than index doc id. Index: {} Database: {}", 
+                                    doc_id, doc_model.doc_id);
+                                // best we could do is normalize the doc id. The issue is that if they have different doc ids, we do not
+                                // know if they have the same / valid content.
+                                let mut updated: indexed_document::ActiveModel =
+                                    doc_model.clone().into();
+                                updated.doc_id = Set(doc_id.clone());
+                                let _ = updated.update(&state.db).await;
+                            }
+                        }
+                    }
+                }
+                Ok(None) => {
+                    log::debug!("Could not find document for url {}, removing", url);
+                    // can't find the url at all must be an old doc that was removed
+                    let _ = Searcher::delete_by_id(state, doc_id.as_str()).await;
+                    changed = true;
+                }
+                Err(error) => {
+                    // we had an error so can't say what happened
+                    log::error!("Got error accessing url {}, error: {:?}", url, error);
+                }
+            }
+        }
+    }
+
+    if changed {
+        let _ = Searcher::save(state).await;
+    }
+
+    Ok(())
 }
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.

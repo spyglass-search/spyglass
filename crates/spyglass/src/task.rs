@@ -37,11 +37,19 @@ pub enum CollectTask {
     },
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CleanupTask {
+    pub missing_docs: Vec<(String, String)>,
+}
+
 /// Tell the manager to schedule some tasks
 #[derive(Clone, Debug)]
 pub enum ManagerCommand {
     Collect(CollectTask),
     CheckForJobs,
+    /// General database cleanup command that sends a worker
+    /// task request for cleanup
+    CleanupDatabase(CleanupTask),
 }
 
 /// Send tasks to the worker
@@ -59,6 +67,9 @@ pub enum WorkerCommand {
     Recrawl { id: i64 },
     /// Applies tag information to an URI
     Tag,
+    /// Updates the document store for indexed document database table to
+    /// cleanup inconsistencies
+    CleanupDatabase(CleanupTask),
 }
 
 #[derive(Clone, Debug)]
@@ -97,7 +108,12 @@ pub async fn manager_task(
                             if let Err(err) = queue.send(WorkerCommand::Collect(task)).await {
                                 log::error!("Unable to send worker cmd: {}", err.to_string());
                             }
-                        }
+                        },
+                        ManagerCommand::CleanupDatabase(task) => {
+                            if let Err(err) = queue.send(WorkerCommand::CleanupDatabase(task)).await {
+                                log::error!("Unable to send worker cmd: {}", err.to_string());
+                            }
+                        },
                         ManagerCommand::CheckForJobs => {
                             if !manager::check_for_jobs(&state, &queue).await {
                                 // If no jobs were queue, sleep longer. This will keep
@@ -219,6 +235,9 @@ pub async fn worker_task(
                                 });
                             }
                         },
+                        WorkerCommand::CleanupDatabase(cleanup_task) => {
+                            let _ = worker::cleanup_database(&state, cleanup_task).await;
+                        }
                         WorkerCommand::CommitIndex => {
                             let state = state.clone();
                             if updated_docs > 0 {
