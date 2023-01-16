@@ -56,7 +56,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                         }}
                         {"Install"}
                     </Btn>
-                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace("_", "-"))} size={BtnSize::Xs}>
+                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace('_', "-"))} size={BtnSize::Xs}>
                         <icons::LinkIcon width="w-3.5" height="h-3.5" />
                         {"View Details"}
                     </Btn>
@@ -73,7 +73,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace("_", "-"))} size={BtnSize::Xs}>
+                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace('_', "-"))} size={BtnSize::Xs}>
                         <icons::LinkIcon width="w-3.5" height="h-3.5" />
                         {"View Details"}
                     </Btn>
