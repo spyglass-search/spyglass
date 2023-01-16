@@ -25,6 +25,7 @@ impl HTTPClient {
         let client = reqwest::Client::builder()
             .user_agent(APP_USER_AGENT)
             // TODO: Make configurable
+            .connect_timeout(std::time::Duration::from_secs(3))
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Unable to create reqwest client");
