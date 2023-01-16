@@ -40,9 +40,10 @@ pub fn lens_component(props: &LensProps) -> Html {
 
     let detail_bar = match &result.progress {
         InstallStatus::NotInstalled => {
+            let lens_display_name = lens_name.clone();
             let install_cb = Callback::from(move |_| {
                 onclick.emit(LensEvent::Install {
-                    name: lens_name.clone(),
+                    name: lens_display_name.clone(),
                 })
             });
             html! {
@@ -54,6 +55,10 @@ pub fn lens_component(props: &LensProps) -> Html {
                             html!{ <icons::DocumentDownloadIcon width="w-3.5" height="h-3.5" /> }
                         }}
                         {"Install"}
+                    </Btn>
+                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace("_", "-"))} size={BtnSize::Xs}>
+                        <icons::LinkIcon width="w-3.5" height="h-3.5" />
+                        {"View Details"}
                     </Btn>
                 </div>
             }
@@ -68,7 +73,7 @@ pub fn lens_component(props: &LensProps) -> Html {
 
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase())} size={BtnSize::Xs}>
+                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace("_", "-"))} size={BtnSize::Xs}>
                         <icons::LinkIcon width="w-3.5" height="h-3.5" />
                         {"View Details"}
                     </Btn>
