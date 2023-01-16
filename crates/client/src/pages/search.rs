@@ -558,7 +558,7 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                <div class="overflow-y-auto overflow-x-hidden h-full">
+                <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px]">
                     {results}
                 </div>
                 <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
