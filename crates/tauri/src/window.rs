@@ -90,7 +90,6 @@ fn show_window(window: &Window) {
     let _ = window.set_always_on_top(true);
     let _ = window.set_always_on_top(false);
     let _ = window.set_focus();
-    let _ = window.center();
 }
 
 fn _show_tab(app: &AppHandle, tab_url: &str) {
@@ -109,9 +108,7 @@ fn _show_tab(app: &AppHandle, tab_url: &str) {
     };
 
     let _ = window.emit(ClientEvent::Navigate.as_ref(), tab_url);
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
+    show_window(&window);
 }
 
 pub fn show_connection_manager_window(app: &AppHandle) {
