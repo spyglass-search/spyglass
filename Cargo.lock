@@ -5925,7 +5925,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass"
-version = "22.12.3"
+version = "23.1.1"
 dependencies = [
  "addr",
  "anyhow",
