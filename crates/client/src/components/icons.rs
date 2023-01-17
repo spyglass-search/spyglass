@@ -87,6 +87,15 @@ pub fn chevron_right_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(CollectionIcon)]
+pub fn collection_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="currentColor" viewBox="0 0 16 16">
+            <path d="M0 13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 13V6a1.5 1.5 0 0 0-1.5-1.5h-13A1.5 1.5 0 0 0 0 6v7zM2 3a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 0-1h-11A.5.5 0 0 0 2 3zm2-2a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 0-1h-7A.5.5 0 0 0 4 1z"/>
+        </svg>
+    }
+}
+
 #[function_component(CurrencyIcon)]
 pub fn currency_dollar_icon(props: &IconProps) -> Html {
     html! {
@@ -205,6 +214,15 @@ pub fn lightning_bolt_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(LinkIcon)]
+pub fn link_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+        </svg>
+    }
+}
+
 #[function_component(PencilIcon)]
 pub fn pencil_icon(props: &IconProps) -> Html {
     html! {
@@ -319,14 +337,14 @@ pub fn file_ext_icon(props: &FileExtIconProps) -> Html {
 #[function_component(GoogleSignIn)]
 pub fn google_signin_btn(props: &IconProps) -> Html {
     html! {
-        <img src="/google_signin.png" class={props.class()} />
+        <img src="/google_signin.png" alt="Google Signin" class={props.class()} />
     }
 }
 
 #[function_component(GoogleSignInDisabled)]
 pub fn google_signin_disabled(props: &IconProps) -> Html {
     html! {
-        <img src="/google_signin_disabled.png" class={props.class()} />
+        <img src="/google_signin_disabled.png" alt="Google Signin Disabled" class={props.class()} />
     }
 }
 

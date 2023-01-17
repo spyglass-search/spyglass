@@ -20,7 +20,9 @@ use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use crate::state::AppState;
 
+pub mod archive;
 pub mod bootstrap;
+pub mod cache;
 pub mod client;
 pub mod robots;
 
@@ -352,7 +354,7 @@ impl Crawler {
 
         match load_connection(state, api_id, &account).await {
             Ok(mut conn) => conn.as_mut().get(uri).await,
-            Err(err) => Err(CrawlError::Unsupported(format!("{}: {}", api_id, err))),
+            Err(err) => Err(CrawlError::Unsupported(format!("{api_id}: {err}"))),
         }
     }
 
@@ -490,7 +492,7 @@ impl Crawler {
                 let domain = url.host_str().expect("Invalid URL");
                 let mut path: String = url.path().to_string();
                 if let Some(query) = url.query() {
-                    path = format!("{}?{}", path, query);
+                    path = format!("{path}?{query}");
                 }
 
                 let _ = fetch_history::upsert(db, domain, &path, result.content_hash.clone(), 200)

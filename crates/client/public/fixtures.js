@@ -83,17 +83,21 @@ export let invoke = async (func_name, params) => {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense",
+            name: "fake_lense",
+            label: "Fake Lense",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: { "Finished": { num_docs: 100 } },
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense_2_boogaloo",
+            name: "fake_lense_2_boogaloo",
+            label: "Fake Lense 2: Boogaloo",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: { "Finished": { num_docs: 100 } },
         }];
     } else if (func_name == "list_connections") {
         return {
@@ -129,17 +133,58 @@ export let invoke = async (func_name, params) => {
         return [{
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense",
+            name: "stardew",
+            label: "Stardew Valley",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: {
+                "Installing": {
+                    percent: 45,
+                    status: 'Downloading...',
+                }
+            }
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-            title: "fake_lense_2_boogaloo",
+            name: "dnd",
+            label: "Dungeons & Dragons",
             hash: "",
             html_url: null,
             download_url: null,
+            progress: {
+                "Finished": {
+                    num_docs: 10000
+                }
+            }
+        }, {
+            author: "a5huynh",
+            description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            name: "2007scape",
+            label: "Old School Runescape",
+            hash: "",
+            html_url: null,
+            download_url: null,
+            progress: {
+                "Installing": {
+                    percent: 45,
+                    status: 'Crawling 10,123 of 20,454 (45%)',
+                }
+            }
+        }, {
+            author: "Spyglass",
+            description: "",
+            name: "docs.google.com",
+            label: "Google Docs",
+            hash: "",
+            html_url: null,
+            download_url: null,
+            progress: {
+                "Installing": {
+                    percent: 100,
+                    status: 'Crawled 12,334 of many',
+                }
+            }
         }];
     } else if (func_name == "plugin:lens-updater|list_installable_lenses") {
         return [{
@@ -149,6 +194,7 @@ export let invoke = async (func_name, params) => {
             sha: "fake-sha",
             html_url: "https://example.com",
             download_url: "https://example.com",
+            progress: "NotInstalled"
         }, {
             author: "a5huynh",
             description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
@@ -156,10 +202,15 @@ export let invoke = async (func_name, params) => {
             sha: "fake-sha-1",
             html_url: "https://example.com",
             download_url: "https://example.com",
+            progress: "NotInstalled"
         }];
-    } else if (func_name == "install_lens") {
+    } else if (func_name == "plugin:lens-updater|install_lens") {
         window.setTimeout(() => {
-            CALLBACKS["RefreshLensManager"]();
+            CALLBACKS["RefreshDiscover"]();
+        }, 5000);
+    } else if (func_name == "plugin:lens-updater|uninstall_lens") {
+        window.setTimeout(() => {
+            CALLBACKS["RefreshLensLibrary"]();
         }, 5000);
     } else if (func_name == "list_plugins") {
         return [{
@@ -229,6 +280,15 @@ export let invoke = async (func_name, params) => {
             await new Promise(r => setTimeout(r, 5000));
         }
         return [];
+    } else if (func_name == "get_library_stats") {
+        return {
+            "test_lens": {
+                lens_name: "test_lens",
+                crawled: 52358,
+                enqueued: 1,
+                indexed: 52357
+            }
+        }
     }
 
     return [];
@@ -246,10 +306,6 @@ export async function deleteDoc(id) {
 
 export async function delete_domain(domain) {
     return await invoke('delete_domain', { domain });
-}
-
-export async function install_lens(downloadUrl) {
-    return await invoke('install_lens', { downloadUrl })
 }
 
 export async function network_change(isOffline) {

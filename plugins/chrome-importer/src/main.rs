@@ -102,7 +102,7 @@ impl SpyglassPlugin for Plugin {
         match fs::read_to_string(path.clone()) {
             Ok(blob) => match self.parse_and_queue_bookmarks(&blob) {
                 Ok(to_add) => enqueue_all(&to_add),
-                Err(e) => log(format!("Unable to parse bookmark file: {}", e)),
+                Err(e) => log(format!("Unable to parse bookmark file: {e}")),
             },
             Err(e) => log(format!("Unable to read {}: {}", path.display(), e)),
         }

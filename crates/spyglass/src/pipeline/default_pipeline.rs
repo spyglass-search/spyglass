@@ -1,6 +1,6 @@
 use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
-use crate::search::Searcher;
+use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
 use crate::task::CrawlTask;
 
@@ -53,6 +53,9 @@ pub async fn pipeline_loop(
                     );
                     start_crawl(state.clone(), &pipeline, &collector, &parser, crawl_task).await;
                 }
+                PipelineCommand::ProcessCache(_, _) => {
+                    // noop
+                }
             }
         }
 
@@ -77,7 +80,7 @@ async fn start_crawl(
 
     match collection_result {
         Ok(result) => {
-            let parse_result = parser.parse(&mut context, task.id, &result.content).await;
+            let parse_result = parser.parse(&mut context, &result.content).await;
 
             match parse_result {
                 Ok(parse_result) => {
@@ -124,7 +127,7 @@ async fn start_crawl(
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
                             let _ = Searcher::delete_by_id(&state, &doc.doc_id).await;
-                            let _ = Searcher::save(&state);
+                            let _ = Searcher::save(&state).await;
                         }
 
                         // Add document to index
@@ -132,12 +135,15 @@ async fn start_crawl(
                             if let Ok(mut index_writer) = state.index.writer.lock() {
                                 match Searcher::upsert_document(
                                     &mut index_writer,
-                                    existing.clone().map(|f| f.doc_id),
-                                    &crawl_result.title.unwrap_or_default(),
-                                    &crawl_result.description.unwrap_or_default(),
-                                    url_host,
-                                    url.as_str(),
-                                    &content,
+                                    DocumentUpdate {
+                                        doc_id: existing.clone().map(|f| f.doc_id),
+                                        title: &crawl_result.title.unwrap_or_default(),
+                                        description: &crawl_result.description.unwrap_or_default(),
+                                        domain: url_host,
+                                        url: url.as_str(),
+                                        content: &content,
+                                        tags: &None,
+                                    },
                                 ) {
                                     Ok(new_doc_id) => Some(new_doc_id),
                                     _ => None,

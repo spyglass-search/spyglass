@@ -60,18 +60,20 @@ pub fn hide_search_bar(window: &Window) {
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
-    let window_height = {
+    let monitor_height = {
         if let Some(monitor) = find_monitor(window) {
             let size = monitor.size();
             let scale = monitor.scale_factor();
-            Some((size.height as f64) / scale - constants::INPUT_Y)
+            Some((size.height as f64) / scale - (constants::INPUT_Y * 2.0))
         } else {
             None
         }
     };
 
-    let height = if let Some(window_height) = window_height {
-        window_height.min(height)
+    // If the requested height is greater than the monitor size, use the monitor
+    // height so we don't go offscreen.
+    let height = if let Some(monitor_height) = monitor_height {
+        monitor_height.min(height)
     } else {
         height
     };
@@ -88,7 +90,6 @@ fn show_window(window: &Window) {
     let _ = window.set_always_on_top(true);
     let _ = window.set_always_on_top(false);
     let _ = window.set_focus();
-    let _ = window.center();
 }
 
 fn _show_tab(app: &AppHandle, tab_url: &str) {
@@ -107,21 +108,19 @@ fn _show_tab(app: &AppHandle, tab_url: &str) {
     };
 
     let _ = window.emit(ClientEvent::Navigate.as_ref(), tab_url);
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
+    show_window(&window);
 }
 
 pub fn show_connection_manager_window(app: &AppHandle) {
     _show_tab(app, "/settings/connections");
 }
 
-pub fn show_crawl_stats_window(app: &AppHandle) {
-    _show_tab(app, "/settings/stats");
+pub fn show_discover_window(app: &AppHandle) {
+    _show_tab(app, "/settings/discover");
 }
 
 pub fn show_lens_manager_window(app: &AppHandle) {
-    _show_tab(app, "/settings/lenses");
+    _show_tab(app, "/settings/library");
 }
 
 pub fn show_plugin_manager(app: &AppHandle) {

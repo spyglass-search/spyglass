@@ -1,6 +1,6 @@
-use futures::StreamExt;
+use entities::get_library_stats;
 use jsonrpsee::core::Error;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
@@ -12,19 +12,20 @@ use entities::models::{
 };
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use shared::config::Config;
+use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, QueueStatus,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
+    AppStatus, InstallStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
+    SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
-use spyglass_plugin::SearchFilter;
 
 use libgoog::{ClientType, Credentials, GoogClient};
 use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::{lens::lens_to_filters, Searcher};
+use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CollectTask, ManagerCommand};
+use libspyglass::task::{AppPause, CleanupTask, CollectTask, ManagerCommand};
 
 use super::auth::create_auth_listener;
 use super::response;
@@ -58,6 +59,12 @@ pub async fn add_queue(
 #[instrument(skip(state))]
 pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(), Error> {
     log::debug!("authorizing <{}>", api_id);
+    state
+        .metrics
+        .track(Event::AuthorizeConnection {
+            api_id: api_id.clone(),
+        })
+        .await;
 
     if let Some((client_id, client_secret, scopes)) = connection_secret(&api_id) {
         let mut listener = create_auth_listener().await;
@@ -127,8 +134,7 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
         Ok(())
     } else {
         Err(Error::Custom(format!(
-            "Connection <{}> not supported",
-            api_id
+            "Connection <{api_id}> not supported"
         )))
     }
 }
@@ -145,47 +151,6 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
     })
 }
 
-#[instrument(skip(state))]
-pub async fn crawl_stats(state: AppState) -> Result<CrawlStats, Error> {
-    let queue_stats = crawl_queue::queue_stats(&state.db).await;
-    if let Err(err) = queue_stats {
-        log::error!("queue_stats {:?}", err);
-        return Err(Error::Custom(err.to_string()));
-    }
-
-    let indexed_stats = indexed_document::indexed_stats(&state.db).await;
-    if let Err(err) = indexed_stats {
-        log::error!("index_stats {:?}", err);
-        return Err(Error::Custom(err.to_string()));
-    }
-
-    let mut by_domain = HashMap::new();
-    let queue_stats = queue_stats.expect("Invalid queue_stats");
-    for stat in queue_stats {
-        let entry = by_domain
-            .entry(stat.domain)
-            .or_insert_with(QueueStatus::default);
-        match stat.status.as_str() {
-            "Queued" => entry.num_queued += stat.count as u64,
-            "Processing" => entry.num_processing += stat.count as u64,
-            "Completed" => entry.num_completed += stat.count as u64,
-            _ => {}
-        }
-    }
-
-    let indexed_stats = indexed_stats.expect("Invalid indexed_stats");
-    for stat in indexed_stats {
-        let entry = by_domain
-            .entry(stat.domain)
-            .or_insert_with(QueueStatus::default);
-        entry.num_indexed += stat.count as u64;
-    }
-
-    let by_domain = by_domain.into_iter().collect();
-
-    Ok(CrawlStats { by_domain })
-}
-
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
@@ -193,7 +158,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-    let _ = Searcher::save(&state);
+    let _ = Searcher::save(&state).await;
     Ok(())
 }
 
@@ -202,7 +167,7 @@ pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
 pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error> {
     // Remove domain from bootstrap queue
     if let Err(err) =
-        bootstrap_queue::dequeue(&state.db, format!("https://{}", domain).as_str()).await
+        bootstrap_queue::dequeue(&state.db, format!("https://{domain}").as_str()).await
     {
         log::error!("Error deleting seed_url {} from DB: {}", &domain, &err);
     }
@@ -229,7 +194,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
         for result in indexed {
             let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
         }
-        let _ = Searcher::save(&state);
+        let _ = Searcher::save(&state).await;
 
         log::debug!("removed {} items from index", indexed_count);
     }
@@ -269,20 +234,50 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
 /// List of installed lenses
 #[instrument(skip(state))]
 pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, Error> {
+    let stats = get_library_stats(state.db).await.unwrap_or_default();
     let mut lenses: Vec<LensResult> = state
         .lenses
         .iter()
-        .map(|lens| LensResult {
-            author: lens.author.clone(),
-            title: lens.name.clone(),
-            description: lens.description.clone().unwrap_or_else(|| "".into()),
-            hash: lens.hash.clone(),
-            file_path: Some(lens.file_path.clone()),
-            ..Default::default()
+        .map(|lens| {
+            let progress = if let Some(lens_stats) = stats.get(&lens.name) {
+                // In the middle of installing the lens if no stats are available.
+                if lens_stats.enqueued == 0 && lens_stats.indexed == 0 {
+                    InstallStatus::Installing {
+                        percent: 100,
+                        status: "Installing...".to_string(),
+                    }
+                } else if lens_stats.enqueued == 0 {
+                    InstallStatus::Finished {
+                        num_docs: lens_stats.indexed as u32,
+                    }
+                } else {
+                    InstallStatus::Installing {
+                        percent: lens_stats.percent_done(),
+                        status: lens_stats.status_string(),
+                    }
+                }
+            } else {
+                InstallStatus::Installing {
+                    percent: 100,
+                    status: "Installing...".to_string(),
+                }
+            };
+
+            LensResult {
+                author: lens.author.clone(),
+                name: lens.name.clone(),
+                label: lens.label(),
+                description: lens.description.clone().unwrap_or_else(|| "".into()),
+                hash: lens.hash.clone(),
+                file_path: Some(lens.file_path.clone()),
+                progress,
+                html_url: None,
+                download_url: None,
+            }
         })
         .collect();
 
-    lenses.sort_by(|x, y| x.title.cmp(&y.title));
+    lenses.sort_by(|x, y| x.label.to_lowercase().cmp(&y.label.to_lowercase()));
 
     Ok(lenses)
 }
@@ -361,33 +356,35 @@ pub async fn search(
     state: AppState,
     search_req: request::SearchParam,
 ) -> Result<SearchResults, Error> {
+    state
+        .metrics
+        .track(metrics::Event::Search {
+            filters: search_req.lenses.clone(),
+        })
+        .await;
+
     let start = SystemTime::now();
     let fields = DocFields::as_fields();
 
     let index = &state.index;
     let searcher = index.reader.searcher();
 
-    let applied: Vec<SearchFilter> = futures::stream::iter(search_req.lenses.iter())
-        .filter_map(|trigger| async {
-            let vec = lens_to_filters(state.clone(), trigger).await;
-            if vec.is_empty() {
-                None
-            } else {
-                Some(vec)
-            }
-        })
-        // Gather search filters
-        .collect::<Vec<Vec<SearchFilter>>>()
+    let tags = tag::Entity::find()
+        .filter(tag::Column::Label.eq(tag::TagType::Lens))
+        .filter(tag::Column::Value.is_in(search_req.lenses))
+        .all(&state.db)
         .await
-        // Flatten
-        .into_iter()
-        .flatten()
-        .collect::<Vec<SearchFilter>>();
+        .unwrap_or_default();
+    let tag_ids = tags
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
 
     let docs =
-        Searcher::search_with_lens(state.db.clone(), &applied, index, &search_req.query).await;
+        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &search_req.query).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
+    let mut missing: Vec<(String, String)> = Vec::new();
     for (score, doc_addr) in docs {
         if let Ok(retrieved) = searcher.doc(doc_addr) {
             let doc_id = retrieved
@@ -406,6 +403,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
+            log::debug!("Got id with url {:?} {:?}", doc_id, url);
             if let Some(doc_id) = doc_id.as_text() {
                 let indexed = indexed_document::Entity::find()
                     .filter(indexed_document::Column::DocId.eq(doc_id))
@@ -413,30 +411,34 @@ pub async fn search(
                     .await;
 
                 let crawl_uri = url.as_text().unwrap_or_default().to_string();
+                match indexed {
+                    Ok(Some(indexed)) => {
+                        let tags = indexed
+                            .find_related(tag::Entity)
+                            .all(&state.db)
+                            .await
+                            .unwrap_or_default()
+                            .iter()
+                            .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
+                            .collect::<Vec<(String, String)>>();
 
-                if let Ok(Some(indexed)) = indexed {
-                    let tags = indexed
-                        .find_related(tag::Entity)
-                        .all(&state.db)
-                        .await
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
-                        .collect::<Vec<(String, String)>>();
+                        let mut result = SearchResult {
+                            doc_id: doc_id.to_string(),
+                            domain: domain.as_text().unwrap_or_default().to_string(),
+                            title: title.as_text().unwrap_or_default().to_string(),
+                            crawl_uri: crawl_uri.clone(),
+                            description: description.as_text().unwrap_or_default().to_string(),
+                            url: indexed.open_url.unwrap_or(crawl_uri),
+                            tags,
+                            score,
+                        };
 
-                    let mut result = SearchResult {
-                        doc_id: doc_id.to_string(),
-                        domain: domain.as_text().unwrap_or_default().to_string(),
-                        title: title.as_text().unwrap_or_default().to_string(),
-                        crawl_uri: crawl_uri.clone(),
-                        description: description.as_text().unwrap_or_default().to_string(),
-                        url: indexed.open_url.unwrap_or(crawl_uri),
-                        tags,
-                        score,
-                    };
-
-                    result.description.truncate(256);
-                    results.push(result);
+                        result.description.truncate(256);
+                        results.push(result);
+                    }
+                    _ => {
+                        missing.push((doc_id.to_owned(), crawl_uri.to_owned()));
+                    }
                 }
             }
         }
@@ -448,9 +450,32 @@ pub async fn search(
 
     let meta = SearchMeta {
         query: search_req.query,
-        num_docs: searcher.num_docs(),
-        wall_time_ms,
+        num_docs: searcher.num_docs() as u32,
+        wall_time_ms: wall_time_ms as u32,
     };
+
+    let domains: HashSet<String> = HashSet::from_iter(results.iter().map(|r| r.domain.clone()));
+    state
+        .metrics
+        .track(metrics::Event::SearchResult {
+            num_results: results.len(),
+            domains: domains.iter().cloned().collect(),
+            wall_time_ms,
+        })
+        .await;
+
+    // Send cleanup task for any missing docs
+    if !missing.is_empty() {
+        let mut cmd_tx = state.manager_cmd_tx.lock().await;
+        match &mut *cmd_tx {
+            Some(cmd_tx) => {
+                let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
+                    missing_docs: missing,
+                }));
+            }
+            None => {}
+        }
+    }
 
     Ok(SearchResults { results, meta })
 }
@@ -485,11 +510,12 @@ pub async fn search_lenses(
                             label
                         }
                     })
-                    .unwrap_or(lens.name);
+                    .unwrap_or_else(|| lens.name.clone());
 
                 results.push(LensResult {
                     author: lens.author,
-                    title: label,
+                    name: lens.name,
+                    label,
                     description: lens.description.unwrap_or_default(),
                     ..Default::default()
                 });
@@ -549,4 +575,122 @@ pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Result<(), Error> {
+    // Remove from filesystem
+    let lens_path = config.lenses_dir().join(format!("{name}.ron"));
+    let config = state.lenses.remove(name);
+    let _ = std::fs::remove_file(lens_path);
+
+    // Remove from database
+    // - remove from lens table
+    let _ = lens::Entity::delete_many()
+        .filter(lens::Column::Name.eq(name))
+        .exec(&state.db)
+        .await;
+
+    // - find relevant doc ids to remove
+    if let Ok(ids) = indexed_document::find_by_lens(state.db.clone(), name).await {
+        // - remove from db & index
+        let doc_ids: Vec<String> = ids.iter().map(|x| x.doc_id.to_owned()).collect();
+        if let Err(err) = Searcher::delete_many_by_id(&state, &doc_ids, true).await {
+            return Err(Error::Custom(err.to_string()));
+        } else {
+            let _ = Searcher::save(&state).await;
+        }
+    }
+
+    // -- remove from crawl queue & bootstrap table
+    if let Err(err) = crawl_queue::delete_by_lens(state.db.clone(), name).await {
+        return Err(Error::Custom(err.to_string()));
+    }
+
+    // - remove seed urls from bootstrap queue table
+    if let Some((_, config)) = config {
+        for url in &config.urls {
+            let _ = bootstrap_queue::dequeue(&state.db, url).await;
+        }
+
+        for url in &config.domains {
+            let _ = bootstrap_queue::dequeue(&state.db, url).await;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::uninstall_lens;
+    use entities::models::tag::TagType;
+    use entities::sea_orm::{ActiveModelTrait, EntityTrait, Set};
+    use entities::{
+        models::{crawl_queue, indexed_document},
+        test::setup_test_db,
+    };
+    use libspyglass::search::{DocumentUpdate, Searcher};
+    use libspyglass::state::AppState;
+    use shared::config::{Config, LensConfig};
+
+    #[tokio::test]
+    async fn test_uninstall_lens() {
+        let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db.clone()).build();
+
+        let mut config = Config::new();
+        let lens = LensConfig {
+            name: "test".to_string(),
+            urls: vec!["https://example.com".into()],
+            ..Default::default()
+        };
+
+        if let Ok(mut writer) = state.index.writer.lock() {
+            Searcher::upsert_document(
+                &mut writer,
+                DocumentUpdate {
+                    doc_id: Some("test_id".into()),
+                    title: "test title",
+                    description: "test desc",
+                    domain: "example.com",
+                    url: "https://example.com/test",
+                    content: "test content",
+                    tags: &None,
+                },
+            )
+            .expect("Unable to add doc");
+        }
+        let _ = Searcher::save(&state).await;
+
+        let doc = indexed_document::ActiveModel {
+            domain: Set("example.com".into()),
+            url: Set("https://example.com/test".into()),
+            doc_id: Set("test_id".into()),
+            ..Default::default()
+        };
+
+        let model = doc.insert(&db).await.expect("Unable to insert doc");
+        let doc: indexed_document::ActiveModel = model.into();
+        doc.insert_tags(&db, &vec![(TagType::Lens, lens.name.clone())])
+            .await
+            .expect("Unable to insert tags");
+
+        config.lenses.insert(lens.name.clone(), lens.clone());
+        uninstall_lens(state.clone(), &config, &lens.name)
+            .await
+            .expect("Unable to uninstall");
+
+        let cqs = crawl_queue::Entity::find()
+            .all(&state.db)
+            .await
+            .expect("Unable to find crawl tasks");
+        assert_eq!(cqs.len(), 0);
+
+        let indexed = indexed_document::Entity::find()
+            .all(&state.db)
+            .await
+            .expect("Unable to find indexed docs");
+        assert_eq!(indexed.len(), 0);
+        assert_eq!(state.index.reader.searcher().num_docs(), 0);
+    }
 }

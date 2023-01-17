@@ -21,8 +21,11 @@ pub struct CrawlTask {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CollectTask {
+    BootstrapLens {
+        lens: String,
+    },
     // Pull URLs from a CDX server
-    Bootstrap {
+    CDXCollection {
         lens: String,
         seed_url: String,
         pipeline: Option<String>,
@@ -34,11 +37,19 @@ pub enum CollectTask {
     },
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CleanupTask {
+    pub missing_docs: Vec<(String, String)>,
+}
+
 /// Tell the manager to schedule some tasks
 #[derive(Clone, Debug)]
 pub enum ManagerCommand {
     Collect(CollectTask),
     CheckForJobs,
+    /// General database cleanup command that sends a worker
+    /// task request for cleanup
+    CleanupDatabase(CleanupTask),
 }
 
 /// Send tasks to the worker
@@ -56,6 +67,9 @@ pub enum WorkerCommand {
     Recrawl { id: i64 },
     /// Applies tag information to an URI
     Tag,
+    /// Updates the document store for indexed document database table to
+    /// cleanup inconsistencies
+    CleanupDatabase(CleanupTask),
 }
 
 #[derive(Clone, Debug)]
@@ -94,7 +108,12 @@ pub async fn manager_task(
                             if let Err(err) = queue.send(WorkerCommand::Collect(task)).await {
                                 log::error!("Unable to send worker cmd: {}", err.to_string());
                             }
-                        }
+                        },
+                        ManagerCommand::CleanupDatabase(task) => {
+                            if let Err(err) = queue.send(WorkerCommand::CleanupDatabase(task)).await {
+                                log::error!("Unable to send worker cmd: {}", err.to_string());
+                            }
+                        },
                         ManagerCommand::CheckForJobs => {
                             if !manager::check_for_jobs(&state, &queue).await {
                                 // If no jobs were queue, sleep longer. This will keep
@@ -135,6 +154,7 @@ pub async fn manager_task(
 /// Grabs a task
 pub async fn worker_task(
     state: AppState,
+    config: Config,
     mut queue: mpsc::Receiver<WorkerCommand>,
     mut pause_rx: broadcast::Receiver<AppPause>,
 ) {
@@ -169,12 +189,27 @@ pub async fn worker_task(
                 if let Some(cmd) = res {
                     match cmd {
                         WorkerCommand::Collect(task) => match task {
-                            CollectTask::Bootstrap {
+                            CollectTask::BootstrapLens {
+                                lens
+                            } => {
+                                log::debug!("Handling BootstrapLens for {}", lens);
+                                let state = state.clone();
+                                let config = config.clone();
+                                tokio::spawn(async move {
+                                    if let Some(lens_config) = &state.lenses.get(&lens) {
+                                        worker::handle_bootstrap_lens(&state, &config, lens_config)
+                                            .await;
+                                    } else {
+                                        log::error!("Unable to find requested lens {:?}, lens list {:?}", lens, state.lenses);
+                                    }
+                                });
+                            },
+                            CollectTask::CDXCollection {
                                 lens,
                                 seed_url,
                                 pipeline,
                             } => {
-                                log::debug!("handling Bootstrap for {} - {}", lens, seed_url);
+                                log::debug!("handling CDXCollection for {} - {}", lens, seed_url);
                                 let state = state.clone();
                                 tokio::spawn(async move {
                                     if let Some(lens_config) = &state.lenses.get(&lens) {
@@ -200,6 +235,9 @@ pub async fn worker_task(
                                 });
                             }
                         },
+                        WorkerCommand::CleanupDatabase(cleanup_task) => {
+                            let _ = worker::cleanup_database(&state, cleanup_task).await;
+                        }
                         WorkerCommand::CommitIndex => {
                             let state = state.clone();
                             if updated_docs > 0 {
@@ -291,8 +329,9 @@ pub async fn lens_watcher(
     let _ = watcher.watch(&config.lenses_dir(), RecursiveMode::Recursive);
 
     // Read + load lenses for the first time.
-    let _ = read_lenses(&state, &config).await;
-    load_lenses(state.clone()).await;
+    let lens_map = read_lenses(&config).await.unwrap_or_default();
+
+    load_lenses(&lens_map, state.clone()).await;
 
     loop {
         // Run w/ a select on the shutdown signal otherwise we're stuck in an
@@ -344,8 +383,8 @@ pub async fn lens_watcher(
                             EventKind::Create(_)
                             | EventKind::Modify(ModifyKind::Data(_))
                             | EventKind::Modify(ModifyKind::Name(_)) => {
-                                if read_lenses(&state, &config).await.is_ok() {
-                                    load_lenses(state.clone()).await;
+                                if let Ok(lens_map) = read_lenses(&config).await {
+                                    load_lenses(&lens_map, state.clone()).await;
                                 }
                             }
                             _ => {}

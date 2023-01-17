@@ -7,7 +7,6 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
-use crate::plugins::lens_updater::install_lens_to_path;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, Limit, UserSettings};
@@ -81,8 +80,8 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
             {
                 use shared::url_to_file_path;
                 let path = url_to_file_path(url.path(), true);
-                if let Err(err) = open::that(format!("file://{}", path)) {
-                    log::error!("Unable to open file://{} due to: {}", path, err);
+                if let Err(err) = open::that(format!("file://{path}")) {
+                    log::error!("Unable to open file://{path} due to: {err}");
                 }
 
                 return Ok(());
@@ -99,26 +98,6 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn resize_window(window: tauri::Window, height: f64) {
     window::resize_window(&window, height).await;
-}
-
-#[tauri::command]
-pub async fn crawl_stats<'r>(win: tauri::Window) -> Result<response::CrawlStats, String> {
-    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        match rpc.client.crawl_stats().await {
-            Ok(resp) => Ok(resp),
-            Err(err) => {
-                log::error!("Error sending RPC: {}", err);
-                Ok(response::CrawlStats {
-                    by_domain: Vec::new(),
-                })
-            }
-        }
-    } else {
-        Ok(response::CrawlStats {
-            by_domain: Vec::new(),
-        })
-    }
 }
 
 #[tauri::command]
@@ -203,28 +182,6 @@ pub async fn delete_domain<'r>(window: tauri::Window, domain: &str) -> Result<()
     Ok(())
 }
 
-/// Install a lens (assumes correct format) from a URL
-#[tauri::command]
-pub async fn install_lens<'r>(
-    window: tauri::Window,
-    config: State<'_, Config>,
-    download_url: &str,
-) -> Result<(), String> {
-    if let Err(e) = install_lens_to_path(download_url, config.lenses_dir()).await {
-        log::error!(
-            "Unable to install lens {}, due to error: {}",
-            download_url,
-            e
-        );
-    } else {
-        // Sleep for a second to let the app reload the lenses and then let the client know we're done.
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        let _ = window.emit(ClientEvent::RefreshLensManager.as_ref(), true);
-    }
-
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn network_change(
     win: tauri::Window,
@@ -258,6 +215,24 @@ pub async fn recrawl_domain(win: tauri::Window, domain: &str) -> Result<(), Stri
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_library_stats(
+    win: tauri::Window,
+) -> Result<HashMap<String, response::LibraryStats>, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.get_library_stats().await {
+            Ok(res) => Ok(res),
+            Err(err) => {
+                log::error!("get_library_stats err: {}", err.to_string());
+                Err(err.to_string())
+            }
+        }
+    } else {
+        Err("Unable to communicate w/ backend".to_string())
+    }
 }
 
 #[tauri::command]
@@ -389,7 +364,7 @@ pub async fn save_user_settings(
                             }
                         }
                     } else {
-                        errors.insert(key.to_string(), format!("Config not found for {}", key));
+                        errors.insert(key.to_string(), format!("Config not found for {key}"));
                     }
                 }
             }
@@ -432,7 +407,7 @@ pub async fn load_user_settings(
                 opts.value = value.to_string();
             }
 
-            list.push((format!("{}.{}", pname, setting_name), opts));
+            list.push((format!("{pname}.{setting_name}"), opts));
         }
     }
 

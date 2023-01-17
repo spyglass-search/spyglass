@@ -423,8 +423,8 @@ pub async fn plugin_load(
             };
 
             match lens::add_or_enable(&state.db, &lens_config, lens::LensType::Plugin).await {
-                Ok(is_new) => {
-                    log::info!("loaded lens {}, new? {}", plug.name, is_new)
+                Ok((is_new, _model)) => {
+                    log::info!("loaded plugin {}, new? {}", plug.name, is_new);
                 }
                 Err(e) => log::error!("Unable to add lens: {}", e),
             }
@@ -552,7 +552,7 @@ fn wasi_write_string(env: &WasiEnv, buf: &str) -> anyhow::Result<()> {
         .stdin_mut()?
         .as_mut()
         .ok_or_else(|| anyhow::Error::msg("Unable to get stdin pipe"))?;
-    writeln!(stdin, "{}\r", buf)?;
+    writeln!(stdin, "{buf}\r")?;
     Ok(())
 }
 

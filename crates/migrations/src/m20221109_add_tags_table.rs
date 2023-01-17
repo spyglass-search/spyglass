@@ -53,7 +53,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE UNIQUE INDEX `idx-tag-label-value` ON `tags` (`label`, `value`);"
+                "CREATE UNIQUE INDEX IF NOT EXISTS `idx-tag-label-value` ON `tags` (`label`, `value`);"
                     .to_string(),
             ))
             .await?;

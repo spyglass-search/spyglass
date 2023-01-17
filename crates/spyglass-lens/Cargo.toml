@@ -1,6 +1,6 @@
 [package]
 name = "spyglass-lens"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Andrew Huynh <andrew@spyglass.fyi>"]
 description = "A small library for reading/writing spyglass lens files."

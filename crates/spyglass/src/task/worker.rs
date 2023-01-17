@@ -1,15 +1,235 @@
+use entities::models::crawl_queue::EnqueueSettings;
+use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
 use entities::models::{bootstrap_queue, crawl_queue, indexed_document, tag};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::LensConfig;
+use shared::config::{Config, LensConfig, LensRule, LensSource};
 
-use super::bootstrap;
-use super::CrawlTask;
+use super::{bootstrap, CollectTask, ManagerCommand};
+use super::{CleanupTask, CrawlTask};
 use crate::crawler::{CrawlError, CrawlResult, Crawler};
-use crate::search::Searcher;
+use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
+
+/// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache.
+/// If no cache is accessible then we run the standard bootstrap process. Local lenses use
+/// the standard bootstrap process
+#[tracing::instrument(skip(state, config, lens))]
+pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &LensConfig) {
+    log::debug!("Bootstrapping Lens {:?}", lens);
+    match &lens.lens_source {
+        LensSource::Remote(_) => {
+            if !(bootstrap::bootstrap_lens_cache(state, config, lens).await) {
+                process_lens(state, lens).await;
+            }
+        }
+        _ => {
+            process_lens(state, lens).await;
+        }
+    } // Deleted or no longer exists?
+}
+
+// Process lens by kicking off a bootstrap for the lens
+async fn process_lens(state: &AppState, lens: &LensConfig) {
+    for domain in lens.domains.iter() {
+        let _ = state
+            .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
+                lens: lens.name.clone(),
+                seed_url: format!("https://{domain}"),
+                pipeline: lens.pipeline.as_ref().cloned(),
+            }))
+            .await;
+    }
+
+    process_urls(lens, state).await;
+    process_lens_rules(lens, state).await;
+}
+
+// Process the urls by adding them to the crawl queue or bootstrapping the urls
+async fn process_urls(lens: &LensConfig, state: &AppState) {
+    let pipeline_kind = lens.pipeline.as_ref().cloned();
+
+    for prefix in lens.urls.iter() {
+        // Handle singular URL matches. Simply add these to the crawl queue.
+        if prefix.ends_with('$') {
+            // Remove the '$' suffix and add to the crawl queue
+            let url = prefix.strip_suffix('$').expect("No $ at end of prefix");
+            if let Err(err) = crawl_queue::enqueue_all(
+                &state.db,
+                &[url.to_owned()],
+                &[],
+                &state.user_settings,
+                &EnqueueSettings {
+                    force_allow: true,
+                    ..Default::default()
+                },
+                pipeline_kind.clone(),
+            )
+            .await
+            {
+                log::warn!("unable to enqueue <{}> due to {}", prefix, err)
+            }
+        } else {
+            // Otherwise, bootstrap using this as a prefix.
+            let _ = state
+                .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
+                    lens: lens.name.clone(),
+                    seed_url: prefix.to_string(),
+                    pipeline: pipeline_kind.clone(),
+                }))
+                .await;
+        }
+    }
+}
+
+// Processes the len rules
+async fn process_lens_rules(lens: &LensConfig, state: &AppState) {
+    // Rules will go through and remove crawl tasks AND indexed_documents that match.
+    for rule in lens.rules.iter() {
+        match rule {
+            LensRule::SkipURL(rule_str) => {
+                if let Some(rule_like) = regex_for_robots(rule_str, WildcardType::Database) {
+                    // Remove matching crawl tasks
+                    let _ = crawl_queue::remove_by_rule(&state.db, &rule_like).await;
+                    // Remove matching indexed documents
+                    match indexed_document::remove_by_rule(&state.db, &rule_like).await {
+                        Ok(doc_ids) => {
+                            for doc_id in doc_ids {
+                                let _ = Searcher::delete_by_id(state, &doc_id).await;
+                            }
+                            let _ = Searcher::save(state).await;
+                        }
+                        Err(e) => log::error!("Unable to remove docs: {:?}", e),
+                    }
+                }
+            }
+            LensRule::LimitURLDepth(rule_str, _) => {
+                // Remove URLs that don't match this rule
+                // sqlite3 does support regexp, but this is _not_ guaranteed to
+                // be on all platforms, so we'll apply this in a brute-force way.
+                if let Ok(parsed) = Url::parse(rule_str) {
+                    if let Some(domain) = parsed.host_str() {
+                        // Remove none matchin URLs from crawl_queue
+                        let urls = crawl_queue::Entity::find()
+                            .filter(crawl_queue::Column::Domain.eq(domain))
+                            .all(&state.db)
+                            .await;
+
+                        let regex = regex::Regex::new(&rule.to_regex())
+                            .expect("Invalid LimitURLDepth regex");
+
+                        let mut num_removed = 0;
+                        if let Ok(urls) = urls {
+                            for crawl in urls {
+                                if !regex.is_match(&crawl.url) {
+                                    num_removed += 1;
+                                    let _ = crawl.delete(&state.db).await;
+                                }
+                            }
+                        }
+                        log::info!("removed {} docs from crawl_queue", num_removed);
+
+                        // Remove none matchin URLs from indexed documents
+                        let mut num_removed = 0;
+                        let indexed = indexed_document::Entity::find()
+                            .filter(indexed_document::Column::Domain.eq(domain))
+                            .all(&state.db)
+                            .await;
+
+                        let mut doc_ids = Vec::new();
+                        if let Ok(indexed) = indexed {
+                            for doc in indexed {
+                                if !regex.is_match(&doc.url) {
+                                    num_removed += 1;
+                                    doc_ids.push(doc.doc_id.clone());
+                                    let _ = doc.delete(&state.db).await;
+                                }
+                            }
+                        }
+
+                        for doc_id in doc_ids {
+                            let _ = Searcher::delete_by_id(state, &doc_id).await;
+                        }
+                        let _ = Searcher::save(state).await;
+
+                        log::info!("removed {} docs from indexed_documents", num_removed);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Helper used to cleanup the database when documents are in the index, but are missing from
+/// the database. This typically happens when a cache has invalid content. Currently the
+/// cleanup is minimal, but can be expanded in the future.
+pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> anyhow::Result<()> {
+    log::debug!(
+        "Running database cleanup for the following {:?}",
+        cleanup_task
+    );
+    let mut changed = false;
+    if !&cleanup_task.missing_docs.is_empty() {
+        for (doc_id, url) in cleanup_task.missing_docs {
+            let doc = indexed_document::Entity::find()
+                .filter(indexed_document::Column::Url.eq(url.clone()))
+                .one(&state.db)
+                .await;
+            match doc {
+                Ok(Some(doc_model)) => {
+                    log::debug!("Found document for url {}", url);
+                    if !doc_model.doc_id.eq(&doc_id) {
+                        // Found document for the url, but it has a different doc id.
+                        // check if this document exists in the index to see if we
+                        // had a duplicate
+                        let indexed_result =
+                            Searcher::get_by_id(&state.index.reader, doc_model.doc_id.as_str());
+                        match indexed_result {
+                            Some(_doc) => {
+                                log::debug!(
+                                    "Found duplicate for url: {}, removing duplicate doc {}",
+                                    url,
+                                    doc_id
+                                );
+                                // Found indexed document, so we must have had duplicates, remove dup
+                                let _ = Searcher::delete_by_id(state, doc_id.as_str()).await;
+                                changed = true;
+                            }
+                            None => {
+                                log::error!("No document found in index, db doc id is different than index doc id. Index: {} Database: {}", 
+                                    doc_id, doc_model.doc_id);
+                                // best we could do is normalize the doc id. The issue is that if they have different doc ids, we do not
+                                // know if they have the same / valid content.
+                                let mut updated: indexed_document::ActiveModel =
+                                    doc_model.clone().into();
+                                updated.doc_id = Set(doc_id.clone());
+                                let _ = updated.update(&state.db).await;
+                            }
+                        }
+                    }
+                }
+                Ok(None) => {
+                    log::debug!("Could not find document for url {}, removing", url);
+                    // can't find the url at all must be an old doc that was removed
+                    let _ = Searcher::delete_by_id(state, doc_id.as_str()).await;
+                    changed = true;
+                }
+                Err(error) => {
+                    // we had an error so can't say what happened
+                    log::error!("Got error accessing url {}, error: {:?}", url, error);
+                }
+            }
+        }
+    }
+
+    if changed {
+        let _ = Searcher::save(state).await;
+    }
+
+    Ok(())
+}
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
 #[tracing::instrument(skip(state, lens))]
@@ -144,25 +364,32 @@ pub async fn process_crawl(
                 let _ = Searcher::remove_from_index(&mut index_writer, &doc.doc_id);
             }
         }
+        let task_tags = task
+            .find_related(tag::Entity)
+            .all(&state.db)
+            .await
+            .unwrap_or_default();
 
+        let tags: Vec<u64> = task_tags.iter().map(|tag| tag.id as u64).collect();
         // Add document to index
         let doc_id: String = {
             if let Ok(mut index_writer) = state.index.writer.lock() {
                 match Searcher::upsert_document(
                     &mut index_writer,
-                    existing.clone().map(|d| d.doc_id),
-                    &crawl_result.title.clone().unwrap_or_default(),
-                    &crawl_result.description.clone().unwrap_or_default(),
-                    url_host,
-                    url.as_str(),
-                    &content,
+                    DocumentUpdate {
+                        doc_id: existing.clone().map(|d| d.doc_id),
+
+                        title: &crawl_result.title.clone().unwrap_or_default(),
+                        description: &crawl_result.description.clone().unwrap_or_default(),
+                        domain: url_host,
+                        url: url.as_str(),
+                        content: &content,
+                        tags: &Some(tags),
+                    },
                 ) {
                     Ok(new_doc_id) => new_doc_id,
                     Err(err) => {
-                        return Err(CrawlError::Other(format!(
-                            "Unable to save document: {}",
-                            err
-                        )));
+                        return Err(CrawlError::Other(format!("Unable to save document: {err}")));
                     }
                 }
             } else {
@@ -210,7 +437,7 @@ pub async fn process_crawl(
                     Ok(FetchResult::New)
                 }
             }
-            Err(e) => Err(CrawlError::Other(format!("Unable to save document: {}", e))),
+            Err(e) => Err(CrawlError::Other(format!("Unable to save document: {e}"))),
         };
     }
 

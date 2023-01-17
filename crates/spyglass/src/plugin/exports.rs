@@ -86,7 +86,7 @@ async fn handle_plugin_cmd_request(
         PluginCommandRequest::SqliteQuery { path, query } => {
             let db_path = env.data_dir.join(path);
             if !db_path.exists() {
-                return Err(Error::msg(format!("Invalid sqlite db path: {}", path)));
+                return Err(Error::msg(format!("Invalid sqlite db path: {path}")));
             }
 
             let conn = Connection::open(db_path)?;
@@ -166,7 +166,7 @@ fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     if let Some(file_name) = src.file_name() {
         let dst = env.data_dir.join(dst).join(file_name);
         // Attempt to copy file into plugin data directory
-        if let Err(e) = std::fs::copy(src, &dst) {
+        if let Err(e) = std::fs::copy(src, dst) {
             log::error!("Unable to copy into plugin data dir: {}", e);
         }
     } else {

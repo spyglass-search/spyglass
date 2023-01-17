@@ -37,13 +37,13 @@ fn render_icon(result: &SearchResult) -> Html {
                     html! { <icons::FileExtIcon ext={ext.to_string()} class={icon_size} /> }
                 } else {
                     html! {
-                        <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+                        <img class={icon_size} alt="File" src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
                     }
                 }
             }
             _ => {
                 html! {
-                    <img class={icon_size} src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
+                    <img class={icon_size} alt="Website" src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
                 }
             }
         }
@@ -221,7 +221,7 @@ pub fn lens_result_component(props: &LensResultProps) -> Html {
     html! {
         <div id={props.id.clone()} class={component_styles}>
             <h2 class="text-2xl truncate py-1">
-                {result.title.clone()}
+                {result.label.clone()}
             </h2>
             <div class="text-sm leading-relaxed text-neutral-400">
                 {result.description.clone()}

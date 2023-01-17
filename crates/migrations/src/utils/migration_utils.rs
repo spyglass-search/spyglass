@@ -25,8 +25,7 @@ pub fn backup_dir(dir: &PathBuf) -> Result<()> {
     let file_result = File::create(backup_path);
     if let Err(e) = file_result {
         println!(
-            "Error generating backup file {:?} for directory {:?}, Error: {:?}",
-            logging_str, dir, e
+            "Error generating backup file {logging_str:?} for directory {dir:?}, Error: {e:?}"
         );
         return Err(e);
     }
@@ -36,7 +35,7 @@ pub fn backup_dir(dir: &PathBuf) -> Result<()> {
 
     let tar_response = tar_builder.append_dir_all(".", dir);
     if let Err(e) = tar_response {
-        println!("Error adding files to tar, {:?}", e);
+        println!("Error adding files to tar, {e:?}");
         return Err(e);
     }
     Ok(())
@@ -67,7 +66,7 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
         // Step 3 Copy files from source to destination
         for entry in std::fs::read_dir(source)? {
             if let Err(e) = entry {
-                println!("Error accessing index File {:?} ", e);
+                println!("Error accessing index File {e:?} ");
                 return Err(e);
             }
 
@@ -80,7 +79,7 @@ pub fn replace_dir(source: &PathBuf, dest: &PathBuf) -> Result<()> {
                         std::fs::copy(&path, &dest_path)?;
                     }
                     None => {
-                        println!("failed: {:?}", path);
+                        println!("failed: {path:?}");
                     }
                 }
             }

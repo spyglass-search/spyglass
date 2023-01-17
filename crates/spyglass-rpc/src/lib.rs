@@ -1,9 +1,10 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
+use std::collections::HashMap;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, CrawlStats, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
+    AppStatus, LensResult, LibraryStats, ListConnectionResult, PluginResult, SearchLensesResp,
     SearchResults,
 };
 
@@ -20,14 +21,17 @@ pub trait Rpc {
     #[method(name = "app_status")]
     async fn app_status(&self) -> Result<AppStatus, Error>;
 
-    #[method(name = "crawl_stats")]
-    async fn crawl_stats(&self) -> Result<CrawlStats, Error>;
-
     #[method(name = "delete_doc")]
     async fn delete_doc(&self, id: String) -> Result<(), Error>;
 
     #[method(name = "delete_domain")]
     async fn delete_domain(&self, domain: String) -> Result<(), Error>;
+
+    #[method(name = "get_library_stats")]
+    async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error>;
+
+    #[method(name = "install_lens")]
+    async fn install_lens(&self, lens_name: String) -> Result<(), Error>;
 
     #[method(name = "list_connections")]
     async fn list_connections(&self) -> Result<ListConnectionResult, Error>;
@@ -58,4 +62,7 @@ pub trait Rpc {
 
     #[method(name = "toggle_plugin")]
     async fn toggle_plugin(&self, name: String) -> Result<(), Error>;
+
+    #[method(name = "uninstall_lens")]
+    async fn uninstall_lens(&self, name: String) -> Result<(), Error>;
 }

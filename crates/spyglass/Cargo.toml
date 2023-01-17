@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "22.12.3"
+version = "23.1.1"
 edition = "2021"
 
 [dependencies]
@@ -9,6 +9,7 @@ anyhow = "1.0"
 bytes = "1.2.1"
 calamine = "0.19.1"
 chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.0.32", features = ["derive"] }
 dashmap = "5.2"
 digest = "0.10"
 directories = "4.0"
@@ -16,30 +17,35 @@ dirs = "4.0"
 docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
 ego-tree = "0.6.2"
 entities = { path = "../entities" }
+flate2 = "1.0.24"
 futures = "0.3"
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4" }
 hex = "0.4"
 hostname = "^0.3"
 html5ever = "0.25"
 http = "0.2"
 ignore = "0.4"
-jsonrpsee = { version = "0.15", features = ["http-server"] }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4" }
+jsonrpsee = { version = "0.16.2", features = ["server"] }
 log = "0.4"
 migration = { path = "../migrations" }
 notify = "5.0.0-pre.16"
 open = "3.0"
 percent-encoding = "2.2"
 regex = "1"
-reqwest = "0.11"
+reqwest = { version = "0.11", features = ["json"] }
 ron = "0.8"
 rusqlite = { version = "*", features = ["bundled"] }
 sentry = "0.29.0"
 sentry-tracing = "0.29.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 sha2 = "0.10"
-shared = { path = "../shared" }
+shared = { path = "../shared", features = ["metrics"] }
+spyglass-netrunner = "0.1.9"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
+strum = "0.24"
+strum_macros = "0.24"
 tantivy = "0.18"
 tendril = "0.4.2"
 thiserror = "1.0.37"
@@ -52,6 +58,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
 url = "2.2"
 uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
 warp = "0.3"
+warc = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
 

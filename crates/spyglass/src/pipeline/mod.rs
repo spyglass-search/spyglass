@@ -1,3 +1,4 @@
+pub mod cache_pipeline;
 pub mod collector;
 pub mod default_pipeline;
 pub mod parser;
@@ -11,6 +12,7 @@ use shared::config::PipelineConfiguration;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
+use std::path::PathBuf;
 use tokio::sync::mpsc;
 
 // The pipeline context is a context object that is passed between
@@ -39,6 +41,7 @@ impl PipelineContext {
 #[derive(Debug, Clone)]
 pub enum PipelineCommand {
     ProcessUrl(String, CrawlTask),
+    ProcessCache(String, PathBuf),
 }
 
 // General pipeline initialize function. This function will read the lenses and pipelines
@@ -52,12 +55,11 @@ pub async fn initialize_pipelines(
     let mut shutdown_rx = app_state.shutdown_cmd_tx.lock().await.subscribe();
     // Yes probably should do some error handling, but not really needed. No pipelines
     // just means not tasks to send.
-    let _ = lens::read_lenses(&app_state, &config).await;
+    let lens_map = lens::read_lenses(&config).await.unwrap_or_default();
     let _ = read_pipelines(&app_state, &config).await;
 
     // Grab all pipelines
-    let configured_pipelines: HashSet<String> = app_state
-        .lenses
+    let configured_pipelines: HashSet<String> = lens_map
         .iter()
         .filter(|entry| entry.value().pipeline.as_ref().is_some())
         .map(|entry| entry.value().pipeline.as_ref().unwrap().clone())
@@ -125,6 +127,9 @@ pub async fn initialize_pipelines(
                             fail_crawl_cmd(&app_state, task.id).await;
                         }
                     }
+                }
+                PipelineCommand::ProcessCache(lens, cache_file) => {
+                    cache_pipeline::process_update(app_state.clone(), lens, cache_file).await;
                 }
             }
         }

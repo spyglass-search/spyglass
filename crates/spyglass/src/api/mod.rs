@@ -1,13 +1,17 @@
+use entities::get_library_stats;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
+use libspyglass::search;
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle};
+use jsonrpsee::server::{ServerBuilder, ServerHandle};
 
+use shared::config::Config;
 use shared::request::{SearchLensesParam, SearchParam};
-use shared::response as resp;
+use shared::response::{self as resp, LibraryStats};
 use spyglass_rpc::RpcServer;
 
 mod auth;
@@ -16,6 +20,7 @@ mod route;
 
 pub struct SpyglassRpc {
     state: AppState,
+    config: Config,
 }
 
 #[async_trait]
@@ -32,10 +37,6 @@ impl RpcServer for SpyglassRpc {
         route::app_status(self.state.clone()).await
     }
 
-    async fn crawl_stats(&self) -> Result<resp::CrawlStats, Error> {
-        route::crawl_stats(self.state.clone()).await
-    }
-
     async fn delete_doc(&self, id: String) -> Result<(), Error> {
         route::delete_doc(self.state.clone(), id).await
     }
@@ -44,12 +45,29 @@ impl RpcServer for SpyglassRpc {
         route::delete_domain(self.state.clone(), domain).await
     }
 
+    async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
+        match get_library_stats(self.state.db.clone()).await {
+            Ok(stats) => Ok(stats),
+            Err(err) => {
+                log::error!("Unable to get library stats: {}", err);
+                Ok(HashMap::new())
+            }
+        }
+    }
+
     async fn list_connections(&self) -> Result<resp::ListConnectionResult, Error> {
         route::list_connections(self.state.clone()).await
     }
 
     async fn list_installed_lenses(&self) -> Result<Vec<resp::LensResult>, Error> {
         route::list_installed_lenses(self.state.clone()).await
+    }
+
+    async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
+        if let Err(error) = search::lens::install_lens(&self.state, &self.config, lens_name).await {
+            return Err(Error::Custom(error.to_string()));
+        }
+        Ok(())
     }
 
     async fn list_plugins(&self) -> Result<Vec<resp::PluginResult>, Error> {
@@ -105,14 +123,22 @@ impl RpcServer for SpyglassRpc {
     async fn toggle_plugin(&self, name: String) -> Result<(), Error> {
         route::toggle_plugin(self.state.clone(), name).await
     }
+
+    async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
+        route::uninstall_lens(self.state.clone(), &self.config, &name).await
+    }
 }
 
-pub async fn start_api_server(state: AppState) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+pub async fn start_api_server(
+    state: AppState,
+    config: Config,
+) -> anyhow::Result<(SocketAddr, ServerHandle)> {
     let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), state.user_settings.port);
-    let server = HttpServerBuilder::default().build(server_addr).await?;
+    let server = ServerBuilder::default().build(server_addr).await?;
 
     let rpc_module = SpyglassRpc {
-        state: state.clone(),
+        state,
+        config: config.clone(),
     };
     let addr = server.local_addr()?;
     let server_handle = server.start(rpc_module.into_rpc())?;

@@ -25,6 +25,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use cocoa::appkit::NSWindow;
 
 use shared::config::Config;
+use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
 
 mod cmd;
@@ -36,9 +37,8 @@ mod plugins;
 mod rpc;
 mod window;
 use window::{
-    show_connection_manager_window, show_crawl_stats_window, show_lens_manager_window,
-    show_plugin_manager, show_search_bar, show_update_window, show_user_settings,
-    show_wizard_window,
+    show_connection_manager_window, show_lens_manager_window, show_plugin_manager, show_search_bar,
+    show_update_window, show_user_settings, show_wizard_window,
 };
 
 const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
@@ -53,7 +53,9 @@ type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = tauri::generate_context!();
+    let current_version = format!("v20{}", &ctx.package_info().version);
     let config = Config::new();
+
     #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telemetry {
         None
@@ -111,11 +113,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
-            cmd::crawl_stats,
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
-            cmd::install_lens,
+            cmd::get_library_stats,
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
@@ -152,12 +153,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
-            let default_height = if cfg!(target_os = "windows") {
-                98.0
-            } else {
-                96.0
-            };
-
+            let default_height = 101.0;
             let window = WindowBuilder::new(
                 app,
                 constants::SEARCH_WIN_NAME,
@@ -183,11 +179,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Spawn a version checking background task. Check every couple hours
             // for a new version.
-            tauri::async_runtime::spawn(check_version_interval(window.clone()));
 
-            // Load user settings
+            tauri::async_runtime::spawn(check_version_interval(current_version, window.clone()));
+
             app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
+            app.manage(shared::metrics::Metrics::new(&Config::machine_identifier(), config.user_settings.disable_telemetry));
 
             // Register global shortcut
             let window_clone = window.clone();
@@ -202,11 +199,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let window = window_clone.clone();
                                 window::show_search_bar(&window);
                             }) {
-                            window::alert(&window, "Error registering global shortcut", &format!("{}", e));
+                            window::alert(&window, "Error registering global shortcut", &format!("{e}"));
                         }
                     }
                 }
-                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{}", e))
+                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{e}"))
             }
 
             Ok(())
@@ -231,13 +228,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = item_handle.set_enabled(false);
                                 tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                             }
+                            MenuID::DISCOVER => { window::show_discover_window(app); }
                             MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
                             MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
                             MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                             MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
                             MenuID::OPEN_WIZARD => { show_wizard_window(app); }
-                            MenuID::SHOW_CRAWL_STATUS => { show_crawl_stats_window(app); }
                             MenuID::SHOW_SEARCHBAR => { window::show_search_bar(&window); }
                             MenuID::QUIT => app.exit(0),
                             MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
@@ -335,13 +332,14 @@ fn open_folder(folder: PathBuf) {
         .expect("explorer cmd not available");
 }
 
-async fn check_version_interval(window: Window) {
+async fn check_version_interval(current_version: String, window: Window) {
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
     let app_handle = window.app_handle();
     let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
     let mut shutdown = shutdown_tx.subscribe();
+    let metrics = app_handle.try_state::<Metrics>();
 
     loop {
         tokio::select! {
@@ -351,6 +349,10 @@ async fn check_version_interval(window: Window) {
             },
             _ = interval.tick() => {
                 log::info!("checking for update...");
+                if let Some(ref metrics) = metrics {
+                    metrics.track(Event::UpdateCheck { current_version: current_version.clone() }).await;
+                }
+
                 if let Ok(response) = app_handle.updater().check().await {
                     if response.is_update_available() {
                         // show update dialog

@@ -28,7 +28,7 @@ register_plugin!(Plugin);
 fn join_path(folder: &str, file: &str) -> PathBuf {
     let host_os_res = std::env::var(consts::env::HOST_OS);
     match host_os_res.unwrap_or_default().as_str() {
-        "windows" => Path::new(&format!("{}\\\\{}", folder, file)).to_path_buf(),
+        "windows" => Path::new(&format!("{folder}\\\\{file}")).to_path_buf(),
         _ => Path::new(&folder).join(file),
     }
 }

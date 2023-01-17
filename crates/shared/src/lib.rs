@@ -2,6 +2,8 @@ pub mod config;
 pub mod constants;
 pub mod event;
 pub mod form;
+#[cfg(feature = "metrics")]
+pub mod metrics;
 pub mod plugin;
 pub mod regex;
 pub mod request;

@@ -1,20 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-pub struct QueueStatus {
-    pub num_queued: u64,
-    pub num_processing: u64,
-    pub num_completed: u64,
-    pub num_indexed: u64,
-}
-
-impl QueueStatus {
-    pub fn total(&self) -> u64 {
-        self.num_completed + self.num_indexed + self.num_processing + self.num_queued
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
@@ -39,33 +25,63 @@ pub struct ListConnectionResult {
     pub user_connections: Vec<UserConnection>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CrawlStats {
-    pub by_domain: Vec<(String, QueueStatus)>,
-}
-
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct InstallableLens {
     pub author: String,
     pub description: String,
     pub name: String,
+    #[serde(default)]
+    label: String,
     pub sha: String,
     pub download_url: String,
     pub html_url: String,
 }
 
+impl InstallableLens {
+    pub fn identifier(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn label(&self) -> String {
+        if self.label.is_empty() {
+            self.name.clone()
+        } else {
+            self.label.clone()
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub enum InstallStatus {
+    NotInstalled,
+    Finished { num_docs: u32 },
+    Installing { percent: i32, status: String },
+}
+
+impl Default for InstallStatus {
+    fn default() -> Self {
+        Self::NotInstalled
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LensResult {
+    /// Author of this lens
     pub author: String,
-    pub title: String,
+    /// Unique identifier
+    pub name: String,
+    /// Human readable label
+    pub label: String,
+    /// Huamn readable description of the lens
     pub description: String,
-    // Used to determine whether a lens needs an update
+    /// Used to determine whether a lens needs an update
     pub hash: String,
-    // For installed lenses.
+    /// For installed lenses.
     pub file_path: Option<PathBuf>,
     // Only relevant for installable lenses
     pub html_url: Option<String>,
     pub download_url: Option<String>,
+    pub progress: InstallStatus,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -79,8 +95,8 @@ pub struct PluginResult {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchMeta {
     pub query: String,
-    pub num_docs: u64,
-    pub wall_time_ms: u64,
+    pub num_docs: u32,
+    pub wall_time_ms: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -106,4 +122,39 @@ pub struct SearchResults {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LibraryStats {
+    pub lens_name: String,
+    pub crawled: i32,
+    pub enqueued: i32,
+    pub indexed: i32,
+}
+
+impl LibraryStats {
+    pub fn new(name: &str) -> Self {
+        LibraryStats {
+            lens_name: name.to_owned(),
+            crawled: 0,
+            enqueued: 0,
+            indexed: 0,
+        }
+    }
+
+    pub fn total_docs(&self) -> i32 {
+        if self.enqueued == 0 {
+            self.indexed
+        } else {
+            self.crawled + self.enqueued
+        }
+    }
+
+    pub fn percent_done(&self) -> i32 {
+        self.crawled * 100 / (self.crawled + self.enqueued)
+    }
+
+    pub fn status_string(&self) -> String {
+        format!("Crawled {} of {}", self.crawled, self.total_docs())
+    }
 }

@@ -11,7 +11,7 @@ mod constants;
 mod pages;
 mod utils;
 
-use crate::pages::{SearchPage, SettingsPage, StartupPage, StatsPage, UpdaterPage, WizardPage};
+use crate::pages::{SearchPage, SettingsPage, StartupPage, UpdaterPage, WizardPage};
 
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
@@ -30,9 +30,6 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
-    pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn save_user_settings(settings: JsValue) -> Result<JsValue, JsValue>;
@@ -86,9 +83,6 @@ extern "C" {
     pub async fn delete_domain(domain: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
-    pub async fn install_lens(download_url: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
     pub async fn save_user_settings(settings: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = "searchDocs", catch)]
@@ -126,8 +120,6 @@ pub enum Route {
     // aka DB migrations.
     #[at("/startup")]
     Startup,
-    #[at("/stats")]
-    Status,
     #[at("/updater")]
     Updater,
     #[at("/wizard")]
@@ -145,7 +137,7 @@ pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
             Ok(parsed) => Ok(parsed),
             Err(err) => Err(err.to_string()),
         },
-        Err(e) => Err(format!("Error fetching connections: {:?}", e.as_string())),
+        Err(e) => Err(format!("Error invoking {} - {:?}", fn_name, e.as_string())),
     }
 }
 
@@ -195,8 +187,6 @@ fn switch(routes: &Route) -> Html {
         Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
         #[allow(clippy::let_unit_value)]
         Route::Startup => html! { <StartupPage /> },
-        #[allow(clippy::let_unit_value)]
-        Route::Status => html! { <StatsPage /> },
         #[allow(clippy::let_unit_value)]
         Route::Updater => html! { <UpdaterPage /> },
         #[allow(clippy::let_unit_value)]

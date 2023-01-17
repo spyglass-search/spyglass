@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-pub use spyglass_lens::{LensConfig, LensRule, PipelineConfiguration};
+use uuid::Uuid;
+
+pub use spyglass_lens::{LensConfig, LensRule, LensSource, PipelineConfiguration};
 
 use crate::{
     form::{FormType, SettingOpts},
@@ -278,6 +280,18 @@ impl Config {
         }
     }
 
+    pub fn machine_identifier() -> String {
+        let uid_file = Self::prefs_dir().join("uid");
+        if uid_file.exists() {
+            std::fs::read_to_string(uid_file).unwrap_or_default()
+        } else {
+            // Generate a random ID and associate it with this machine for error/metrics.
+            let new_uid = Uuid::new_v4().as_hyphenated().to_string();
+            let _ = std::fs::write(uid_file, new_uid.clone());
+            new_uid
+        }
+    }
+
     pub fn default_data_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier())
             .expect("Unable to find a default data directory");
@@ -319,13 +333,17 @@ impl Config {
         self.data_dir().join("lenses")
     }
 
+    pub fn cache_dir(&self) -> PathBuf {
+        self.data_dir().join("cache")
+    }
+
     pub fn pipelines_dir(&self) -> PathBuf {
         self.data_dir().join("pipelines")
     }
 
     pub fn new() -> Self {
         let prefs_dir = Config::prefs_dir();
-        fs::create_dir_all(&prefs_dir).expect("Unable to create config folder");
+        fs::create_dir_all(prefs_dir).expect("Unable to create config folder");
 
         // Gracefully handle issues loading user settings/lenses
         let user_settings = Self::load_user_settings().unwrap_or_else(|err| {
@@ -340,22 +358,22 @@ impl Config {
         };
 
         let data_dir = config.data_dir();
-        fs::create_dir_all(&data_dir).expect("Unable to create data folder");
+        fs::create_dir_all(data_dir).expect("Unable to create data folder");
 
         let index_dir = config.index_dir();
-        fs::create_dir_all(&index_dir).expect("Unable to create index folder");
+        fs::create_dir_all(index_dir).expect("Unable to create index folder");
 
         let logs_dir = config.logs_dir();
-        fs::create_dir_all(&logs_dir).expect("Unable to create logs folder");
+        fs::create_dir_all(logs_dir).expect("Unable to create logs folder");
 
         let lenses_dir = config.lenses_dir();
-        fs::create_dir_all(&lenses_dir).expect("Unable to create `lenses` folder");
+        fs::create_dir_all(lenses_dir).expect("Unable to create `lenses` folder");
 
         let pipelines_dir = config.pipelines_dir();
-        fs::create_dir_all(&pipelines_dir).expect("Unable to create `pipelines` folder");
+        fs::create_dir_all(pipelines_dir).expect("Unable to create `pipelines` folder");
 
         let plugins_dir = config.plugins_dir();
-        fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
+        fs::create_dir_all(plugins_dir).expect("Unable to create `plugin` folder");
 
         config
     }

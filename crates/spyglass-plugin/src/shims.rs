@@ -70,7 +70,7 @@ pub fn walk_and_enqueue_dir(
 
 /// Utility function to log to spyglass logs
 pub fn log(msg: String) {
-    println!("{}", msg);
+    println!("{msg}");
     unsafe {
         plugin_log();
     }

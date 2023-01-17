@@ -12,6 +12,7 @@ use shared::{
 };
 
 use crate::components::{
+    icons,
     result::{LensResultItem, SearchResultItem},
     SelectedLens,
 };
@@ -60,6 +61,7 @@ pub struct SearchPage {
     query: String,
     query_debounce: Option<i32>,
     blur_timeout: Option<i32>,
+    is_searching: bool,
 }
 
 impl SearchPage {
@@ -71,7 +73,7 @@ impl SearchPage {
             }
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
-            self.lens.push(selected.title.to_string());
+            self.lens.push(selected.label.to_string());
             // Clear query string
             link.send_message(Msg::ClearQuery);
         }
@@ -103,7 +105,7 @@ impl SearchPage {
 
     fn scroll_to_result(&self, idx: usize) {
         let document = gloo::utils::document();
-        if let Some(el) = document.get_element_by_id(&format!("result-{}", idx)) {
+        if let Some(el) = document.get_element_by_id(&format!("result-{idx}")) {
             if let Ok(el) = el.dyn_into::<HtmlElement>() {
                 el.scroll_into_view();
             }
@@ -195,6 +197,7 @@ impl Component for SearchPage {
             query: String::new(),
             query_debounce: None,
             blur_timeout: None,
+            is_searching: false,
         }
     }
 
@@ -344,12 +347,26 @@ impl Component for SearchPage {
             }
             Msg::SearchLenses => {
                 let query = self.query.trim_start_matches('/').to_string();
+                self.is_searching = true;
                 link.send_future(async move {
                     match search_lenses(query).await {
-                        Ok(results) => Msg::UpdateLensResults(
-                            serde_wasm_bindgen::from_value(results).unwrap_or_default(),
-                        ),
-                        Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                        Ok(results) => {
+                            let lens_results = {
+                                match serde_wasm_bindgen::from_value(results) {
+                                    Ok(results) => results,
+                                    Err(err) => {
+                                        log::error!(
+                                            "Unable to deserialize search_lenses result: {:?}",
+                                            err
+                                        );
+                                        Vec::new()
+                                    }
+                                }
+                            };
+
+                            Msg::UpdateLensResults(lens_results)
+                        }
+                        Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
                 false
@@ -357,17 +374,17 @@ impl Component for SearchPage {
             Msg::SearchDocs => {
                 let lenses = self.lens.clone();
                 let query = self.query.clone();
-
+                self.is_searching = true;
                 link.send_future(async move {
                     match serde_wasm_bindgen::to_value(&lenses) {
                         Ok(lenses) => match search_docs(lenses, query).await {
                             Ok(results) => match serde_wasm_bindgen::from_value(results) {
                                 Ok(deser) => Msg::UpdateDocsResults(deser),
-                                Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                                Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                             },
-                            Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                            Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                         },
-                        Err(e) => Msg::HandleError(format!("Error: {:?}", e)),
+                        Err(e) => Msg::HandleError(format!("Error: {e:?}")),
                     }
                 });
 
@@ -378,14 +395,18 @@ impl Component for SearchPage {
                 self.docs_results.clear();
                 self.result_display = ResultDisplay::Lens;
                 self.request_resize();
+                self.is_searching = false;
                 true
             }
             Msg::UpdateDocsResults(results) => {
-                self.docs_results = results.results;
-                self.search_meta = Some(results.meta);
-                self.lens_results.clear();
-                self.result_display = ResultDisplay::Docs;
-                self.request_resize();
+                if self.query == results.meta.query {
+                    self.docs_results = results.results;
+                    self.search_meta = Some(results.meta);
+                    self.lens_results.clear();
+                    self.result_display = ResultDisplay::Docs;
+                    self.request_resize();
+                    self.is_searching = false;
+                }
                 true
             }
             Msg::UpdateQuery(query) => {
@@ -428,7 +449,7 @@ impl Component for SearchPage {
                         let open_msg = Msg::OpenResult(res.to_owned());
                         html! {
                             <SearchResultItem
-                                 id={format!("result-{}", idx)}
+                                 id={format!("result-{idx}")}
                                  onclick={link.callback(move |_| open_msg.clone())}
                                  result={res.clone()}
                                  {is_selected}
@@ -444,7 +465,7 @@ impl Component for SearchPage {
                     .map(|(idx, res)| {
                         let is_selected = idx == self.selected_idx;
                         html! {
-                            <LensResultItem id={format!("result-{}", idx)} result={res.clone()} {is_selected} />
+                            <LensResultItem id={format!("result-{idx}")} result={res.clone()} {is_selected} />
                         }
                     })
                     .collect::<Html>()
@@ -459,12 +480,12 @@ impl Component for SearchPage {
             wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
 
             html! {
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-4 py-2 flex flex-row items-center">
+                <>
                     <div>
                         {"Searched "}
                         <span class="text-cyan-600">{num_docs}</span>
                         {" documents in "}
-                        <span class="text-cyan-600">{wall_time}{" ms"}</span>
+                        <span class="text-cyan-600">{wall_time}{" ms."}</span>
                     </div>
                     <div class="ml-auto flex flex-row align-middle items-center">
                         {"Use"}
@@ -485,10 +506,36 @@ impl Component for SearchPage {
                         </div>
                         {"to open."}
                     </div>
-                </div>
+                </>
             }
         } else {
-            html! {}
+            let is_searching_indicator = if self.is_searching {
+                html! {
+                    <div class="flex flex-row gap-1 items-center">
+                        <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                        {"Searching..."}
+                    </div>
+                }
+            } else {
+                html! {}
+            };
+
+            html! {
+                <>
+                    {is_searching_indicator}
+                    <div class="ml-auto flex flex-row items-center align-middle">
+                    {"Use"}
+                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-1 text-black text-[8px]">
+                        {"/"}
+                    </div>
+                    {"to select a lens."}
+                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
+                        {"Enter"}
+                    </div>
+                    {"to search."}
+                    </div>
+                </>
+            }
         };
 
         html! {
@@ -496,13 +543,13 @@ impl Component for SearchPage {
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
                 onclick={link.callback(|_| Msg::Focus)}
             >
-                <div class="flex flex-nowrap w-full">
+                <div class="flex flex-nowrap w-full bg-neutral-800">
                     <SelectedLens lens={self.lens.clone()} />
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-5xl py-4 px-6 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+                        class="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
                         placeholder="Search"
                         onkeyup={link.callback(Msg::KeyboardEvent)}
                         onkeydown={link.callback(Msg::KeyboardEvent)}
@@ -511,10 +558,12 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                <div class="overflow-y-auto overflow-x-hidden h-full">
+                <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px]">
                     {results}
                 </div>
-                {search_meta}
+                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
+                    {search_meta}
+                </div>
             </div>
         }
     }

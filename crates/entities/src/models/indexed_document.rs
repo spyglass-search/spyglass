@@ -1,6 +1,8 @@
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
-use sea_orm::{ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, Set};
+use sea_orm::{
+    ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, Set, Statement,
+};
 
 use super::tag::{get_or_create, TagPair};
 
@@ -12,6 +14,7 @@ pub struct Model {
     /// Domain for this document, used to implement per domain crawl limits.
     pub domain: String,
     /// URL that was indexed.
+    #[sea_orm(unique)]
     pub url: String,
     /// URL used to open in a file/browser window.
     pub open_url: Option<String>,
@@ -127,6 +130,49 @@ pub async fn indexed_stats(
     Ok(res)
 }
 
+/// Inserts an entry into the tag table for each document and
+/// tag pair provided
+pub async fn insert_tags_many<C: ConnectionTrait>(
+    docs: &[Model],
+    db: &C,
+    tags: &[TagPair],
+) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+    let mut tag_models: Vec<tag::Model> = Vec::new();
+    for (label, value) in tags.iter() {
+        match get_or_create(db, label.to_owned(), value).await {
+            Ok(tag) => tag_models.push(tag),
+            Err(err) => log::error!("{}", err),
+        }
+    }
+
+    // create connections for each tag
+    let doc_tags = docs
+        .iter()
+        .flat_map(|model| {
+            tag_models.iter().map(|t| document_tag::ActiveModel {
+                indexed_document_id: Set(model.id),
+                tag_id: Set(t.id),
+                created_at: Set(chrono::Utc::now()),
+                updated_at: Set(chrono::Utc::now()),
+                ..Default::default()
+            })
+        })
+        .collect::<Vec<document_tag::ActiveModel>>();
+
+    // Insert connections, ignoring duplicates
+    document_tag::Entity::insert_many(doc_tags)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![
+                document_tag::Column::IndexedDocumentId,
+                document_tag::Column::TagId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(db)
+        .await
+}
+
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected
 /// to be a SQL like statement.
 pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {
@@ -137,18 +183,54 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
 
     let removed = matching
         .iter()
-        .map(|x| x.doc_id.to_string())
-        .collect::<Vec<String>>();
-
-    let _ = Entity::delete_many()
-        .filter(Column::Url.like(rule))
-        .exec(db)
-        .await?;
+        .map(|x| (x.id, x.doc_id.to_string()))
+        .collect::<Vec<(i64, String)>>();
 
     if !removed.is_empty() {
+        let ids = removed.iter().map(|(id, _)| *id).collect::<Vec<i64>>();
+        let _ = document_tag::Entity::delete_many()
+            .filter(document_tag::Column::IndexedDocumentId.is_in(ids))
+            .exec(db)
+            .await?;
+
+        let _ = Entity::delete_many()
+            .filter(Column::Url.like(rule))
+            .exec(db)
+            .await?;
+
         log::info!("removed {} docs due to '{}'", removed.len(), rule);
     }
-    Ok(removed)
+
+    Ok(removed
+        .into_iter()
+        .map(|(_id, doc_id)| doc_id)
+        .collect::<Vec<String>>())
+}
+
+#[derive(Debug, FromQueryResult)]
+pub struct IndexedDocumentId {
+    pub id: i64,
+    pub doc_id: String,
+}
+
+pub async fn find_by_lens(
+    db: DatabaseConnection,
+    name: &str,
+) -> Result<Vec<IndexedDocumentId>, sea_orm::DbErr> {
+    IndexedDocumentId::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite,
+        r#"
+        SELECT
+            indexed_document.id,
+            indexed_document.doc_id
+        FROM indexed_document
+        LEFT JOIN document_tag on indexed_document.id = document_tag.indexed_document_id
+        LEFT JOIN tags on tags.id = document_tag.tag_id
+        WHERE tags.label = "lens" AND tags.value = $1"#,
+        vec![name.into()],
+    ))
+    .all(&db)
+    .await
 }
 
 #[cfg(test)]

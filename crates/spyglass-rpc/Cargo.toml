@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # We only need the macros functionality for the shared library
-jsonrpsee = { version = "0.15", features = ["macros"] }
+jsonrpsee = { version = "0.16.2", features = ["full"] }
 shared = { path = "../shared" }
 
 [lib]

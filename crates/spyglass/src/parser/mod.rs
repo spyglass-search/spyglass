@@ -38,6 +38,6 @@ pub fn parse_file(extension: &OsStr, file_path: &Path) -> io::Result<String> {
     }
     Err(Error::new(
         ErrorKind::Unsupported,
-        format!("Extension {:?} not supported", extension),
+        format!("Extension {extension:?} not supported"),
     ))
 }

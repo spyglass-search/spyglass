@@ -10,6 +10,7 @@ use tauri::{
 pub enum MenuID {
     CRAWL_STATUS,
     DEV_SHOW_CONSOLE,
+    DISCOVER,
     JOIN_DISCORD,
     OPEN_CONNECTION_MANAGER,
     OPEN_LENS_MANAGER,
@@ -18,7 +19,6 @@ pub enum MenuID {
     OPEN_SETTINGS_MANAGER,
     OPEN_WIZARD,
     QUIT,
-    SHOW_CRAWL_STATUS,
     SHOW_SEARCHBAR,
     VERSION,
 }
@@ -47,10 +47,6 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
             "Connections",
         ))
         .add_item(CustomMenuItem::new(
-            MenuID::OPEN_LENS_MANAGER.to_string(),
-            "Lenses",
-        ))
-        .add_item(CustomMenuItem::new(
             MenuID::OPEN_PLUGIN_MANAGER.to_string(),
             "Plugins",
         ))
@@ -65,8 +61,12 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
         .add_item(CustomMenuItem::new(
-            MenuID::SHOW_CRAWL_STATUS.to_string(),
-            "Crawl status",
+            MenuID::DISCOVER.to_string(),
+            "Discover Lenses",
+        ))
+        .add_item(CustomMenuItem::new(
+            MenuID::OPEN_LENS_MANAGER.to_string(),
+            "My Library",
         ))
         .add_submenu(SystemTraySubmenu::new("Settings", settings_menu))
         .add_native_item(SystemTrayMenuItem::Separator)
