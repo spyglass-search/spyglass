@@ -403,7 +403,7 @@ pub async fn search(
                 .get_first(fields.url)
                 .expect("Missing url in schema");
 
-            log::error!("Got id with url {:?} {:?}", doc_id, url);
+            log::debug!("Got id with url {:?} {:?}", doc_id, url);
             if let Some(doc_id) = doc_id.as_text() {
                 let indexed = indexed_document::Entity::find()
                     .filter(indexed_document::Column::DocId.eq(doc_id))
