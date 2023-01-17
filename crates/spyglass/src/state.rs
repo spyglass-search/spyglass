@@ -45,6 +45,11 @@ impl AppState {
             .expect("Unable to connect to database");
 
         log::debug!("Loading index from: {:?}", config.index_dir());
+        let index_dir = config.index_dir();
+        if !index_dir.exists() {
+            let _ = std::fs::create_dir_all(index_dir);
+        }
+
         let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()))
             .expect("Unable to open index.");
 

@@ -200,13 +200,16 @@ impl MigrationTrait for Migration {
 
         let tag_map = build_tag_map(&tags_result);
 
+        let config = Config::new();
+        let old_index_path = config.index_dir();
         // No docs yet, nothing to migrate.
         if result.is_empty() {
+            // Removing the old index folder will also remove any metadata that lingers
+            // from an empty index.
+            let _ = std::fs::remove_dir_all(old_index_path);
             return Ok(());
         }
 
-        let config = Config::new();
-        let old_index_path = config.index_dir();
         let new_index_path = old_index_path
             .parent()
             .expect("Expected parent path")
