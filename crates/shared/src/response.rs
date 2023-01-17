@@ -155,6 +155,6 @@ impl LibraryStats {
     }
 
     pub fn status_string(&self) -> String {
-        format!("Crawling {} of {}", self.enqueued, self.total_docs())
+        format!("Crawled {} of {}", self.crawled, self.total_docs())
     }
 }
