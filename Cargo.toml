@@ -25,3 +25,5 @@ opt-level = "s"
 [profile.sentry]
 inherits = "release"
 debug = true
+opt-level = 0
+lto = false
