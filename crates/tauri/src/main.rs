@@ -135,6 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::search_lenses,
             cmd::toggle_plugin,
             cmd::update_and_restart,
+            cmd::wizard_finished,
         ])
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))

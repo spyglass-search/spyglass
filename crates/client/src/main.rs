@@ -55,9 +55,6 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn recrawl_domain(domain: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
-    pub async fn toggle_plugin(name: &str) -> Result<(), JsValue>;
 }
 
 #[cfg(not(headless))]
@@ -106,9 +103,6 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn recrawl_domain(domain: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
-    pub async fn toggle_plugin(name: &str) -> Result<(), JsValue>;
 }
 
 #[derive(Clone, Routable, PartialEq, Eq)]

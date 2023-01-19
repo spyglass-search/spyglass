@@ -120,8 +120,8 @@ impl RpcServer for SpyglassRpc {
         route::toggle_pause(self.state.clone(), is_paused).await
     }
 
-    async fn toggle_plugin(&self, name: String) -> Result<(), Error> {
-        route::toggle_plugin(self.state.clone(), name).await
+    async fn toggle_plugin(&self, name: String, enabled: bool) -> Result<(), Error> {
+        route::toggle_plugin(self.state.clone(), name, enabled).await
     }
 
     async fn uninstall_lens(&self, name: String) -> Result<(), Error> {

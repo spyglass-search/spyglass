@@ -55,6 +55,8 @@ pub enum ClientInvoke {
     ResyncConnection,
     #[strum(serialize = "revoke_connection")]
     RevokeConnection,
+    #[strum(serialize = "toggle_plugin")]
+    TogglePlugin,
     #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
     #[strum(serialize = "open_folder_path")]
@@ -85,6 +87,12 @@ pub struct ResyncConnectionParams {
 #[derive(Deserialize, Serialize)]
 pub struct InstallLensParams {
     pub name: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct TogglePluginParams {
+    pub name: String,
+    pub enabled: bool,
 }
 
 #[derive(Deserialize, Serialize)]

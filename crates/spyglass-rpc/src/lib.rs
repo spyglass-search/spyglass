@@ -61,7 +61,7 @@ pub trait Rpc {
     async fn toggle_pause(&self, is_paused: bool) -> Result<(), Error>;
 
     #[method(name = "toggle_plugin")]
-    async fn toggle_plugin(&self, name: String) -> Result<(), Error>;
+    async fn toggle_plugin(&self, name: String, enabled: bool) -> Result<(), Error>;
 
     #[method(name = "uninstall_lens")]
     async fn uninstall_lens(&self, name: String) -> Result<(), Error>;

@@ -545,7 +545,7 @@ pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error>
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
+pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Result<(), Error> {
     // Find the plugin
     let plugin = lens::Entity::find()
         .filter(lens::Column::Name.eq(name))
@@ -555,14 +555,13 @@ pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
 
     if let Ok(Some(plugin)) = plugin {
         let mut updated: lens::ActiveModel = plugin.clone().into();
-        let plugin_enabled = !plugin.is_enabled;
-        updated.is_enabled = Set(plugin_enabled);
+        updated.is_enabled = Set(enabled);
         let _ = updated.update(&state.db).await;
 
         let mut cmd_tx = state.plugin_cmd_tx.lock().await;
         match &mut *cmd_tx {
             Some(cmd_tx) => {
-                let cmd = if plugin_enabled {
+                let cmd = if enabled {
                     PluginCommand::EnablePlugin(plugin.name)
                 } else {
                     PluginCommand::DisablePlugin(plugin.name)
