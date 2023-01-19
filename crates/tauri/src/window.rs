@@ -1,7 +1,7 @@
 use crate::{constants, platform};
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
-use tauri::{AppHandle, LogicalSize, Manager, Monitor, Size, Window, WindowBuilder, WindowUrl};
+use tauri::{AppHandle, LogicalSize, Manager, Monitor, Size, Window, WindowBuilder, WindowUrl, Menu};
 
 /// Try and detect which monitor the window is on so that we can determine the
 /// screen size
@@ -134,6 +134,8 @@ fn _show_tab(app: &AppHandle, tab_url: &str) {
             WindowUrl::App(tab_url.into()),
         )
         .title("Spyglass - Personal Search Engine")
+        // Create an empty menu so now menubar shows up on Windows
+        .menu(Menu::new())
         .min_inner_size(constants::MIN_WINDOW_WIDTH, constants::MIN_WINDOW_HEIGHT)
         .build()
         .expect("Unable to build window for settings")
