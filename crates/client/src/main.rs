@@ -143,7 +143,7 @@ pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
 
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
-    yew::start_app::<App>();
+    yew::Renderer::<App>::new().render();
 }
 
 #[function_component(App)]
@@ -174,12 +174,12 @@ pub fn app() -> Html {
 
     html! {
         <BrowserRouter>
-            <Switch<Route> render={Switch::render(switch)} />
+            <Switch<Route> render={switch} />
         </BrowserRouter>
     }
 }
 
-fn switch(routes: &Route) -> Html {
+fn switch(routes: Route) -> Html {
     match routes {
         #[allow(clippy::let_unit_value)]
         Route::Search => html! { <SearchPage /> },

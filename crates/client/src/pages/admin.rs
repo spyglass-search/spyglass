@@ -3,8 +3,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::{classes, prelude::*, Children};
 use yew_router::components::Link;
-use yew_router::history::History;
-use yew_router::hooks::use_history;
+use yew_router::hooks::use_navigator;
 
 use crate::components::icons;
 use crate::{listen, pages, Route};
@@ -65,28 +64,28 @@ pub struct SettingsPageProps {
 
 #[function_component(SettingsPage)]
 pub fn settings_page(props: &SettingsPageProps) -> Html {
-    let history = use_history().expect("History not available in this browser");
+    let history = use_navigator().expect("History not available in this browser");
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
             if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
                 match payload.payload.as_str() {
-                    "/settings/discover" => history.push(Route::SettingsPage {
+                    "/settings/discover" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::Discover,
                     }),
-                    "/settings/library" => history.push(Route::SettingsPage {
+                    "/settings/library" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::LensManager,
                     }),
-                    "/settings/connections" => history.push(Route::SettingsPage {
+                    "/settings/connections" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::ConnectionsManager,
                     }),
-                    "/settings/plugins" => history.push(Route::SettingsPage {
+                    "/settings/plugins" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::PluginsManager,
                     }),
-                    "/settings/user" => history.push(Route::SettingsPage {
+                    "/settings/user" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::UserSettings,
                     }),
-                    _ => history.push(Route::SettingsPage {
+                    _ => history.push(&Route::SettingsPage {
                         tab: pages::Tab::LensManager,
                     }),
                 }
