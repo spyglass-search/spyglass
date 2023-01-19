@@ -1,9 +1,7 @@
 use crate::{constants, platform};
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
-use tauri::{
-    AppHandle, LogicalSize, Manager, Menu, Monitor, Size, Window, WindowBuilder, WindowUrl,
-};
+use tauri::{AppHandle, LogicalSize, Manager, Monitor, Size, Window, WindowBuilder, WindowUrl, Menu};
 
 /// Try and detect which monitor the window is on so that we can determine the
 /// screen size
@@ -217,9 +215,10 @@ pub fn show_wizard_window(app: &AppHandle) {
             constants::WIZARD_WIN_NAME,
             WindowUrl::App("/wizard".into()),
         )
-        .title("Spyglass - Wizard")
-        .min_inner_size(400.0, 480.0)
-        .max_inner_size(400.0, 480.0)
+        .title("Getting Started w/ Spyglass")
+        .menu(Menu::new())
+        .min_inner_size(400.0, 492.0)
+        .max_inner_size(400.0, 492.0)
         .build()
         .expect("Unable to build window for wizard")
     };
