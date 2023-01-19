@@ -8,7 +8,7 @@ use tauri::api::dialog::blocking::message;
 use tauri::async_runtime::JoinHandle;
 use tauri::{
     api::process::{Command, CommandEvent},
-    AppHandle, Manager,
+    AppHandle,
 };
 use tokio::sync::{broadcast, Mutex};
 use tokio_retry::strategy::FixedInterval;
@@ -17,7 +17,7 @@ use tokio_retry::Retry;
 use shared::config::Config;
 use spyglass_rpc::RpcClient;
 
-use crate::{constants, AppShutdown};
+use crate::{window, AppShutdown};
 
 pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
@@ -95,20 +95,18 @@ impl SpyglassServerClient {
         let client = match try_connect(&endpoint).await {
             Ok(client) => Some(client),
             Err(err) => {
-                if let Some(window) = app_handle.get_window(constants::SEARCH_WIN_NAME) {
-                    // Let users know something has gone dreadfully wrong.
-                    message(
-                        Some(&window),
-                        "Unable to start search backend",
-                        format!(
-                            "Error: {}\nPlease file a bug report!\nThe application will exit now.",
-                            &err.to_string()
-                        ),
-                    );
+                let window = window::get_searchbar(app_handle);
+                // Let users know something has gone dreadfully wrong.
+                message(
+                    Some(&window),
+                    "Unable to start search backend",
+                    format!(
+                        "Error: {}\nPlease file a bug report!\nThe application will exit now.",
+                        &err.to_string()
+                    ),
+                );
 
-                    app_handle.exit(0);
-                }
-
+                app_handle.exit(0);
                 None
             }
         };
@@ -142,17 +140,16 @@ impl SpyglassServerClient {
                 self.client = client;
             }
             Err(err) => {
-                if let Some(window) = self.app_handle.get_window(constants::SEARCH_WIN_NAME) {
-                    // Let users know something has gone dreadfully wrong.
-                    message(
-                        Some(&window),
-                        "Unable to start search backend",
-                        format!(
-                            "Error: {}\nPlease file a bug report!\nThe application will exit now.",
-                            &err.to_string()
-                        ),
-                    );
-                }
+                let window = window::get_searchbar(&self.app_handle);
+                // Let users know something has gone dreadfully wrong.
+                message(
+                    Some(&window),
+                    "Unable to start search backend",
+                    format!(
+                        "Error: {}\nPlease file a bug report!\nThe application will exit now.",
+                        &err.to_string()
+                    ),
+                );
             }
         }
     }

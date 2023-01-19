@@ -59,6 +59,37 @@ pub fn hide_search_bar(window: &Window) {
     platform::windows::hide_search_bar(window);
 }
 
+/// Builds or returns the main searchbar window
+pub fn get_searchbar(app: &AppHandle) -> Window {
+    if let Some(window) = app.get_window(constants::SEARCH_WIN_NAME) {
+        window
+    } else {
+        let default_height = 101.0;
+        let window =
+            WindowBuilder::new(app, constants::SEARCH_WIN_NAME, WindowUrl::App("/".into()))
+                .decorations(false)
+                .transparent(true)
+                .disable_file_drop_handler()
+                .inner_size(640.0, default_height)
+                .build()
+                .expect("Unable to create searchbar window");
+        center_search_bar(&window);
+
+        // macOS: Handle multiple spaces correctly
+        #[cfg(target_os = "macos")]
+        {
+            use cocoa::appkit::NSWindow;
+            unsafe {
+                let ns_window =
+                    window.ns_window().expect("Unable to get ns_window") as cocoa::base::id;
+                ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
+            }
+        }
+
+        window
+    }
+}
+
 pub async fn resize_window(window: &Window, height: f64) {
     let monitor_height = {
         if let Some(monitor) = find_monitor(window) {

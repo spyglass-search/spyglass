@@ -14,15 +14,11 @@ use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
 use tauri::{
     AppHandle, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
-    Window, WindowBuilder, WindowUrl,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
-
-#[cfg(target_os = "macos")]
-use cocoa::appkit::NSWindow;
 
 use shared::config::Config;
 use shared::metrics::{Event, Metrics};
@@ -140,7 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
             let app_handle = app.app_handle();
-            window::show_startup_window(&app_handle);
+            let startup_win = window::show_startup_window(&app_handle);
 
             let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(1);
             app.manage(shutdown_tx);
@@ -153,57 +149,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 log::error!("Unable to copy default plugins: {}", e);
             }
 
-            let default_height = 101.0;
-            let window = WindowBuilder::new(
-                app,
-                constants::SEARCH_WIN_NAME,
-                WindowUrl::App("/".into()),
-            )
-                .decorations(false)
-                .transparent(true)
-                .disable_file_drop_handler()
-                .inner_size(640.0, default_height)
-                .build()
-                .expect("Unable to create searchbar window");
-            // Center on launch.
-            window::center_search_bar(&window);
-
-            // macOS: Handle multiple spaces correctly
-            #[cfg(target_os = "macos")]
-            {
-                unsafe {
-                    let ns_window = window.ns_window().expect("Unable to get ns_window") as cocoa::base::id;
-                    ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
-                }
-            }
-
             // Spawn a version checking background task. Check every couple hours
             // for a new version.
-
-            tauri::async_runtime::spawn(check_version_interval(current_version, window.clone()));
+            tauri::async_runtime::spawn(check_version_interval(
+                current_version,
+                app_handle.clone(),
+            ));
 
             app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
-            app.manage(shared::metrics::Metrics::new(&Config::machine_identifier(), config.user_settings.disable_telemetry));
+            app.manage(shared::metrics::Metrics::new(
+                &Config::machine_identifier(),
+                config.user_settings.disable_telemetry,
+            ));
 
             // Register global shortcut
-            let window_clone = window.clone();
-            let mut shortcuts = window.app_handle().global_shortcut_manager();
+            let mut shortcuts = app_handle.global_shortcut_manager();
             match shortcuts.is_registered(&config.user_settings.shortcut) {
                 Ok(is_registered) => {
-                    if !is_registered
-                    {
+                    if !is_registered {
                         log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
-                        if let Err(e) = shortcuts
-                            .register(&config.user_settings.shortcut, move || {
-                                let window = window_clone.clone();
+                        let app_hand = app_handle;
+                        if let Err(e) =
+                            shortcuts.register(&config.user_settings.shortcut, move || {
+                                let window = window::get_searchbar(&app_hand);
                                 window::show_search_bar(&window);
-                            }) {
-                            window::alert(&window, "Error registering global shortcut", &format!("{e}"));
+                            })
+                        {
+                            window::alert(
+                                &startup_win,
+                                "Error registering global shortcut",
+                                &format!("{e}"),
+                            );
                         }
                     }
                 }
-                Err(e) => window::alert(&window_clone, "Error registering global shortcut", &format!("{e}"))
+                Err(e) => {
+                    window::alert(
+                        &startup_win,
+                        "Error registering global shortcut",
+                        &format!("{e}"),
+                    );
+                }
             }
 
             Ok(())
@@ -212,13 +199,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match event {
                 // Only occurs on Windows.
                 SystemTrayEvent::DoubleClick { .. } => {
-                    let window = app.get_window(constants::SEARCH_WIN_NAME)
-                        .expect("Main window not initialized");
+                    let window = window::get_searchbar(app);
                     show_search_bar(&window);
                 }
                 SystemTrayEvent::MenuItemClick { id, .. } => {
-                    let window = app.get_window(constants::SEARCH_WIN_NAME).expect("Main window not initialized");
-
                     if let Ok(menu_id) = MenuID::from_str(&id) {
                         match menu_id {
                             MenuID::CRAWL_STATUS => {
@@ -228,25 +212,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = item_handle.set_enabled(false);
                                 tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                             }
-                            MenuID::DISCOVER => { window::show_discover_window(app); }
-                            MenuID::OPEN_CONNECTION_MANAGER => { show_connection_manager_window(app); },
-                            MenuID::OPEN_LENS_MANAGER => { show_lens_manager_window(app); },
-                            MenuID::OPEN_PLUGIN_MANAGER => { show_plugin_manager(app); },
+                            MenuID::DISCOVER => {
+                                window::show_discover_window(app);
+                            }
+                            MenuID::OPEN_CONNECTION_MANAGER => {
+                                show_connection_manager_window(app);
+                            }
+                            MenuID::OPEN_LENS_MANAGER => {
+                                show_lens_manager_window(app);
+                            }
+                            MenuID::OPEN_PLUGIN_MANAGER => {
+                                show_plugin_manager(app);
+                            }
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
-                            MenuID::OPEN_SETTINGS_MANAGER => { show_user_settings(app) },
-                            MenuID::OPEN_WIZARD => { show_wizard_window(app); }
-                            MenuID::SHOW_SEARCHBAR => { window::show_search_bar(&window); }
+                            MenuID::OPEN_SETTINGS_MANAGER => show_user_settings(app),
+                            MenuID::OPEN_WIZARD => {
+                                show_wizard_window(app);
+                            }
+                            MenuID::SHOW_SEARCHBAR => {
+                                let window = window::get_searchbar(app);
+                                window::show_search_bar(&window);
+                            }
                             MenuID::QUIT => app.exit(0),
-                            MenuID::DEV_SHOW_CONSOLE => window.open_devtools(),
+                            MenuID::DEV_SHOW_CONSOLE => {
+                                let window = window::get_searchbar(app);
+                                window.open_devtools();
+                            }
                             MenuID::JOIN_DISCORD => {
                                 let _ = open::that(shared::constants::DISCORD_JOIN_URL);
                             }
                             // Just metainfo
-                            MenuID::VERSION => {},
+                            MenuID::VERSION => {}
                         }
                     }
-                },
-                _ => ()
+                }
+                _ => (),
             }
         })
         .build(ctx)
@@ -259,12 +259,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             #[cfg(target_os = "macos")]
             {
-                if let Some(window) = app_handle.get_window(constants::SEARCH_WIN_NAME) {
-                    match window.is_visible() {
-                        Ok(true) => window::hide_search_bar(&window),
-                        Ok(false) => window::show_search_bar(&window),
-                        _ => {}
-                    }
+                let window = window::get_searchbar(app_handle);
+                match window.is_visible() {
+                    Ok(true) => window::hide_search_bar(&window),
+                    Ok(false) => window::show_search_bar(&window),
+                    _ => {}
                 }
             }
         }
@@ -332,11 +331,10 @@ fn open_folder(folder: PathBuf) {
         .expect("explorer cmd not available");
 }
 
-async fn check_version_interval(current_version: String, window: Window) {
+async fn check_version_interval(current_version: String, app_handle: AppHandle) {
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
-    let app_handle = window.app_handle();
     let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
     let mut shutdown = shutdown_tx.subscribe();
     let metrics = app_handle.try_state::<Metrics>();
