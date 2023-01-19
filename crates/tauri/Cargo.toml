@@ -32,7 +32,7 @@ shared = { path = "../shared", features = ["metrics"] }
 spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"
 strum_macros = "0.24"
-tauri = { git = "https://github.com/spyglass-search/tauri", rev = "f986e9a5d8623dd220e829ab14940234f9e83d4f", features = ["api-all", "devtools", "macos-private-api", "system-tray", "updater"] }
+tauri = { version = "1.2.4", features = ["api-all", "devtools", "macos-private-api", "system-tray", "updater"] }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"

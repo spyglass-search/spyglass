@@ -11,7 +11,7 @@ use shared::config::Config;
 use crate::rpc::SpyglassServerClient;
 use crate::window::show_wizard_window;
 
-use crate::{constants, rpc::RpcMutex, AppShutdown};
+use crate::{rpc::RpcMutex, window, AppShutdown};
 pub struct StartupProgressText(std::sync::Mutex<String>);
 
 impl StartupProgressText {
@@ -67,9 +67,7 @@ async fn get_startup_progress(window: tauri::Window) -> Result<String, String> {
 async fn run_and_check_backend(app_handle: AppHandle) {
     log::info!("Running startup tasks");
     let progress = app_handle.state::<StartupProgressText>();
-    let window = app_handle
-        .get_window(constants::STARTUP_WIN_NAME)
-        .expect("Unable to get startup window");
+    let window = window::show_startup_window(&app_handle);
 
     // Run migrations
     log::info!("Running migrations");
