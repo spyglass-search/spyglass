@@ -105,7 +105,7 @@ pub fn delete_button(props: &DeleteDomainButtonProps) -> Html {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
     Default,
     Danger,
@@ -195,19 +195,40 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         "rounded-md",
     );
 
+    let is_confirmed = use_state(|| false);
+    let btn_label = use_state(|| html! { <>{props.children.clone()}</> });
+
+    let confirmed_state = is_confirmed.clone();
+    let btn_label_state = btn_label.clone();
+    let prop_onclick = props.onclick.clone();
+    let btn_type = props._type.clone();
+    let handle_onclick = Callback::from(move |evt| {
+        // Handle confirmation for danger buttons
+        if btn_type == BtnType::Danger {
+            if *confirmed_state {
+                prop_onclick.emit(evt);
+            } else {
+                confirmed_state.set(true);
+                btn_label_state.set(html! { <>{"Click again to confirm"}</> });
+            }
+        } else {
+            prop_onclick.emit(evt);
+        }
+    });
+
     if props.href.is_empty() {
         html! {
-            <button onclick={props.onclick.clone()} class={styles} disabled={props.disabled}>
+            <button onclick={handle_onclick} class={styles} disabled={props.disabled}>
                 <div class="flex flex-row gap-1 items-center mx-auto">
-                    {props.children.clone()}
+                    {(*btn_label).clone()}
                 </div>
             </button>
         }
     } else {
         html! {
-            <a onclick={props.onclick.clone()} href={props.href.clone()} class={styles} target="_blank">
+            <a onclick={handle_onclick} href={props.href.clone()} class={styles} target="_blank">
                 <div class="flex flex-row gap-1 items-center mx-auto">
-                    {props.children.clone()}
+                    {(*btn_label).clone()}
                 </div>
             </a>
         }
