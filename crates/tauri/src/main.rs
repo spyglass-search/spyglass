@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .set_use_launch_agent(true)
             .build()
         {
-            if !config.user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
+            if !config.user_settings.disable_autolaunch && cfg!(not(debug_assertions)) && !auto.is_enabled() {
                 let _ = auto.enable();
             } else if let Ok(true) = auto.is_enabled() {
                 let _ = auto.disable();
