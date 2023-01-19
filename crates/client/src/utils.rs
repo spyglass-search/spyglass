@@ -4,7 +4,7 @@ pub enum OsName {
     MacOS,
     Windows,
     Linux,
-    Unknown
+    Unknown,
 }
 
 #[derive(Debug, PartialEq, Eq)]

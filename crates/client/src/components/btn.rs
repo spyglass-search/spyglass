@@ -196,12 +196,11 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     );
 
     let is_confirmed = use_state(|| false);
-    let btn_label = use_state(|| html! { <>{props.children.clone()}</> });
 
     let confirmed_state = is_confirmed.clone();
-    let btn_label_state = btn_label.clone();
     let prop_onclick = props.onclick.clone();
     let btn_type = props._type.clone();
+
     let handle_onclick = Callback::from(move |evt| {
         // Handle confirmation for danger buttons
         if btn_type == BtnType::Danger {
@@ -209,18 +208,23 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
                 prop_onclick.emit(evt);
             } else {
                 confirmed_state.set(true);
-                btn_label_state.set(html! { <>{"Click again to confirm"}</> });
             }
         } else {
             prop_onclick.emit(evt);
         }
     });
 
+    let label = if props._type == BtnType::Danger && *is_confirmed {
+        Children::new(vec![html! { <>{"⚠️ Click to confirm"}</> }])
+    } else {
+        props.children.clone()
+    };
+
     if props.href.is_empty() {
         html! {
             <button onclick={handle_onclick} class={styles} disabled={props.disabled}>
                 <div class="flex flex-row gap-1 items-center mx-auto">
-                    {(*btn_label).clone()}
+                    {label}
                 </div>
             </button>
         }
@@ -228,7 +232,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         html! {
             <a onclick={handle_onclick} href={props.href.clone()} class={styles} target="_blank">
                 <div class="flex flex-row gap-1 items-center mx-auto">
-                    {(*btn_label).clone()}
+                    {label}
                 </div>
             </a>
         }

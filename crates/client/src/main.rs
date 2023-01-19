@@ -1,4 +1,5 @@
 use gloo::events::EventListener;
+use pages::WizardStage;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::event::ClientInvoke;
 use wasm_bindgen::prelude::*;
@@ -123,7 +124,9 @@ pub enum Route {
     #[at("/updater")]
     Updater,
     #[at("/wizard")]
-    Wizard,
+    WizardRoot,
+    #[at("/wizard/:stage")]
+    Wizard { stage: pages::WizardStage },
 }
 
 /// Utility invoke function to handle types & proper serialization/deserialization from JS
@@ -181,15 +184,11 @@ pub fn app() -> Html {
 
 fn switch(routes: Route) -> Html {
     match routes {
-        #[allow(clippy::let_unit_value)]
         Route::Search => html! { <SearchPage /> },
-        #[allow(clippy::let_unit_value)]
-        Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
-        #[allow(clippy::let_unit_value)]
+        Route::SettingsPage { tab } => html! { <SettingsPage tab={tab} /> },
         Route::Startup => html! { <StartupPage /> },
-        #[allow(clippy::let_unit_value)]
         Route::Updater => html! { <UpdaterPage /> },
-        #[allow(clippy::let_unit_value)]
-        Route::Wizard => html! { <WizardPage /> },
+        Route::WizardRoot => html! { <WizardPage stage={WizardStage::MenubarHelp} /> },
+        Route::Wizard { stage } => html! { <WizardPage stage={stage} /> },
     }
 }
