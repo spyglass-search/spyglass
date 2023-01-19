@@ -253,20 +253,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("error while running tauri application");
 
     app.run(|app_handle, e| match e {
-        // Only called on macos
-        RunEvent::ApplicationShouldHandleReopen {
-            has_visible_windows: _has_visible_windows,
-        } => {
-            #[cfg(target_os = "macos")]
-            {
-                let window = window::get_searchbar(app_handle);
-                match window.is_visible() {
-                    Ok(true) => window::hide_search_bar(&window),
-                    Ok(false) => window::show_search_bar(&window),
-                    _ => {}
-                }
-            }
-        }
         RunEvent::ExitRequested { .. } => {
             // Do some cleanup for long running tasks
             let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();

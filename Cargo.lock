@@ -2809,10 +2809,11 @@ dependencies = [
 
 [[package]]
 name = "ignore"
-version = "0.4.19"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a05705bc64e0b66a806c3740bd6578ea66051b157ec42dc219c785cbf185aef3"
+checksum = "713f1b139373f96a2e0ce3ac931cd01ee973c3c5dd7c40c0c2efe96ad2b6751d"
 dependencies = [
+ "crossbeam-utils",
  "globset",
  "lazy_static",
  "log",
@@ -6524,8 +6525,9 @@ dependencies = [
 
 [[package]]
 name = "tao"
-version = "0.15.6"
-source = "git+https://github.com/spyglass-search/tao?rev=f2d17be2ba93703ddc74d5c40eb94f1e428e73d1#f2d17be2ba93703ddc74d5c40eb94f1e428e73d1"
+version = "0.15.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac8e6399427c8494f9849b58694754d7cc741293348a6836b6c8d2c5aa82d8e6"
 dependencies = [
  "bitflags",
  "cairo-rs",
@@ -6588,8 +6590,9 @@ checksum = "9410d0f6853b1d94f0e519fb95df60f29d2c1eff2d921ffdf01a4c8a3b54f12d"
 
 [[package]]
 name = "tauri"
-version = "1.2.1"
-source = "git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f#f986e9a5d8623dd220e829ab14940234f9e83d4f"
+version = "1.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe7e0f1d535e7cbbbab43c82be4fc992b84f9156c16c160955617e0260ebc449"
 dependencies = [
  "anyhow",
  "attohttpc",
@@ -6629,7 +6632,7 @@ dependencies = [
  "tauri-macros",
  "tauri-runtime",
  "tauri-runtime-wry",
- "tauri-utils 1.2.1 (git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f)",
+ "tauri-utils",
  "tempfile",
  "thiserror",
  "time 0.3.17",
@@ -6654,14 +6657,15 @@ dependencies = [
  "json-patch",
  "semver 1.0.16",
  "serde_json",
- "tauri-utils 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tauri-utils",
  "winres",
 ]
 
 [[package]]
 name = "tauri-codegen"
 version = "1.2.1"
-source = "git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f#f986e9a5d8623dd220e829ab14940234f9e83d4f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14388d484b6b1b5dc0f6a7d6cc6433b3b230bec85eaa576adcdf3f9fafa49251"
 dependencies = [
  "base64 0.13.1",
  "brotli",
@@ -6676,7 +6680,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.6",
- "tauri-utils 1.2.1 (git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f)",
+ "tauri-utils",
  "thiserror",
  "time 0.3.17",
  "uuid 1.2.2",
@@ -6686,20 +6690,22 @@ dependencies = [
 [[package]]
 name = "tauri-macros"
 version = "1.2.1"
-source = "git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f#f986e9a5d8623dd220e829ab14940234f9e83d4f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "069319e5ecbe653a799b94b0690d9f9bf5d00f7b1d3989aa331c524d4e354075"
 dependencies = [
  "heck 0.4.0",
  "proc-macro2",
  "quote",
  "syn",
  "tauri-codegen",
- "tauri-utils 1.2.1 (git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f)",
+ "tauri-utils",
 ]
 
 [[package]]
 name = "tauri-runtime"
 version = "0.12.1"
-source = "git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f#f986e9a5d8623dd220e829ab14940234f9e83d4f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c507d954d08ac8705d235bc70ec6975b9054fb95ff7823af72dbb04186596f3b"
 dependencies = [
  "gtk",
  "http",
@@ -6708,7 +6714,7 @@ dependencies = [
  "raw-window-handle",
  "serde",
  "serde_json",
- "tauri-utils 1.2.1 (git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f)",
+ "tauri-utils",
  "thiserror",
  "uuid 1.2.2",
  "webview2-com",
@@ -6717,8 +6723,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-runtime-wry"
-version = "0.12.1"
-source = "git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f#f986e9a5d8623dd220e829ab14940234f9e83d4f"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36b1c5764a41a13176a4599b5b7bd0881bea7d94dfe45e1e755f789b98317e30"
 dependencies = [
  "cocoa",
  "gtk",
@@ -6726,7 +6733,7 @@ dependencies = [
  "rand 0.8.5",
  "raw-window-handle",
  "tauri-runtime",
- "tauri-utils 1.2.1 (git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f)",
+ "tauri-utils",
  "uuid 1.2.2",
  "webkit2gtk",
  "webview2-com",
@@ -6739,32 +6746,6 @@ name = "tauri-utils"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5abbc109a6eb45127956ffcc26ef0e875d160150ac16cfa45d26a6b2871686f1"
-dependencies = [
- "ctor",
- "glob",
- "heck 0.4.0",
- "html5ever 0.25.2",
- "infer",
- "json-patch",
- "kuchiki",
- "memchr",
- "phf 0.10.1",
- "proc-macro2",
- "quote",
- "semver 1.0.16",
- "serde",
- "serde_json",
- "serde_with",
- "thiserror",
- "url",
- "walkdir",
- "windows 0.39.0",
-]
-
-[[package]]
-name = "tauri-utils"
-version = "1.2.1"
-source = "git+https://github.com/spyglass-search/tauri?rev=f986e9a5d8623dd220e829ab14940234f9e83d4f#f986e9a5d8623dd220e829ab14940234f9e83d4f"
 dependencies = [
  "brotli",
  "ctor",
@@ -8263,8 +8244,9 @@ dependencies = [
 
 [[package]]
 name = "wry"
-version = "0.22.5"
-source = "git+https://github.com/spyglass-search/wry?rev=040552d54a4ec266bf1217807d8a65f400a16096#040552d54a4ec266bf1217807d8a65f400a16096"
+version = "0.23.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c1ad8e2424f554cc5bdebe8aa374ef5b433feff817aebabca0389961fc7ef98"
 dependencies = [
  "base64 0.13.1",
  "block",
