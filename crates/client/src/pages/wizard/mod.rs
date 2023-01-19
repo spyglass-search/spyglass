@@ -3,8 +3,25 @@ use yew::prelude::*;
 use crate::components::icons;
 use shared::constants;
 
-#[function_component(WizardPage)]
-pub fn wizard_page() -> Html {
+mod display_searchbar;
+mod menubar_help;
+enum WizardStage {
+    MenubarHelp,
+    DisplaySearchbarHelp,
+    GetStarted,
+    Done,
+}
+
+#[derive(Properties, PartialEq)]
+pub struct WizardPageProps {
+    #[prop_or_default]
+    on_cancel: Callback<MouseEvent>,
+    #[prop_or_default]
+    on_next: Callback<MouseEvent>,
+}
+
+#[function_component(GetStartedPage)]
+pub fn get_started_page(_props: &WizardPageProps) -> Html {
     let doc_styles = classes!(
         "bg-neutral-900",
         "border-neutral-700",
@@ -60,5 +77,29 @@ pub fn wizard_page() -> Html {
                 </div>
             </div>
         </div>
+    }
+}
+
+#[function_component(WizardPage)]
+pub fn wizard_page() -> Html {
+    let stage = use_state(|| WizardStage::MenubarHelp);
+
+    let stage_clone = stage.clone();
+    let handle_next = Callback::from(move |_| {
+        let next_stage = match *stage_clone {
+            WizardStage::MenubarHelp => WizardStage::DisplaySearchbarHelp,
+            WizardStage::DisplaySearchbarHelp => WizardStage::GetStarted,
+            WizardStage::GetStarted => WizardStage::Done,
+            WizardStage::Done => WizardStage::Done,
+        };
+
+        stage_clone.set(next_stage);
+    });
+
+    match *stage {
+        WizardStage::MenubarHelp => html!{ <menubar_help::MenubarHelpPage on_next={handle_next.clone()} /> },
+        WizardStage::DisplaySearchbarHelp => html!{ <display_searchbar::DisplaySearchbarPage on_next={handle_next.clone()} /> },
+        WizardStage::GetStarted => html! { <GetStartedPage on_next={handle_next} /> },
+        WizardStage::Done => html!{},
     }
 }

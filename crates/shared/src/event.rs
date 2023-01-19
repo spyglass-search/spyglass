@@ -35,6 +35,8 @@ pub enum ClientInvoke {
     EditPluginSettings,
     #[strum(serialize = "get_library_stats")]
     GetLibraryStats,
+    #[strum(serialize = "get_shortcut")]
+    GetShortcut,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
     #[strum(serialize = "plugin:lens-updater|install_lens")]

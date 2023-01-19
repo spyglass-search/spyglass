@@ -158,7 +158,8 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
             "border-neutral-600",
             "border",
             "hover:bg-neutral-600",
-            "active:bg-neutral-700"
+            "active:bg-neutral-700",
+            "text-white",
         ),
         BtnType::Danger => classes!(
             "border",
@@ -197,7 +198,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     if props.href.is_empty() {
         html! {
             <button onclick={props.onclick.clone()} class={styles} disabled={props.disabled}>
-                <div class="flex flex-row gap-1 items-center">
+                <div class="flex flex-row gap-1 items-center mx-auto">
                     {props.children.clone()}
                 </div>
             </button>
@@ -205,7 +206,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     } else {
         html! {
             <a onclick={props.onclick.clone()} href={props.href.clone()} class={styles} target="_blank">
-                <div class="flex flex-row gap-1 items-center">
+                <div class="flex flex-row gap-1 items-center mx-auto">
                     {props.children.clone()}
                 </div>
             </a>
