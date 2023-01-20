@@ -37,6 +37,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
     let nav = use_navigator().expect("History not available in this browser");
 
     let cur_stage = props.stage.clone();
+    let nav_clone = nav.clone();
     let handle_next = Callback::from(move |_| {
         let next_stage = match cur_stage {
             WizardStage::MenubarHelp => WizardStage::DisplaySearchbarHelp,
@@ -58,7 +59,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
             return;
         }
 
-        nav.push(&Route::Wizard { stage: next_stage });
+        nav_clone.push(&Route::Wizard { stage: next_stage });
     });
 
     let mut next_label = String::new();
@@ -86,11 +87,25 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         _ => html! {},
     };
 
+    let back_btn = if props.stage == WizardStage::MenubarHelp {
+        html! {}
+    } else {
+        let nav_clone = nav;
+        let handle_back = Callback::from(move |_| nav_clone.back());
+        html! {
+            <btn::Btn onclick={handle_back} classes={classes!("w-18")}>
+                <icons::ChevronLeftIcon height="h-8" width="w-8" classes="ml-auto float-right"/>
+                <div>{"Back"}</div>
+            </btn::Btn>
+        }
+    };
+
     html! {
         <div class="py-4 px-8 bg-neutral-800 h-screen text-center flex flex-col gap-4">
             {content}
-            <div class="mt-auto mb-2 flex flex-col">
-                <btn::Btn onclick={handle_next}>
+            <div class="mt-auto mb-2 flex flex-row gap-4">
+                {back_btn}
+                <btn::Btn onclick={handle_next} classes={classes!("w-full")}>
                     <div>{next_label.clone()}</div>
                     <icons::ChevronRightIcon height="h-8" width="w-8" classes="ml-auto float-right"/>
                 </btn::Btn>
