@@ -341,12 +341,11 @@ pub async fn get_shortcut(win: tauri::Window) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn wizard_finished(win: tauri::Window, toggle_file_indexer: bool) -> Result<(), String> {
-    // Turn on/off the plugin.
+    // Turn on/off the plugin based on the user prefs.
     let _ = toggle_plugin(win.clone(), "local-file-indexer", toggle_file_indexer).await;
-
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
-        let _ = window.hide();
+        let _ = window.close();
     }
 
     Ok(())
