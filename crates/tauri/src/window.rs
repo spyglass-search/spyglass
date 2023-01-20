@@ -217,9 +217,10 @@ pub fn show_wizard_window(app: &AppHandle) {
             constants::WIZARD_WIN_NAME,
             WindowUrl::App("/wizard".into()),
         )
-        .title("Spyglass - Wizard")
-        .min_inner_size(480.0, 440.0)
-        .max_inner_size(480.0, 440.0)
+        .title("Getting Started w/ Spyglass")
+        .menu(Menu::new())
+        .min_inner_size(400.0, 492.0)
+        .max_inner_size(400.0, 492.0)
         .build()
         .expect("Unable to build window for wizard")
     };

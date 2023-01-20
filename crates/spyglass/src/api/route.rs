@@ -1,6 +1,8 @@
+use directories::UserDirs;
 use entities::get_library_stats;
 use jsonrpsee::core::Error;
 use std::collections::HashSet;
+use std::path::Path;
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
@@ -16,8 +18,8 @@ use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
-    AppStatus, InstallStatus, LensResult, ListConnectionResult, PluginResult, SearchLensesResp,
-    SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
+    AppStatus, DefaultIndices, InstallStatus, LensResult, ListConnectionResult, PluginResult,
+    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 
 use libgoog::{ClientType, Credentials, GoogClient};
@@ -545,7 +547,7 @@ pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error>
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
+pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Result<(), Error> {
     // Find the plugin
     let plugin = lens::Entity::find()
         .filter(lens::Column::Name.eq(name))
@@ -555,14 +557,13 @@ pub async fn toggle_plugin(state: AppState, name: String) -> Result<(), Error> {
 
     if let Ok(Some(plugin)) = plugin {
         let mut updated: lens::ActiveModel = plugin.clone().into();
-        let plugin_enabled = !plugin.is_enabled;
-        updated.is_enabled = Set(plugin_enabled);
+        updated.is_enabled = Set(enabled);
         let _ = updated.update(&state.db).await;
 
         let mut cmd_tx = state.plugin_cmd_tx.lock().await;
         match &mut *cmd_tx {
             Some(cmd_tx) => {
-                let cmd = if plugin_enabled {
+                let cmd = if enabled {
                     PluginCommand::EnablePlugin(plugin.name)
                 } else {
                     PluginCommand::DisablePlugin(plugin.name)
@@ -618,6 +619,30 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
         }
     }
     Ok(())
+}
+
+pub async fn default_indices() -> DefaultIndices {
+    let mut file_paths: Vec<String> = Vec::new();
+
+    if let Some(user_dirs) = UserDirs::new() {
+        if let Some(path) = user_dirs.desktop_dir() {
+            file_paths.push(path.display().to_string());
+        }
+
+        if let Some(path) = user_dirs.document_dir() {
+            file_paths.push(path.display().to_string());
+        }
+    }
+
+    // Application path is os dependent
+    if cfg!(target_os = "macos") {
+        file_paths.push("/Applications".into());
+    } else if cfg!(target_os = "windows") {
+        file_paths.push("C:\\Program Files (x86)".into());
+    }
+
+    file_paths.retain(|f| Path::new(f).exists());
+    DefaultIndices { file_paths }
 }
 
 #[cfg(test)]

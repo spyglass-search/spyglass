@@ -1,17 +1,20 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{atomic::Ordering, Arc};
 
-use shared::response::SearchResults;
+use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
-use shared::config::{Config, Limit, UserSettings};
-use shared::{event::ClientEvent, form::SettingOpts, request, response};
+use shared::config::Config;
+use shared::{event::ClientEvent, request, response};
 use spyglass_rpc::RpcClient;
+
+mod settings;
+pub use settings::*;
 
 #[tauri::command]
 pub async fn authorize_connection(win: tauri::Window, id: String) -> Result<(), String> {
@@ -270,149 +273,14 @@ pub async fn list_plugins(win: tauri::Window) -> Result<Vec<response::PluginResu
 }
 
 #[tauri::command]
-pub async fn toggle_plugin(window: tauri::Window, name: &str) -> Result<(), String> {
+pub async fn toggle_plugin(window: tauri::Window, name: &str, enabled: bool) -> Result<(), String> {
     if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
-        let _ = rpc.client.toggle_plugin(name.to_string()).await;
+        let _ = rpc.client.toggle_plugin(name.to_string(), enabled).await;
         let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
     }
 
     Ok(())
-}
-
-#[tauri::command]
-pub async fn save_user_settings(
-    window: tauri::Window,
-    config: State<'_, Config>,
-    settings: HashMap<String, String>,
-) -> Result<(), HashMap<String, String>> {
-    let mut current_settings = config.user_settings.clone();
-
-    let config_list: Vec<(String, SettingOpts)> = config.user_settings.clone().into();
-    let setting_configs: HashMap<String, SettingOpts> = config_list.into_iter().collect();
-    let mut errors: HashMap<String, String> = HashMap::new();
-
-    let plugin_configs = config.load_plugin_config();
-
-    let mut fields_updated: usize = 0;
-
-    // Loop through each updated settings value sent from the front-end and
-    // validate the values.
-    for (key, value) in settings.iter() {
-        // Update spyglass or plugin settings?
-        if let Some((parent, field)) = key.split_once('.') {
-            match parent {
-                // Hacky way to update user settings directly.
-                "_" => {
-                    if let Some(opt) = setting_configs.get(key) {
-                        match opt.form_type.validate(value) {
-                            Ok(val) => {
-                                fields_updated += 1;
-                                match field {
-                                    "data_directory" => {
-                                        current_settings.data_directory = PathBuf::from(val);
-                                    }
-                                    "disable_autolaunch" => {
-                                        current_settings.disable_autolaunch =
-                                            serde_json::from_str(value).unwrap_or_default();
-                                    }
-                                    "disable_telemetry" => {
-                                        current_settings.disable_telemetry =
-                                            serde_json::from_str(value).unwrap_or_default();
-                                    }
-                                    "inflight_crawl_limit" => {
-                                        let limit: u32 = serde_json::from_str(value).unwrap_or(10);
-                                        current_settings.inflight_crawl_limit =
-                                            Limit::Finite(limit);
-                                    }
-                                    "inflight_domain_limit" => {
-                                        let limit: u32 = serde_json::from_str(value).unwrap_or(2);
-                                        current_settings.inflight_domain_limit =
-                                            Limit::Finite(limit);
-                                    }
-                                    "port" => {
-                                        current_settings.port = serde_json::from_str(value)
-                                            .unwrap_or_else(|_| UserSettings::default_port());
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            Err(err) => {
-                                errors.insert(key.to_string(), err);
-                            }
-                        }
-                    }
-                }
-                plugin_name => {
-                    // Load plugin settings configurations
-                    if let Some(plugin_config) = plugin_configs.get(plugin_name) {
-                        let to_update = current_settings
-                            .plugin_settings
-                            .entry(plugin_name.to_string())
-                            .or_default();
-
-                        if let Some(field_opts) = plugin_config.user_settings.get(field) {
-                            // Validate & serialize value into something we can save.
-                            match field_opts.form_type.validate(value) {
-                                Ok(val) => {
-                                    fields_updated += 1;
-                                    to_update.insert(field.into(), val);
-                                }
-                                Err(err) => {
-                                    errors.insert(key.to_string(), err);
-                                }
-                            }
-                        }
-                    } else {
-                        errors.insert(key.to_string(), format!("Config not found for {key}"));
-                    }
-                }
-            }
-        }
-    }
-
-    // Only save settings if everything is valid.
-    if errors.is_empty() && fields_updated > 0 {
-        let _ = config.save_user_settings(&current_settings);
-        let app = window.app_handle();
-        app.restart();
-        Ok(())
-    } else {
-        Err(errors)
-    }
-}
-
-#[tauri::command]
-pub async fn load_user_settings(
-    _: tauri::Window,
-    config: State<'_, Config>,
-) -> Result<Vec<(String, SettingOpts)>, String> {
-    let current_settings = Config::load_user_settings().expect("Unable to read user settings");
-
-    let plugin_configs = config.load_plugin_config();
-    let mut list: Vec<(String, SettingOpts)> = current_settings.clone().into();
-
-    let current_plug_settings = current_settings.plugin_settings;
-    for (pname, pconfig) in plugin_configs {
-        for (setting_name, setting_opts) in pconfig.user_settings {
-            let mut opts = setting_opts.clone();
-
-            let value = current_plug_settings
-                .get(&pname)
-                .and_then(|settings| settings.get(&setting_name))
-                // Reverse backslash escaping
-                .map(|value| value.to_string().replace("\\\\", "\\"));
-
-            if let Some(value) = value {
-                opts.value = value.to_string();
-            }
-
-            list.push((format!("{pname}.{setting_name}"), opts));
-        }
-    }
-
-    list.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(list)
 }
 
 #[tauri::command]
@@ -460,4 +328,42 @@ pub async fn resync_connection(win: tauri::Window, id: &str, account: &str) -> R
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_shortcut(win: tauri::Window) -> Result<String, String> {
+    if let Some(config) = win.app_handle().try_state::<Config>() {
+        Ok(config.user_settings.shortcut.clone())
+    } else {
+        Ok("CmdOrCtrl+Shift+/".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn wizard_finished(win: tauri::Window, toggle_file_indexer: bool) -> Result<(), String> {
+    // Turn on/off the plugin based on the user prefs.
+    let _ = toggle_plugin(win.clone(), "local-file-indexer", toggle_file_indexer).await;
+    // close wizard window
+    if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
+        let _ = window.close();
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.default_indices().await {
+            Ok(res) => return Ok(res),
+            Err(err) => {
+                log::info!("default_indices: {:?}", err);
+            }
+        }
+    }
+
+    Ok(DefaultIndices {
+        file_paths: Vec::new(),
+    })
 }

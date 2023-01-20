@@ -85,6 +85,10 @@ pub struct UserSettings {
     pub disable_autolaunch: bool,
     #[serde(default = "UserSettings::default_port")]
     pub port: u16,
+    // /// Hide the app icon from the dock/taskbar while running. Will still show up
+    // /// in the menubar/systemtray.
+    // #[serde(default)]
+    // pub hide_taskicon: bool,
 }
 
 impl UserSettings {

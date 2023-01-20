@@ -289,6 +289,12 @@ export let invoke = async (func_name, params) => {
                 indexed: 52357
             }
         }
+    } else if (func_name == "get_shortcut") {
+        return "CmdOrCtrl+Shift+/";
+    } else if (func_name == "default_indices") {
+        return {
+            file_paths: ["/Users/billy/Desktop", "/Users/billy/Documents", "/Applications"]
+        };
     }
 
     return [];
@@ -338,8 +344,4 @@ export async function openResult(url) {
 
 export async function resizeWindow(height) {
     return await invoke('resize_window', { height });
-}
-
-export async function toggle_plugin(name) {
-    return await invoke('toggle_plugin', { name })
 }
