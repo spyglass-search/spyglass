@@ -1,3 +1,4 @@
+use crate::components::forms::SettingChangeEvent;
 use crate::components::{forms, icons};
 use crate::tauri_invoke;
 use yew::platform::spawn_local;
@@ -10,8 +11,16 @@ use shared::{
 };
 use yew::virtual_dom::VNode;
 
+#[derive(Properties, PartialEq)]
+pub struct IndexFilesHelpProps {
+    #[prop_or_default]
+    pub toggle_file_indexer: bool,
+    #[prop_or_default]
+    pub onchange: Callback<SettingChangeEvent>,
+}
+
 #[function_component(IndexFilesHelp)]
-pub fn index_files_help() -> Html {
+pub fn index_files_help(props: &IndexFilesHelpProps) -> Html {
     let paths: UseStateHandle<Vec<String>> = use_state(Vec::new);
     {
         let paths_state = paths.clone();
@@ -23,7 +32,8 @@ pub fn index_files_help() -> Html {
                         Ok(result) => {
                             let mut sorted = result.file_paths;
                             sorted.sort();
-                            paths_state.set(sorted);
+                            paths_state
+                                .set(sorted.iter().map(|p| p.display().to_string()).collect());
                         }
                         Err(err) => {
                             log::info!("error: {}", err);
@@ -39,7 +49,7 @@ pub fn index_files_help() -> Html {
 
     let toggle = SettingOpts {
         label: "Enable local file searching".into(),
-        value: "false".into(),
+        value: serde_json::to_string(&props.toggle_file_indexer).unwrap_or_default(),
         form_type: FormType::Bool,
         help_text: None,
     };
@@ -65,6 +75,7 @@ pub fn index_files_help() -> Html {
                     class="flex flex-row"
                     setting_name="_.file-indexer"
                     opts={toggle}
+                    onchange={props.onchange.clone()}
                 />
             </div>
             <div class="text-sm">
