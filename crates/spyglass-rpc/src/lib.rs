@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{
-    AppStatus, LensResult, LibraryStats, ListConnectionResult, PluginResult, SearchLensesResp,
-    SearchResults,
+    AppStatus, DefaultIndicies, LensResult, LibraryStats, ListConnectionResult, PluginResult,
+    SearchLensesResp, SearchResults,
 };
 
 /// Rpc trait
@@ -20,6 +20,9 @@ pub trait Rpc {
 
     #[method(name = "app_status")]
     async fn app_status(&self) -> Result<AppStatus, Error>;
+
+    #[method(name = "default_indicies")]
+    async fn default_indices(&self) -> Result<DefaultIndicies, Error>;
 
     #[method(name = "delete_doc")]
     async fn delete_doc(&self, id: String) -> Result<(), Error>;

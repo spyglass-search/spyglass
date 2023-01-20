@@ -1,16 +1,52 @@
 use crate::components::{forms, icons};
+use crate::tauri_invoke;
+use yew::platform::spawn_local;
 use yew::prelude::*;
 
-use shared::form::{FormType, SettingOpts};
+use shared::{
+    event::ClientInvoke,
+    form::{FormType, SettingOpts},
+    response::DefaultIndicies,
+};
+use yew::virtual_dom::VNode;
 
 #[function_component(IndexFilesHelp)]
 pub fn index_files_help() -> Html {
+    let paths: UseStateHandle<Vec<String>> = use_state(Vec::new);
+    {
+        let paths_state = paths.clone();
+        use_effect_with_deps(
+            move |_| {
+                spawn_local(async move {
+                    match tauri_invoke::<_, DefaultIndicies>(ClientInvoke::DefaultIndicies, "").await {
+                        Ok(result) => {
+                            let mut sorted = result.file_paths.clone();
+                            sorted.sort();
+                            paths_state.set(sorted);
+                        },
+                        Err(err) => {
+                            log::info!("error: {}", err);
+                        }
+                    }
+                });
+
+                || ()
+            },
+            (),
+        );
+    }
+
     let toggle = SettingOpts {
         label: "Enable local file searching".into(),
         value: "false".into(),
         form_type: FormType::Bool,
         help_text: None,
     };
+
+    let paths_rendered: VNode = paths
+        .iter()
+        .map(|p| { html! { <li class="list-disc">{p}</li> } })
+        .collect();
 
     html! {
         <div class="p-4 bg-neutral-800 h-screen text-left text-neutral-400 flex flex-col gap-4">
@@ -30,9 +66,8 @@ pub fn index_files_help() -> Html {
             </div>
             <div class="text-sm">
                 {"If enabled, the following folders will be automatically indexed. You can add/remove folders in your settings."}
-                <ul class="mt-2 text-sm text-cyan-500">
-                    <li class="list-disc font-mono">{"C:\\Users\\andrew huynh\\Documents"}</li>
-                    <li class="list-disc font-mono">{"C:\\Users\\andrew huynh\\Program Files"}</li>
+                <ul class="mt-4 text-sm text-cyan-500 flex flex-col gap-2 font-mono">
+                    {paths_rendered}
                 </ul>
             </div>
         </div>

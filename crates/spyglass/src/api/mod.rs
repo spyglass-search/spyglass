@@ -11,7 +11,7 @@ use jsonrpsee::server::{ServerBuilder, ServerHandle};
 
 use shared::config::Config;
 use shared::request::{SearchLensesParam, SearchParam};
-use shared::response::{self as resp, LibraryStats};
+use shared::response::{self as resp, DefaultIndicies, LibraryStats};
 use spyglass_rpc::RpcServer;
 
 mod auth;
@@ -35,6 +35,10 @@ impl RpcServer for SpyglassRpc {
 
     async fn app_status(&self) -> Result<resp::AppStatus, Error> {
         route::app_status(self.state.clone()).await
+    }
+
+    async fn default_indices(&self) -> Result<DefaultIndicies, Error> {
+        Ok(route::default_indicies().await)
     }
 
     async fn delete_doc(&self, id: String) -> Result<(), Error> {

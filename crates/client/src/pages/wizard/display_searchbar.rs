@@ -75,7 +75,7 @@ pub fn display_search_help() -> Html {
     }
 
     html! {
-        <div class="flex flex-col gap-4 items-center align-middle text-center">
+        <div class="my-auto flex flex-col gap-4 items-center align-middle text-center">
             <div>
                 <img src={"/launching-example.gif"} alt="Launching in action" class="mx-auto rounded-lg w-[196px]"/>
             </div>

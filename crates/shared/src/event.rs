@@ -29,6 +29,8 @@ pub enum ClientInvoke {
     AuthorizeConnection,
     #[strum(serialize = "choose_folder")]
     ChooseFolder,
+    #[strum(serialize = "default_indicies")]
+    DefaultIndicies,
     #[strum(serialize = "escape")]
     Escape,
     #[strum(serialize = "open_plugins_folder")]

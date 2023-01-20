@@ -1,7 +1,9 @@
 use crate::{constants, platform};
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
-use tauri::{AppHandle, LogicalSize, Manager, Monitor, Size, Window, WindowBuilder, WindowUrl, Menu};
+use tauri::{
+    AppHandle, LogicalSize, Manager, Menu, Monitor, Size, Window, WindowBuilder, WindowUrl,
+};
 
 /// Try and detect which monitor the window is on so that we can determine the
 /// screen size
