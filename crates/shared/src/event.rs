@@ -29,12 +29,16 @@ pub enum ClientInvoke {
     AuthorizeConnection,
     #[strum(serialize = "choose_folder")]
     ChooseFolder,
+    #[strum(serialize = "default_indices")]
+    DefaultIndices,
     #[strum(serialize = "escape")]
     Escape,
     #[strum(serialize = "open_plugins_folder")]
     EditPluginSettings,
     #[strum(serialize = "get_library_stats")]
     GetLibraryStats,
+    #[strum(serialize = "get_shortcut")]
+    GetShortcut,
     #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
     GetStartupProgressText,
     #[strum(serialize = "plugin:lens-updater|install_lens")]
@@ -53,6 +57,8 @@ pub enum ClientInvoke {
     ResyncConnection,
     #[strum(serialize = "revoke_connection")]
     RevokeConnection,
+    #[strum(serialize = "toggle_plugin")]
+    TogglePlugin,
     #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
     #[strum(serialize = "open_folder_path")]
@@ -65,6 +71,8 @@ pub enum ClientInvoke {
     UninstallLens,
     #[strum(serialize = "update_and_restart")]
     UpdateAndRestart,
+    #[strum(serialize = "wizard_finished")]
+    WizardFinished,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -84,6 +92,18 @@ pub struct InstallLensParams {
 }
 
 #[derive(Deserialize, Serialize)]
+pub struct TogglePluginParams {
+    pub name: String,
+    pub enabled: bool,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct UninstallLensParams {
     pub name: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct WizardFinishedParams {
+    #[serde(rename(serialize = "toggleFileIndexer"))]
+    pub toggle_file_indexer: bool,
 }

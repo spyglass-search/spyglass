@@ -1,4 +1,5 @@
 use shared::event::ClientEvent;
+use shared::event::TogglePluginParams;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::function_component;
@@ -10,7 +11,7 @@ use shared::response::PluginResult;
 use crate::components::forms::Toggle;
 use crate::components::{icons, Header};
 use crate::utils::RequestState;
-use crate::{invoke, listen, toggle_plugin};
+use crate::{invoke, listen, tauri_invoke};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct PluginProps {
@@ -24,10 +25,19 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
 
     let onclick = {
         let plugin_name = plugin.title.clone();
+        let plugin_enabled = plugin.is_enabled;
         Callback::from(move |_| {
             let plugin_name = plugin_name.clone();
             spawn_local(async move {
-                if let Err(e) = toggle_plugin(&plugin_name).await {
+                if let Err(e) = tauri_invoke::<_, ()>(
+                    ClientInvoke::TogglePlugin,
+                    TogglePluginParams {
+                        name: plugin_name,
+                        enabled: !plugin_enabled,
+                    },
+                )
+                .await
+                {
                     log::error!("Error toggling plugin: {:?}", e);
                 }
             })

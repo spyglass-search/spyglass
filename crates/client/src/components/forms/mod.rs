@@ -33,6 +33,8 @@ pub struct FormProps {
     pub opts: SettingOpts,
     #[prop_or_default]
     pub error_msg: Option<String>,
+    #[prop_or_default]
+    pub class: Classes,
 }
 
 pub struct FormElement {
@@ -149,8 +151,14 @@ impl Component for FormElement {
             html! { <span>{props.opts.label.clone()}</span> }
         };
 
+        let classes = if props.class.is_empty() {
+            classes!("px-8", "mb-8", "flex", self.alignment())
+        } else {
+            props.class.clone()
+        };
+
         html! {
-            <div class={classes!("px-8", "mb-8", "flex", self.alignment())}>
+            <div class={classes}>
                 <div class="mb-2">
                     <label class="text-yellow-500">{label}</label>
                     {

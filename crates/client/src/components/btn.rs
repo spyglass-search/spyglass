@@ -105,7 +105,7 @@ pub fn delete_button(props: &DeleteDomainButtonProps) -> Html {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
     Default,
     Danger,
@@ -158,7 +158,8 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
             "border-neutral-600",
             "border",
             "hover:bg-neutral-600",
-            "active:bg-neutral-700"
+            "active:bg-neutral-700",
+            "text-white",
         ),
         BtnType::Danger => classes!(
             "border",
@@ -194,19 +195,44 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         "rounded-md",
     );
 
+    let is_confirmed = use_state(|| false);
+
+    let confirmed_state = is_confirmed.clone();
+    let prop_onclick = props.onclick.clone();
+    let btn_type = props._type.clone();
+
+    let handle_onclick = Callback::from(move |evt| {
+        // Handle confirmation for danger buttons
+        if btn_type == BtnType::Danger {
+            if *confirmed_state {
+                prop_onclick.emit(evt);
+            } else {
+                confirmed_state.set(true);
+            }
+        } else {
+            prop_onclick.emit(evt);
+        }
+    });
+
+    let label = if props._type == BtnType::Danger && *is_confirmed {
+        Children::new(vec![html! { <>{"⚠️ Click to confirm"}</> }])
+    } else {
+        props.children.clone()
+    };
+
     if props.href.is_empty() {
         html! {
-            <button onclick={props.onclick.clone()} class={styles} disabled={props.disabled}>
-                <div class="flex flex-row gap-1 items-center">
-                    {props.children.clone()}
+            <button onclick={handle_onclick} class={styles} disabled={props.disabled}>
+                <div class="flex flex-row gap-1 items-center mx-auto">
+                    {label}
                 </div>
             </button>
         }
     } else {
         html! {
-            <a onclick={props.onclick.clone()} href={props.href.clone()} class={styles} target="_blank">
-                <div class="flex flex-row gap-1 items-center">
-                    {props.children.clone()}
+            <a onclick={handle_onclick} href={props.href.clone()} class={styles} target="_blank">
+                <div class="flex flex-row gap-1 items-center mx-auto">
+                    {label}
                 </div>
             </a>
         }

@@ -112,10 +112,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
+            cmd::default_indices,
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,
             cmd::get_library_stats,
+            cmd::get_shortcut,
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
@@ -134,6 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::search_lenses,
             cmd::toggle_plugin,
             cmd::update_and_restart,
+            cmd::wizard_finished,
         ])
         .menu(menu::get_app_menu(&ctx))
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))

@@ -158,3 +158,8 @@ impl LibraryStats {
         format!("Crawled {} of {}", self.crawled, self.total_docs())
     }
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DefaultIndices {
+    pub file_paths: Vec<String>,
+}

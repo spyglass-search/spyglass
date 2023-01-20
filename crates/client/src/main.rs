@@ -1,4 +1,5 @@
 use gloo::events::EventListener;
+use pages::WizardStage;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::event::ClientInvoke;
 use wasm_bindgen::prelude::*;
@@ -54,9 +55,6 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn recrawl_domain(domain: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
-    pub async fn toggle_plugin(name: &str) -> Result<(), JsValue>;
 }
 
 #[cfg(not(headless))]
@@ -105,9 +103,6 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn recrawl_domain(domain: String) -> Result<(), JsValue>;
-
-    #[wasm_bindgen(catch)]
-    pub async fn toggle_plugin(name: &str) -> Result<(), JsValue>;
 }
 
 #[derive(Clone, Routable, PartialEq, Eq)]
@@ -123,7 +118,9 @@ pub enum Route {
     #[at("/updater")]
     Updater,
     #[at("/wizard")]
-    Wizard,
+    WizardRoot,
+    #[at("/wizard/:stage")]
+    Wizard { stage: pages::WizardStage },
 }
 
 /// Utility invoke function to handle types & proper serialization/deserialization from JS
@@ -143,7 +140,7 @@ pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
 
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
-    yew::start_app::<App>();
+    yew::Renderer::<App>::new().render();
 }
 
 #[function_component(App)]
@@ -174,22 +171,18 @@ pub fn app() -> Html {
 
     html! {
         <BrowserRouter>
-            <Switch<Route> render={Switch::render(switch)} />
+            <Switch<Route> render={switch} />
         </BrowserRouter>
     }
 }
 
-fn switch(routes: &Route) -> Html {
+fn switch(routes: Route) -> Html {
     match routes {
-        #[allow(clippy::let_unit_value)]
         Route::Search => html! { <SearchPage /> },
-        #[allow(clippy::let_unit_value)]
-        Route::SettingsPage { tab } => html! { <SettingsPage tab={tab.clone()} /> },
-        #[allow(clippy::let_unit_value)]
+        Route::SettingsPage { tab } => html! { <SettingsPage tab={tab} /> },
         Route::Startup => html! { <StartupPage /> },
-        #[allow(clippy::let_unit_value)]
         Route::Updater => html! { <UpdaterPage /> },
-        #[allow(clippy::let_unit_value)]
-        Route::Wizard => html! { <WizardPage /> },
+        Route::WizardRoot => html! { <WizardPage stage={WizardStage::MenubarHelp} /> },
+        Route::Wizard { stage } => html! { <WizardPage stage={stage} /> },
     }
 }
