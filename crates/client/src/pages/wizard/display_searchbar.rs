@@ -25,7 +25,7 @@ pub fn key_element(props: &KeyElementProps) -> Html {
     );
 
     let code = match props.key_code.as_str() {
-        "Cmd" | "Ctrl" | "CmdOrCtrl" => match get_os() {
+        "Cmd" | "CmdOrCtrl" => match get_os() {
             OsName::MacOS => "⌘",
             _ => "Ctrl",
         },

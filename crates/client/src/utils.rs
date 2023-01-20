@@ -28,6 +28,7 @@ impl RequestState {
 pub fn get_os() -> OsName {
     let nav = window().navigator();
     if let Ok(user_agent) = nav.user_agent() {
+        let user_agent = user_agent.to_lowercase();
         if user_agent.contains("windows") {
             return OsName::Windows;
         } else if user_agent.contains("mac") {
