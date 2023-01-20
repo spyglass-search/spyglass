@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{atomic::Ordering, Arc};
 
-use shared::response::{DefaultIndicies, SearchResults};
+use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
@@ -353,15 +353,18 @@ pub async fn wizard_finished(win: tauri::Window, toggle_file_indexer: bool) -> R
 }
 
 #[tauri::command]
-pub async fn default_indicies(win: tauri::Window) -> Result<DefaultIndicies, String> {
+pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
-        if let Ok(res) = rpc.client.default_indices().await {
-            return Ok(res);
+        match rpc.client.default_indices().await {
+            Ok(res) => return Ok(res),
+            Err(err) => {
+                log::info!("default_indices: {:?}", err);
+            }
         }
     }
 
-    Ok(DefaultIndicies {
+    Ok(DefaultIndices {
         file_paths: Vec::new(),
     })
 }

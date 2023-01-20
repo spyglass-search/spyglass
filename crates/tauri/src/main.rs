@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
-            cmd::default_indicies,
+            cmd::default_indices,
             cmd::delete_doc,
             cmd::delete_domain,
             cmd::escape,

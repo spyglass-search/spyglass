@@ -18,7 +18,7 @@ use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
-    AppStatus, DefaultIndicies, InstallStatus, LensResult, ListConnectionResult, PluginResult,
+    AppStatus, DefaultIndices, InstallStatus, LensResult, ListConnectionResult, PluginResult,
     SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 
@@ -621,7 +621,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
     Ok(())
 }
 
-pub async fn default_indicies() -> DefaultIndicies {
+pub async fn default_indices() -> DefaultIndices {
     let mut file_paths: Vec<String> = Vec::new();
 
     if let Some(user_dirs) = UserDirs::new() {
@@ -642,7 +642,7 @@ pub async fn default_indicies() -> DefaultIndicies {
     }
 
     file_paths.retain(|f| Path::new(f).exists());
-    DefaultIndicies { file_paths }
+    DefaultIndices { file_paths }
 }
 
 #[cfg(test)]

@@ -160,6 +160,6 @@ impl LibraryStats {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DefaultIndicies {
+pub struct DefaultIndices {
     pub file_paths: Vec<String>,
 }

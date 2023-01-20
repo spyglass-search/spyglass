@@ -291,7 +291,7 @@ export let invoke = async (func_name, params) => {
         }
     } else if (func_name == "get_shortcut") {
         return "CmdOrCtrl+Shift+/";
-    } else if (func_name == "default_indicies") {
+    } else if (func_name == "default_indices") {
         return {
             file_paths: ["/Users/billy/Desktop", "/Users/billy/Documents", "/Applications"]
         };

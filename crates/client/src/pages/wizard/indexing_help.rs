@@ -6,7 +6,7 @@ use yew::prelude::*;
 use shared::{
     event::ClientInvoke,
     form::{FormType, SettingOpts},
-    response::DefaultIndicies,
+    response::DefaultIndices,
 };
 use yew::virtual_dom::VNode;
 
@@ -18,7 +18,7 @@ pub fn index_files_help() -> Html {
         use_effect_with_deps(
             move |_| {
                 spawn_local(async move {
-                    match tauri_invoke::<_, DefaultIndicies>(ClientInvoke::DefaultIndicies, "").await {
+                    match tauri_invoke::<_, DefaultIndices>(ClientInvoke::DefaultIndices, "").await {
                         Ok(result) => {
                             let mut sorted = result.file_paths.clone();
                             sorted.sort();
