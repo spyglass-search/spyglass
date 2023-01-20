@@ -3,7 +3,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::components::{btn, icons};
+use crate::components::{btn, forms::SettingChangeEvent, icons};
 use crate::{tauri_invoke, Route};
 use shared::event::{ClientInvoke, WizardFinishedParams};
 
@@ -35,9 +35,11 @@ pub struct WizardProps {
 #[function_component(WizardPage)]
 pub fn wizard_page(props: &WizardProps) -> Html {
     let nav = use_navigator().expect("History not available in this browser");
+    let toggle_file_indexer = use_state(|| false);
 
     let cur_stage = props.stage.clone();
     let nav_clone = nav.clone();
+    let tfi_state = toggle_file_indexer.clone();
     let handle_next = Callback::from(move |_| {
         let next_stage = match cur_stage {
             WizardStage::MenubarHelp => WizardStage::DisplaySearchbarHelp,
@@ -50,7 +52,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
 
         if next_stage == WizardStage::Done {
             let params = WizardFinishedParams {
-                toggle_file_indexer: false,
+                toggle_file_indexer: *tfi_state,
             };
 
             spawn_local(async move {
@@ -60,6 +62,13 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         }
 
         nav_clone.push(&Route::Wizard { stage: next_stage });
+    });
+
+    let tfi_state = toggle_file_indexer;
+    let handle_onchange = Callback::from(move |event: SettingChangeEvent| {
+        if let Ok(new_value) = serde_json::from_str::<bool>(&event.new_value) {
+            tfi_state.set(new_value);
+        }
     });
 
     let mut next_label = String::new();
@@ -74,7 +83,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         }
         WizardStage::IndexFiles => {
             next_label = "Indexing Cloud Accounts".into();
-            html! { <indexing_help::IndexFilesHelp /> }
+            html! { <indexing_help::IndexFilesHelp onchange={handle_onchange} /> }
         }
         WizardStage::IndexCloud => {
             next_label = "Indexing Web Content".into();
