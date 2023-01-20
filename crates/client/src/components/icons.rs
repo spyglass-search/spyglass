@@ -78,6 +78,15 @@ pub fn bookmark_icon(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(ChevronLeftIcon)]
+pub fn chevron_left_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" class={props.class()} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+    }
+}
+
 #[function_component(ChevronRightIcon)]
 pub fn chevron_right_icon(props: &IconProps) -> Html {
     html! {
