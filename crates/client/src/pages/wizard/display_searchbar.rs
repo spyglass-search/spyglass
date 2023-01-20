@@ -2,7 +2,10 @@ use shared::event::ClientInvoke;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::{tauri_invoke, utils::{get_os, OsName}};
+use crate::{
+    tauri_invoke,
+    utils::{get_os, OsName},
+};
 
 #[derive(Properties, PartialEq)]
 pub struct KeyElementProps {
@@ -22,12 +25,10 @@ pub fn key_element(props: &KeyElementProps) -> Html {
     );
 
     let code = match props.key_code.as_str() {
-        "Cmd" | "Ctrl" | "CmdOrCtrl" => {
-            match get_os() {
-                OsName::MacOS => "⌘",
-                _ => "Ctrl"
-            }
-        }
+        "Cmd" | "Ctrl" | "CmdOrCtrl" => match get_os() {
+            OsName::MacOS => "⌘",
+            _ => "Ctrl",
+        },
         _ => &props.key_code,
     };
 

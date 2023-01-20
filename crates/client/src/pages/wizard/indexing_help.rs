@@ -18,12 +18,13 @@ pub fn index_files_help() -> Html {
         use_effect_with_deps(
             move |_| {
                 spawn_local(async move {
-                    match tauri_invoke::<_, DefaultIndices>(ClientInvoke::DefaultIndices, "").await {
+                    match tauri_invoke::<_, DefaultIndices>(ClientInvoke::DefaultIndices, "").await
+                    {
                         Ok(result) => {
-                            let mut sorted = result.file_paths.clone();
+                            let mut sorted = result.file_paths;
                             sorted.sort();
                             paths_state.set(sorted);
-                        },
+                        }
                         Err(err) => {
                             log::info!("error: {}", err);
                         }
@@ -45,7 +46,9 @@ pub fn index_files_help() -> Html {
 
     let paths_rendered: VNode = paths
         .iter()
-        .map(|p| { html! { <li class="list-disc">{p}</li> } })
+        .map(|p| {
+            html! { <li class="list-disc">{p}</li> }
+        })
         .collect();
 
     html! {
