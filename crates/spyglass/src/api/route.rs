@@ -2,7 +2,7 @@ use directories::UserDirs;
 use entities::get_library_stats;
 use jsonrpsee::core::Error;
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::PathBuf;
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
@@ -622,26 +622,27 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
 }
 
 pub async fn default_indices() -> DefaultIndices {
-    let mut file_paths: Vec<String> = Vec::new();
+    let mut file_paths: Vec<PathBuf> = Vec::new();
 
     if let Some(user_dirs) = UserDirs::new() {
         if let Some(path) = user_dirs.desktop_dir() {
-            file_paths.push(path.display().to_string());
+            file_paths.push(path.to_path_buf());
         }
 
         if let Some(path) = user_dirs.document_dir() {
-            file_paths.push(path.display().to_string());
+            file_paths.push(path.to_path_buf());
         }
     }
 
     // Application path is os dependent
-    if cfg!(target_os = "macos") {
-        file_paths.push("/Applications".into());
-    } else if cfg!(target_os = "windows") {
-        file_paths.push("C:\\Program Files (x86)".into());
-    }
+    // NOTE: Uncomment when we add in app searching ability
+    // if cfg!(target_os = "macos") {
+    //     file_paths.push("/Applications".into());
+    // } else if cfg!(target_os = "windows") {
+    //     file_paths.push("C:\\Program Files (x86)".into());
+    // }
 
-    file_paths.retain(|f| Path::new(f).exists());
+    file_paths.retain(|f| f.exists());
     DefaultIndices { file_paths }
 }
 

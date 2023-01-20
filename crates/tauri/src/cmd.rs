@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
@@ -340,9 +340,54 @@ pub async fn get_shortcut(win: tauri::Window) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn wizard_finished(win: tauri::Window, toggle_file_indexer: bool) -> Result<(), String> {
+pub async fn wizard_finished(
+    win: tauri::Window,
+    config: State<'_, Config>,
+    toggle_file_indexer: bool,
+) -> Result<(), String> {
+    let plugin_name = "local-file-indexer";
+    // Only do this is we're enabling the plugin.
+    if toggle_file_indexer {
+        let field = "FOLDERS_LIST";
+
+        let mut current_settings = config.user_settings.clone();
+        let plugin_configs = config.load_plugin_config();
+        // Load the plugin configuration, grab the default paths & add to the plugin config.
+        let to_update = current_settings
+            .plugin_settings
+            .entry(plugin_name.to_string())
+            .or_default();
+        let default_indices = default_indices(win.clone())
+            .await
+            .expect("Should not fail getting defaults");
+        if let Some(plugin_config) = plugin_configs.get(plugin_name) {
+            if let Some(field_opts) = plugin_config.user_settings.get(field) {
+                let merged = if let Some(paths) = to_update.get(field) {
+                    let mut paths =
+                        serde_json::from_str::<Vec<PathBuf>>(paths).map_or(Vec::new(), |x| x);
+                    for path in default_indices.file_paths.iter() {
+                        if !paths.contains(path) {
+                            paths.push(path.to_path_buf());
+                        }
+                    }
+
+                    paths
+                } else {
+                    default_indices.file_paths
+                };
+
+                if let Ok(paths) = serde_json::to_string(&merged) {
+                    if let Ok(val) = field_opts.form_type.validate(&paths) {
+                        to_update.insert(field.into(), val);
+                    }
+                }
+            }
+        }
+    }
+
     // Turn on/off the plugin based on the user prefs.
-    let _ = toggle_plugin(win.clone(), "local-file-indexer", toggle_file_indexer).await;
+    let _ = toggle_plugin(win.clone(), plugin_name, toggle_file_indexer).await;
+
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
         let _ = window.close();

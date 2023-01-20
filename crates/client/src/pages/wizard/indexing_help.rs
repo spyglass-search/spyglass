@@ -23,7 +23,8 @@ pub fn index_files_help() -> Html {
                         Ok(result) => {
                             let mut sorted = result.file_paths;
                             sorted.sort();
-                            paths_state.set(sorted);
+                            paths_state
+                                .set(sorted.iter().map(|p| p.display().to_string()).collect());
                         }
                         Err(err) => {
                             log::info!("error: {}", err);
