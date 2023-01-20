@@ -82,7 +82,7 @@ pub fn index_cloud_help() -> Html {
     html! {
         <div class="p-4 bg-neutral-800 h-screen text-left text-neutral-400 flex flex-col gap-4">
             <h1 class="text-2xl flex flex-row items-center gap-2 text-white">
-                <icons::FileExtIcon class="w-8 h-8" ext="any" />
+                <icons::ShareIcon height="h-8" width="w-8" />
                 <div>{"Search your cloud accounts"}</div>
             </h1>
             <div class="text-sm">
@@ -102,7 +102,7 @@ pub fn index_web_help() -> Html {
     html! {
         <div class="p-4 bg-neutral-800 h-screen text-left text-neutral-400 flex flex-col gap-4">
             <h1 class="text-2xl flex flex-row items-center gap-2 text-white">
-                <icons::FileExtIcon class="w-8 h-8" ext="any" />
+                <icons::GlobeIcon width="w-8" height="h-8" />
                 <div>{"Search web context"}</div>
             </h1>
             <div class="text-sm">
