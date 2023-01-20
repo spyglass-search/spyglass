@@ -345,11 +345,12 @@ pub async fn wizard_finished(
     config: State<'_, Config>,
     toggle_file_indexer: bool,
 ) -> Result<(), String> {
-    let plugin_name = "local-file-indexer";
+    let plugin_name = "local-file-importer";
     // Only do this is we're enabling the plugin.
     if toggle_file_indexer {
         let field = "FOLDERS_LIST";
 
+        // TODO: Make this waaaay less involved to get & update a single field.
         let mut current_settings = config.user_settings.clone();
         let plugin_configs = config.load_plugin_config();
         // Load the plugin configuration, grab the default paths & add to the plugin config.
@@ -378,7 +379,9 @@ pub async fn wizard_finished(
 
                 if let Ok(paths) = serde_json::to_string(&merged) {
                     if let Ok(val) = field_opts.form_type.validate(&paths) {
+                        log::debug!("Updating {}.{} w/ {}", plugin_name, field, val);
                         to_update.insert(field.into(), val);
+                        let _ = config.save_user_settings(&current_settings);
                     }
                 }
             }
