@@ -114,9 +114,5 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     // Run wizard on first run
     if !config.user_settings.run_wizard {
         show_wizard_window(&window.app_handle());
-        // Only run the wizard once.
-        let mut updated = config.user_settings.clone();
-        updated.run_wizard = true;
-        let _ = config.save_user_settings(&updated);
     }
 }

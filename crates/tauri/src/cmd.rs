@@ -353,7 +353,7 @@ pub async fn wizard_finished(
 
         // TODO: Make this waaaay less involved to get & update a single field.
         let mut current_settings = config.user_settings.clone();
-        current_settings.run_wizard = false;
+        current_settings.run_wizard = true;
 
         let plugin_configs = config.load_plugin_config();
         // Load the plugin configuration, grab the default paths & add to the plugin config.
