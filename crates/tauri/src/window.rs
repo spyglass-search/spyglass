@@ -212,15 +212,21 @@ pub fn show_wizard_window(app: &AppHandle) {
     let window = if let Some(window) = app.get_window(constants::WIZARD_WIN_NAME) {
         window
     } else {
+        let height = if cfg!(target_os = "windows") {
+            472.0
+        } else {
+            492.0
+        };
+
         WindowBuilder::new(
             app,
             constants::WIZARD_WIN_NAME,
             WindowUrl::App("/wizard".into()),
         )
-        .title("Getting Started w/ Spyglass")
+        .title("Getting Started")
         .menu(Menu::new())
-        .min_inner_size(400.0, 492.0)
-        .max_inner_size(400.0, 492.0)
+        .min_inner_size(400.0, height)
+        .max_inner_size(400.0, height)
         .build()
         .expect("Unable to build window for wizard")
     };
