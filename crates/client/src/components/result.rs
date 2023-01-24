@@ -64,6 +64,7 @@ fn render_metadata(result: &SearchResult) -> Html {
             "api" => {
                 // Show friendly API name
                 match result.domain.as_str() {
+                    "api.github.com" => meta.push(html! { <span>{"Github"}</span> }),
                     "calendar.google.com" => meta.push(html! { <span>{"Google Calendar"}</span> }),
                     "drive.google.com" => meta.push(html! { <span>{"Google Drive"}</span> }),
                     _ => {}
