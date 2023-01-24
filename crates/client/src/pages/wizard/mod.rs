@@ -78,15 +78,15 @@ pub fn wizard_page(props: &WizardProps) -> Html {
             html! { <menubar_help::MenubarHelpPage /> }
         }
         WizardStage::DisplaySearchbarHelp => {
-            next_label = "Indexing files, web content, & more".into();
+            next_label = "Create your library".into();
             html! { <display_searchbar::DisplaySearchbarPage /> }
         }
         WizardStage::IndexFiles => {
-            next_label = "Indexing Cloud Accounts".into();
+            next_label = "Connect your cloud".into();
             html! { <indexing_help::IndexFilesHelp onchange={handle_onchange} /> }
         }
         WizardStage::IndexCloud => {
-            next_label = "Indexing Web Content".into();
+            next_label = "Add web content".into();
             html! { <indexing_help::IndexCloudHelp /> }
         }
         WizardStage::IndexWeb => {
