@@ -64,7 +64,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         nav_clone.push(&Route::Wizard { stage: next_stage });
     });
 
-    let tfi_state = toggle_file_indexer;
+    let tfi_state = toggle_file_indexer.clone();
     let handle_onchange = Callback::from(move |event: SettingChangeEvent| {
         if let Ok(new_value) = serde_json::from_str::<bool>(&event.new_value) {
             tfi_state.set(new_value);
@@ -83,7 +83,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         }
         WizardStage::IndexFiles => {
             next_label = "Connect your cloud".into();
-            html! { <indexing_help::IndexFilesHelp onchange={handle_onchange} /> }
+            html! { <indexing_help::IndexFilesHelp toggle_file_indexer={*toggle_file_indexer} onchange={handle_onchange} /> }
         }
         WizardStage::IndexCloud => {
             next_label = "Add web content".into();
