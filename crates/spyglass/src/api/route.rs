@@ -24,7 +24,7 @@ use shared::response::{
 
 use libauth::ApiClient;
 use libgoog::{ClientType, Credentials, GoogClient};
-use libspyglass::oauth::{self, connection_secret};
+use libspyglass::connection::credentials::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
@@ -211,7 +211,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
     match connection::Entity::find().all(&state.db).await {
         Ok(enabled) => {
             // TODO: Move this into a config / db table?
-            let all_conns = oauth::supported_connections();
+            let all_conns = credentials::supported_connections();
             let supported = all_conns
                 .values()
                 .cloned()

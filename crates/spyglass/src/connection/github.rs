@@ -3,9 +3,9 @@ use jsonrpsee::core::async_trait;
 use libgithub::GithubClient;
 use url::Url;
 
-use super::{Connection, load_credentials, handle_sync_credentials};
+use super::credentials::connection_secret;
+use super::{handle_sync_credentials, load_credentials, Connection};
 use crate::crawler::{CrawlError, CrawlResult};
-use crate::oauth;
 use crate::state::AppState;
 
 const BUFFER_SYNC_SIZE: usize = 500;
@@ -18,13 +18,14 @@ pub struct GithubConnection {
 impl GithubConnection {
     pub async fn new(state: &AppState, account: &str) -> anyhow::Result<Self> {
         let credentials = load_credentials(&state.db, &Self::id(), account).await?;
-        let (client_id, client_secret, _) = oauth::connection_secret(&Self::id()).expect("Connection not supported");
+        let (client_id, client_secret, _) =
+            connection_secret(&Self::id()).expect("Connection not supported");
 
         let mut client = GithubClient::new(
             &client_id,
             &client_secret,
             "http://127.0.0.1:0",
-            credentials
+            credentials,
         )?;
 
         handle_sync_credentials(&mut client, &state.db, &Self::id(), account).await;

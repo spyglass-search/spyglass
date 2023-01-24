@@ -4,11 +4,11 @@ use jsonrpsee::core::async_trait;
 use libgoog::GoogClient;
 
 use crate::crawler::{CrawlError, CrawlResult};
-use crate::oauth;
 use crate::state::AppState;
 use entities::models::crawl_queue;
 use url::Url;
 
+use super::credentials::connection_secret;
 use super::{handle_sync_credentials, load_credentials, Connection};
 
 pub struct GCalConnection {
@@ -20,7 +20,7 @@ impl GCalConnection {
     pub async fn new(state: &AppState, account: &str) -> anyhow::Result<Self> {
         let credentials = load_credentials(&state.db, &Self::id(), account).await?;
         let (client_id, client_secret, _) =
-            oauth::connection_secret(&Self::id()).expect("Connection not supported");
+            connection_secret(&Self::id()).expect("Connection not supported");
 
         let mut client = GoogClient::new(
             libgoog::ClientType::Calendar,

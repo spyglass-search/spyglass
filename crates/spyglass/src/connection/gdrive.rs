@@ -5,8 +5,8 @@ use jsonrpsee::core::async_trait;
 use libgoog::GoogClient;
 use url::Url;
 
+use super::credentials::connection_secret;
 use crate::crawler::{CrawlError, CrawlResult};
-use crate::oauth;
 use crate::state::AppState;
 
 use super::{handle_sync_credentials, load_credentials, Connection};
@@ -23,7 +23,7 @@ impl DriveConnection {
             .expect("No credentials matching that id");
 
         let (client_id, client_secret, _) =
-            oauth::connection_secret(&Self::id()).expect("Connection not supported");
+            connection_secret(&Self::id()).expect("Connection not supported");
 
         let mut client = GoogClient::new(
             libgoog::ClientType::Drive,

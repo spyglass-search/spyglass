@@ -10,6 +10,7 @@ use crate::crawler::{CrawlError, CrawlResult};
 use crate::state::AppState;
 use url::Url;
 
+pub mod credentials;
 pub mod gcal;
 pub mod gdrive;
 pub mod github;
