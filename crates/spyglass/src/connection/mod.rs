@@ -1,19 +1,26 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use entities::models::connection;
 use entities::models::tag::TagPair;
 use entities::sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 use jsonrpsee::core::async_trait;
 use libauth::{AccessToken, ApiClient, Credentials, RefreshToken};
+use libgithub::GithubClient;
+use libgoog::{ClientType, GoogClient};
 use std::time::Duration;
 
 use crate::crawler::{CrawlError, CrawlResult};
 use crate::state::AppState;
+use crate::task::{CollectTask, ManagerCommand};
 use url::Url;
 
+pub mod auth_server;
 pub mod credentials;
 pub mod gcal;
 pub mod gdrive;
 pub mod github;
+
+use auth_server::{create_auth_listener, AuthListener};
+use credentials::connection_secret;
 
 #[async_trait]
 pub trait Connection {
@@ -35,12 +42,12 @@ pub trait Connection {
     async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError>;
 }
 
+/// Load credentials from the db for an account, Errs if no credentials are found.
 async fn load_credentials(
     db: &DatabaseConnection,
     id: &str,
     account: &str,
 ) -> anyhow::Result<Credentials> {
-    // Load credentials from db
     let creds = connection::get_by_id(db, &id, account)
         .await?
         .expect("No credentials matching that id");
@@ -55,7 +62,7 @@ async fn load_credentials(
     Ok(credentials)
 }
 
-// Update credentials in database whenever we refresh the token.
+/// Update credentials in database whenever we refresh the token.
 async fn handle_sync_credentials(
     api_client: &mut impl ApiClient,
     db: &DatabaseConnection,
@@ -92,6 +99,7 @@ async fn handle_sync_credentials(
     });
 }
 
+/// Load a connection for sync/crawls
 pub async fn load_connection(
     state: &AppState,
     api_id: &str,
@@ -115,4 +123,102 @@ pub async fn load_connection(
         )),
         _ => Err(anyhow::anyhow!("Not suppported connection")),
     }
+}
+
+async fn listen_for_token(
+    state: &AppState,
+    client: &mut impl ApiClient,
+    listener: &mut AuthListener,
+    scopes: &[String],
+) -> Result<()> {
+    let request = client.authorize(scopes);
+    let _ = open::that(request.url.to_string());
+
+    log::debug!("listening for auth code");
+    let auth_code = listener
+        .listen(60 * 5)
+        .await
+        .expect("No auth code detected");
+
+    log::debug!("received oauth credentials: {:?}", auth_code);
+
+    let token = client
+        .token_exchange(&auth_code.code, &request.pkce_verifier)
+        .await?;
+    let mut creds = Credentials::default();
+    creds.refresh_token(&token);
+    let _ = client.set_credentials(&creds);
+
+    let api_id = client.id();
+    let account_id = client
+        .account_id()
+        .await
+        .expect("Unable to get account information");
+    let new_conn = connection::ActiveModel::new(
+        api_id.clone(),
+        account_id.clone(),
+        creds.access_token.secret().to_string(),
+        creds.refresh_token.map(|t| t.secret().to_string()),
+        creds
+            .expires_in
+            .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
+        auth_code.scopes,
+    );
+
+    new_conn.insert(&state.db).await?;
+    log::debug!("saved connection {} for {}", account_id, api_id);
+    let _ = state
+        .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
+            api_id,
+            account: account_id,
+        }))
+        .await;
+
+    Ok(())
+}
+
+pub async fn handle_authorize_connection(state: &AppState, api_id: &str) -> Result<()> {
+    // Grab the client id/secret for this connection
+    let (client_id, client_secret, scopes) =
+        connection_secret(api_id).expect("Unsupported connection");
+
+    let mut listener = create_auth_listener().await;
+    let redirect_uri = format!("http://127.0.0.1:{}", listener.port());
+
+    let res = match api_id.as_ref() {
+        "api.github.com" => {
+            let mut client = GithubClient::new(
+                &client_id,
+                &client_secret,
+                &redirect_uri,
+                Default::default(),
+            )?;
+            listen_for_token(state, &mut client, &mut listener, &scopes).await
+        }
+        "calendar.google.com" => {
+            let mut client = GoogClient::new(
+                ClientType::Calendar,
+                &client_id,
+                &client_secret,
+                &redirect_uri,
+                Default::default(),
+            )?;
+            listen_for_token(state, &mut client, &mut listener, &scopes).await
+        }
+        "drive.google.com" => {
+            let mut client = GoogClient::new(
+                ClientType::Drive,
+                &client_id,
+                &client_secret,
+                &redirect_uri,
+                Default::default(),
+            )?;
+            listen_for_token(state, &mut client, &mut listener, &scopes).await
+        }
+        _ => return Err(anyhow!("Unsupported connection")),
+    };
+
+    res?;
+
+    Ok(())
 }
