@@ -8,6 +8,7 @@ use tauri::Manager;
 use tauri::State;
 
 use crate::PauseState;
+use crate::window::show_discover_window;
 use crate::{open_folder, rpc, window};
 use shared::config::Config;
 use shared::{event::ClientEvent, request, response};
@@ -352,6 +353,8 @@ pub async fn wizard_finished(
 
         // TODO: Make this waaaay less involved to get & update a single field.
         let mut current_settings = config.user_settings.clone();
+        current_settings.run_wizard = false;
+
         let plugin_configs = config.load_plugin_config();
         // Load the plugin configuration, grab the default paths & add to the plugin config.
         let to_update = current_settings
@@ -394,6 +397,7 @@ pub async fn wizard_finished(
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
         let _ = window.close();
+        show_discover_window(&window.app_handle());
     }
 
     Ok(())
