@@ -19,7 +19,6 @@ ego-tree = "0.6.2"
 entities = { path = "../entities" }
 flate2 = "1.0.24"
 futures = "0.3"
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4" }
 hex = "0.4"
 hostname = "^0.3"
 html5ever = "0.25"
@@ -61,6 +60,11 @@ warp = "0.3"
 warc = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
+
+# Spyglass libs
+auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "15f551808788205d5c3475957356546f0b5302f1" }
+github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "15f551808788205d5c3475957356546f0b5302f1" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "15f551808788205d5c3475957356546f0b5302f1" }
 
 [lib]
 name = "libspyglass"

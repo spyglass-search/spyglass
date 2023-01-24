@@ -22,6 +22,7 @@ use shared::response::{
     SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 
+use libauth::ApiClient;
 use libgoog::{ClientType, Credentials, GoogClient};
 use libspyglass::oauth::{self, connection_secret};
 use libspyglass::plugin::PluginCommand;
@@ -83,6 +84,7 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
             Default::default(),
         )?;
 
+        let scopes: Vec<String> = scopes.iter().map(|x| x.to_string()).collect();
         let request = client.authorize(&scopes);
         let _ = open::that(request.url.to_string());
 

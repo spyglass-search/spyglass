@@ -265,6 +265,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth_core"
+version = "0.1.0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=15f551808788205d5c3475957356546f0b5302f1#15f551808788205d5c3475957356546f0b5302f1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "dotenv",
+ "dotenv_codegen",
+ "log",
+ "oauth2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "auto-launch"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2103,6 +2125,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "github"
+version = "0.1.0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=15f551808788205d5c3475957356546f0b5302f1#15f551808788205d5c3475957356546f0b5302f1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "auth_core",
+ "bytes",
+ "chrono",
+ "dotenv",
+ "dotenv_codegen",
+ "log",
+ "oauth2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "glib"
 version = "0.15.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2348,9 +2393,11 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4#37675fbc7973b2e8ad7b8f1544f9f0f05f0ed1e4"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=15f551808788205d5c3475957356546f0b5302f1#15f551808788205d5c3475957356546f0b5302f1"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "auth_core",
  "bytes",
  "chrono",
  "dotenv",
@@ -5955,6 +6002,7 @@ version = "23.1.2"
 dependencies = [
  "addr",
  "anyhow",
+ "auth_core",
  "bytes",
  "calamine",
  "chrono",
@@ -5968,6 +6016,7 @@ dependencies = [
  "entities",
  "flate2",
  "futures",
+ "github",
  "google",
  "hex",
  "hostname",
