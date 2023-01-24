@@ -4,7 +4,6 @@ use yew::prelude::*;
 /// Confused about where the tray icon is?
 #[function_component(MenubarHelpPage)]
 pub fn menubar_help() -> Html {
-
     let os = get_os();
 
     let (example_img, menubar_name) = match os {
@@ -14,7 +13,7 @@ pub fn menubar_help() -> Html {
 
     let click_str = match os {
         OsName::MacOS => "Left click",
-        _ => "Right click"
+        _ => "Right click",
     };
 
     html! {

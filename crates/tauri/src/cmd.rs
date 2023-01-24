@@ -7,8 +7,8 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
-use crate::PauseState;
 use crate::window::show_discover_window;
+use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::Config;
 use shared::{event::ClientEvent, request, response};
