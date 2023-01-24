@@ -36,7 +36,7 @@ impl GithubConnection {
         })
     }
 
-    async fn sync_repos(&mut self, state: &AppState) {
+    async fn sync_repos(&mut self, _state: &AppState) {
         let mut page = Some(1);
         let mut total_synced = 0;
         let mut buffer = Vec::new();
@@ -45,10 +45,13 @@ impl GithubConnection {
             page = resp.next_page;
             total_synced += resp.result.len();
             buffer.extend(resp.result);
-
             // Save to DB when we've reached a limit or there are no more pages.
             if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
                 // Add to database
+                for res in &buffer {
+                    let desc = res.description.clone();
+                    log::debug!("repo: {} - {}", res.full_name, desc.unwrap_or("N/A".to_string()));
+                }
                 // clear buffer
                 buffer.clear()
             }
@@ -84,7 +87,7 @@ impl Connection for GithubConnection {
         self.sync_repos(state).await;
     }
 
-    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
+    async fn get(&mut self, _uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
         Ok(CrawlResult::default())
     }
 }
