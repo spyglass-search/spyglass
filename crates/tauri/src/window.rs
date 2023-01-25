@@ -119,9 +119,6 @@ pub async fn resize_window(window: &Window, height: f64) {
 
 fn show_window(window: &Window) {
     let _ = window.show();
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
     let _ = window.set_focus();
     let _ = window.center();
 }
@@ -217,7 +214,7 @@ pub fn show_wizard_window(app: &AppHandle) {
             constants::WIZARD_WIN_NAME,
             WindowUrl::App("/wizard".into()),
         )
-        .title("Getting Started w/ Spyglass")
+        .title("Getting Started")
         .menu(Menu::new())
         .min_inner_size(400.0, 492.0)
         .max_inner_size(400.0, 492.0)
