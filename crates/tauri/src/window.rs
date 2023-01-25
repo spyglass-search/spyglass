@@ -119,9 +119,6 @@ pub async fn resize_window(window: &Window, height: f64) {
 
 fn show_window(window: &Window) {
     let _ = window.show();
-    // A little hack to bring window to the front if its hiding behind something.
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_always_on_top(false);
     let _ = window.set_focus();
     let _ = window.center();
 }
