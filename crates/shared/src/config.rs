@@ -60,7 +60,7 @@ pub struct UserSettings {
     pub inflight_crawl_limit: Limit,
     /// Number of in-flight crawls allowed per domain.
     pub inflight_domain_limit: Limit,
-    /// Have we run the wizard?
+    /// Have we run the wizard? false will run it again on startup.
     pub run_wizard: bool,
     /// Domains explicitly allowed, regardless of what's in the blocklist.
     pub allow_list: Vec<String>,

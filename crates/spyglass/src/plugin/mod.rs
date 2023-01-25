@@ -235,6 +235,11 @@ pub async fn plugin_event_loop(
                 let manager = state.plugin_manager.lock().await;
                 if let Some(plugin) = manager.find_by_name(plugin_name) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
+                        // Reload configuration for this plugin & initialize.
+                        if let Ok(user_settings) = Config::load_user_settings() {
+                            config.user_settings = user_settings;
+                            instance.config.set_user_config(&config.user_settings);
+                        }
                         instance.config.is_enabled = true;
                         // Re-initialize plugin
                         let _ = cmd_writer

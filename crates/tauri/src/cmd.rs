@@ -7,6 +7,7 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
+use crate::window::show_discover_window;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::Config;
@@ -346,12 +347,14 @@ pub async fn wizard_finished(
     toggle_file_indexer: bool,
 ) -> Result<(), String> {
     let plugin_name = "local-file-importer";
+    let mut current_settings = config.user_settings.clone();
+    current_settings.run_wizard = true;
+
     // Only do this is we're enabling the plugin.
     if toggle_file_indexer {
         let field = "FOLDERS_LIST";
 
         // TODO: Make this waaaay less involved to get & update a single field.
-        let mut current_settings = config.user_settings.clone();
         let plugin_configs = config.load_plugin_config();
         // Load the plugin configuration, grab the default paths & add to the plugin config.
         let to_update = current_settings
@@ -381,19 +384,21 @@ pub async fn wizard_finished(
                     if let Ok(val) = field_opts.form_type.validate(&paths) {
                         log::debug!("Updating {}.{} w/ {}", plugin_name, field, val);
                         to_update.insert(field.into(), val);
-                        let _ = config.save_user_settings(&current_settings);
                     }
                 }
             }
         }
     }
 
+    // Save any updated settings based on onboarding flow.
+    let _ = config.save_user_settings(&current_settings);
     // Turn on/off the plugin based on the user prefs.
     let _ = toggle_plugin(win.clone(), plugin_name, toggle_file_indexer).await;
 
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
         let _ = window.close();
+        show_discover_window(&window.app_handle());
     }
 
     Ok(())
