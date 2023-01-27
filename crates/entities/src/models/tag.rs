@@ -29,6 +29,10 @@ pub enum TagType {
     // mimetypes somewhere
     #[sea_orm(string_value = "mimetype")]
     MimeType,
+    // General type tag, Used for high level types ex: File, directory. The MimeType
+    // would be used as a more specific type
+    #[sea_orm(string_value = "type")]
+    Type,
     // where this document came from,
     #[sea_orm(string_value = "source")]
     Source,
@@ -41,6 +45,9 @@ pub enum TagType {
     // Part of this/these lens(es)
     #[sea_orm(string_value = "lens")]
     Lens,
+    // For file based content this tag
+    #[sea_orm(string_value = "fileext")]
+    FileExt,
 }
 
 #[derive(AsRefStr)]

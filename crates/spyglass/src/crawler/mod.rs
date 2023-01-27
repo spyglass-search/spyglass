@@ -5,7 +5,9 @@ use addr::parse_domain_name;
 use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
+use entities::models::crawl_queue::EnqueueSettings;
 use entities::models::tag::TagPair;
+use entities::models::tag::TagType;
 use percent_encoding::percent_decode_str;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -16,6 +18,7 @@ use entities::sea_orm::prelude::*;
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
+use crate::filesystem;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use crate::state::AppState;
@@ -330,7 +333,7 @@ impl Crawler {
         // handle any fetching/parsing.
         match url.scheme() {
             "api" => self.handle_api_fetch(state, &crawl, &url).await,
-            "file" => self.handle_file_fetch(&crawl, &url).await,
+            "file" => self.handle_file_fetch(state, &crawl, &url).await,
             "http" | "https" => {
                 self.handle_http_fetch(&state.db, &crawl, &url, parse_results)
                     .await
@@ -360,6 +363,7 @@ impl Crawler {
 
     async fn handle_file_fetch(
         &self,
+        state: &AppState,
         _: &crawl_queue::Model,
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
@@ -371,7 +375,7 @@ impl Crawler {
 
         let path = Path::new(&file_path);
         // Is this a file and does this exist?
-        if !path.exists() || !path.is_file() {
+        if !path.exists() {
             return Err(CrawlError::NotFound);
         }
 
@@ -381,48 +385,7 @@ impl Crawler {
             .map(|x| x.to_string())
             .expect("Unable to convert path file name to string");
 
-        // Attempt to read file
-        let contents = match path.extension() {
-            Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
-                Err(err) => return Err(CrawlError::ParseError(err.to_string())),
-                Ok(contents) => contents,
-            },
-            _ => match std::fs::read_to_string(path) {
-                Ok(x) => x,
-                Err(err) => {
-                    return Err(CrawlError::FetchError(err.to_string()));
-                }
-            },
-        };
-
-        let mut hasher = Sha256::new();
-        hasher.update(contents.as_bytes());
-        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-
-        // TODO: Better description building for text files?
-        let description = if !contents.is_empty() {
-            let desc = contents
-                .split(' ')
-                .into_iter()
-                .take(DEFAULT_DESC_LENGTH)
-                .collect::<Vec<&str>>()
-                .join(" ");
-            Some(desc)
-        } else {
-            None
-        };
-
-        Ok(CrawlResult {
-            content_hash,
-            content: Some(contents.clone()),
-            // Does a file have a description? Pull the first part of the file
-            description,
-            title: Some(file_name),
-            url: url.to_string(),
-            open_url: Some(url.to_string()),
-            links: Default::default(),
-            ..Default::default()
-        })
+        _process_path(state, path, file_name, url).await
     }
 
     /// Handle HTTP related requests
@@ -502,6 +465,142 @@ impl Crawler {
             }
         }
     }
+}
+
+fn _build_file_tags(path: &Path) -> Vec<TagPair> {
+    let mut tags = Vec::new();
+    tags.push((TagType::Lens, String::from("filesystem")));
+    if path.is_dir() {
+        tags.push((TagType::Type, String::from("directory")));
+    } else if path.is_file() {
+        tags.push((TagType::Type, String::from("file")));
+        let ext = path
+            .extension()
+            .and_then(|x| x.to_str())
+            .map(|x| x.to_string());
+        if let Some(ext) = ext {
+            tags.push((TagType::FileExt, ext));
+        }
+    }
+
+    if path.is_symlink() {
+        tags.push((TagType::Type, String::from("symlink")))
+    }
+
+    let guess = new_mime_guess::from_path(path.clone());
+    for mime_guess in guess.iter() {
+        tags.push((TagType::MimeType, mime_guess.to_string()));
+    }
+
+    tags
+}
+
+fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
+    // Attempt to read file
+    let contents = match path.extension() {
+        Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
+            Err(err) => return Err(CrawlError::ParseError(err.to_string())),
+            Ok(contents) => contents,
+        },
+        _ => match std::fs::read_to_string(path) {
+            Ok(x) => x,
+            Err(err) => {
+                return Err(CrawlError::FetchError(err.to_string()));
+            }
+        },
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(contents.as_bytes());
+    let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+
+    // TODO: Better description building for text files?
+    let description = if !contents.is_empty() {
+        let desc = contents
+            .split(' ')
+            .into_iter()
+            .take(DEFAULT_DESC_LENGTH)
+            .collect::<Vec<&str>>()
+            .join(" ");
+        Some(desc)
+    } else {
+        None
+    };
+
+    let tags = _build_file_tags(path);
+    Ok(CrawlResult {
+        content_hash,
+        content: Some(contents.clone()),
+        // Does a file have a description? Pull the first part of the file
+        description,
+        title: Some(file_name),
+        url: url.to_string(),
+        open_url: Some(url.to_string()),
+        links: Default::default(),
+        tags: tags,
+        ..Default::default()
+    })
+}
+
+async fn _process_path(
+    state: &AppState,
+    path: &Path,
+    file_name: String,
+    url: &Url,
+) -> Result<CrawlResult, CrawlError> {
+    let extension = filesystem::utils::get_supported_file_extensions(state);
+
+    if path.is_file() {
+        if _matches_ext(path, &extension) {
+            log::error!("Is a file {:?}", path);
+            _process_file(path, file_name, url)
+        } else {
+            let tags = _build_file_tags(path);
+            let mut hasher = Sha256::new();
+            hasher.update(file_name.as_bytes());
+            let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+            Ok(CrawlResult {
+                content_hash,
+                content: Some(file_name.clone()),
+                // Does a file have a description? Pull the first part of the file
+                description: Some(file_name.clone()),
+                title: Some(url.to_string()),
+                url: url.to_string(),
+                open_url: Some(url.to_string()),
+                links: Default::default(),
+                tags: tags,
+                ..Default::default()
+            })
+        }
+    } else if path.is_dir() {
+        let tags = _build_file_tags(path);
+        let mut hasher = Sha256::new();
+        hasher.update(file_name.as_bytes());
+        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+        Ok(CrawlResult {
+            content_hash,
+            content: Some(file_name.clone()),
+            // Does a file have a description? Pull the first part of the file
+            description: Some(file_name.clone()),
+            title: Some(url.to_string()),
+            url: url.to_string(),
+            open_url: Some(url.to_string()),
+            links: Default::default(),
+            tags: tags,
+            ..Default::default()
+        })
+    } else {
+        return Err(CrawlError::NotFound);
+    }
+}
+
+fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {
+    let ext = &path
+        .extension()
+        .and_then(|x| x.to_str())
+        .map(|x| x.to_string())
+        .unwrap_or_default();
+    extension.contains(ext)
 }
 
 #[cfg(test)]
