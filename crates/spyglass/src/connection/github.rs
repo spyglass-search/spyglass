@@ -6,7 +6,9 @@ use url::Url;
 use super::credentials::connection_secret;
 use super::{handle_sync_credentials, load_credentials, Connection};
 use crate::crawler::{CrawlError, CrawlResult};
+use crate::search::Searcher;
 use crate::state::AppState;
+use crate::task::worker::add_document_and_tags;
 
 const BUFFER_SYNC_SIZE: usize = 500;
 
@@ -36,7 +38,14 @@ impl GithubConnection {
         })
     }
 
-    async fn sync_repos(&mut self, _state: &AppState) {
+    pub fn to_url(&self, url: &str) -> anyhow::Result<Url> {
+        let url = url.replace("https", "api");
+        let mut url_base = Url::parse(&url)?;
+        let _ = url_base.set_username(&self.user);
+        Ok(url_base)
+    }
+
+    async fn sync_repos(&mut self, state: &AppState) {
         let mut page = Some(1);
         let mut total_synced = 0;
         let mut buffer = Vec::new();
@@ -49,9 +58,27 @@ impl GithubConnection {
             if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
                 // Add to database
                 for res in &buffer {
-                    let desc = res.description.clone();
-                    log::debug!("repo: {} - {}", res.full_name, desc.unwrap_or("N/A".to_string()));
+                    let api_url = self.to_url(&res.url).expect("unable to create url");
+                    log::debug!("repo: {} - {}", res.full_name, api_url.to_string());
+                    let result = CrawlResult::new(
+                        &api_url,
+                        Some(res.html_url.clone()),
+                        &res.description.clone().unwrap_or_default(),
+                        &res.full_name,
+                        None,
+                    );
+
+                    if let Err(err) =
+                        add_document_and_tags(state, &result, &self.default_tags()).await
+                    {
+                        log::error!("Unable to add repo: {}", err);
+                    }
                 }
+
+                if let Err(err) = Searcher::save(state).await {
+                    log::error!("Unable to save repos: {}", err);
+                }
+
                 // clear buffer
                 buffer.clear()
             }
