@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
+use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, Set, Statement,
 };
@@ -130,28 +133,34 @@ pub async fn indexed_stats(
     Ok(res)
 }
 
-/// Inserts an entry into the tag table for each document and
-/// tag pair provided
-pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &[Model],
-    db: &C,
-    tags: &[TagPair],
-) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
-    let mut tag_models: Vec<tag::Model> = Vec::new();
-    for (label, value) in tags.iter() {
-        match get_or_create(db, label.to_owned(), value).await {
-            Ok(tag) => tag_models.push(tag),
-            Err(err) => log::error!("{}", err),
-        }
-    }
+pub async fn insert_many(
+    db: &impl ConnectionTrait,
+    docs: Vec<ActiveModel>,
+) -> Result<InsertResult<ActiveModel>, DbErr> {
+    Entity::insert_many(docs)
+        .on_conflict(
+            OnConflict::columns(vec![Column::Url])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(db)
+        .await
+}
 
+pub async fn insert_tags_by_id<C: ConnectionTrait>(
+    db: &C,
+    docs: &[Model],
+    tags: &[i64],
+) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+    // Remove dupes before adding
+    let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
     // create connections for each tag
     let doc_tags = docs
         .iter()
         .flat_map(|model| {
-            tag_models.iter().map(|t| document_tag::ActiveModel {
+            tags.iter().map(|t| document_tag::ActiveModel {
                 indexed_document_id: Set(model.id),
-                tag_id: Set(t.id),
+                tag_id: Set(*t),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
                 ..Default::default()
@@ -171,6 +180,24 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
         )
         .exec(db)
         .await
+}
+
+/// Inserts an entry into the tag table for each document and
+/// tag pair provided
+pub async fn insert_tags_many<C: ConnectionTrait>(
+    docs: &[Model],
+    db: &C,
+    tags: &[TagPair],
+) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+    let mut tag_ids: Vec<i64> = Vec::new();
+    for (label, value) in tags.iter() {
+        match get_or_create(db, label.to_owned(), value).await {
+            Ok(tag) => tag_ids.push(tag.id),
+            Err(err) => log::error!("{}", err),
+        }
+    }
+
+    insert_tags_by_id(db, docs, &tag_ids).await
 }
 
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected

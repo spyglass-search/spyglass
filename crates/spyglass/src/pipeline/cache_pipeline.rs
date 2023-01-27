@@ -144,7 +144,7 @@ async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseRe
     // Access tag for this lens and build id list
     let tag = tag::get_or_create(&state.db, TagType::Lens, lens).await;
     let tag_list = match tag {
-        Ok(model) => Some(vec![model.id as u64]),
+        Ok(model) => Some(vec![model.id]),
         Err(error) => {
             log::error!("Error accessing tag for lens {:?}", error);
             None

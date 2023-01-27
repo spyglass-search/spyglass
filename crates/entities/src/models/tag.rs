@@ -60,6 +60,12 @@ pub struct Model {
     pub updated_at: DateTimeUtc,
 }
 
+impl Model {
+    pub fn tag_pair(&self) -> TagPair {
+        (self.label.clone(), self.value.clone())
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter)]
 pub enum Relation {
     CrawlQueue,

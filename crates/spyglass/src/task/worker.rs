@@ -2,10 +2,14 @@ use entities::models::crawl_queue::EnqueueSettings;
 use shared::regex::{regex_for_robots, WildcardType};
 use url::Url;
 
-use entities::models::{bootstrap_queue, crawl_queue, indexed_document, tag};
+use entities::models::{
+    bootstrap_queue, crawl_queue, crawl_tag, indexed_document,
+    tag::{self, TagPair},
+};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, LensRule, LensSource};
+use std::collections::HashMap;
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
@@ -198,7 +202,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                                 changed = true;
                             }
                             None => {
-                                log::error!("No document found in index, db doc id is different than index doc id. Index: {} Database: {}", 
+                                log::error!("No document found in index, db doc id is different than index doc id. Index: {} Database: {}",
                                     doc_id, doc_model.doc_id);
                                 // best we could do is normalize the doc id. The issue is that if they have different doc ids, we do not
                                 // know if they have the same / valid content.
@@ -280,13 +284,113 @@ pub enum FetchResult {
     Updated,
 }
 
+/// Handle multiple crawl results at once.
+pub async fn add_document_and_tags(
+    state: &AppState,
+    result: &CrawlResult,
+    extra_tags: &[TagPair],
+) -> anyhow::Result<FetchResult> {
+    // find all documents that already exist with that url
+    let existing: Vec<indexed_document::Model> = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Url.eq(result.url.clone()))
+        .all(&state.db)
+        .await
+        .unwrap_or_default();
+
+    // build a hash map of Url to the doc id
+    let id_map = existing
+        .iter()
+        .map(|model| (model.url.to_string(), model.doc_id.to_string()))
+        .collect::<HashMap<String, String>>();
+
+    // build a list of doc ids to delete from the index
+    let doc_id_list = id_map
+        .values()
+        .into_iter()
+        .map(|x| x.to_owned())
+        .collect::<Vec<String>>();
+
+    // Delete existing docs
+    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
+    let _ = Searcher::save(state).await;
+
+    let mut updates = Vec::new();
+    let mut added_docs = Vec::new();
+
+    // Find/create the tags for this crawl.
+    let mut all_tags = Vec::new();
+    all_tags.extend(&result.tags);
+    all_tags.extend(extra_tags);
+    let mut tags = Vec::new();
+    for (label, value) in &all_tags {
+        let tag = tag::get_or_create(&state.db, label.to_owned(), value).await?;
+        tags.push(tag.id);
+    }
+
+    match Url::parse(&result.url) {
+        Ok(url) => {
+            let url_host = url.host_str().unwrap_or("");
+            // Add document to index
+            if let Ok(mut index_writer) = state.index.writer.lock() {
+                let doc_id = Searcher::upsert_document(
+                    &mut index_writer,
+                    DocumentUpdate {
+                        doc_id: id_map.get(&result.url).cloned(),
+                        title: &result.title.clone().unwrap_or_default(),
+                        description: &result.description.clone().unwrap_or_default(),
+                        domain: url_host,
+                        url: url.as_str(),
+                        content: &result.content.clone().unwrap_or_default(),
+                        tags: &Some(tags.clone()),
+                    },
+                )?;
+
+                if !id_map.contains_key(&doc_id) {
+                    added_docs.push(url.to_string());
+                    let update = indexed_document::ActiveModel {
+                        domain: Set(url_host.to_string()),
+                        url: Set(url.to_string()),
+                        open_url: Set(Some(url.to_string())),
+                        doc_id: Set(doc_id),
+                        ..Default::default()
+                    };
+
+                    updates.push(update);
+                }
+            }
+        }
+        Err(error) => log::error!("Error processing url: {} error: {:?}", result.url, error),
+    }
+
+    indexed_document::insert_many(&state.db, updates).await?;
+    // Get ids of recently added docs
+    let added = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Url.eq(result.url.clone()))
+        .one(&state.db)
+        .await?;
+
+    if let Some(added) = added {
+        println!("Adding tags to: {} - {:?}", added.id, result.tags);
+        let result = indexed_document::insert_tags_by_id(&state.db, &[added], &tags).await;
+        if let Err(error) = result {
+            log::error!("Error inserting tags {:?}", error);
+        }
+    }
+
+    if existing.is_empty() {
+        Ok(FetchResult::New)
+    } else {
+        Ok(FetchResult::Updated)
+    }
+}
+
 pub async fn process_crawl(
     state: &AppState,
     task_id: i64,
     crawl_result: &CrawlResult,
 ) -> anyhow::Result<FetchResult, CrawlError> {
     // Update job status
-    let mut task =
+    let task =
         match crawl_queue::mark_done(&state.db, task_id, Some(crawl_result.tags.clone())).await {
             Some(task) => task,
             // Task removed while being processed?
@@ -296,21 +400,26 @@ pub async fn process_crawl(
     // Update URL in crawl_task to match the canonical URL extracted in the crawl result.
     if task.url != crawl_result.url {
         log::debug!("Updating task URL {} -> {}", task.url, crawl_result.url);
-        task = match crawl_queue::update_or_remove_task(&state.db, task.id, &crawl_result.url).await
-        {
+        match crawl_queue::update_or_remove_task(&state.db, task.id, &crawl_result.url).await {
             Ok(updated) => {
                 if updated.id != task.id {
                     log::debug!("Removed {}, duplicate canonical URL found", task.id);
                 }
-
-                updated
             }
             Err(err) => {
                 log::error!("Unable to update task URL: {}", err);
-                task
             }
-        }
+        };
     }
+
+    let task_tags = task
+        .find_related(tag::Entity)
+        .all(&state.db)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|t| t.tag_pair())
+        .collect::<Vec<TagPair>>();
 
     // Add all valid, non-duplicate, non-indexed links found to crawl queue
     let to_enqueue: Vec<String> = crawl_result.links.clone().into_iter().collect();
@@ -337,111 +446,14 @@ pub async fn process_crawl(
     }
 
     // Add / update search index w/ crawl result.
-    if let Some(content) = crawl_result.content.clone() {
-        let url = Url::parse(&crawl_result.url);
-        if url.is_err() {
-            return Err(CrawlError::FetchError(format!(
-                "Invalid url: {}",
-                &crawl_result.url
-            )));
-        }
-
-        let url = url.expect("Invalid crawl URL");
-        let url_host = match url.scheme() {
-            "file" => "localhost",
-            _ => url.host_str().expect("Invalid URL host"),
-        };
-
-        let existing = indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.eq(url.as_str()))
-            .one(&state.db)
-            .await
-            .unwrap_or_default();
-
-        // Delete old document, if any.
-        if let Some(doc) = &existing {
-            if let Ok(mut index_writer) = state.index.writer.lock() {
-                let _ = Searcher::remove_from_index(&mut index_writer, &doc.doc_id);
-            }
-        }
-        let task_tags = task
-            .find_related(tag::Entity)
-            .all(&state.db)
-            .await
-            .unwrap_or_default();
-
-        let tags: Vec<u64> = task_tags.iter().map(|tag| tag.id as u64).collect();
-        // Add document to index
-        let doc_id: String = {
-            if let Ok(mut index_writer) = state.index.writer.lock() {
-                match Searcher::upsert_document(
-                    &mut index_writer,
-                    DocumentUpdate {
-                        doc_id: existing.clone().map(|d| d.doc_id),
-
-                        title: &crawl_result.title.clone().unwrap_or_default(),
-                        description: &crawl_result.description.clone().unwrap_or_default(),
-                        domain: url_host,
-                        url: url.as_str(),
-                        content: &content,
-                        tags: &Some(tags),
-                    },
-                ) {
-                    Ok(new_doc_id) => new_doc_id,
-                    Err(err) => {
-                        return Err(CrawlError::Other(format!("Unable to save document: {err}")));
-                    }
-                }
-            } else {
-                return Err(CrawlError::Other(
-                    "Unable to save document, writer lock.".to_owned(),
-                ));
-            }
-        };
-
-        // Update/create index reference in our database
-        let is_update = existing.is_some();
-        let indexed = if let Some(doc) = existing {
-            let mut update: indexed_document::ActiveModel = doc.into();
-            update.doc_id = Set(doc_id);
-            update.open_url = Set(crawl_result.open_url.clone());
-            update
-        } else {
-            indexed_document::ActiveModel {
-                domain: Set(url_host.to_string()),
-                url: Set(url.as_str().to_string()),
-                open_url: Set(crawl_result.open_url.clone()),
-                doc_id: Set(doc_id),
-                ..Default::default()
-            }
-        };
-
-        return match indexed.save(&state.db).await {
-            Ok(doc) => {
-                // attach tags to document once we're all done.
-                let task_tags = task
-                    .find_related(tag::Entity)
-                    .all(&state.db)
-                    .await
-                    .unwrap_or_default();
-
-                let tag_pairs: Vec<tag::TagPair> = task_tags
-                    .iter()
-                    .map(|tag| (tag.label.to_owned(), tag.value.to_string()))
-                    .collect();
-
-                let _ = doc.insert_tags(&state.db, &tag_pairs).await;
-                if is_update {
-                    Ok(FetchResult::Updated)
-                } else {
-                    Ok(FetchResult::New)
-                }
-            }
-            Err(e) => Err(CrawlError::Other(format!("Unable to save document: {e}"))),
-        };
+    if crawl_result.content.is_none() {
+        return Err(CrawlError::ParseError("No content found".to_string()));
     }
 
-    Err(CrawlError::ParseError("No content found".to_string()))
+    match add_document_and_tags(state, crawl_result, &task_tags).await {
+        Ok(res) => Ok(res),
+        Err(err) => Err(CrawlError::Other(err.to_string())),
+    }
 }
 
 #[tracing::instrument(skip(state))]
@@ -499,6 +511,12 @@ pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<()
         .await?;
 
     if let Some(task) = task {
+        // Delete any associated tags
+        crawl_tag::Entity::delete_many()
+            .filter(crawl_tag::Column::CrawlQueueId.eq(task.id))
+            .exec(&state.db)
+            .await?;
+
         // Delete any documents that match this task.
         let docs = indexed_document::Entity::find()
             .filter(indexed_document::Column::Url.eq(task.url.clone()))

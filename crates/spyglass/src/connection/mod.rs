@@ -48,7 +48,7 @@ async fn load_credentials(
     id: &str,
     account: &str,
 ) -> anyhow::Result<Credentials> {
-    let creds = connection::get_by_id(db, &id, account)
+    let creds = connection::get_by_id(db, id, account)
         .await?
         .expect("No credentials matching that id");
 
@@ -185,7 +185,7 @@ pub async fn handle_authorize_connection(state: &AppState, api_id: &str) -> Resu
     let mut listener = create_auth_listener().await;
     let redirect_uri = format!("http://127.0.0.1:{}", listener.port());
 
-    let res = match api_id.as_ref() {
+    let res = match api_id {
         "api.github.com" => {
             let mut client = GithubClient::new(
                 &client_id,
