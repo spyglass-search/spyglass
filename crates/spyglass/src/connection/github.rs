@@ -68,8 +68,11 @@ impl GithubConnection {
                         None,
                     );
 
+                    let mut tags = self.default_tags().clone();
+                    tags.push((TagType::Owner, res.owner.login.clone()));
+
                     if let Err(err) =
-                        add_document_and_tags(state, &result, &self.default_tags()).await
+                        add_document_and_tags(state, &result, &tags).await
                     {
                         log::error!("Unable to add repo: {}", err);
                     }
