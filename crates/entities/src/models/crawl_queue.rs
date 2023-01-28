@@ -303,12 +303,10 @@ pub async fn dequeue(
             Some(task)
         } else {
             // Otherwise, grab a URL off the stack & send it back.
-            let val = Entity::find()
+            Entity::find()
                 .from_raw_sql(gen_dequeue_sql(user_settings))
                 .one(db)
-                .await?;
-            log::error!("Got one {:?}", val);
-            val
+                .await?
         }
     };
 

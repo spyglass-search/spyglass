@@ -13,24 +13,15 @@ use crate::state::AppState;
 
 // Create a file URI
 pub fn path_to_uri(path: &Path) -> String {
-    let path_str = path.display().to_string();
-    // Eventually this will be away to keep track of multiple devices and searching across
-    // them.
-    let host = "";
-
-    let mut new_url = Url::parse("file://").expect("Base URI");
-    let _ = new_url.set_host(Some(host));
-    // Fixes issues handling windows drive letters
-    let path_str = path_str.replace(':', "%3A");
-    // Fixes an issue where DirEntry adds too many escapes.
-    let path_str = path_str.replace("\\\\", "\\");
-    new_url.set_path(&path_str);
-    new_url.to_string()
+    path_string_to_uri(path.display().to_string())
 }
 
 // Create a file URI
 pub fn path_buf_to_uri(path: &PathBuf) -> String {
-    let path_str = path.display().to_string();
+    path_string_to_uri(path.display().to_string())
+}
+
+pub fn path_string_to_uri(path_str: String) -> String {
     // Eventually this will be away to keep track of multiple devices and searching across
     // them.
     let host = "";
@@ -40,7 +31,11 @@ pub fn path_buf_to_uri(path: &PathBuf) -> String {
     // Fixes issues handling windows drive letters
     let path_str = path_str.replace(':', "%3A");
     // Fixes an issue where DirEntry adds too many escapes.
-    let path_str = path_str.replace("\\\\", "\\");
+    let path_str = path_str.replace(r#"\\\\"#, r#"\"#);
+    let path_str = path_str.replace(r#"\\"#, r#"\"#);
+
+    log::error!("Path string {:?}", path_str);
+
     new_url.set_path(&path_str);
     new_url.to_string()
 }
@@ -136,34 +131,38 @@ pub fn last_modified_time(path: &PathBuf) -> DateTime<Utc> {
 /// user settings.
 pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
     let plugin_settings = state.user_settings.plugin_settings.clone();
-    let local_file_settings = plugin_settings.get("local-file-importer").unwrap();
-    let dir_list = local_file_settings.get("FOLDERS_LIST");
+    if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
+        let dir_list = local_file_settings.get("FOLDERS_LIST");
 
-    let directories =
-        if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(dir_list.unwrap().as_str()) {
-            dirs
-        } else {
-            HashSet::new()
-        };
-
-    directories
-        .iter()
-        .map(|str| PathBuf::from(str))
-        .collect::<Vec<PathBuf>>()
+        let directories =
+            if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(dir_list.unwrap().as_str()) {
+                dirs
+            } else {
+                HashSet::new()
+            };
+    
+        directories
+            .iter()
+            .map(|str| PathBuf::from(str))
+            .collect::<Vec<PathBuf>>()
+    } else {
+        Vec::new()
+    }
+    
 }
 
 /// Helper method used to access the configured file extensions from
 /// user settings.
 pub fn get_supported_file_extensions(state: &AppState) -> HashSet<String> {
     let plugin_settings = state.user_settings.plugin_settings.clone();
-    let local_file_settings = plugin_settings.get("local-file-importer").unwrap();
-    let ext_list = local_file_settings.get("EXTS_LIST");
-
-    if let Ok(exts) = serde_json::from_str::<HashSet<String>>(ext_list.unwrap().as_str()) {
-        exts
-    } else {
-        HashSet::new()
+    
+    if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
+        let ext_list = local_file_settings.get("EXTS_LIST");
+        if let Ok(exts) = serde_json::from_str::<HashSet<String>>(ext_list.unwrap().as_str()) {
+            return exts;
+        } 
     }
+    HashSet::new()
 }
 
 /// Helper method used to identify if the provided path represents a gitignore file

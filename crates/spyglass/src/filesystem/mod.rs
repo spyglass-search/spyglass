@@ -2,6 +2,7 @@ use dashmap::DashMap;
 use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
 use entities::models::processed_files;
 use entities::models::tag::TagType;
+use entities::models::lens;
 use entities::sea_orm::entity::prelude::*;
 use entities::sea_orm::DatabaseConnection;
 use ignore::gitignore::Gitignore;
@@ -519,48 +520,76 @@ impl SpyglassFileWatcher {
 /// Configures the file watcher with the user set directories
 pub async fn configure_watcher(state: AppState) {
     // temp use plugin configuration
-    let extension = utils::get_supported_file_extensions(&state);
-    let paths = utils::get_search_directories(&state);
-    let path_names = paths
-        .iter()
-        .map(|path| utils::path_buf_to_uri(path))
-        .collect::<Vec<String>>();
+    if let Ok(Some(lens)) = lens::find_by_name("local-file-importer", &state.db).await {
+        if lens.is_enabled {
+            log::info!("📂 Loading local file watcher");
 
-    let mut watcher = state.file_watcher.lock().await;
-    if let Some(watcher) = watcher.as_mut() {
-        for path in paths {
-            log::debug!("Adding {:?} to watch list", path);
-            let updates = watcher.initialize_path(path.as_path()).await;
-            let rx1 = watcher.watch_path(path.as_path(), None, true).await;
-
-            tokio::spawn(_process_messages(
-                state.clone(),
-                rx1,
-                updates,
-                extension.clone(),
-            ));
-        }
-    } else {
-        log::error!("Watcher is missing");
-    }
-
-    match processed_files::remove_unmatched_paths(&state.db, path_names).await {
-        Ok(removed) => {
-            let uri_list = removed
+            let extension = utils::get_supported_file_extensions(&state);
+            let paths = utils::get_search_directories(&state);
+            let path_names = paths
                 .iter()
-                .map(|model| model.file_path.clone())
+                .map(|path| utils::path_buf_to_uri(path))
                 .collect::<Vec<String>>();
-            documents::delete_documents_by_uri(&state, uri_list).await;
-        }
-        Err(error) => log::error!(
-            "Error removing paths that are no longer being watched. {:?}",
-            error
-        ),
-    }
+        
+            let mut watcher = state.file_watcher.lock().await;
+            if let Some(watcher) = watcher.as_mut() {
+                for path in paths {
+                    log::debug!("Adding {:?} to watch list", path);
+                    let updates = watcher.initialize_path(path.as_path()).await;
+                    let rx1 = watcher.watch_path(path.as_path(), None, true).await;
+        
+                    tokio::spawn(_process_messages(
+                        state.clone(),
+                        rx1,
+                        updates,
+                        extension.clone(),
+                    ));
+                }
+            } else {
+                log::error!("Watcher is missing");
+            }
+        
+            match processed_files::remove_unmatched_paths(&state.db, path_names).await {
+                Ok(removed) => {
+                    let uri_list = removed
+                        .iter()
+                        .map(|model| model.file_path.clone())
+                        .collect::<Vec<String>>();
+                    documents::delete_documents_by_uri(&state, uri_list).await;
+                }
+                Err(error) => log::error!(
+                    "Error removing paths that are no longer being watched. {:?}",
+                    error
+                ),
+            }
 
-    // TODO remove the content from extensions that are no longer being processed, this should be the
-    // purview of the document handling and not the file handling since we cannot make the assumption
-    // here of what happens to files that do not meet the expected extension.
+            // TODO remove the content from extensions that are no longer being processed, this should be the
+            // purview of the document handling and not the file handling since we cannot make the assumption
+            // here of what happens to files that do not meet the expected extension.
+
+
+            // At the moment triggering a recrawl will work the best
+
+                } else {
+                    log::info!("❌ Local file watcher is disabled");
+
+                    match processed_files::remove_unmatched_paths(&state.db, Vec::new()).await {
+                        Ok(removed) => {
+                            let uri_list = removed
+                                .iter()
+                                .map(|model| model.file_path.clone())
+                                .collect::<Vec<String>>();
+                            documents::delete_documents_by_uri(&state, uri_list).await;
+                        }
+                        Err(error) => log::error!(
+                            "Error removing paths that are no longer being watched. {:?}",
+                            error
+                        ),
+                    }       
+                }
+            } else {
+                log::info!("❌ Local file watcher not installed");
+    }
 }
 
 /// Helper method use to process updates from a watched path
@@ -630,7 +659,7 @@ async fn _process_file_and_dir(
     }
 
     if !enqueue_list.is_empty() {
-        let tags = vec![(TagType::Lens, String::from("filesystem"))];
+        let tags = vec![(TagType::Lens, String::from("files"))];
         let enqueue_settings = EnqueueSettings {
             crawl_type: CrawlType::Normal,
             is_recrawl: true,

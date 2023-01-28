@@ -25,61 +25,8 @@ register_plugin!(Plugin);
 
 impl SpyglassPlugin for Plugin {
     fn load(&mut self) {
-        // List of supported file types
-        let default_exts =
-            HashSet::from_iter(vec!["md".to_string(), "txt".to_string()].into_iter());
-        self.extensions = if let Ok(blob) = std::env::var(EXTS_LIST_ENV) {
-            if let Ok(exts) = serde_json::from_str(&blob) {
-                exts
-            } else {
-                default_exts
-            }
-        } else {
-            default_exts
-        };
-
-        // When paths were last synced
-        self.last_synced = if let Ok(blob) = std::fs::read_to_string(PLUGIN_DATA) {
-            serde_json::from_str::<SyncData>(&blob).map_or(Default::default(), |x| x)
-        } else {
-            Default::default()
-        };
-
-        let paths = if let Ok(blob) = std::env::var(FOLDERS_LIST_ENV) {
-            serde_json::from_str::<Vec<String>>(&blob).map_or(Vec::new(), |x| x)
-        } else {
-            Vec::new()
-        };
-
-        for path in paths.iter().map(|path| Path::new(&path).to_path_buf()) {
-            let now = Utc::now();
-
-            let last_processed_time = self
-                .last_synced
-                .path_to_times
-                .entry(path.to_path_buf())
-                .or_default();
-
-            let diff = now - *last_processed_time;
-            if diff.num_days() > 1 {
-                if let Err(e) = walk_and_enqueue_dir(path.to_path_buf(), &self.extensions) {
-                    log(format!("Unable to process dir: {e}"));
-                } else {
-                    *last_processed_time = now;
-                }
-            }
-
-            // List to notifications
-            subscribe(PluginSubscription::WatchDirectory {
-                path: path.to_path_buf(),
-                recurse: true,
-            });
-        }
-
-        // Save list of processed paths to data dir
-        if let Ok(blob) = serde_json::to_string_pretty(&self.last_synced) {
-            let _ = std::fs::write(PLUGIN_DATA, blob);
-        }
+        // Noop, now handled internally. Plugin can be removed when settings
+        // are converted to core
     }
 
     fn update(&mut self, event: PluginEvent) {
