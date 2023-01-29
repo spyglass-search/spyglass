@@ -1,8 +1,8 @@
 use dashmap::DashMap;
 use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
+use entities::models::lens;
 use entities::models::processed_files;
 use entities::models::tag::TagType;
-use entities::models::lens;
 use entities::sea_orm::entity::prelude::*;
 use entities::sea_orm::DatabaseConnection;
 use ignore::gitignore::Gitignore;
@@ -50,7 +50,7 @@ pub struct SpyglassFileWatcher {
 /// be notified of system changes via the send and receiver
 #[derive(Debug)]
 pub struct WatchPath {
-    _path: PathBuf,
+    path: PathBuf,
     _uuid: String,
     extensions: Option<HashSet<String>>,
     tx_channel: Option<Sender<Vec<DebouncedEvent>>>,
@@ -63,7 +63,7 @@ impl WatchPath {
         let uuid = Uuid::new_v4().as_hyphenated().to_string();
 
         WatchPath {
-            _path: path.to_path_buf(),
+            path: path.to_path_buf(),
             _uuid: uuid.clone(),
             extensions,
             tx_channel: None::<Sender<Vec<DebouncedEvent>>>,
@@ -145,7 +145,7 @@ async fn watch_events(
                 file_events.close();
                 let mut watcher = state.file_watcher.lock().await;
                 if let Some(watcher) = watcher.as_mut() {
-                    watcher.close();
+                    watcher.close().await;
                 }
                 return;
             }
@@ -286,15 +286,35 @@ impl SpyglassFileWatcher {
         }
     }
 
-    /// Closes the watcher and associated resources
-    fn close(&mut self) {
-        for path_ref in self.path_map.iter() {
-            for path in path_ref.value() {
+    async fn remove_path(&mut self, path: &Path) {
+        if let Some((key, watchers)) = self.path_map.remove(&path.to_path_buf()) {
+            let _ = self.watcher.lock().await.watcher().unwatch(path);
+            for path in watchers {
                 if let Some(sender) = &path.tx_channel {
                     drop(sender);
                 }
             }
         }
+    }
+
+    /// Closes the watcher and associated resources
+    async fn close(&mut self) {
+        self.ignore_files.clear();
+
+        for path_ref in self.path_map.iter() {
+            for path in path_ref.value() {
+                let _ = self
+                    .watcher
+                    .lock()
+                    .await
+                    .watcher()
+                    .unwatch(path.path.as_path());
+                if let Some(sender) = &path.tx_channel {
+                    drop(sender);
+                }
+            }
+        }
+        self.path_map.clear();
     }
 
     /// Adds .gitignore files
@@ -311,6 +331,10 @@ impl SpyglassFileWatcher {
         if let Ok(patterns) = utils::patterns_from_file(file) {
             self.ignore_files.insert(file.to_path_buf(), patterns);
         }
+    }
+
+    fn is_path_initialized(&self, file: &Path) -> bool {
+        self.path_map.contains_key(&file.to_path_buf())
     }
 
     /// filters the provided events and returns the list of events that should not
@@ -530,25 +554,28 @@ pub async fn configure_watcher(state: AppState) {
                 .iter()
                 .map(|path| utils::path_buf_to_uri(path))
                 .collect::<Vec<String>>();
-        
+
             let mut watcher = state.file_watcher.lock().await;
             if let Some(watcher) = watcher.as_mut() {
                 for path in paths {
+                    if !watcher.is_path_initialized(path.as_path()) {
+                        
                     log::debug!("Adding {:?} to watch list", path);
-                    let updates = watcher.initialize_path(path.as_path()).await;
-                    let rx1 = watcher.watch_path(path.as_path(), None, true).await;
-        
-                    tokio::spawn(_process_messages(
-                        state.clone(),
-                        rx1,
-                        updates,
-                        extension.clone(),
-                    ));
+                        let updates = watcher.initialize_path(path.as_path()).await;
+                        let rx1 = watcher.watch_path(path.as_path(), None, true).await;
+    
+                        tokio::spawn(_process_messages(
+                            state.clone(),
+                            rx1,
+                            updates,
+                            extension.clone(),
+                        ));
+                    }
                 }
             } else {
                 log::error!("Watcher is missing");
             }
-        
+
             match processed_files::remove_unmatched_paths(&state.db, path_names).await {
                 Ok(removed) => {
                     let uri_list = removed
@@ -563,32 +590,35 @@ pub async fn configure_watcher(state: AppState) {
                 ),
             }
 
-            // TODO remove the content from extensions that are no longer being processed, this should be the
-            // purview of the document handling and not the file handling since we cannot make the assumption
-            // here of what happens to files that do not meet the expected extension.
+        // TODO remove the content from extensions that are no longer being processed, this should be the
+        // purview of the document handling and not the file handling since we cannot make the assumption
+        // here of what happens to files that do not meet the expected extension.
 
+        // At the moment triggering a recrawl will work the best
+        } else {
+            log::info!("❌ Local file watcher is disabled");
 
-            // At the moment triggering a recrawl will work the best
+            let mut watcher = state.file_watcher.lock().await;
+            if let Some(watcher) = watcher.as_mut() {
+                watcher.close().await;
+            }
 
-                } else {
-                    log::info!("❌ Local file watcher is disabled");
-
-                    match processed_files::remove_unmatched_paths(&state.db, Vec::new()).await {
-                        Ok(removed) => {
-                            let uri_list = removed
-                                .iter()
-                                .map(|model| model.file_path.clone())
-                                .collect::<Vec<String>>();
-                            documents::delete_documents_by_uri(&state, uri_list).await;
-                        }
-                        Err(error) => log::error!(
-                            "Error removing paths that are no longer being watched. {:?}",
-                            error
-                        ),
-                    }       
+            match processed_files::remove_unmatched_paths(&state.db, Vec::new()).await {
+                Ok(removed) => {
+                    let uri_list = removed
+                        .iter()
+                        .map(|model| model.file_path.clone())
+                        .collect::<Vec<String>>();
+                    documents::delete_documents_by_uri(&state, uri_list).await;
                 }
-            } else {
-                log::info!("❌ Local file watcher not installed");
+                Err(error) => log::error!(
+                    "Error removing paths that are no longer being watched. {:?}",
+                    error
+                ),
+            }
+        }
+    } else {
+        log::info!("❌ Local file watcher not installed");
     }
 }
 

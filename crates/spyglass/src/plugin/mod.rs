@@ -21,6 +21,7 @@ use shared::config::{Config, LensConfig};
 use shared::plugin::{PluginConfig, PluginType};
 use spyglass_plugin::{consts::env, PluginEvent, PluginSubscription};
 
+use crate::filesystem;
 use crate::state::AppState;
 
 mod exports;
@@ -219,7 +220,7 @@ pub async fn plugin_event_loop(
 
                 let mut disabled = Vec::new();
                 let mut manager = state.plugin_manager.lock().await;
-                if let Some(plugin) = manager.find_by_name(plugin_name) {
+                if let Some(plugin) = manager.find_by_name(plugin_name.clone()) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = false;
                         disabled.push(plugin.id);
@@ -228,12 +229,17 @@ pub async fn plugin_event_loop(
 
                 disabled.iter().for_each(|pid| {
                     manager.check_update_subs.remove(pid);
-                })
+                });
+
+                if plugin_name.eq("local-file-importer") {
+                    tokio::spawn(filesystem::configure_watcher(state.clone()));
+                }
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
                 log::info!("enabling plugin <{}>", plugin_name);
+                
                 let manager = state.plugin_manager.lock().await;
-                if let Some(plugin) = manager.find_by_name(plugin_name) {
+                if let Some(plugin) = manager.find_by_name(plugin_name.clone()) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {
                         instance.config.is_enabled = true;
                         // Re-initialize plugin
@@ -241,6 +247,9 @@ pub async fn plugin_event_loop(
                             .send(PluginCommand::Initialize(instance.config.clone()))
                             .await;
                     }
+                }
+                if plugin_name.eq("local-file-importer") {
+                    tokio::spawn(filesystem::configure_watcher(state.clone()));
                 }
             }
             Some(PluginCommand::HandleUpdate { plugin_id, event }) => {

@@ -34,8 +34,6 @@ pub fn path_string_to_uri(path_str: String) -> String {
     let path_str = path_str.replace(r#"\\\\"#, r#"\"#);
     let path_str = path_str.replace(r#"\\"#, r#"\"#);
 
-    log::error!("Path string {:?}", path_str);
-
     new_url.set_path(&path_str);
     new_url.to_string()
 }
@@ -140,7 +138,7 @@ pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
             } else {
                 HashSet::new()
             };
-    
+
         directories
             .iter()
             .map(|str| PathBuf::from(str))
@@ -148,19 +146,18 @@ pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
     } else {
         Vec::new()
     }
-    
 }
 
 /// Helper method used to access the configured file extensions from
 /// user settings.
 pub fn get_supported_file_extensions(state: &AppState) -> HashSet<String> {
     let plugin_settings = state.user_settings.plugin_settings.clone();
-    
+
     if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
         let ext_list = local_file_settings.get("EXTS_LIST");
         if let Ok(exts) = serde_json::from_str::<HashSet<String>>(ext_list.unwrap().as_str()) {
             return exts;
-        } 
+        }
     }
     HashSet::new()
 }
