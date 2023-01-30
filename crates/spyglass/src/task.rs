@@ -124,7 +124,7 @@ pub async fn manager_task(
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             } else {
-                                queue_check_interval = tokio::time::interval(Duration::from_millis(100));
+                                queue_check_interval = tokio::time::interval(Duration::from_millis(50));
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             }
