@@ -156,7 +156,7 @@ impl Connection for DriveConnection {
         // Extract and apply tags to crawl result.
         let mut tags: Vec<TagPair> = vec![(TagType::MimeType, metadata.mime_type)];
         if metadata.starred {
-            tags.push((TagType::Favorited, TagValue::Favorited.as_ref().to_owned()));
+            tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
         }
 
         let mut crawl = CrawlResult::new(

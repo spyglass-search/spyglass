@@ -757,8 +757,10 @@ mod test {
         let _ = model
             .insert_tags(
                 &db,
-                &[(TagType::Source, "web".to_owned()),
-                    (TagType::Lens, "lens".to_owned())],
+                &[
+                    (TagType::Source, "web".to_owned()),
+                    (TagType::Lens, "lens".to_owned()),
+                ],
             )
             .await;
 

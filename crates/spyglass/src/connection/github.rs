@@ -1,4 +1,4 @@
-use entities::models::tag::{TagPair, TagType};
+use entities::models::tag::{TagPair, TagType, TagValue};
 use jsonrpsee::core::async_trait;
 use libgithub::GithubClient;
 use url::Url;
@@ -45,6 +45,52 @@ impl GithubConnection {
         Ok(url_base)
     }
 
+    async fn sync_issues(&mut self, state: &AppState) {
+        let mut page = Some(1);
+        let mut total_synced = 0;
+        let mut buffer = Vec::new();
+
+        while let Ok(resp) = self.client.list_issues(page).await {
+            page = resp.next_page;
+            total_synced += resp.result.len();
+            buffer.extend(resp.result);
+
+            if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
+                // Add to database
+                for issue in &buffer {
+                    let api_url = self.to_url(&issue.url).expect("unable to create url");
+                    log::debug!("issue: {}", issue.title);
+                    let result = CrawlResult::new(
+                        &api_url,
+                        Some(issue.html_url.clone()),
+                        &issue.to_text(),
+                        &issue.title,
+                        None,
+                    );
+
+                    let mut tags = self.default_tags().clone();
+                    tags.push((TagType::Owner, issue.user.login.clone()));
+
+                    if let Err(err) = add_document_and_tags(state, &result, &tags).await {
+                        log::error!("Unable to add issue: {}", err);
+                    }
+                }
+
+                if let Err(err) = Searcher::save(state).await {
+                    log::error!("Unable to save repos: {}", err);
+                }
+
+                buffer.clear();
+            }
+
+            if page.is_none() {
+                break;
+            }
+        }
+
+        log::debug!("synced {} issues", total_synced);
+    }
+
     async fn sync_repos(&mut self, state: &AppState) {
         let mut page = Some(1);
         let mut total_synced = 0;
@@ -70,10 +116,55 @@ impl GithubConnection {
 
                     let mut tags = self.default_tags().clone();
                     tags.push((TagType::Owner, res.owner.login.clone()));
+                    tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
+                    if let Err(err) = add_document_and_tags(state, &result, &tags).await {
+                        log::error!("Unable to add repo: {}", err);
+                    }
+                }
 
-                    if let Err(err) =
-                        add_document_and_tags(state, &result, &tags).await
-                    {
+                if let Err(err) = Searcher::save(state).await {
+                    log::error!("Unable to save repos: {}", err);
+                }
+
+                // clear buffer
+                buffer.clear()
+            }
+
+            if page.is_none() {
+                break;
+            }
+        }
+
+        log::debug!("synced {} repos", total_synced);
+    }
+
+    async fn sync_starred(&mut self, state: &AppState) {
+        let mut page = Some(1);
+        let mut total_synced = 0;
+        let mut buffer = Vec::new();
+
+        while let Ok(resp) = self.client.list_starred(page).await {
+            page = resp.next_page;
+            total_synced += resp.result.len();
+            buffer.extend(resp.result);
+            // Save to DB when we've reached a limit or there are no more pages.
+            if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
+                // Add to database
+                for res in &buffer {
+                    let api_url = self.to_url(&res.url).expect("unable to create url");
+                    log::debug!("starred: {} - {}", res.full_name, api_url.to_string());
+                    let result = CrawlResult::new(
+                        &api_url,
+                        Some(res.html_url.clone()),
+                        &res.description.clone().unwrap_or_default(),
+                        &res.full_name,
+                        None,
+                    );
+
+                    let mut tags = self.default_tags().clone();
+                    tags.push((TagType::Owner, res.owner.login.clone()));
+
+                    if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add repo: {}", err);
                     }
                 }
@@ -114,7 +205,9 @@ impl Connection for GithubConnection {
 
     async fn sync(&mut self, state: &AppState) {
         log::debug!("syncing w/ connection: {}", &Self::id());
+        self.sync_issues(state).await;
         self.sync_repos(state).await;
+        self.sync_starred(state).await;
     }
 
     async fn get(&mut self, _uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {

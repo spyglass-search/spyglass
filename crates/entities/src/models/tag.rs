@@ -1,7 +1,7 @@
 use sea_orm::Set;
 use sea_orm::{entity::prelude::*, ConnectionTrait};
 use serde::{Deserialize, Serialize};
-use strum_macros::{AsRefStr, EnumString};
+use strum_macros::{AsRefStr, Display, EnumString};
 
 use super::{crawl_queue, indexed_document};
 
@@ -43,7 +43,7 @@ pub enum TagType {
     Lens,
 }
 
-#[derive(AsRefStr)]
+#[derive(AsRefStr, Display, EnumString)]
 pub enum TagValue {
     #[strum(serialize = "favorited")]
     Favorited,
