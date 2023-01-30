@@ -245,8 +245,7 @@ pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
             Command::new("osascript")
                 .arg("-e")
                 .arg(format!(
-                    "display notification \"{}\" with title \"{}\"",
-                    body, title
+                    "display notification \"{body}\" with title \"{title}\""
                 ))
                 .spawn()
                 .expect("Failed to send message");

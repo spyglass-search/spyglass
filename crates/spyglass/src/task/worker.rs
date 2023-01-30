@@ -566,7 +566,7 @@ mod test {
 
         // Should skip this URL since we already have it.
         bootstrap_queue::enqueue(&state.db, test, 10).await.unwrap();
-        assert!(!handle_bootstrap(&state, &Default::default(), &test, None).await);
+        assert!(!handle_bootstrap(&state, &Default::default(), test, None).await);
     }
 
     #[tokio::test]
@@ -687,7 +687,7 @@ mod test {
         };
         let task = model.save(&db).await.expect("Unable to save model");
         let _ = task
-            .insert_tags(&db, &vec![(TagType::Source, "web".to_string())])
+            .insert_tags(&db, &[(TagType::Source, "web".to_string())])
             .await;
 
         let crawl_result = CrawlResult {
@@ -757,10 +757,8 @@ mod test {
         let _ = model
             .insert_tags(
                 &db,
-                &vec![
-                    (TagType::Source, "web".to_owned()),
-                    (TagType::Lens, "lens".to_owned()),
-                ],
+                &[(TagType::Source, "web".to_owned()),
+                    (TagType::Lens, "lens".to_owned())],
             )
             .await;
 
@@ -772,7 +770,7 @@ mod test {
         };
         let doc = doc.save(&db).await.expect("Unable to save indexed_doc");
         let _ = doc
-            .insert_tags(&db, &vec![(TagType::Source, "web".to_owned())])
+            .insert_tags(&db, &[(TagType::Source, "web".to_owned())])
             .await;
 
         let crawl_result = CrawlResult {

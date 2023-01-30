@@ -245,7 +245,7 @@ mod test {
         let (is_new, _model) = add_or_enable(&db, &lens, super::LensType::Simple)
             .await
             .unwrap();
-        assert_eq!(is_new, true);
+        assert!(is_new);
 
         // Check that we have the right values.
         let model = Entity::find().one(&db).await.unwrap().unwrap();

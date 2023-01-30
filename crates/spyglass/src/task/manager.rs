@@ -112,7 +112,7 @@ mod test {
             domain: Set("localhost".to_owned()),
             crawl_type: Set(CrawlType::Normal),
             status: Set(CrawlStatus::Completed),
-            created_at: Set(one_day_ago.clone()),
+            created_at: Set(one_day_ago),
             updated_at: Set(one_day_ago),
             ..Default::default()
         };
@@ -124,7 +124,7 @@ mod test {
             domain: Set("localhost".to_owned()),
             crawl_type: Set(CrawlType::Normal),
             status: Set(CrawlStatus::Completed),
-            created_at: Set(two_day_ago.clone()),
+            created_at: Set(two_day_ago),
             updated_at: Set(two_day_ago),
             ..Default::default()
         };

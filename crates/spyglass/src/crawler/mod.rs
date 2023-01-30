@@ -526,7 +526,7 @@ mod test {
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
-        assert!(result.links.len() > 0);
+        assert!(!result.links.is_empty());
     }
 
     #[tokio::test]
@@ -641,27 +641,27 @@ mod test {
         let url = "https://example.com";
 
         assert_eq!(
-            normalize_href(&url, "http://foo.com"),
+            normalize_href(url, "http://foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            normalize_href(&url, "https://foo.com"),
+            normalize_href(url, "https://foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            normalize_href(&url, "//foo.com"),
+            normalize_href(url, "//foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            normalize_href(&url, "/foo.html"),
+            normalize_href(url, "/foo.html"),
             Some("https://example.com/foo.html".into())
         );
         assert_eq!(
-            normalize_href(&url, "/foo"),
+            normalize_href(url, "/foo"),
             Some("https://example.com/foo".into())
         );
         assert_eq!(
-            normalize_href(&url, "foo.html"),
+            normalize_href(url, "foo.html"),
             Some("https://example.com/foo.html".into())
         );
     }

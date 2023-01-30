@@ -193,7 +193,7 @@ mod test {
         let doc = html_to_text(html);
         assert_eq!(doc.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(doc.meta.len(), 9);
-        assert!(doc.content.len() > 0);
+        assert!(!doc.content.is_empty());
         assert_eq!(doc.links.len(), 58);
     }
 

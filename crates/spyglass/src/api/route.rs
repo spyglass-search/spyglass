@@ -69,8 +69,7 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
 
     if let Err(err) = handle_authorize_connection(&state, &api_id).await {
         Err(Error::Custom(format!(
-            "Unable to authorize {}: {}",
-            api_id, err
+            "Unable to authorize {api_id}: {err}"
         )))
     } else {
         Ok(())
@@ -633,7 +632,7 @@ mod test {
 
         let model = doc.insert(&db).await.expect("Unable to insert doc");
         let doc: indexed_document::ActiveModel = model.into();
-        doc.insert_tags(&db, &vec![(TagType::Lens, lens.name.clone())])
+        doc.insert_tags(&db, &[(TagType::Lens, lens.name.clone())])
             .await
             .expect("Unable to insert tags");
 
