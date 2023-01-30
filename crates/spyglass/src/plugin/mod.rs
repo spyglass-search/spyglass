@@ -237,7 +237,7 @@ pub async fn plugin_event_loop(
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
                 log::info!("enabling plugin <{}>", plugin_name);
-                
+
                 let manager = state.plugin_manager.lock().await;
                 if let Some(plugin) = manager.find_by_name(plugin_name.clone()) {
                     if let Some(mut instance) = manager.plugins.get_mut(&plugin.id) {

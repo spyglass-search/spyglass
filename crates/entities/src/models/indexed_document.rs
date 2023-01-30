@@ -173,6 +173,36 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
         .await
 }
 
+pub async fn insert_tags_for_document<C: ConnectionTrait>(
+    doc: &Model,
+    db: &C,
+    tags: &[u64],
+) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+    let doc_tags = tags
+        .iter()
+        .map(|tag_id| document_tag::ActiveModel {
+            indexed_document_id: Set(doc.id),
+            tag_id: Set(*tag_id as i64),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
+        })
+        .collect::<Vec<document_tag::ActiveModel>>();
+
+    // Insert connections, ignoring duplicates
+    document_tag::Entity::insert_many(doc_tags)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![
+                document_tag::Column::IndexedDocumentId,
+                document_tag::Column::TagId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(db)
+        .await
+}
+
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected
 /// to be a SQL like statement.
 pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {

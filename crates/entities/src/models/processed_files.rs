@@ -1,7 +1,6 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use serde::{Deserialize, Serialize};
-use url::Url;
+use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "processed_files")]
@@ -36,7 +35,7 @@ impl ActiveModelBehavior for ActiveModel {
     }
 
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    fn before_save(self, _insert: bool) -> Result<Self, DbErr> {
         Ok(self)
     }
 }
@@ -70,6 +69,6 @@ pub async fn remove_unmatched_paths(
             }
             Ok(items)
         }
-        Err(error) => return Err(anyhow::Error::from(error)),
+        Err(error) => Err(anyhow::Error::from(error)),
     }
 }

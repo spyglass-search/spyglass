@@ -1,14 +1,19 @@
 use dashmap::DashMap;
 use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
-use entities::models::lens;
-use entities::models::processed_files;
-use entities::models::tag::TagType;
+use entities::models::tag::{TagPair, TagType};
+use entities::models::{lens, processed_files};
 use entities::sea_orm::entity::prelude::*;
 use entities::sea_orm::DatabaseConnection;
 use ignore::gitignore::Gitignore;
 use ignore::WalkBuilder;
 
+use sha2::{Digest, Sha256};
+use url::Url;
+
+use crate::crawler::CrawlResult;
+use crate::state::AppState;
 use entities::sea_orm::Set;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use migration::OnConflict;
 
 use std::sync::Arc;
@@ -26,7 +31,6 @@ use uuid::Uuid;
 use notify_debouncer_mini::{DebouncedEvent, DebouncedEventKind, Debouncer};
 
 use crate::documents;
-use crate::state::AppState;
 
 pub mod utils;
 
@@ -64,7 +68,7 @@ impl WatchPath {
 
         WatchPath {
             path: path.to_path_buf(),
-            _uuid: uuid.clone(),
+            _uuid: uuid,
             extensions,
             tx_channel: None::<Sender<Vec<DebouncedEvent>>>,
         }
@@ -253,11 +257,11 @@ impl SpyglassFileWatcher {
         for event in events {
             if event.path.exists() {
                 let mut model = processed_files::ActiveModel::new();
-                model.file_path = Set(utils::path_buf_to_uri(&event.path));
+                model.file_path = Set(utils::path_to_uri(&event.path));
                 model.last_modified = Set(utils::last_modified_time(&event.path));
                 inserts.push(model);
             } else {
-                removals.push(utils::path_buf_to_uri(&event.path));
+                removals.push(utils::path_to_uri(&event.path));
             }
         }
 
@@ -286,14 +290,9 @@ impl SpyglassFileWatcher {
         }
     }
 
-    async fn remove_path(&mut self, path: &Path) {
-        if let Some((key, watchers)) = self.path_map.remove(&path.to_path_buf()) {
+    async fn _remove_path(&mut self, path: &Path) {
+        if let Some((_key, _watchers)) = self.path_map.remove(&path.to_path_buf()) {
             let _ = self.watcher.lock().await.watcher().unwatch(path);
-            for path in watchers {
-                if let Some(sender) = &path.tx_channel {
-                    drop(sender);
-                }
-            }
         }
     }
 
@@ -309,9 +308,6 @@ impl SpyglassFileWatcher {
                     .await
                     .watcher()
                     .unwatch(path.path.as_path());
-                if let Some(sender) = &path.tx_channel {
-                    drop(sender);
-                }
             }
         }
         self.path_map.clear();
@@ -339,7 +335,7 @@ impl SpyglassFileWatcher {
 
     /// filters the provided events and returns the list of events that should not
     /// be ignored
-    fn filter_events(&self, events: &Vec<DebouncedEvent>) -> Vec<DebouncedEvent> {
+    fn filter_events(&self, events: &[DebouncedEvent]) -> Vec<DebouncedEvent> {
         events
             .iter()
             .filter_map(|evt| {
@@ -391,10 +387,7 @@ impl SpyglassFileWatcher {
 
         let path_buf = path.to_path_buf();
         let new_path = !self.path_map.contains_key(&path_buf);
-        self.path_map
-            .entry(path_buf)
-            .or_insert(Vec::new())
-            .push(watch_path);
+        self.path_map.entry(path_buf).or_default().push(watch_path);
 
         let mode = if recursive {
             notify::RecursiveMode::Recursive
@@ -491,13 +484,13 @@ impl SpyglassFileWatcher {
                 .iter()
                 .map(|path_ref| {
                     debounced_events.push(DebouncedEvent {
-                        path: utils::uri_to_path(&path_ref.key()).unwrap(),
+                        path: utils::uri_to_path(path_ref.key()).unwrap(),
                         kind: DebouncedEventKind::Any,
                     });
 
                     let mut active_model = processed_files::ActiveModel::new();
                     active_model.file_path = Set(path_ref.key().clone());
-                    active_model.last_modified = Set(path_ref.value().clone());
+                    active_model.last_modified = Set(*path_ref.value());
 
                     active_model
                 })
@@ -517,7 +510,7 @@ impl SpyglassFileWatcher {
                 .map(|(uri, last_modified)| {
                     let mut active_model = processed_files::ActiveModel::new();
                     active_model.file_path = Set(uri.clone());
-                    active_model.last_modified = Set(last_modified.clone());
+                    active_model.last_modified = Set(*last_modified);
 
                     active_model
                 })
@@ -552,18 +545,17 @@ pub async fn configure_watcher(state: AppState) {
             let paths = utils::get_search_directories(&state);
             let path_names = paths
                 .iter()
-                .map(|path| utils::path_buf_to_uri(path))
+                .map(|path| utils::path_to_uri(path))
                 .collect::<Vec<String>>();
 
             let mut watcher = state.file_watcher.lock().await;
             if let Some(watcher) = watcher.as_mut() {
                 for path in paths {
                     if !watcher.is_path_initialized(path.as_path()) {
-                        
-                    log::debug!("Adding {:?} to watch list", path);
+                        log::debug!("Adding {:?} to watch list", path);
                         let updates = watcher.initialize_path(path.as_path()).await;
                         let rx1 = watcher.watch_path(path.as_path(), None, true).await;
-    
+
                         tokio::spawn(_process_messages(
                             state.clone(),
                             rx1,
@@ -657,6 +649,7 @@ async fn _process_file_and_dir(
     extensions: &HashSet<String>,
 ) -> anyhow::Result<()> {
     let mut enqueue_list = Vec::new();
+    let mut general_processing = Vec::new();
     let mut delete_list = Vec::new();
     for event in events {
         let path = event.path;
@@ -682,7 +675,16 @@ async fn _process_file_and_dir(
                 }
             }
 
-            enqueue_list.push(uri);
+            let ext = &path
+                .extension()
+                .and_then(|x| x.to_str())
+                .map(|x| x.to_string())
+                .unwrap_or_default();
+            if extensions.contains(ext) {
+                enqueue_list.push(uri);
+            } else {
+                general_processing.push(uri);
+            }
         } else {
             delete_list.push(uri);
         }
@@ -693,7 +695,7 @@ async fn _process_file_and_dir(
         let enqueue_settings = EnqueueSettings {
             crawl_type: CrawlType::Normal,
             is_recrawl: true,
-            tags: tags,
+            tags,
             force_allow: true,
         };
         if let Err(error) =
@@ -704,9 +706,89 @@ async fn _process_file_and_dir(
         }
     }
 
+    if !general_processing.is_empty() {
+        log::debug!("Adding {} general documents", general_processing.len());
+        for general_chunk in general_processing.chunks(500) {
+            _process_general_file(state, general_chunk).await;
+        }
+    }
+
     if !delete_list.is_empty() {
-        documents::delete_documents_by_uri(&state, delete_list).await;
+        documents::delete_documents_by_uri(state, delete_list).await;
     }
 
     Ok(())
+}
+
+/// Generates the tags for a file
+pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
+    let mut tags = Vec::new();
+    tags.push((TagType::Lens, String::from("files")));
+    if path.is_dir() {
+        tags.push((TagType::Type, String::from("directory")));
+    } else if path.is_file() {
+        tags.push((TagType::Type, String::from("file")));
+        let ext = path
+            .extension()
+            .and_then(|x| x.to_str())
+            .map(|x| x.to_string());
+        if let Some(ext) = ext {
+            tags.push((TagType::FileExt, ext));
+        }
+    }
+
+    if path.is_symlink() {
+        tags.push((TagType::Type, String::from("symlink")))
+    }
+
+    let guess = new_mime_guess::from_path(path);
+    for mime_guess in guess.iter() {
+        tags.push((TagType::MimeType, mime_guess.to_string()));
+    }
+
+    tags
+}
+
+// Helper method used process files
+async fn _process_general_file(state: &AppState, file_uri: &[String]) {
+    let mut crawl_results = file_uri
+        .iter()
+        .filter_map(|uri| match Url::parse(uri) {
+            Ok(url) => match url.to_file_path() {
+                Ok(path) => _path_to_result(&url, &path),
+                Err(_) => None,
+            },
+            Err(_) => None,
+        })
+        .collect::<Vec<CrawlResult>>();
+
+    documents::process_crawl_results(state, "files", &mut crawl_results).await;
+}
+
+// Process a path to parse result
+fn _path_to_result(url: &Url, path: &Path) -> Option<CrawlResult> {
+    let file_name = path
+        .file_name()
+        .and_then(|x| x.to_str())
+        .map(|x| x.to_string())
+        .expect("Unable to convert path file name to string");
+    let mut hasher = Sha256::new();
+    hasher.update(file_name.as_bytes());
+    let content_hash = hex::encode(&hasher.finalize()[..]);
+    let tags = build_file_tags(path);
+    if path.is_file() || path.is_dir() {
+        Some(CrawlResult {
+            content_hash: Some(content_hash),
+            content: Some(file_name.clone()),
+            // Does a file have a description? Pull the first part of the file
+            description: Some(file_name.clone()),
+            title: Some(url.to_string()),
+            url: url.to_string(),
+            open_url: Some(url.to_string()),
+            links: Default::default(),
+            tags,
+        })
+    } else {
+        None
+    }
 }

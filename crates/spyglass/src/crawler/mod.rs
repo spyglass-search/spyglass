@@ -5,9 +5,7 @@ use addr::parse_domain_name;
 use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
-use entities::models::crawl_queue::EnqueueSettings;
 use entities::models::tag::TagPair;
-use entities::models::tag::TagType;
 use percent_encoding::percent_decode_str;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -467,34 +465,6 @@ impl Crawler {
     }
 }
 
-fn _build_file_tags(path: &Path) -> Vec<TagPair> {
-    let mut tags = Vec::new();
-    tags.push((TagType::Lens, String::from("filesystem")));
-    if path.is_dir() {
-        tags.push((TagType::Type, String::from("directory")));
-    } else if path.is_file() {
-        tags.push((TagType::Type, String::from("file")));
-        let ext = path
-            .extension()
-            .and_then(|x| x.to_str())
-            .map(|x| x.to_string());
-        if let Some(ext) = ext {
-            tags.push((TagType::FileExt, ext));
-        }
-    }
-
-    if path.is_symlink() {
-        tags.push((TagType::Type, String::from("symlink")))
-    }
-
-    let guess = new_mime_guess::from_path(path.clone());
-    for mime_guess in guess.iter() {
-        tags.push((TagType::MimeType, mime_guess.to_string()));
-    }
-
-    tags
-}
-
 fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
     // Attempt to read file
     let contents = match path.extension() {
@@ -527,7 +497,7 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
         None
     };
 
-    let tags = _build_file_tags(path);
+    let tags = filesystem::build_file_tags(path);
     Ok(CrawlResult {
         content_hash,
         content: Some(contents.clone()),
@@ -537,8 +507,7 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
         url: url.to_string(),
         open_url: Some(url.to_string()),
         links: Default::default(),
-        tags: tags,
-        ..Default::default()
+        tags,
     })
 }
 
@@ -550,48 +519,10 @@ async fn _process_path(
 ) -> Result<CrawlResult, CrawlError> {
     let extension = filesystem::utils::get_supported_file_extensions(state);
 
-    if path.is_file() {
-        if _matches_ext(path, &extension) {
-            log::error!("Is a file {:?}", path);
-            _process_file(path, file_name, url)
-        } else {
-            let tags = _build_file_tags(path);
-            let mut hasher = Sha256::new();
-            hasher.update(file_name.as_bytes());
-            let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-            Ok(CrawlResult {
-                content_hash,
-                content: Some(file_name.clone()),
-                // Does a file have a description? Pull the first part of the file
-                description: Some(file_name.clone()),
-                title: Some(url.to_string()),
-                url: url.to_string(),
-                open_url: Some(url.to_string()),
-                links: Default::default(),
-                tags: tags,
-                ..Default::default()
-            })
-        }
-    } else if path.is_dir() {
-        let tags = _build_file_tags(path);
-        let mut hasher = Sha256::new();
-        hasher.update(file_name.as_bytes());
-        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-        Ok(CrawlResult {
-            content_hash,
-            content: Some(file_name.clone()),
-            // Does a file have a description? Pull the first part of the file
-            description: Some(file_name.clone()),
-            title: Some(url.to_string()),
-            url: url.to_string(),
-            open_url: Some(url.to_string()),
-            links: Default::default(),
-            tags: tags,
-            ..Default::default()
-        })
-    } else {
-        return Err(CrawlError::NotFound);
+    if path.is_file() && _matches_ext(path, &extension) {
+        return _process_file(path, file_name, url);
     }
+    Err(CrawlError::NotFound)
 }
 
 fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {

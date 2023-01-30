@@ -525,7 +525,7 @@ pub async fn enqueue_local_files(
         OnConflict::column(Column::Url).do_nothing().to_owned()
     };
 
-    let insert = Entity::insert_many(model)
+    let _insert = Entity::insert_many(model)
         .on_conflict(on_conflict)
         .exec(db)
         .await?;
@@ -536,7 +536,7 @@ pub async fn enqueue_local_files(
 
     let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
     let tag_rslt = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
-    if let Ok(_) = tag_rslt {
+    if tag_rslt.is_ok() {
         let query = Query::update()
             .table(Entity.table_ref())
             .values([(Column::Status, CrawlStatus::Queued.into())])
@@ -636,7 +636,6 @@ pub async fn enqueue_all(
             .await
         {
             Ok(_) => {
-                println!("tags {:?}", overrides.tags);
                 if !overrides.tags.is_empty() {
                     let inserted_rows = Entity::find()
                         .filter(Column::Url.is_in(urls))
@@ -747,7 +746,7 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .map(|x| x.id)
         .collect();
 
-    let rows_affected = delete_many_by_id(&db, &dbids).await?;
+    let rows_affected = delete_many_by_id(db, &dbids).await?;
     Ok(rows_affected)
 }
 

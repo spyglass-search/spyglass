@@ -16,10 +16,10 @@ pub fn path_to_uri(path: &Path) -> String {
     path_string_to_uri(path.display().to_string())
 }
 
-// Create a file URI
-pub fn path_buf_to_uri(path: &PathBuf) -> String {
-    path_string_to_uri(path.display().to_string())
-}
+// // Create a file URI
+// pub fn path_buf_to_uri(path: &PathBuf) -> String {
+//     path_string_to_uri(path.display().to_string())
+// }
 
 pub fn path_string_to_uri(path_str: String) -> String {
     // Eventually this will be away to keep track of multiple devices and searching across
@@ -39,7 +39,7 @@ pub fn path_string_to_uri(path_str: String) -> String {
 }
 
 /// Converts a uri to a valid path buf
-pub fn uri_to_path(uri: &String) -> anyhow::Result<PathBuf> {
+pub fn uri_to_path(uri: &str) -> anyhow::Result<PathBuf> {
     match Url::parse(uri) {
         Ok(url) => match url.to_file_path() {
             Ok(path) => Ok(path),
@@ -89,7 +89,7 @@ pub fn last_modified_time_for_path(path: &Path) -> DateTime<Utc> {
             if let Some(time) =
                 NaiveDateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
             {
-                return DateTime::<Utc>::from_utc(time, Utc);
+                DateTime::<Utc>::from_utc(time, Utc)
             } else {
                 Utc::now()
             }
@@ -103,7 +103,7 @@ pub fn last_modified_time_for_path(path: &Path) -> DateTime<Utc> {
 
 /// Accessor for the last modified time for a file. If the last modified
 /// time is not available now is returned
-pub fn last_modified_time(path: &PathBuf) -> DateTime<Utc> {
+pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
     if let Ok(metadata) = path.metadata() {
         if let Ok(modified) = metadata.modified() {
             let since_the_epoch = modified
@@ -113,7 +113,7 @@ pub fn last_modified_time(path: &PathBuf) -> DateTime<Utc> {
             if let Some(time) =
                 NaiveDateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
             {
-                return DateTime::<Utc>::from_utc(time, Utc);
+                DateTime::<Utc>::from_utc(time, Utc)
             } else {
                 Utc::now()
             }
@@ -141,7 +141,7 @@ pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
 
         directories
             .iter()
-            .map(|str| PathBuf::from(str))
+            .map(PathBuf::from)
             .collect::<Vec<PathBuf>>()
     } else {
         Vec::new()
@@ -167,8 +167,7 @@ pub fn is_ignore_file(path: &Path) -> bool {
     if let Some(file_name) = path.file_name() {
         return file_name.eq(OsStr::new(".gitignore"));
     }
-
-    return false;
+    false
 }
 
 /// Helper method used to convert a gitignore file into a processed gitignore object
@@ -183,20 +182,18 @@ pub fn patterns_from_file(path: &Path) -> Result<Gitignore, Error> {
 /// .git
 /// .ssh
 pub fn is_in_hidden_dir(path: &Path) -> bool {
-    path.ancestors()
-        .find(|ancestor| {
-            if ancestor.is_dir() {
-                if let Some(name) = ancestor.file_name() {
-                    if let Some(name_str) = name.to_str() {
-                        if name_str.starts_with(".") {
-                            return true;
-                        }
+    path.ancestors().any(|ancestor| {
+        if ancestor.is_dir() {
+            if let Some(name) = ancestor.file_name() {
+                if let Some(name_str) = name.to_str() {
+                    if name_str.starts_with('.') {
+                        return true;
                     }
                 }
             }
-            false
-        })
-        .is_some()
+        }
+        false
+    })
 }
 
 #[cfg(test)]

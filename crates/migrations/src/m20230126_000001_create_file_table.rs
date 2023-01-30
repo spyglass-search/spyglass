@@ -19,16 +19,13 @@ impl MigrationTrait for Migration {
                 "created_at" text NOT NULL,
                 "last_modified" text NOT NULL);"#;
 
-        for sql in &[processed_files] {
-            manager
-                .get_connection()
-                .execute(Statement::from_string(
-                    manager.get_database_backend(),
-                    sql.to_owned().to_string(),
-                ))
-                .await?;
-        }
-
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                processed_files.to_owned().to_string(),
+            ))
+            .await?;
         Ok(())
     }
 

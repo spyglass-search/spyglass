@@ -1,5 +1,5 @@
-use sea_orm::Set;
 use sea_orm::{entity::prelude::*, ConnectionTrait};
+use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumString};
 
@@ -151,6 +151,46 @@ where
         _ => Err(DbErr::RecordNotFound(format!(
             "label: {label}, value: {value}"
         ))),
+    }
+}
+
+pub async fn get_or_create_many<C>(db: &C, tags: &Vec<TagPair>) -> Result<Vec<Model>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let tag_models = tags
+        .iter()
+        .map(|(label, value)| ActiveModel {
+            label: Set(label.clone()),
+            value: Set(value.to_string()),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
+        })
+        .collect::<Vec<ActiveModel>>();
+
+    let _ = Entity::insert_many(tag_models)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_with_returning(db)
+        .await;
+
+    let mut condition = Condition::any();
+    for (label, value) in tags {
+        condition = condition.add(
+            Condition::all()
+                .add(Column::Label.eq(label.clone()))
+                .add(Column::Value.eq(value.clone())),
+        );
+    }
+    let db_tags = Entity::find().filter(condition).all(db).await;
+
+    match db_tags {
+        Ok(models) => Ok(models),
+        Err(err) => Err(err),
     }
 }
 
