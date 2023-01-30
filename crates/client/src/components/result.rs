@@ -53,15 +53,6 @@ fn render_metadata(result: &SearchResult) -> Html {
     let url = Url::parse(&result.crawl_uri);
     if let Ok(url) = url {
         match url.scheme() {
-            "api" => {
-                // Show friendly API name
-                match result.domain.as_str() {
-                    "api.github.com" => meta.push(html! { <span>{"Github"}</span> }),
-                    "calendar.google.com" => meta.push(html! { <span>{"Google Calendar"}</span> }),
-                    "drive.google.com" => meta.push(html! { <span>{"Google Drive"}</span> }),
-                    _ => {}
-                }
-            }
             "file" => {
                 // Attempt to grab the folder this file resides
                 let path = if let Some(segments) = url.path_segments() {
