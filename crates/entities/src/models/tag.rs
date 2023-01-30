@@ -41,6 +41,9 @@ pub enum TagType {
     // Part of this/these lens(es)
     #[sea_orm(string_value = "lens")]
     Lens,
+    // Part of a specific repo
+    #[sea_orm(string_value = "repo")]
+    Repo,
 }
 
 #[derive(AsRefStr, Display, EnumString)]
