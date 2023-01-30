@@ -21,16 +21,8 @@ fn render_icon(result: &SearchResult) -> Html {
         let domain = url.domain().unwrap_or("example.com").to_owned();
         match url.scheme() {
             "api" => {
-                match url.host_str() {
-                    Some("calendar.google.com") => {
-                        html! { <icons::GoogleCalendar height="h-8" width="w-8" classes={classes!("m-auto")} /> }
-                    }
-                    // TODO: Detect file/mimetype to show even more detail icons for
-                    // drive files.
-                    _ => {
-                        html! { <icons::GDrive height="h-8" width="w-8" classes={classes!("m-auto")} /> }
-                    }
-                }
+                let connection = url.host_str().unwrap_or_default();
+                icons::connection_icon(connection, "h-8", "w-8")
             }
             "file" => {
                 if let Some((_, ext)) = result.title.rsplit_once('.') {
@@ -102,13 +94,14 @@ fn render_metadata(result: &SearchResult) -> Html {
 
     // Tags
     for (tag, value) in result.tags.iter() {
+        let tag = tag.to_lowercase();
         if tag == "source" || tag == "mimetype" {
             continue;
         }
 
         let tag_label = match tag.as_str() {
-            "Lens" => "🔍",
-            _ => tag,
+            "lens" => "🔍",
+            _ => tag.as_str(),
         };
 
         meta.push(html! {
@@ -180,7 +173,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                 <h2 class="text-lg truncate font-bold w-[30rem]">
                     {result.title.clone()}
                 </h2>
-                <div class="text-sm leading-relaxed text-neutral-400 max-h-16 overflow-hidden">
+                <div class="text-sm leading-relaxed text-neutral-400 max-h-14 overflow-hidden">
                     {result.description.clone()}
                 </div>
                 {metadata}

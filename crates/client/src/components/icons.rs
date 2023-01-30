@@ -393,16 +393,19 @@ pub fn github_logo(props: &IconProps) -> Html {
     }
 }
 
-pub fn connection_icon(id: &str) -> Html {
+pub fn connection_icon(id: &str, height: &str, width: &str) -> Html {
+    let height = height.to_string();
+    let width = width.to_string();
+
     if id == "calendar.google.com" {
-        html! { <GoogleCalendar height="h-6" width="w-6" /> }
+        html! { <GoogleCalendar {height} {width} classes="m-auto" /> }
     } else if id == "drive.google.com" {
-        html! { <GDrive height="h-6" width="w-6" /> }
+        html! { <GDrive {height} {width} classes="m-auto" /> }
     } else if id == "mail.google.com" {
-        html! { <Gmail height="h-6" width="w-6" /> }
+        html! { <Gmail {height} {width} classes="m-auto" /> }
     } else if id == "api.github.com" {
-        html! { <GitHub height="h-6" width="w-6" /> }
+        html! { <GitHub {height} {width} classes="m-auto" /> }
     } else {
-        html! { <ShareIcon height="h-6" width="w-6" /> }
+        html! { <ShareIcon {height} {width} classes="m-auto" /> }
     }
 }
