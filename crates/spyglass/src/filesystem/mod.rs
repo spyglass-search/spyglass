@@ -23,7 +23,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use notify::ReadDirectoryChangesWatcher;
+use notify::RecommendedWatcher;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -40,7 +40,7 @@ pub mod utils;
 /// Any updates that make it through will be passed to listeners
 pub struct SpyglassFileWatcher {
     // The director watcher services
-    watcher: Arc<Mutex<Debouncer<ReadDirectoryChangesWatcher>>>,
+    watcher: Arc<Mutex<Debouncer<RecommendedWatcher>>>,
     // The map of path being watched to the list of watchers
     path_map: DashMap<PathBuf, Vec<WatchPath>>,
     // Map of .gitignore file path to the ignore file processor
