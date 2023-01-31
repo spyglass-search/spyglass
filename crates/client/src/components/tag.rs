@@ -10,16 +10,16 @@ pub struct TagProps {
 #[function_component(Tag)]
 pub fn tag_component(props: &TagProps) -> Html {
     let tag_label = match props.label.as_str() {
-        "lens" => "🔍",
-        _ => &props.label,
+        "lens" => html! { <icons::SearchIcon height="h-4" width="w-4" classes="m-0.5" /> },
+        _ => html!{ <small class="py-0.5 px-1">{props.label.clone()}</small> },
     };
 
     html! {
         <div class="text-xs flex flex-row rounded text-white bg-cyan-600 items-center">
-            <div class="border-r border-cyan-900 py-0.5 px-1">
-                <small>{tag_label}</small>
+            <div class="border-r border-cyan-900">
+                {tag_label}
             </div>
-            <div class="py-0.5 px-2">
+            <div class="py-0.5 px-1">
                 {props.value.clone()}
             </div>
         </div>

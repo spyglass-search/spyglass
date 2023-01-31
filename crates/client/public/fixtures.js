@@ -48,7 +48,8 @@ export let invoke = async (func_name, params) => {
                 tags: [
                     ['mimetype', 'application/pdf'],
                     ['source', 'drive.google.com'],
-                    ['Lens', 'example']
+                    ['Lens', 'example'],
+                    ['Owner', 'bob.dole@example.com'],
                 ],
                 score: 1.0
             }, {
