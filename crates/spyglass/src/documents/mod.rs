@@ -58,6 +58,11 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
     }
 }
 
+pub struct AddUpdateResult {
+    pub num_added: usize,
+    pub num_updated: usize
+}
+
 /// Process a list of crawl results. The following steps will be taken:
 /// 1. Find all urls that already have been processed in the database
 /// 2. Remove any documents that already exist from the index
@@ -67,7 +72,7 @@ pub async fn process_crawl_results(
     state: &AppState,
     results: &[CrawlResult],
     global_tags: &[TagPair],
-) -> anyhow::Result<usize> {
+) -> anyhow::Result<AddUpdateResult> {
     let now = Instant::now();
     // get a list of all urls
     let parsed_urls = results
@@ -172,7 +177,11 @@ pub async fn process_crawl_results(
         now.elapsed().as_millis()
     );
 
-    Ok(num_entries)
+    let num_updates = existing.len();
+    Ok(AddUpdateResult {
+        num_added: num_entries - num_updates,
+        num_updated: num_updates
+    })
 }
 
 // Process a list of crawl results. The following steps will be taken:

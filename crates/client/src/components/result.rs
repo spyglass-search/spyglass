@@ -117,7 +117,7 @@ fn render_metadata(result: &SearchResult) -> Html {
     }
 
     html! {
-        <div class="text-xs place-items-center flex flex-row gap-1.5 text-cyan-500 py-0.5 mt-1">
+        <div class="text-xs place-items-center flex flex-row flex-wrap gap-1.5 text-cyan-500 py-0.5 mt-1">
             {joined}
         </div>
     }

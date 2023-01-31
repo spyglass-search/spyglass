@@ -354,10 +354,10 @@ pub async fn process_crawl(
 
     match process_crawl_results(state, &[crawl_result.clone()], &task_tags).await {
         Ok(res) => {
-            if res > 0 {
-                Ok(FetchResult::New)
-            } else {
+            if res.num_updated > 0 {
                 Ok(FetchResult::Updated)
+            } else {
+                Ok(FetchResult::New)
             }
         }
         Err(err) => Err(CrawlError::Other(err.to_string())),
