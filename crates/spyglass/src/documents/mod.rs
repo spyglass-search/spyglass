@@ -409,7 +409,7 @@ async fn _get_tags(
         let mut to_search = Vec::new();
 
         for (tag_type, value) in &result.tags {
-            let uid = format!("{}:{}", tag_type, value);
+            let uid = format!("{tag_type}:{value}");
             match tag_cache.get(&uid) {
                 Some(tag) => {
                     tags.push(*tag);

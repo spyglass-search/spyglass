@@ -85,7 +85,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                         }}
                         {"Uninstall"}
                     </Btn>
-                    <div class="ml-auto text-neutral-200">{format!("{} docs", buf)}</div>
+                    <div class="ml-auto text-neutral-200">{format!("{buf} docs")}</div>
                 </div>
             }
         }

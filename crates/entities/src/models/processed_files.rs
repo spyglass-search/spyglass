@@ -49,7 +49,7 @@ pub async fn remove_unmatched_paths(
     let mut find = Entity::find();
     if !paths.is_empty() {
         for path in paths {
-            find = find.filter(Column::FilePath.not_like(format!("{}%", path).as_str()));
+            find = find.filter(Column::FilePath.not_like(format!("{path}%").as_str()));
         }
     } else {
         log::debug!("No paths being watched removing all.");

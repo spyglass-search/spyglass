@@ -244,7 +244,7 @@ impl SpyglassFileWatcher {
             db: state.db.clone(),
         };
 
-        let _ = tokio::spawn(watch_events(state.clone(), file_events));
+        tokio::spawn(watch_events(state.clone(), file_events));
 
         spy_watcher
     }
