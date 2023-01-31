@@ -185,8 +185,8 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
 /// Inserts an entry into the tag table for each document and
 /// tag pair provided
 pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &[Model],
     db: &C,
+    docs: &[Model],
     tags: &[TagPair],
 ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
     let mut tag_ids: Vec<i64> = Vec::new();
@@ -202,7 +202,7 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
 
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected
 /// to be a SQL like statement.
-pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {
+pub async fn delete_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {
     let matching = Entity::find()
         .filter(Column::Url.like(rule))
         .all(db)
@@ -215,16 +215,7 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
 
     if !removed.is_empty() {
         let ids = removed.iter().map(|(id, _)| *id).collect::<Vec<i64>>();
-        let _ = document_tag::Entity::delete_many()
-            .filter(document_tag::Column::IndexedDocumentId.is_in(ids))
-            .exec(db)
-            .await?;
-
-        let _ = Entity::delete_many()
-            .filter(Column::Url.like(rule))
-            .exec(db)
-            .await?;
-
+        delete_many_by_id(db, &ids).await?;
         log::info!("removed {} docs due to '{}'", removed.len(), rule);
     }
 
@@ -304,7 +295,7 @@ mod test {
     use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, ModelTrait, Set};
 
     #[tokio::test]
-    async fn test_remove_by_rule() {
+    async fn test_delete_by_rule() {
         let db = setup_test_db().await;
 
         let doc = super::ActiveModel {
@@ -322,7 +313,7 @@ mod test {
         };
         doc.save(&db).await.unwrap();
 
-        let removed = super::remove_by_rule(&db, "https://en.wikipedia.com/%action=%")
+        let removed = super::delete_by_rule(&db, "https://en.wikipedia.com/%action=%")
             .await
             .unwrap();
         assert_eq!(removed.len(), 1);

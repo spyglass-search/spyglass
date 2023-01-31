@@ -9,13 +9,15 @@ use entities::models::{
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, LensRule, LensSource};
-use std::collections::HashMap;
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
-use crate::crawler::{CrawlError, CrawlResult, Crawler};
-use crate::search::{DocumentUpdate, Searcher};
+use crate::search::Searcher;
 use crate::state::AppState;
+use crate::{
+    crawler::{CrawlError, CrawlResult, Crawler},
+    documents::process_crawl_results,
+};
 
 /// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache.
 /// If no cache is accessible then we run the standard bootstrap process. Local lenses use
@@ -98,7 +100,7 @@ async fn process_lens_rules(lens: &LensConfig, state: &AppState) {
                     // Remove matching crawl tasks
                     let _ = crawl_queue::remove_by_rule(&state.db, &rule_like).await;
                     // Remove matching indexed documents
-                    match indexed_document::remove_by_rule(&state.db, &rule_like).await {
+                    match indexed_document::delete_by_rule(&state.db, &rule_like).await {
                         Ok(doc_ids) => {
                             for doc_id in doc_ids {
                                 let _ = Searcher::delete_by_id(state, &doc_id).await;
@@ -284,105 +286,6 @@ pub enum FetchResult {
     Updated,
 }
 
-/// Handle multiple crawl results at once.
-pub async fn add_document_and_tags(
-    state: &AppState,
-    result: &CrawlResult,
-    extra_tags: &[TagPair],
-) -> anyhow::Result<FetchResult> {
-    // find all documents that already exist with that url
-    let existing: Vec<indexed_document::Model> = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.eq(result.url.clone()))
-        .all(&state.db)
-        .await
-        .unwrap_or_default();
-
-    // build a hash map of Url to the doc id
-    let id_map = existing
-        .iter()
-        .map(|model| (model.url.to_string(), model.doc_id.to_string()))
-        .collect::<HashMap<String, String>>();
-
-    // build a list of doc ids to delete from the index
-    let doc_id_list = id_map
-        .values()
-        .into_iter()
-        .map(|x| x.to_owned())
-        .collect::<Vec<String>>();
-
-    // Delete existing docs
-    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
-    let _ = Searcher::save(state).await;
-
-    let mut updates = Vec::new();
-    let mut added_docs = Vec::new();
-
-    // Find/create the tags for this crawl.
-    let mut all_tags = Vec::new();
-    all_tags.extend(&result.tags);
-    all_tags.extend(extra_tags);
-    let mut tags = Vec::new();
-    for (label, value) in &all_tags {
-        let tag = tag::get_or_create(&state.db, label.to_owned(), value).await?;
-        tags.push(tag.id);
-    }
-
-    match Url::parse(&result.url) {
-        Ok(url) => {
-            let url_host = url.host_str().unwrap_or("");
-            // Add document to index
-            if let Ok(mut index_writer) = state.index.writer.lock() {
-                let doc_id = Searcher::upsert_document(
-                    &mut index_writer,
-                    DocumentUpdate {
-                        doc_id: id_map.get(&result.url).cloned(),
-                        title: &result.title.clone().unwrap_or_default(),
-                        description: &result.description.clone().unwrap_or_default(),
-                        domain: url_host,
-                        url: url.as_str(),
-                        content: &result.content.clone().unwrap_or_default(),
-                        tags: &Some(tags.clone()),
-                    },
-                )?;
-
-                if !id_map.contains_key(&doc_id) {
-                    added_docs.push(url.to_string());
-                    let update = indexed_document::ActiveModel {
-                        domain: Set(url_host.to_string()),
-                        url: Set(url.to_string()),
-                        open_url: Set(result.open_url.clone()),
-                        doc_id: Set(doc_id),
-                        ..Default::default()
-                    };
-
-                    updates.push(update);
-                }
-            }
-        }
-        Err(error) => log::error!("Error processing url: {} error: {:?}", result.url, error),
-    }
-
-    indexed_document::insert_many(&state.db, updates).await?;
-    // Get ids of recently added docs
-    let added = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.eq(result.url.clone()))
-        .one(&state.db)
-        .await?;
-
-    if let Some(added) = added {
-        let result = indexed_document::insert_tags_for_docs(&state.db, &[added], &tags).await;
-        if let Err(error) = result {
-            log::error!("Error inserting tags {:?}", error);
-        }
-    }
-
-    if existing.is_empty() {
-        Ok(FetchResult::New)
-    } else {
-        Ok(FetchResult::Updated)
-    }
-}
-
 pub async fn process_crawl(
     state: &AppState,
     task_id: i64,
@@ -449,8 +352,14 @@ pub async fn process_crawl(
         return Err(CrawlError::ParseError("No content found".to_string()));
     }
 
-    match add_document_and_tags(state, crawl_result, &task_tags).await {
-        Ok(res) => Ok(res),
+    match process_crawl_results(state, &[crawl_result.clone()], &task_tags).await {
+        Ok(res) => {
+            if res > 0 {
+                Ok(FetchResult::New)
+            } else {
+                Ok(FetchResult::Updated)
+            }
+        }
         Err(err) => Err(CrawlError::Other(err.to_string())),
     }
 }

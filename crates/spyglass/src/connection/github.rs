@@ -8,9 +8,9 @@ use url::Url;
 use super::credentials::connection_secret;
 use super::{handle_sync_credentials, load_credentials, Connection};
 use crate::crawler::{CrawlError, CrawlResult};
+use crate::documents::process_crawl_results;
 use crate::search::Searcher;
 use crate::state::AppState;
-use crate::task::worker::add_document_and_tags;
 
 const BUFFER_SYNC_SIZE: usize = 500;
 
@@ -67,16 +67,16 @@ impl GithubConnection {
 
             if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
                 // Add to database
+                let mut crawls = Vec::new();
                 for issue in &buffer {
                     let api_url = self.to_url(&issue.url).expect("unable to create url");
                     log::debug!("issue: {}", issue.title);
+                    crawls.push(issue_to_crawl(&api_url, issue));
+                }
 
-                    let mut tags = self.default_tags().clone();
-                    let result = issue_to_crawl(&api_url, issue, &mut tags);
-
-                    if let Err(err) = add_document_and_tags(state, &result, &tags).await {
-                        log::error!("Unable to add issue: {}", err);
-                    }
+                if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
+                {
+                    log::error!("Unable to add issue: {}", err);
                 }
 
                 if let Err(err) = Searcher::save(state).await {
@@ -106,16 +106,16 @@ impl GithubConnection {
             // Save to DB when we've reached a limit or there are no more pages.
             if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
                 // Add to database
+                let mut crawls = Vec::new();
                 for res in &buffer {
                     let api_url = self.to_url(&res.url).expect("unable to create url");
                     log::debug!("repo: {} - {}", res.full_name, api_url.to_string());
+                    crawls.push(repo_to_crawl(&api_url, res));
+                }
 
-                    let mut tags = self.default_tags().clone();
-                    let result = repo_to_crawl(&api_url, res, &mut tags);
-
-                    if let Err(err) = add_document_and_tags(state, &result, &tags).await {
-                        log::error!("Unable to add repo: {}", err);
-                    }
+                if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
+                {
+                    log::error!("Unable to add repo: {}", err);
                 }
 
                 if let Err(err) = Searcher::save(state).await {
@@ -139,6 +139,9 @@ impl GithubConnection {
         let mut total_synced = 0;
         let mut buffer = Vec::new();
 
+        let mut tags = self.default_tags().clone();
+        tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
+
         while let Ok(resp) = self.client.list_starred(page).await {
             page = resp.next_page;
             total_synced += resp.result.len();
@@ -146,17 +149,15 @@ impl GithubConnection {
             // Save to DB when we've reached a limit or there are no more pages.
             if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
                 // Add to database
+                let mut crawls = Vec::new();
                 for res in &buffer {
                     let api_url = self.to_url(&res.url).expect("unable to create url");
                     log::debug!("starred: {} - {}", res.full_name, api_url.to_string());
+                    crawls.push(repo_to_crawl(&api_url, res));
+                }
 
-                    let mut tags = self.default_tags().clone();
-                    tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
-                    let result = repo_to_crawl(&api_url, res, &mut tags);
-
-                    if let Err(err) = add_document_and_tags(state, &result, &tags).await {
-                        log::error!("Unable to add repo: {}", err);
-                    }
+                if let Err(err) = process_crawl_results(state, &crawls, &tags).await {
+                    log::error!("Unable to add repo: {}", err);
                 }
 
                 if let Err(err) = Searcher::save(state).await {
@@ -212,16 +213,18 @@ impl Connection for GithubConnection {
         if fetch_uri.contains("/issues/") {
             match self.client.get_issue(&fetch_uri).await {
                 Ok(issue) => {
-                    let mut tags = self.default_tags();
-                    Ok(issue_to_crawl(&uri, &issue, &mut tags))
+                    let mut issue = issue_to_crawl(&uri, &issue);
+                    issue.tags.extend(self.default_tags());
+                    Ok(issue)
                 }
                 Err(err) => Err(CrawlError::FetchError(err.to_string())),
             }
         } else {
             match self.client.get_repo(&fetch_uri).await {
                 Ok(repo) => {
-                    let mut tags = self.default_tags();
-                    Ok(repo_to_crawl(&uri, &repo, &mut tags))
+                    let mut repo = repo_to_crawl(&uri, &repo);
+                    repo.tags.extend(self.default_tags());
+                    Ok(repo)
                 }
                 Err(err) => Err(CrawlError::FetchError(err.to_string())),
             }
@@ -229,8 +232,8 @@ impl Connection for GithubConnection {
     }
 }
 
-fn issue_to_crawl(api_url: &Url, issue: &Issue, tags: &mut Vec<TagPair>) -> CrawlResult {
-    let result = CrawlResult::new(
+fn issue_to_crawl(api_url: &Url, issue: &Issue) -> CrawlResult {
+    let mut result = CrawlResult::new(
         api_url,
         Some(issue.html_url.clone()),
         &issue.to_text(),
@@ -238,15 +241,19 @@ fn issue_to_crawl(api_url: &Url, issue: &Issue, tags: &mut Vec<TagPair>) -> Craw
         None,
     );
 
-    tags.push((TagType::Owner, issue.user.login.clone()));
-    tags.push((TagType::Repository, issue.repository.full_name.clone()));
-    tags.push((TagType::Type, GithubDocTypes::Issue.to_string()));
+    result.tags.push((TagType::Owner, issue.user.login.clone()));
+    result
+        .tags
+        .push((TagType::Repository, issue.repository.full_name.clone()));
+    result
+        .tags
+        .push((TagType::Type, GithubDocTypes::Issue.to_string()));
 
     result
 }
 
-fn repo_to_crawl(api_url: &Url, repo: &Repo, tags: &mut Vec<TagPair>) -> CrawlResult {
-    let result = CrawlResult::new(
+fn repo_to_crawl(api_url: &Url, repo: &Repo) -> CrawlResult {
+    let mut result = CrawlResult::new(
         api_url,
         Some(repo.html_url.clone()),
         &repo.description.clone().unwrap_or_default(),
@@ -254,8 +261,10 @@ fn repo_to_crawl(api_url: &Url, repo: &Repo, tags: &mut Vec<TagPair>) -> CrawlRe
         None,
     );
 
-    tags.push((TagType::Owner, repo.owner.login.clone()));
-    tags.push((TagType::Type, GithubDocTypes::Repository.to_string()));
+    result.tags.push((TagType::Owner, repo.owner.login.clone()));
+    result
+        .tags
+        .push((TagType::Type, GithubDocTypes::Repository.to_string()));
 
     result
 }

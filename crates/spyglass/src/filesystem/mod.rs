@@ -751,7 +751,7 @@ pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
 
 // Helper method used process files
 async fn _process_general_file(state: &AppState, file_uri: &[String]) {
-    let mut crawl_results = file_uri
+    let crawl_results = file_uri
         .iter()
         .filter_map(|uri| match Url::parse(uri) {
             Ok(url) => match url.to_file_path() {
@@ -762,7 +762,15 @@ async fn _process_general_file(state: &AppState, file_uri: &[String]) {
         })
         .collect::<Vec<CrawlResult>>();
 
-    documents::process_crawl_results(state, "files", &mut crawl_results).await;
+    if let Err(err) = documents::process_crawl_results(
+        state,
+        &crawl_results,
+        &[(TagType::Lens, "files".to_string())],
+    )
+    .await
+    {
+        log::error!("Unable to add crawl results: {:?}", err);
+    }
 }
 
 // Process a path to parse result
