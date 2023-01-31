@@ -1,6 +1,7 @@
 use entities::models::tag::{TagPair, TagType, TagValue};
 use jsonrpsee::core::async_trait;
 use libgithub::GithubClient;
+use strum_macros::{Display, EnumString};
 use url::Url;
 
 use super::credentials::connection_secret;
@@ -11,6 +12,14 @@ use crate::state::AppState;
 use crate::task::worker::add_document_and_tags;
 
 const BUFFER_SYNC_SIZE: usize = 500;
+
+#[derive(Display, EnumString)]
+pub enum GithubDocTypes {
+    #[strum(serialize = "issue")]
+    Issue,
+    #[strum(serialize = "repository")]
+    Repository,
+}
 
 pub struct GithubConnection {
     client: GithubClient,
@@ -70,7 +79,8 @@ impl GithubConnection {
 
                     let mut tags = self.default_tags().clone();
                     tags.push((TagType::Owner, issue.user.login.clone()));
-
+                    tags.push((TagType::Repository, issue.repository.full_name.clone()));
+                    tags.push((TagType::Type, GithubDocTypes::Issue.to_string()));
                     if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add issue: {}", err);
                     }
@@ -116,7 +126,7 @@ impl GithubConnection {
 
                     let mut tags = self.default_tags().clone();
                     tags.push((TagType::Owner, res.owner.login.clone()));
-                    tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
+                    tags.push((TagType::Type, GithubDocTypes::Repository.to_string()));
                     if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add repo: {}", err);
                     }
@@ -163,6 +173,8 @@ impl GithubConnection {
 
                     let mut tags = self.default_tags().clone();
                     tags.push((TagType::Owner, res.owner.login.clone()));
+                    tags.push((TagType::Type, GithubDocTypes::Repository.to_string()));
+                    tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
 
                     if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add repo: {}", err);

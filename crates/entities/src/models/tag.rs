@@ -22,28 +22,33 @@ pub type TagPair = (TagType, String);
 )]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum TagType {
-    // Marked as liked/starred/hearted/etc.
+    /// Marked as liked/starred/hearted/etc.
     #[sea_orm(string_value = "favorited")]
     Favorited,
-    // Mimetype of the document. TODO: Need to keep a mapping between file extension and
-    // mimetypes somewhere
+    /// Mimetype of the document. TODO: Need to keep a mapping between file extension and
+    /// mimetypes somewhere
     #[sea_orm(string_value = "mimetype")]
     MimeType,
-    // where this document came from,
+    /// where this document came from,
     #[sea_orm(string_value = "source")]
     Source,
-    // Owner of a doc/item, if relevant.
+    /// Owner of a doc/item, if relevant.
     #[sea_orm(string_value = "owner")]
     Owner,
-    // Shared/invited to a doc/event/etc.
+    /// Shared/invited to a doc/event/etc.
     #[sea_orm(string_value = "shared")]
     SharedWith,
-    // Part of this/these lens(es)
+    /// Part of this/these lens(es)
     #[sea_orm(string_value = "lens")]
     Lens,
-    // Part of a specific repo
-    #[sea_orm(string_value = "repo")]
-    Repo,
+    /// Part of a specific repo
+    #[sea_orm(string_value = "repository")]
+    Repository,
+    /// Used to differentiate from others in this category.
+    /// e.g. for a GitHub connection we can have an "Issue" or "Repo".
+    ///     for a D&D lens we have equipment, magic items, skills, etc.
+    #[sea_orm(string_value = "type")]
+    Type,
 }
 
 #[derive(AsRefStr, Display, EnumString)]

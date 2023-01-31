@@ -2,7 +2,10 @@ use url::Url;
 use yew::prelude::*;
 
 use super::btn::DeleteButton;
-use super::icons;
+use super::{
+    icons,
+    tag::{Tag, TagIcon},
+};
 use shared::response::{LensResult, SearchResult};
 
 #[derive(Properties, PartialEq)]
@@ -83,31 +86,26 @@ fn render_metadata(result: &SearchResult) -> Html {
         }
     }
 
-    // Tags
+    // Generate the icons/labels required for tags
+    let mut priority_tags = Vec::new();
+    let mut normal_tags = Vec::new();
     for (tag, value) in result.tags.iter() {
         let tag = tag.to_lowercase();
         if tag == "source" || tag == "mimetype" {
             continue;
         }
 
-        let tag_label = match tag.as_str() {
-            "lens" => "🔍",
-            _ => tag.as_str(),
-        };
-
-        meta.push(html! {
-            <div class="text-xs flex flex-row rounded text-white bg-cyan-600 items-center">
-                <div class="border-r border-cyan-900 py-0.5 px-1">
-                    <small>{tag_label}</small>
-                </div>
-                <div class="py-0.5 px-2">
-                    {value}
-                </div>
-            </div>
-        });
+        if tag == "favorited" {
+            priority_tags.push(html! { <TagIcon label={tag} value={value.clone()} /> });
+        } else {
+            normal_tags.push(html! { <Tag label={tag} value={value.clone()} /> });
+        }
     }
 
     let mut joined = Vec::new();
+    meta.extend(priority_tags);
+    meta.extend(normal_tags);
+
     if !meta.is_empty() {
         let last_idx = meta.len() - 1;
         for (idx, node) in meta.iter().enumerate() {
