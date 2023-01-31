@@ -1,4 +1,5 @@
 use entities::{
+    BATCH_SIZE,
     models::{
         document_tag, indexed_document,
         lens::{self, LensType},
@@ -51,7 +52,7 @@ where
         .collect::<Vec<document_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates
-    for chunk in doc_tags.chunks(5000) {
+    for chunk in doc_tags.chunks(BATCH_SIZE) {
         document_tag::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 sea_orm::sea_query::OnConflict::columns(vec![

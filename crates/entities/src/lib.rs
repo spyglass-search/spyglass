@@ -6,6 +6,9 @@ pub mod test;
 pub use sea_orm;
 use sea_orm::{DatabaseConnection, DbBackend, DbErr, FromQueryResult, Statement};
 use shared::response::LibraryStats;
+
+pub const BATCH_SIZE: usize = 5000;
+
 #[derive(Debug, FromQueryResult)]
 pub struct CountByStatus {
     count: i32,

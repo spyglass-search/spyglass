@@ -1,4 +1,5 @@
 use entities::{
+    BATCH_SIZE,
     models::{
         crawl_queue, crawl_tag,
         lens::{self, LensType},
@@ -51,7 +52,7 @@ where
         .collect::<Vec<crawl_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates
-    for chunk in task_tags.chunks(5000) {
+    for chunk in task_tags.chunks(BATCH_SIZE) {
         crawl_tag::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 sea_orm::sea_query::OnConflict::columns(vec![
