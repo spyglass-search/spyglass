@@ -1,6 +1,6 @@
 use chrono::prelude::*;
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use spyglass_plugin::utils::path_to_uri;
@@ -9,12 +9,8 @@ use spyglass_plugin::*;
 #[derive(Default)]
 struct Plugin {
     extensions: HashSet<String>,
-    last_synced: SyncData,
+    _last_synced: SyncData,
 }
-
-const PLUGIN_DATA: &str = "/data.json";
-const FOLDERS_LIST_ENV: &str = "FOLDERS_LIST";
-const EXTS_LIST_ENV: &str = "EXTS_LIST";
 
 #[derive(Default, Deserialize, Serialize)]
 struct SyncData {
