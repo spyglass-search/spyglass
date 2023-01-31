@@ -1,5 +1,6 @@
 use entities::models::tag::{TagPair, TagType, TagValue};
 use jsonrpsee::core::async_trait;
+use libgithub::types::{Issue, Repo};
 use libgithub::GithubClient;
 use strum_macros::{Display, EnumString};
 use url::Url;
@@ -69,18 +70,10 @@ impl GithubConnection {
                 for issue in &buffer {
                     let api_url = self.to_url(&issue.url).expect("unable to create url");
                     log::debug!("issue: {}", issue.title);
-                    let result = CrawlResult::new(
-                        &api_url,
-                        Some(issue.html_url.clone()),
-                        &issue.to_text(),
-                        &issue.title,
-                        None,
-                    );
 
                     let mut tags = self.default_tags().clone();
-                    tags.push((TagType::Owner, issue.user.login.clone()));
-                    tags.push((TagType::Repository, issue.repository.full_name.clone()));
-                    tags.push((TagType::Type, GithubDocTypes::Issue.to_string()));
+                    let result = issue_to_crawl(&api_url, issue, &mut tags);
+
                     if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add issue: {}", err);
                     }
@@ -116,17 +109,10 @@ impl GithubConnection {
                 for res in &buffer {
                     let api_url = self.to_url(&res.url).expect("unable to create url");
                     log::debug!("repo: {} - {}", res.full_name, api_url.to_string());
-                    let result = CrawlResult::new(
-                        &api_url,
-                        Some(res.html_url.clone()),
-                        &res.description.clone().unwrap_or_default(),
-                        &res.full_name,
-                        None,
-                    );
 
                     let mut tags = self.default_tags().clone();
-                    tags.push((TagType::Owner, res.owner.login.clone()));
-                    tags.push((TagType::Type, GithubDocTypes::Repository.to_string()));
+                    let result = repo_to_crawl(&api_url, res, &mut tags);
+
                     if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add repo: {}", err);
                     }
@@ -163,18 +149,10 @@ impl GithubConnection {
                 for res in &buffer {
                     let api_url = self.to_url(&res.url).expect("unable to create url");
                     log::debug!("starred: {} - {}", res.full_name, api_url.to_string());
-                    let result = CrawlResult::new(
-                        &api_url,
-                        Some(res.html_url.clone()),
-                        &res.description.clone().unwrap_or_default(),
-                        &res.full_name,
-                        None,
-                    );
 
                     let mut tags = self.default_tags().clone();
-                    tags.push((TagType::Owner, res.owner.login.clone()));
-                    tags.push((TagType::Type, GithubDocTypes::Repository.to_string()));
                     tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
+                    let result = repo_to_crawl(&api_url, res, &mut tags);
 
                     if let Err(err) = add_document_and_tags(state, &result, &tags).await {
                         log::error!("Unable to add repo: {}", err);
@@ -222,7 +200,62 @@ impl Connection for GithubConnection {
         self.sync_starred(state).await;
     }
 
-    async fn get(&mut self, _uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
-        Ok(CrawlResult::default())
+    async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {
+        let mut uri = uri.clone();
+        if uri.scheme() != "api" {
+            return Err(CrawlError::Unsupported("Invalid URL".to_string()));
+        }
+
+        let _ = uri.set_username("");
+        let fetch_uri = uri.to_string().replace("api://", "https://");
+
+        if fetch_uri.contains("/issues/") {
+            match self.client.get_issue(&fetch_uri).await {
+                Ok(issue) => {
+                    let mut tags = self.default_tags().clone();
+                    Ok(issue_to_crawl(&uri, &issue, &mut tags))
+                }
+                Err(err) => Err(CrawlError::FetchError(err.to_string()))
+            }
+        } else {
+            match self.client.get_repo(&fetch_uri).await {
+                Ok(repo) => {
+                    let mut tags = self.default_tags().clone();
+                    Ok(repo_to_crawl(&uri, &repo, &mut tags))
+                }
+                Err(err) => Err(CrawlError::FetchError(err.to_string()))
+            }
+        }
     }
+}
+
+fn issue_to_crawl(api_url: &Url, issue: &Issue, tags: &mut Vec<TagPair>) -> CrawlResult {
+    let result = CrawlResult::new(
+        &api_url,
+        Some(issue.html_url.clone()),
+        &issue.to_text(),
+        &issue.title,
+        None,
+    );
+
+    tags.push((TagType::Owner, issue.user.login.clone()));
+    tags.push((TagType::Repository, issue.repository.full_name.clone()));
+    tags.push((TagType::Type, GithubDocTypes::Issue.to_string()));
+
+    result
+}
+
+fn repo_to_crawl(api_url: &Url, repo: &Repo, tags: &mut Vec<TagPair>) -> CrawlResult {
+    let result = CrawlResult::new(
+        api_url,
+        Some(repo.html_url.clone()),
+        &repo.description.clone().unwrap_or_default(),
+        &repo.full_name,
+        None,
+    );
+
+    tags.push((TagType::Owner, repo.owner.login.clone()));
+    tags.push((TagType::Type, GithubDocTypes::Repository.to_string()));
+
+    result
 }
