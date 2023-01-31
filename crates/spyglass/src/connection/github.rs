@@ -212,18 +212,18 @@ impl Connection for GithubConnection {
         if fetch_uri.contains("/issues/") {
             match self.client.get_issue(&fetch_uri).await {
                 Ok(issue) => {
-                    let mut tags = self.default_tags().clone();
+                    let mut tags = self.default_tags();
                     Ok(issue_to_crawl(&uri, &issue, &mut tags))
                 }
-                Err(err) => Err(CrawlError::FetchError(err.to_string()))
+                Err(err) => Err(CrawlError::FetchError(err.to_string())),
             }
         } else {
             match self.client.get_repo(&fetch_uri).await {
                 Ok(repo) => {
-                    let mut tags = self.default_tags().clone();
+                    let mut tags = self.default_tags();
                     Ok(repo_to_crawl(&uri, &repo, &mut tags))
                 }
-                Err(err) => Err(CrawlError::FetchError(err.to_string()))
+                Err(err) => Err(CrawlError::FetchError(err.to_string())),
             }
         }
     }
@@ -231,7 +231,7 @@ impl Connection for GithubConnection {
 
 fn issue_to_crawl(api_url: &Url, issue: &Issue, tags: &mut Vec<TagPair>) -> CrawlResult {
     let result = CrawlResult::new(
-        &api_url,
+        api_url,
         Some(issue.html_url.clone()),
         &issue.to_text(),
         &issue.title,
