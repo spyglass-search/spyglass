@@ -233,6 +233,12 @@ async fn start_backend(state: AppState, config: Config) {
         plugin_cmd_rx,
     ));
 
+    let watcher = libspyglass::filesystem::SpyglassFileWatcher::new(&state);
+    {
+        state.file_watcher.lock().await.replace(watcher);
+    }
+    tokio::spawn(libspyglass::filesystem::configure_watcher(state.clone()));
+
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {

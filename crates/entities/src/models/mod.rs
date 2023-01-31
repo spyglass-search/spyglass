@@ -9,6 +9,7 @@ pub mod fetch_history;
 pub mod indexed_document;
 pub mod lens;
 pub mod link;
+pub mod processed_files;
 pub mod resource_rule;
 pub mod tag;
 

@@ -19,7 +19,7 @@ pub fn menubar_help() -> Html {
     html! {
         <div class="my-auto">
             <img src={example_img} alt="Location of the menubar menu" class="h-[128px] mx-auto my-6"/>
-            <div class="font-bold text-lg">{format!("Spyglass lives in your {}.", menubar_name)}</div>
+            <div class="font-bold text-lg">{format!("Spyglass lives in your {menubar_name}.")}</div>
             <div class="text-sm text-neutral-400 px-8">
                 {format!("{click_str} on the icon to access your library, discover new lenses, and adjust your settings.")}
             </div>
