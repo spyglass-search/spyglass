@@ -60,7 +60,7 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
 
 pub struct AddUpdateResult {
     pub num_added: usize,
-    pub num_updated: usize
+    pub num_updated: usize,
 }
 
 /// Process a list of crawl results. The following steps will be taken:
@@ -180,7 +180,7 @@ pub async fn process_crawl_results(
     let num_updates = existing.len();
     Ok(AddUpdateResult {
         num_added: num_entries - num_updates,
-        num_updated: num_updates
+        num_updated: num_updates,
     })
 }
 
