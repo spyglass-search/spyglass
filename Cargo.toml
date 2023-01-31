@@ -23,7 +23,5 @@ incremental = false
 opt-level = "s"
 
 [profile.sentry]
-inherits = "release"
+inherits = "dev"
 debug = true
-opt-level = 0
-lto = false
