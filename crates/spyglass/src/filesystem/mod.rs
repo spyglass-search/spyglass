@@ -353,7 +353,7 @@ impl SpyglassFileWatcher {
     /// Checks if the path represents a hidden directory or
     /// or file ignored by a .gitignore file
     fn is_ignored(&self, path: &Path) -> bool {
-        if utils::is_in_hidden_dir(path) {
+        if utils::is_hidden(path) {
             return true;
         }
 
@@ -418,7 +418,7 @@ impl SpyglassFileWatcher {
         // will not ignore hidden since we need to include .git files
         let walker = WalkBuilder::new(path).hidden(false).build();
         for entry in walker.flatten() {
-            if !utils::is_in_hidden_dir(entry.path()) {
+            if !utils::is_hidden(entry.path()) {
                 if utils::is_ignore_file(entry.path()) {
                     self.add_ignore_file(entry.path());
                 }

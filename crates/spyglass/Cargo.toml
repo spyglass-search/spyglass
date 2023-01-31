@@ -31,7 +31,7 @@ log = "0.4"
 migration = { path = "../migrations" }
 mime = "0.3.16"
 new_mime_guess = "4.0.1"
-notify = { version = "5.0.0", default-features = false , features = ["serde", "macos_kqueue"]}
+notify = { version = "5.1.0", default-features = false, features = ["serde", "macos_fsevent"] }
 notify-debouncer-mini = { version = "*", default-features = false }
 open = "3.0"
 percent-encoding = "2.2"
