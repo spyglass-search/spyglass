@@ -1211,7 +1211,7 @@ mod test {
             domain: Set("localhost".to_string()),
             status: Set(crawl_queue::CrawlStatus::Completed),
             url: Set(url.to_string()),
-            created_at: Set(one_day_ago.clone()),
+            created_at: Set(one_day_ago),
             updated_at: Set(one_day_ago),
             ..Default::default()
         };

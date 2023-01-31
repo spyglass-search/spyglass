@@ -3,8 +3,8 @@ pub mod forms;
 pub mod icons;
 pub mod lens;
 pub mod result;
+pub mod tag;
 pub mod tooltip;
-
 use yew::{prelude::*, virtual_dom::AttrValue};
 
 #[derive(Properties, PartialEq, Eq)]

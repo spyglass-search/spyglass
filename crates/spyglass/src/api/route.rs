@@ -1,6 +1,7 @@
 use directories::UserDirs;
 use entities::get_library_stats;
 use jsonrpsee::core::Error;
+use libspyglass::connection::handle_authorize_connection;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -22,14 +23,12 @@ use shared::response::{
     SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
 };
 
-use libgoog::{ClientType, Credentials, GoogClient};
-use libspyglass::oauth::{self, connection_secret};
+use libspyglass::connection::credentials;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CleanupTask, CollectTask, ManagerCommand};
+use libspyglass::task::{AppPause, CleanupTask, ManagerCommand};
 
-use super::auth::create_auth_listener;
 use super::response;
 
 /// Add url to queue
@@ -68,76 +67,12 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
         })
         .await;
 
-    if let Some((client_id, client_secret, scopes)) = connection_secret(&api_id) {
-        let mut listener = create_auth_listener().await;
-        let client_type = match api_id.as_str() {
-            "calendar.google.com" => ClientType::Calendar,
-            "drive.google.com" => ClientType::Drive,
-            _ => ClientType::Drive,
-        };
-        let mut client = GoogClient::new(
-            client_type,
-            &client_id,
-            &client_secret,
-            &format!("http://127.0.0.1:{}", listener.port()),
-            Default::default(),
-        )?;
-
-        let request = client.authorize(&scopes);
-        let _ = open::that(request.url.to_string());
-
-        log::debug!("listening for auth code");
-        if let Some(auth) = listener.listen(60 * 5).await {
-            log::debug!("received oauth credentials: {:?}", auth);
-            match client
-                .token_exchange(&auth.code, &request.pkce_verifier)
-                .await
-            {
-                Ok(token) => {
-                    let mut creds = Credentials::default();
-                    creds.refresh_token(&token);
-                    let _ = client.set_credentials(&creds);
-
-                    let user = client
-                        .get_user()
-                        .await
-                        .expect("Unable to get account information");
-
-                    let new_conn = connection::ActiveModel::new(
-                        api_id.clone(),
-                        user.email.clone(),
-                        creds.access_token.secret().to_string(),
-                        creds.refresh_token.map(|t| t.secret().to_string()),
-                        creds
-                            .expires_in
-                            .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
-                        auth.scopes,
-                    );
-                    let res = new_conn.insert(&state.db).await;
-                    match res {
-                        Ok(_) => {
-                            log::debug!("saved connection {} for {}", user.email.clone(), api_id);
-                            let _ = state
-                                .schedule_work(ManagerCommand::Collect(
-                                    CollectTask::ConnectionSync {
-                                        api_id,
-                                        account: user.email,
-                                    },
-                                ))
-                                .await;
-                        }
-                        Err(err) => log::error!("Unable to save connection: {}", err.to_string()),
-                    }
-                }
-                Err(err) => log::error!("unable to exchange token: {}", err),
-            }
-        }
-
-        Ok(())
-    } else {
+    if let Err(err) = handle_authorize_connection(&state, &api_id).await {
         Err(Error::Custom(format!(
-            "Connection <{api_id}> not supported"
+            "Unable to authorize {api_id}: {err}"
         )))
+    } else {
+        Ok(())
     }
 }
 
@@ -209,7 +144,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
     match connection::Entity::find().all(&state.db).await {
         Ok(enabled) => {
             // TODO: Move this into a config / db table?
-            let all_conns = oauth::supported_connections();
+            let all_conns = credentials::supported_connections();
             let supported = all_conns
                 .values()
                 .cloned()
@@ -697,7 +632,7 @@ mod test {
 
         let model = doc.insert(&db).await.expect("Unable to insert doc");
         let doc: indexed_document::ActiveModel = model.into();
-        doc.insert_tags(&db, &vec![(TagType::Lens, lens.name.clone())])
+        doc.insert_tags(&db, &[(TagType::Lens, lens.name.clone())])
             .await
             .expect("Unable to insert tags");
 

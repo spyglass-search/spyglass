@@ -246,7 +246,7 @@ mod test {
         };
 
         if let Err(e) = lens::add_or_enable(&db, &test_lens, lens::LensType::Simple).await {
-            eprintln!("{}", e);
+            eprintln!("{e}");
         }
 
         // Make sure the lens was added

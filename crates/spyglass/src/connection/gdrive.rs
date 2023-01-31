@@ -1,18 +1,15 @@
+use entities::models::crawl_queue;
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType, TagValue};
-use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
-use libgoog::auth::{AccessToken, RefreshToken};
-use libgoog::{Credentials, GoogClient};
-use std::time::Duration;
-
-use crate::crawler::{CrawlError, CrawlResult};
-use crate::oauth;
-use crate::state::AppState;
-use entities::models::{connection, crawl_queue};
+use libgoog::GoogClient;
 use url::Url;
 
-use super::Connection;
+use super::credentials::connection_secret;
+use crate::crawler::{CrawlError, CrawlResult};
+use crate::state::AppState;
+
+use super::{handle_sync_credentials, load_credentials, Connection};
 
 pub struct DriveConnection {
     client: GoogClient,
@@ -21,65 +18,28 @@ pub struct DriveConnection {
 
 impl DriveConnection {
     pub async fn new(state: &AppState, account: &str) -> anyhow::Result<Self> {
-        // Load credentials from db
-        let creds = connection::get_by_id(&state.db, &Self::id(), account)
-            .await?
+        let credentials = load_credentials(&state.db, &Self::id(), account)
+            .await
             .expect("No credentials matching that id");
 
-        let credentials = Credentials {
-            access_token: AccessToken::new(creds.access_token),
-            refresh_token: creds.refresh_token.map(RefreshToken::new),
-            requested_at: creds.granted_at,
-            expires_in: creds.expires_in.map(|d| Duration::from_secs(d as u64)),
-        };
+        let (client_id, client_secret, _) =
+            connection_secret(&Self::id()).expect("Connection not supported");
 
-        if let Some((client_id, client_secret, _)) = oauth::connection_secret(&Self::id()) {
-            let mut client = GoogClient::new(
-                libgoog::ClientType::Drive,
-                &client_id,
-                &client_secret,
-                "http://localhost:0",
-                credentials,
-            )?;
+        let mut client = GoogClient::new(
+            libgoog::ClientType::Drive,
+            &client_id,
+            &client_secret,
+            "http://localhost:0",
+            credentials,
+        )?;
 
-            // Update credentials in database whenever we refresh the token.
-            {
-                let account = account.to_string();
-                let state = state.clone();
-                client.set_on_refresh(move |new_creds| {
-                    log::debug!("received new credentials");
-                    let state = state.clone();
-                    let account = account.clone();
-                    let new_creds = new_creds.clone();
-                    tokio::spawn(async move {
-                        if let Ok(Some(conn)) =
-                            connection::get_by_id(&state.db, &Self::id(), &account).await
-                        {
-                            let mut update: connection::ActiveModel = conn.into();
-                            update.access_token = Set(new_creds.access_token.secret().to_string());
-                            // Refresh tokens are optionally sent
-                            if let Some(refresh_token) = new_creds.refresh_token {
-                                update.refresh_token =
-                                    Set(Some(refresh_token.secret().to_string()));
-                            }
-                            update.expires_in = Set(new_creds
-                                .expires_in
-                                .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)));
-                            update.granted_at = Set(chrono::Utc::now());
-                            let res = update.save(&state.db).await;
-                            log::debug!("credentials updated: {:?}", res);
-                        }
-                    });
-                });
-            }
+        // Update credentials in database whenever we refresh the token.
+        handle_sync_credentials(&mut client, &state.db, &Self::id(), account).await;
 
-            Ok(Self {
-                client,
-                user: account.to_string(),
-            })
-        } else {
-            Err(anyhow::anyhow!("Connection not supported"))
-        }
+        Ok(Self {
+            client,
+            user: account.to_string(),
+        })
     }
 
     pub fn is_indexable_mimetype(&self, mime_type: &str) -> bool {
@@ -104,6 +64,13 @@ impl Connection for DriveConnection {
 
     fn user(&self) -> String {
         self.user.clone()
+    }
+
+    fn default_tags(&self) -> Vec<TagPair> {
+        vec![
+            (TagType::Source, Self::id()),
+            (TagType::Lens, "GDrive".into()),
+        ]
     }
 
     async fn sync(&mut self, state: &AppState) {
@@ -134,7 +101,7 @@ impl Connection for DriveConnection {
             // Enqueue URIs
             let enqueue_settings = EnqueueSettings {
                 crawl_type: CrawlType::Api,
-                tags: vec![(TagType::Source, Self::id())],
+                tags: self.default_tags(),
                 force_allow: true,
                 is_recrawl: true,
             };
@@ -189,7 +156,7 @@ impl Connection for DriveConnection {
         // Extract and apply tags to crawl result.
         let mut tags: Vec<TagPair> = vec![(TagType::MimeType, metadata.mime_type)];
         if metadata.starred {
-            tags.push((TagType::Favorited, TagValue::Favorited.as_ref().to_owned()));
+            tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
         }
 
         let mut crawl = CrawlResult::new(

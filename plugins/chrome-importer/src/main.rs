@@ -157,7 +157,7 @@ mod test {
         let plugin = Plugin;
         let blob = include_str!("../../../fixtures/plugins/bookmarks.json");
 
-        let res = plugin.parse_and_queue_bookmarks(&blob.to_string());
+        let res = plugin.parse_and_queue_bookmarks(blob);
         assert!(res.is_ok());
         assert_eq!(res.unwrap().len(), 3);
     }

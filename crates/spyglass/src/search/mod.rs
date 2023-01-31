@@ -46,7 +46,7 @@ pub struct DocumentUpdate<'a> {
     pub domain: &'a str,
     pub url: &'a str,
     pub content: &'a str,
-    pub tags: &'a Option<Vec<u64>>,
+    pub tags: &'a Option<Vec<i64>>,
 }
 
 impl Debug for Searcher {
@@ -234,7 +234,7 @@ impl Searcher {
         doc.add_text(fields.url, doc_update.url);
         if let Some(tag) = doc_update.tags {
             for t in tag {
-                doc.add_u64(fields.tags, *t);
+                doc.add_u64(fields.tags, *t as u64);
             }
         }
         writer.add_document(doc)?;
@@ -310,7 +310,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![1 as u64]),
+                tags: &Some(vec![1_i64]),
             },
         )
         .expect("Unable to add doc");
@@ -332,7 +332,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![2 as u64]),
+                tags: &Some(vec![2_i64]),
             },
         )
         .expect("Unable to add doc");
@@ -352,7 +352,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-                tags: &Some(vec![2 as u64]),
+                tags: &Some(vec![2_i64]),
             },
         )
         .expect("Unable to add doc");
@@ -369,13 +369,13 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-             tags: &Some(vec![1 as u64]),}
+             tags: &Some(vec![1_i64]),}
         )
         .expect("Unable to add doc");
 
         let res = writer.commit();
         if let Err(err) = res {
-            println!("{:?}", err);
+            println!("{err:?}");
         }
 
         // add a small delay so that the documents can be properly committed
@@ -396,7 +396,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -416,7 +416,7 @@ mod test {
 
         _build_test_index(&mut searcher);
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -436,7 +436,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinasd";
-        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
         assert_eq!(results.len(), 0);
     }
 }

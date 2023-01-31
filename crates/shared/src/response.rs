@@ -13,7 +13,7 @@ pub struct SupportedConnection {
     pub description: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UserConnection {
     pub id: String,
     pub account: String,

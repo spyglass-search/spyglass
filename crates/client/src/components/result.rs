@@ -2,7 +2,10 @@ use url::Url;
 use yew::prelude::*;
 
 use super::btn::DeleteButton;
-use super::icons;
+use super::{
+    icons,
+    tag::{Tag, TagIcon},
+};
 use shared::response::{LensResult, SearchResult};
 
 #[derive(Properties, PartialEq)]
@@ -21,16 +24,8 @@ fn render_icon(result: &SearchResult) -> Html {
         let domain = url.domain().unwrap_or("example.com").to_owned();
         match url.scheme() {
             "api" => {
-                match url.host_str() {
-                    Some("calendar.google.com") => {
-                        html! { <icons::GoogleCalendar height="h-8" width="w-8" classes={classes!("m-auto")} /> }
-                    }
-                    // TODO: Detect file/mimetype to show even more detail icons for
-                    // drive files.
-                    _ => {
-                        html! { <icons::GDrive height="h-8" width="w-8" classes={classes!("m-auto")} /> }
-                    }
-                }
+                let connection = url.host_str().unwrap_or_default();
+                icons::connection_icon(connection, "h-8", "w-8")
             }
             "file" => {
                 if let Some((_, ext)) = result.title.rsplit_once('.') {
@@ -61,14 +56,6 @@ fn render_metadata(result: &SearchResult) -> Html {
     let url = Url::parse(&result.crawl_uri);
     if let Ok(url) = url {
         match url.scheme() {
-            "api" => {
-                // Show friendly API name
-                match result.domain.as_str() {
-                    "calendar.google.com" => meta.push(html! { <span>{"Google Calendar"}</span> }),
-                    "drive.google.com" => meta.push(html! { <span>{"Google Drive"}</span> }),
-                    _ => {}
-                }
-            }
             "file" => {
                 // Attempt to grab the folder this file resides
                 let path = if let Some(segments) = url.path_segments() {
@@ -99,30 +86,26 @@ fn render_metadata(result: &SearchResult) -> Html {
         }
     }
 
-    // Tags
+    // Generate the icons/labels required for tags
+    let mut priority_tags = Vec::new();
+    let mut normal_tags = Vec::new();
     for (tag, value) in result.tags.iter() {
+        let tag = tag.to_lowercase();
         if tag == "source" || tag == "mimetype" {
             continue;
         }
 
-        let tag_label = match tag.as_str() {
-            "Lens" => "🔍",
-            _ => tag,
-        };
-
-        meta.push(html! {
-            <div class="text-xs flex flex-row rounded text-white bg-cyan-600 items-center">
-                <div class="border-r border-cyan-900 py-0.5 px-1">
-                    <small>{tag_label}</small>
-                </div>
-                <div class="py-0.5 px-2">
-                    {value}
-                </div>
-            </div>
-        });
+        if tag == "favorited" {
+            priority_tags.push(html! { <TagIcon label={tag} value={value.clone()} /> });
+        } else {
+            normal_tags.push(html! { <Tag label={tag} value={value.clone()} /> });
+        }
     }
 
     let mut joined = Vec::new();
+    meta.extend(priority_tags);
+    meta.extend(normal_tags);
+
     if !meta.is_empty() {
         let last_idx = meta.len() - 1;
         for (idx, node) in meta.iter().enumerate() {
@@ -134,7 +117,7 @@ fn render_metadata(result: &SearchResult) -> Html {
     }
 
     html! {
-        <div class="text-xs place-items-center flex flex-row gap-1.5 text-cyan-500 py-0.5 mt-1">
+        <div class="text-xs place-items-center flex flex-row flex-wrap gap-1.5 text-cyan-500 py-0.5 mt-1">
             {joined}
         </div>
     }
@@ -179,7 +162,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                 <h2 class="text-lg truncate font-bold w-[30rem]">
                     {result.title.clone()}
                 </h2>
-                <div class="text-sm leading-relaxed text-neutral-400 max-h-16 overflow-hidden">
+                <div class="text-sm leading-relaxed text-neutral-400 max-h-14 overflow-hidden">
                     {result.description.clone()}
                 </div>
                 {metadata}

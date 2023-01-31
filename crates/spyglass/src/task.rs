@@ -12,7 +12,7 @@ use crate::state::AppState;
 use crate::task::worker::FetchResult;
 
 mod manager;
-mod worker;
+pub mod worker;
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {

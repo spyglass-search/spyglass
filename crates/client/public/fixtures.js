@@ -23,7 +23,7 @@ export let invoke = async (func_name, params) => {
                     ['source', 'web'],
                     ['Lens', 'google'],
                     ['Lens', 'search-engines'],
-                    ['Lens', 'bookmarks'],
+                    ['Favorited', 'Favorited'],
                 ],
                 score: 1.0
             }, {
@@ -49,6 +49,7 @@ export let invoke = async (func_name, params) => {
                     ['mimetype', 'application/pdf'],
                     ['source', 'drive.google.com'],
                     ['Lens', 'example'],
+                    ['Owner', 'bob.dole@example.com'],
                 ],
                 score: 1.0
             }, {
