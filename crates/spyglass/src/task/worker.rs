@@ -370,7 +370,7 @@ pub async fn add_document_and_tags(
         .await?;
 
     if let Some(added) = added {
-        let result = indexed_document::insert_tags_by_id(&state.db, &[added], &tags).await;
+        let result = indexed_document::insert_tags_for_docs(&state.db, &[added], &tags).await;
         if let Err(error) = result {
             log::error!("Error inserting tags {:?}", error);
         }

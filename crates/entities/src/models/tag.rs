@@ -1,5 +1,5 @@
-use sea_orm::Set;
 use sea_orm::{entity::prelude::*, ConnectionTrait};
+use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumString};
 
@@ -29,6 +29,13 @@ pub enum TagType {
     /// mimetypes somewhere
     #[sea_orm(string_value = "mimetype")]
     MimeType,
+    /// General type tag, Used for high level types ex: File, directory. The MimeType
+    /// would be used as a more specific type.
+    /// For non-file docs, can be used to differentiate from others in this category.
+    /// e.g. for a GitHub connection we can have an "Issue" or "Repo".
+    ///     for a D&D lens we have equipment, magic items, skills, etc.
+    #[sea_orm(string_value = "type")]
+    Type,
     /// where this document came from,
     #[sea_orm(string_value = "source")]
     Source,
@@ -44,11 +51,9 @@ pub enum TagType {
     /// Part of a specific repo
     #[sea_orm(string_value = "repository")]
     Repository,
-    /// Used to differentiate from others in this category.
-    /// e.g. for a GitHub connection we can have an "Issue" or "Repo".
-    ///     for a D&D lens we have equipment, magic items, skills, etc.
-    #[sea_orm(string_value = "type")]
-    Type,
+    /// For file based content this tag
+    #[sea_orm(string_value = "fileext")]
+    FileExt,
 }
 
 #[derive(AsRefStr, Display, EnumString)]
@@ -158,6 +163,46 @@ where
         _ => Err(DbErr::RecordNotFound(format!(
             "label: {label}, value: {value}"
         ))),
+    }
+}
+
+pub async fn get_or_create_many<C>(db: &C, tags: &Vec<TagPair>) -> Result<Vec<Model>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let tag_models = tags
+        .iter()
+        .map(|(label, value)| ActiveModel {
+            label: Set(label.clone()),
+            value: Set(value.to_string()),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
+        })
+        .collect::<Vec<ActiveModel>>();
+
+    let _ = Entity::insert_many(tag_models)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_with_returning(db)
+        .await;
+
+    let mut condition = Condition::any();
+    for (label, value) in tags {
+        condition = condition.add(
+            Condition::all()
+                .add(Column::Label.eq(label.clone()))
+                .add(Column::Value.eq(value.clone())),
+        );
+    }
+    let db_tags = Entity::find().filter(condition).all(db).await;
+
+    match db_tags {
+        Ok(models) => Ok(models),
+        Err(err) => Err(err),
     }
 }
 

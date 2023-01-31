@@ -7,6 +7,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
+use crate::filesystem::SpyglassFileWatcher;
 use crate::task::AppShutdown;
 use crate::{
     pipeline::PipelineCommand,
@@ -26,6 +27,7 @@ pub struct AppState {
     pub user_settings: UserSettings,
     pub index: Searcher,
     pub metrics: Metrics,
+    pub config: Config,
     // Task scheduler command/control
     pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
     pub shutdown_cmd_tx: Arc<Mutex<broadcast::Sender<AppShutdown>>>,
@@ -36,6 +38,7 @@ pub struct AppState {
     pub plugin_manager: Arc<Mutex<PluginManager>>,
     // Pipeline command/control
     pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
+    pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
 }
 
 impl AppState {
@@ -78,6 +81,7 @@ impl AppState {
                 &Config::machine_identifier(),
                 config.user_settings.disable_telemetry,
             ),
+            config: config.clone(),
             lenses: Arc::new(lenses),
             pipelines: Arc::new(pipelines),
             index,
@@ -87,6 +91,7 @@ impl AppState {
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
             manager_cmd_tx: Arc::new(Mutex::new(None)),
+            file_watcher: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -153,12 +158,14 @@ impl AppStateBuilder {
                 &Config::machine_identifier(),
                 user_settings.disable_telemetry,
             ),
+            config: Config::new(),
             pause_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             pipelines: Arc::new(pipelines),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
             shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
+            file_watcher: Arc::new(Mutex::new(None)),
             user_settings,
         }
     }

@@ -21,7 +21,7 @@ use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = "clearTimeout")]
-    fn clear_timeout(handle: i32);
+    fn clear_timeout(handle: JsValue);
 }
 
 const QUERY_DEBOUNCE_MS: u32 = 256;
@@ -59,8 +59,8 @@ pub struct SearchPage {
     search_input_ref: NodeRef,
     selected_idx: usize,
     query: String,
-    query_debounce: Option<i32>,
-    blur_timeout: Option<i32>,
+    query_debounce: Option<JsValue>,
+    blur_timeout: Option<JsValue>,
     is_searching: bool,
 }
 
@@ -251,8 +251,8 @@ impl Component for SearchPage {
                 }
                 self.request_resize();
 
-                if let Some(timeout) = self.blur_timeout {
-                    clear_timeout(timeout);
+                if let Some(timeout) = &self.blur_timeout {
+                    clear_timeout(timeout.clone());
                     self.blur_timeout = None;
                 }
 
@@ -411,8 +411,8 @@ impl Component for SearchPage {
             }
             Msg::UpdateQuery(query) => {
                 self.query = query.clone();
-                if let Some(timeout_id) = self.query_debounce {
-                    clear_timeout(timeout_id);
+                if let Some(timeout_id) = &self.query_debounce {
+                    clear_timeout(timeout_id.clone());
                     self.query_debounce = None;
                 }
 

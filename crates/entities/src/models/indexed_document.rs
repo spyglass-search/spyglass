@@ -147,7 +147,7 @@ pub async fn insert_many(
         .await
 }
 
-pub async fn insert_tags_by_id<C: ConnectionTrait>(
+pub async fn insert_tags_for_docs<C: ConnectionTrait>(
     db: &C,
     docs: &[Model],
     tags: &[i64],
@@ -197,7 +197,7 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
         }
     }
 
-    insert_tags_by_id(db, docs, &tag_ids).await
+    insert_tags_for_docs(db, docs, &tag_ids).await
 }
 
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected
@@ -232,6 +232,43 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .into_iter()
         .map(|(_id, doc_id)| doc_id)
         .collect::<Vec<String>>())
+}
+
+/// Helper method used to delete multiple documents by id. This method will first
+/// delete all related tag references before deleting the documents
+pub async fn delete_many_by_id(
+    db: &DatabaseConnection,
+    dbids: &[i64],
+) -> Result<u64, sea_orm::DbErr> {
+    // Delete all associated tags
+    document_tag::Entity::delete_many()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(dbids.to_owned()))
+        .exec(db)
+        .await?;
+
+    // Delete item
+    let res = Entity::delete_many()
+        .filter(Column::Id.is_in(dbids.to_owned()))
+        .exec(db)
+        .await?;
+
+    Ok(res.rows_affected)
+}
+
+/// Helper method used to delete multiple documents by url. This method will first
+/// delete all related tag references before deleting the documents
+pub async fn delete_many_by_url(
+    db: &DatabaseConnection,
+    urls: Vec<String>,
+) -> Result<u64, sea_orm::DbErr> {
+    let entries = Entity::find()
+        .filter(Column::Url.is_in(urls))
+        .all(db)
+        .await?;
+
+    let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
+
+    delete_many_by_id(db, &id_list).await
 }
 
 #[derive(Debug, FromQueryResult)]

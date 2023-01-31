@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
-use sea_orm::sea_query::{OnConflict, SqliteQueryBuilder};
+use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
     sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
     QueryOrder, QueryTrait, Set, Statement,
@@ -41,6 +41,8 @@ pub struct TaskError {
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum CrawlStatus {
+    #[sea_orm(string_value = "Initial")]
+    Initial,
     #[sea_orm(string_value = "Queued")]
     Queued,
     #[sea_orm(string_value = "Processing")]
@@ -266,6 +268,14 @@ pub async fn num_tasks_in_progress(db: &DatabaseConnection) -> anyhow::Result<u6
         .await
 }
 
+/// How many tasks do we have in progress?
+pub async fn num_of_files_in_progress(db: &DatabaseConnection) -> anyhow::Result<u64, DbErr> {
+    Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Processing))
+        .count(db)
+        .await
+}
+
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
@@ -284,8 +294,8 @@ pub async fn dequeue(
     // Prioritize any bootstrapping tasks first.
     let entity = {
         let result = Entity::find()
-            .filter(Column::Status.eq(CrawlStatus::Queued))
             .filter(Column::CrawlType.eq(CrawlType::Bootstrap))
+            .filter(Column::Status.eq(CrawlStatus::Queued))
             .one(db)
             .await?;
 
@@ -299,6 +309,44 @@ pub async fn dequeue(
                 .await?
         }
     };
+
+    // Grab new entity and immediately mark in-progress
+    if let Some(task) = entity {
+        let mut update: ActiveModel = task.into();
+        update.status = Set(CrawlStatus::Processing);
+        return match update.update(db).await {
+            Ok(model) => Ok(Some(model)),
+            // Deleted while being processed?
+            Err(err) => {
+                log::error!("Unable to update crawl task: {}", err);
+                Ok(None)
+            }
+        };
+    }
+
+    Ok(None)
+}
+
+/// Get the next url in the crawl queue
+pub async fn dequeue_files(
+    db: &DatabaseConnection,
+    user_settings: UserSettings,
+) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
+    // Check for inflight limits
+    if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
+        // How many do we have in progress?
+        let num_in_progress = num_of_files_in_progress(db).await?;
+        // Nothing to do if we have too many crawls
+        if num_in_progress >= inflight_crawl_limit as u64 {
+            return Ok(None);
+        }
+    }
+
+    let entity = Entity::find()
+        .filter(Column::Status.eq(CrawlStatus::Queued))
+        .filter(Column::Url.starts_with("file:"))
+        .one(db)
+        .await?;
 
     // Grab new entity and immediately mark in-progress
     if let Some(task) = entity {
@@ -451,6 +499,58 @@ fn filter_urls(
         .collect::<Vec<String>>()
 }
 
+pub async fn enqueue_local_files(
+    db: &DatabaseConnection,
+    urls: &[String],
+    overrides: &EnqueueSettings,
+    pipeline: Option<String>,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let model = urls
+        .iter()
+        .map(|url| ActiveModel {
+            domain: Set(String::from("localhost")),
+            crawl_type: Set(overrides.crawl_type.clone()),
+            status: Set(CrawlStatus::Initial),
+            url: Set(url.to_string()),
+            pipeline: Set(pipeline.clone()),
+            ..Default::default()
+        })
+        .collect::<Vec<ActiveModel>>();
+
+    let on_conflict = if overrides.is_recrawl {
+        OnConflict::column(Column::Url)
+            .update_column(Column::Status)
+            .to_owned()
+    } else {
+        OnConflict::column(Column::Url).do_nothing().to_owned()
+    };
+
+    let _insert = Entity::insert_many(model)
+        .on_conflict(on_conflict)
+        .exec(db)
+        .await?;
+    let inserted_rows = Entity::find()
+        .filter(Column::Url.is_in(urls.to_vec()))
+        .all(db)
+        .await?;
+
+    let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
+    let tag_rslt = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
+    if tag_rslt.is_ok() {
+        let query = Query::update()
+            .table(Entity.table_ref())
+            .values([(Column::Status, CrawlStatus::Queued.into())])
+            .and_where(Column::Id.is_in(ids))
+            .to_owned();
+
+        let query = query.to_string(SqliteQueryBuilder);
+        db.execute(Statement::from_string(db.get_database_backend(), query))
+            .await?;
+    }
+
+    Ok(())
+}
+
 pub async fn enqueue_all(
     db: &DatabaseConnection,
     urls: &[String],
@@ -536,7 +636,6 @@ pub async fn enqueue_all(
             .await
         {
             Ok(_) => {
-                println!("tags {:?}", overrides.tags);
                 if !overrides.tags.is_empty() {
                     let inserted_rows = Entity::find()
                         .filter(Column::Url.is_in(urls))
@@ -647,7 +746,7 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .map(|x| x.id)
         .collect();
 
-    let rows_affected = delete_many_by_id(db.clone(), &dbids).await?;
+    let rows_affected = delete_many_by_id(db, &dbids).await?;
     Ok(rows_affected)
 }
 
@@ -694,28 +793,46 @@ pub async fn update_or_remove_task(
 pub async fn delete_by_lens(db: DatabaseConnection, name: &str) -> Result<(), sea_orm::DbErr> {
     if let Ok(ids) = find_by_lens(db.clone(), name).await {
         let dbids: Vec<i64> = ids.iter().map(|item| item.id).collect();
-        delete_many_by_id(db, &dbids).await?;
+        delete_many_by_id(&db, &dbids).await?;
     }
     Ok(())
 }
 
+/// Helper method used to delete multiple crawl entries by id. This method will first
+/// delete all related tag references before deleting the crawl entries
 pub async fn delete_many_by_id(
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
     dbids: &[i64],
 ) -> Result<u64, sea_orm::DbErr> {
     // Delete all associated tags
     crawl_tag::Entity::delete_many()
         .filter(crawl_tag::Column::CrawlQueueId.is_in(dbids.to_owned()))
-        .exec(&db)
+        .exec(db)
         .await?;
 
     // Delete item
     let res = Entity::delete_many()
         .filter(Column::Id.is_in(dbids.to_owned()))
-        .exec(&db)
+        .exec(db)
         .await?;
 
     Ok(res.rows_affected)
+}
+
+/// Helper method used to delete multiple crawl entries by url. This method will first
+/// delete all related tag references before deleting the crawl entries
+pub async fn delete_many_by_url(
+    db: &DatabaseConnection,
+    urls: &Vec<String>,
+) -> Result<u64, sea_orm::DbErr> {
+    let entries = Entity::find()
+        .filter(Column::Url.is_in(urls.to_owned()))
+        .all(db)
+        .await?;
+
+    let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
+
+    delete_many_by_id(db, &id_list).await
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -787,7 +904,7 @@ mod test {
         let sql = gen_dequeue_sql(settings);
         assert_eq!(
             sql.to_string(),
-            "WITH\nindexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\"\nORDER BY\n    cq.updated_at ASC"
+            "WITH\nindexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\" and\n    url not like \"file%\"\nORDER BY\n    cq.updated_at ASC"
         );
     }
 

@@ -22,6 +22,7 @@ LEFT JOIN inflight ON inflight.domain = cq.domain
 WHERE
     COALESCE(indexed.count, 0) < ? AND
     COALESCE(inflight.count, 0) < ? AND
-    status = "Queued"
+    status = "Queued" and
+    url not like "file%"
 ORDER BY
     cq.updated_at ASC
