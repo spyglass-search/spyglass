@@ -512,14 +512,12 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
 }
 
 async fn _process_path(
-    state: &AppState,
+    _state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
-    let extension = filesystem::utils::get_supported_file_extensions(state);
-
-    if path.is_file() && _matches_ext(path, &extension) {
+    if path.is_file() {
         return _process_file(path, file_name, url);
     }
     Err(CrawlError::NotFound)

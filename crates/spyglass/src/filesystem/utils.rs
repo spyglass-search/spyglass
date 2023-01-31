@@ -217,9 +217,9 @@ mod test {
         let uri = path_to_uri(&test_path.to_path_buf());
 
         #[cfg(target_os = "windows")]
-        assert_eq!(uri, "file://localhost/C%3A/tmp/path_to_uri/test.txt");
+        assert_eq!(uri, "file:///C%3A/tmp/path_to_uri/test.txt");
         #[cfg(not(target_os = "windows"))]
-        assert_eq!(uri, "file://localhost/tmp/path_to_uri/test.txt");
+        assert_eq!(uri, "file:///tmp/path_to_uri/test.txt");
 
         let url = Url::parse(&uri).unwrap();
         let file_path = url.to_file_path().unwrap();
