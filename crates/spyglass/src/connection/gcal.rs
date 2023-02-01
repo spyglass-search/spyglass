@@ -1,3 +1,4 @@
+use entities::models::connection;
 use entities::models::tag::{TagPair, TagType};
 use jsonrpsee::core::async_trait;
 use libgoog::types::CalendarEvent;
@@ -72,6 +73,7 @@ impl Connection for GCalConnection {
     }
 
     async fn sync(&mut self, state: &AppState) {
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
         log::debug!("syncing w/ connection: {}", &Self::id());
 
         // stream pages of files from the integration & add them to the crawl queue
@@ -107,6 +109,7 @@ impl Connection for GCalConnection {
             }
         }
 
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
         log::debug!("synced {} events", num_events);
     }
 
