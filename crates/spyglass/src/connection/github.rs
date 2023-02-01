@@ -269,6 +269,7 @@ fn repo_to_crawl(api_url: &Url, repo: &Repo) -> CrawlResult {
         None,
     );
 
+    result.tags.push((TagType::Repository, repo.full_name.clone()));
     result.tags.push((TagType::Owner, repo.owner.login.clone()));
     result
         .tags

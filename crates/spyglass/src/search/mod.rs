@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -13,7 +14,7 @@ use uuid::Uuid;
 
 use crate::search::query::build_query;
 use crate::state::AppState;
-use entities::models::{document_tag, indexed_document};
+use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
@@ -244,14 +245,26 @@ impl Searcher {
     }
 
     pub async fn search_with_lens(
-        _db: DatabaseConnection,
+        db: DatabaseConnection,
         applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
 
-        let tag_checks = get_tag_checks(&_db, query_string).await;
+        let mut tag_boosts = HashSet::new();
+        if let Ok(Some(favorited)) = tag::Entity::find()
+            .filter(tag::Column::Label.eq(tag::TagType::Favorited))
+            .one(&db)
+            .await
+        {
+            tag_boosts.insert(favorited.id);
+        }
+
+        let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
+        tag_boosts.extend(tag_checks);
+        log::debug!("TAG_BOOSTS: {:?}", tag_boosts);
+
         let index = &searcher.index;
         let reader = &searcher.reader;
         let fields = DocFields::as_fields();
@@ -263,7 +276,7 @@ impl Searcher {
             fields,
             query_string,
             applied_lenses,
-            &tag_checks,
+            tag_boosts.into_iter(),
         );
 
         let collector = TopDocs::with_limit(5);
@@ -289,7 +302,7 @@ impl Searcher {
 }
 
 // Helper method used to get the list of tag ids that should be included in the search
-async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<u64>> {
+async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64>> {
     let lower = search.to_lowercase();
     let tokens = lower.split(' ').collect::<Vec<&str>>();
     let expr =
@@ -298,8 +311,9 @@ async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<u64
         .filter(expr)
         .all(db)
         .await;
+
     if let Ok(tags) = tag_rslt {
-        return Some(tags.iter().map(|tag| tag.id as u64).collect::<Vec<u64>>());
+        return Some(tags.iter().map(|tag| tag.id).collect::<Vec<i64>>());
     }
     None
 }
