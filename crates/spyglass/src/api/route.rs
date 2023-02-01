@@ -217,7 +217,9 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
         })
         .collect();
 
-    if let Some(result) = build_filesystem_information(&state, stats.get("files")).await {
+    if let Some(result) =
+        build_filesystem_information(&state, stats.get(filesystem::FILES_LENS)).await
+    {
         lenses.push(result);
     }
 

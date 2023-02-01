@@ -34,6 +34,8 @@ use crate::documents;
 
 pub mod utils;
 
+pub static FILES_LENS: &str = "files";
+
 /// Watcher responsible for processing paths on the file system.
 /// All filesystem updates will be run through the debouncer to
 /// batch updates then processed through any found git ignore files.
@@ -718,7 +720,7 @@ async fn _process_file_and_dir(
     }
 
     if !enqueue_list.is_empty() {
-        let tags = vec![(TagType::Lens, String::from("files"))];
+        let tags = vec![(TagType::Lens, String::from(FILES_LENS))];
         let enqueue_settings = EnqueueSettings {
             crawl_type: CrawlType::Normal,
             is_recrawl: true,
