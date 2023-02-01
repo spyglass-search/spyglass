@@ -1,3 +1,4 @@
+use chrono::Utc;
 use entities::{
     models::{
         crawl_queue, indexed_document,
@@ -143,6 +144,7 @@ pub async fn process_crawl_results(
                     url: Set(url.to_string()),
                     open_url: Set(crawl_result.open_url.clone()),
                     doc_id: Set(doc_id),
+                    updated_at: Set(Utc::now()),
                     ..Default::default()
                 });
             }

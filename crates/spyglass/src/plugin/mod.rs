@@ -380,8 +380,6 @@ pub async fn plugin_event_loop(
                                         event: event.clone(),
                                     })
                                     .await;
-                            } else {
-                                log::debug!("ignored changes to {}", path.display());
                             }
                         }
                     }
