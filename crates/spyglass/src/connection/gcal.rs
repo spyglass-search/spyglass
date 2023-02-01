@@ -1,11 +1,11 @@
-use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType};
 use jsonrpsee::core::async_trait;
+use libgoog::types::CalendarEvent;
 use libgoog::GoogClient;
 
 use crate::crawler::{CrawlError, CrawlResult};
+use crate::documents::process_crawl_results;
 use crate::state::AppState;
-use entities::models::crawl_queue;
 use url::Url;
 
 use super::credentials::connection_secret;
@@ -20,6 +20,7 @@ pub const TITLE: &str = "Google Calendar";
 /// The description for google calendar connections
 pub const DESCRIPTION: &str = "Adds indexing support for Google calendar events.";
 
+const BUFFER_SYNC_SIZE: usize = 500;
 pub struct GCalConnection {
     client: GoogClient,
     user: String,
@@ -77,36 +78,28 @@ impl Connection for GCalConnection {
         let mut next_page = None;
         let mut num_events = 0;
 
+        let mut buffer = Vec::new();
+
         // Grab the next page of files
         while let Ok(events) = self.client.list_calendar_events("primary", next_page).await {
             next_page = events.next_page_token;
             num_events += events.items.len();
+            buffer.extend(events.items);
 
-            let urls = events
-                .items
-                .iter()
-                .map(|event| self.to_url("primary", &event.id).to_string())
-                .collect::<Vec<String>>();
+            if buffer.len() > BUFFER_SYNC_SIZE || next_page.is_none() {
+                let mut events = Vec::new();
+                for event in &buffer {
+                    let api_uri = self.to_url("primary", &event.id);
+                    log::debug!("gcal event: {}", event.summary);
+                    events.push(event_to_crawl(&api_uri, event));
+                }
 
-            // Enqueue URIs
-            let enqueue_settings = EnqueueSettings {
-                crawl_type: CrawlType::Api,
-                tags: self.default_tags(),
-                force_allow: true,
-                is_recrawl: true,
-            };
+                if let Err(err) = process_crawl_results(state, &events, &self.default_tags()).await
+                {
+                    log::error!("Unable to add gcal events: {}", err);
+                }
 
-            if let Err(err) = crawl_queue::enqueue_all(
-                &state.db,
-                &urls,
-                &[],
-                &state.user_settings,
-                &enqueue_settings,
-                None,
-            )
-            .await
-            {
-                log::error!("Unable to enqueue: {}", err.to_string());
+                buffer.clear();
             }
 
             if next_page.is_none() {
@@ -132,37 +125,9 @@ impl Connection for GCalConnection {
                 .await
             {
                 Ok(event) => {
-                    let mut tags: Vec<TagPair> = Vec::new();
-                    for attendee in &event.attendees {
-                        if attendee.is_organizer {
-                            tags.push((TagType::Owner, attendee.email.clone()));
-                        } else {
-                            tags.push((TagType::SharedWith, attendee.email.clone()));
-                        }
-                    }
-
-                    let content = if event.attendees.is_empty() {
-                        event.description.unwrap_or_default()
-                    } else {
-                        let attendees = event
-                            .attendees
-                            .iter()
-                            .map(|item| format!("{} <{}>", item.email, item.display_name))
-                            .collect::<Vec<String>>()
-                            .join(";");
-
-                        format!(
-                            "Attendees: {}\n{}",
-                            attendees,
-                            &event.description.unwrap_or_default()
-                        )
-                    };
-                    let title = format!("{} ({})", &event.summary, event.start.date);
-                    let mut crawl_result =
-                        CrawlResult::new(uri, Some(event.html_link), &content, &title, None);
-                    crawl_result.tags = tags;
-
-                    Ok(crawl_result)
+                    let mut event = event_to_crawl(uri, &event);
+                    event.tags.extend(self.default_tags());
+                    Ok(event)
                 }
                 Err(err) => Err(CrawlError::FetchError(err.to_string())),
             };
@@ -170,4 +135,28 @@ impl Connection for GCalConnection {
 
         Err(CrawlError::FetchError("Invalid URL".to_string()))
     }
+}
+
+fn event_to_crawl(api_url: &Url, event: &CalendarEvent) -> CrawlResult {
+    let mut tags: Vec<TagPair> = Vec::new();
+    for attendee in &event.attendees {
+        if attendee.is_organizer {
+            tags.push((TagType::Owner, attendee.email.clone()));
+        } else {
+            tags.push((TagType::SharedWith, attendee.email.clone()));
+        }
+    }
+
+    let content = event.description.clone().unwrap_or_default();
+    let title = format!("{} ({})", &event.summary, event.start.date);
+    let mut crawl_result = CrawlResult::new(
+        api_url,
+        Some(event.html_link.clone()),
+        &content,
+        &title,
+        None,
+    );
+    crawl_result.tags = tags;
+
+    crawl_result
 }
