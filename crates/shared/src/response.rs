@@ -140,6 +140,7 @@ pub struct LibraryStats {
     pub crawled: i32,
     pub enqueued: i32,
     pub indexed: i32,
+    pub failed: i32,
 }
 
 impl LibraryStats {
@@ -149,6 +150,7 @@ impl LibraryStats {
             crawled: 0,
             enqueued: 0,
             indexed: 0,
+            failed: 0,
         }
     }
 
