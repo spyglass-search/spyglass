@@ -75,6 +75,12 @@ impl ActiveModel {
     }
 }
 
+/// Helper method used to access all configured connections
+pub async fn get_all_connections(db: &DatabaseConnection) -> Vec<Model> {
+    Entity::find().all(db).await.unwrap_or_default()
+}
+
+/// Helper method used to get the entry for the specified id and account
 pub async fn get_by_id(
     db: &DatabaseConnection,
     id: &str,

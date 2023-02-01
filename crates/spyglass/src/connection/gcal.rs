@@ -11,6 +11,15 @@ use url::Url;
 use super::credentials::connection_secret;
 use super::{handle_sync_credentials, load_credentials, Connection};
 
+/// The api id for google calendar connections
+pub const API_ID: &str = "calendar.google.com";
+/// The lens name for indexed documents from google calendar
+pub const LENS: &str = "Calendar";
+/// The title for google calendar connections
+pub const TITLE: &str = "Google Calendar";
+/// The description for google calendar connections
+pub const DESCRIPTION: &str = "Adds indexing support for Google calendar events.";
+
 pub struct GCalConnection {
     client: GoogClient,
     user: String,
@@ -50,7 +59,7 @@ impl GCalConnection {
 #[async_trait]
 impl Connection for GCalConnection {
     fn id() -> String {
-        "calendar.google.com".to_string()
+        API_ID.to_string()
     }
 
     fn user(&self) -> String {
@@ -58,10 +67,7 @@ impl Connection for GCalConnection {
     }
 
     fn default_tags(&self) -> Vec<TagPair> {
-        vec![
-            (TagType::Source, Self::id()),
-            (TagType::Lens, "Calendar".into()),
-        ]
+        vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
     async fn sync(&mut self, state: &AppState) {

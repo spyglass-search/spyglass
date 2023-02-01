@@ -11,6 +11,15 @@ use crate::state::AppState;
 
 use super::{handle_sync_credentials, load_credentials, Connection};
 
+/// The api id for google drive connections
+pub const API_ID: &str = "drive.google.com";
+/// The lens name for indexed documents from google drive
+pub const LENS: &str = "GDrive";
+/// The title for google drive connections
+pub const TITLE: &str = "Google Drive";
+/// The description for google drive connections
+pub const DESCRIPTION: &str = "Adds indexing support for Google drive. This will allow you to search for through documents, spreadsheets, and presentations.";
+
 pub struct DriveConnection {
     client: GoogClient,
     user: String,
@@ -59,7 +68,7 @@ impl DriveConnection {
 #[async_trait]
 impl Connection for DriveConnection {
     fn id() -> String {
-        "drive.google.com".to_string()
+        API_ID.to_string()
     }
 
     fn user(&self) -> String {
@@ -67,10 +76,7 @@ impl Connection for DriveConnection {
     }
 
     fn default_tags(&self) -> Vec<TagPair> {
-        vec![
-            (TagType::Source, Self::id()),
-            (TagType::Lens, "GDrive".into()),
-        ]
+        vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
     async fn sync(&mut self, state: &AppState) {

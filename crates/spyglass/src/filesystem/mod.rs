@@ -34,7 +34,8 @@ use crate::documents;
 
 pub mod utils;
 
-pub static FILES_LENS: &str = "files";
+/// The lens name for indexed files
+pub const FILES_LENS: &str = "files";
 
 /// Watcher responsible for processing paths on the file system.
 /// All filesystem updates will be run through the debouncer to

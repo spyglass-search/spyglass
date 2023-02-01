@@ -14,6 +14,16 @@ use crate::state::AppState;
 
 const BUFFER_SYNC_SIZE: usize = 500;
 
+/// The api id for github connections
+pub const API_ID: &str = "api.github.com";
+/// The lens name for indexed documents from github
+pub const LENS: &str = "GitHub";
+/// The title for github connections
+pub const TITLE: &str = "GitHub";
+/// The description for github connections
+pub const DESCRIPTION: &str =
+    "Adds indexing support for Github owned repos, starred repos, and issues.";
+
 #[derive(Display, EnumString)]
 pub enum GithubDocTypes {
     #[strum(serialize = "issue")]
@@ -180,7 +190,7 @@ impl GithubConnection {
 #[async_trait]
 impl Connection for GithubConnection {
     fn id() -> String {
-        "api.github.com".to_string()
+        API_ID.to_string()
     }
 
     fn user(&self) -> String {
@@ -188,10 +198,7 @@ impl Connection for GithubConnection {
     }
 
     fn default_tags(&self) -> Vec<TagPair> {
-        vec![
-            (TagType::Source, Self::id()),
-            (TagType::Lens, "GitHub".into()),
-        ]
+        vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
     async fn sync(&mut self, state: &AppState) {
