@@ -28,12 +28,16 @@ fn render_icon(result: &SearchResult) -> Html {
                 icons::connection_icon(connection, "h-8", "w-8")
             }
             "file" => {
-                if let Some((_, ext)) = result.title.rsplit_once('.') {
+                let is_directory = result.tags.iter().any(|(label, value)| {
+                    label.to_lowercase() == "type" && value.to_lowercase() == "directory"
+                });
+
+                if is_directory {
+                    html! { <icons::FolderIcon height="h-8" width="w-8" classes="bg-color-white m-auto" /> }
+                } else if let Some((_, ext)) = result.title.rsplit_once('.') {
                     html! { <icons::FileExtIcon ext={ext.to_string()} class={icon_size} /> }
                 } else {
-                    html! {
-                        <img class={icon_size} alt="File" src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
-                    }
+                    html! { <icons::FileExtIcon ext={"txt"} class={icon_size} /> }
                 }
             }
             _ => {
