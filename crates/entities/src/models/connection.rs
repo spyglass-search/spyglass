@@ -26,6 +26,8 @@ pub struct Model {
     pub expires_in: Option<i64>,
     // When the access token was granted (updated on refresh)
     pub granted_at: DateTimeUtc,
+    // Whether or not this connection is currently syncing.
+    pub is_syncing: bool,
     // When this connection was created/updated
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
@@ -91,4 +93,19 @@ pub async fn get_by_id(
         .filter(Column::Account.eq(account))
         .one(db)
         .await
+}
+
+pub async fn set_sync_status(
+    db: &DatabaseConnection,
+    id: &str,
+    account: &str,
+    is_syncing: bool,
+) -> Result<(), sea_orm::DbErr> {
+    if let Some(model) = get_by_id(db, id, account).await? {
+        let mut update: ActiveModel = model.into();
+        update.is_syncing = Set(is_syncing);
+        update.save(db).await?;
+    }
+
+    Ok(())
 }
