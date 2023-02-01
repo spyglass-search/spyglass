@@ -1,10 +1,10 @@
 use dashmap::DashMap;
-use entities::BATCH_SIZE;
 use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType};
 use entities::models::{lens, processed_files};
 use entities::sea_orm::entity::prelude::*;
 use entities::sea_orm::DatabaseConnection;
+use entities::BATCH_SIZE;
 use ignore::gitignore::Gitignore;
 use ignore::WalkBuilder;
 

@@ -10,10 +10,10 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::BATCH_SIZE;
 use super::crawl_tag;
 use super::indexed_document;
 use super::tag::{self, get_or_create, TagPair};
+use crate::BATCH_SIZE;
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 

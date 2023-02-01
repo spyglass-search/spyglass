@@ -1,5 +1,4 @@
 use entities::{
-    BATCH_SIZE,
     models::{
         document_tag, indexed_document,
         lens::{self, LensType},
@@ -9,6 +8,7 @@ use entities::{
         ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set,
         TransactionTrait,
     },
+    BATCH_SIZE,
 };
 use sea_orm_migration::prelude::*;
 use shared::config::{Config, LensConfig};
