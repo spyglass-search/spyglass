@@ -14,7 +14,7 @@ pub struct CountByStatus {
 }
 
 pub async fn get_library_stats(
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
 ) -> Result<HashMap<String, LibraryStats>, DbErr> {
     let counts = CountByStatus::find_by_statement(Statement::from_string(
         DbBackend::Sqlite,
@@ -37,7 +37,7 @@ pub async fn get_library_stats(
         "#
         .to_string(),
     ))
-    .all(&db)
+    .all(db)
     .await?;
 
     let mut stats: HashMap<String, LibraryStats> = HashMap::new();

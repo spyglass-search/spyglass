@@ -49,7 +49,7 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
-        match get_library_stats(self.state.db.clone()).await {
+        match get_library_stats(&self.state.db).await {
             Ok(stats) => Ok(stats),
             Err(err) => {
                 log::error!("Unable to get library stats: {}", err);
