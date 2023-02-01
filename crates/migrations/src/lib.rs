@@ -56,6 +56,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230111_000001_add_lens_column::Migration),
             Box::new(m20230112_000001_migrate_search_schema::Migration),
             Box::new(m20230126_000001_create_file_table::Migration),
+            Box::new(m20230131_000001_add_is_syncing_to_connection_table::Migration),
         ]
     }
 }
