@@ -1,8 +1,9 @@
 use directories::UserDirs;
 use entities::get_library_stats;
 use jsonrpsee::core::Error;
-use libspyglass::connection::handle_authorize_connection;
-use std::collections::HashSet;
+use libspyglass::connection::{self, credentials, handle_authorize_connection};
+use libspyglass::filesystem;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::SystemTime;
 use tracing::instrument;
@@ -10,20 +11,18 @@ use url::Url;
 
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
-use entities::models::{
-    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens, tag,
-};
+use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens, tag};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
 use shared::response::{
-    AppStatus, DefaultIndices, InstallStatus, LensResult, ListConnectionResult, PluginResult,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
+    AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
+    PluginResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection,
+    UserConnection,
 };
 
-use libspyglass::connection::credentials;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
@@ -141,7 +140,10 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
 #[instrument(skip(state))]
 pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, Error> {
-    match connection::Entity::find().all(&state.db).await {
+    match entities::models::connection::Entity::find()
+        .all(&state.db)
+        .await
+    {
         Ok(enabled) => {
             // TODO: Move this into a config / db table?
             let all_conns = credentials::supported_connections();
@@ -171,7 +173,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
 /// List of installed lenses
 #[instrument(skip(state))]
 pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, Error> {
-    let stats = get_library_stats(state.db).await.unwrap_or_default();
+    let stats = get_library_stats(&state.db).await.unwrap_or_default();
     let mut lenses: Vec<LensResult> = state
         .lenses
         .iter()
@@ -210,13 +212,105 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                 progress,
                 html_url: None,
                 download_url: None,
+                lens_type: shared::response::LensType::Lens,
             }
         })
         .collect();
 
+    if let Some(result) =
+        build_filesystem_information(&state, stats.get(filesystem::FILES_LENS)).await
+    {
+        lenses.push(result);
+    }
+
+    add_connections_information(&state, &mut lenses, &stats).await;
+
     lenses.sort_by(|x, y| x.label.to_lowercase().cmp(&y.label.to_lowercase()));
 
     Ok(lenses)
+}
+
+// Helper method used to add a len result for all api connections
+async fn add_connections_information(
+    state: &AppState,
+    lenses: &mut Vec<LensResult>,
+    stats: &HashMap<String, LibraryStats>,
+) {
+    let connections = connection::get_connection_ids(&state.db).await;
+    for connection in connections {
+        let lens_name = connection::api_id_to_lens(connection.as_str());
+        if let Some(lens_name) = lens_name {
+            if let Some(stats) = stats.get(lens_name) {
+                if let Some((title, description)) =
+                    connection::get_api_description(connection.as_str())
+                {
+                    lenses.push(LensResult {
+                        author: String::from("spyglass-search"),
+                        name: connection.clone(),
+                        label: String::from(title),
+                        description: String::from(description),
+                        hash: String::from("N/A"),
+                        file_path: None,
+                        progress: InstallStatus::Finished {
+                            num_docs: stats.indexed as u32,
+                        },
+                        html_url: None,
+                        download_url: None,
+                        lens_type: shared::response::LensType::API,
+                    });
+                }
+            }
+        }
+    }
+}
+
+// Helper method used to build a len result for the filesystem
+async fn build_filesystem_information(
+    state: &AppState,
+    lens_stats: Option<&LibraryStats>,
+) -> Option<LensResult> {
+    if filesystem::is_watcher_enabled(&state.db).await {
+        let watcher = state.file_watcher.lock().await;
+        let ref_watcher = watcher.as_ref();
+        if let Some(watcher) = ref_watcher {
+            let total_paths = watcher.processed_path_count().await as u32;
+            let indexed = match lens_stats {
+                Some(stats) => stats.indexed as u32,
+                None => 0,
+            };
+
+            let path = watcher.initializing_path().await;
+            let mut status = InstallStatus::Finished { num_docs: indexed };
+            if total_paths != indexed {
+                let percent = ((indexed * 100) / total_paths) as i32;
+                let status_msg = match path {
+                    Some(path) => format!("Walking path {path}"),
+                    None => String::from("Processing local files..."),
+                };
+                status = InstallStatus::Installing {
+                    percent,
+                    status: status_msg,
+                }
+            }
+
+            Some(LensResult {
+            author: String::from("spyglass-search"),
+            name: String::from("local-file-system"),
+            label: String::from("Local File System"),
+            description: String::from("Provides indexing for local files. All content is processed locally and stored locally! Contents of supported file types will be indexed. All unsupported file types and directories will be indexed based on their path, name and extension."),
+            hash: String::from("N/A"),
+            file_path: None,
+            progress: status,
+            html_url: None,
+            download_url: None,
+            lens_type: shared::response::LensType::Internal
+        })
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {

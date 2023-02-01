@@ -42,6 +42,35 @@ pub trait Connection {
     async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError>;
 }
 
+/// Helper method used to access all configured api ids
+pub async fn get_connection_ids(db: &DatabaseConnection) -> Vec<String> {
+    let connections = connection::get_all_connections(db).await;
+    connections
+        .iter()
+        .map(|connection| connection.api_id.clone())
+        .collect::<Vec<String>>()
+}
+
+/// Helper method used to access the title and description for the specified api id
+pub fn get_api_description(api_id: &str) -> Option<(&str, &str)> {
+    match api_id {
+        github::API_ID => Some((github::TITLE, github::DESCRIPTION)),
+        gdrive::API_ID => Some((gdrive::TITLE, gdrive::DESCRIPTION)),
+        gcal::API_ID => Some((gcal::TITLE, gcal::DESCRIPTION)),
+        _ => None,
+    }
+}
+
+/// Helper method used to convert from an api id to the associated lens id
+pub fn api_id_to_lens(api_id: &str) -> Option<&str> {
+    match api_id {
+        github::API_ID => Some(github::LENS),
+        gdrive::API_ID => Some(gdrive::LENS),
+        gcal::API_ID => Some(gcal::LENS),
+        _ => None,
+    }
+}
+
 /// Load credentials from the db for an account, Errs if no credentials are found.
 async fn load_credentials(
     db: &DatabaseConnection,

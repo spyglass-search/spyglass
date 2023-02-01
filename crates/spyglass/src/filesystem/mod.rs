@@ -35,6 +35,9 @@ use crate::documents;
 
 pub mod utils;
 
+/// The lens name for indexed files
+pub const FILES_LENS: &str = "files";
+
 /// Watcher responsible for processing paths on the file system.
 /// All filesystem updates will be run through the debouncer to
 /// batch updates then processed through any found git ignore files.
@@ -49,6 +52,8 @@ pub struct SpyglassFileWatcher {
     // The database connection used to update the database with
     // the state of file processing
     db: DatabaseConnection,
+    // Used to indication the current path that is being initialized
+    path_initializing: Arc<Mutex<Option<String>>>,
 }
 
 /// The watch path represents a watcher of a path. The watcher will
@@ -243,6 +248,7 @@ impl SpyglassFileWatcher {
             path_map: DashMap::new(),
             ignore_files: DashMap::new(),
             db: state.db.clone(),
+            path_initializing: Arc::new(Mutex::new(None)),
         };
 
         tokio::spawn(watch_events(state.clone(), file_events));
@@ -409,12 +415,28 @@ impl SpyglassFileWatcher {
         rx
     }
 
+    /// Returns the number of files and directories that have been found
+    /// in the filesystem
+    pub async fn processed_path_count(&self) -> u64 {
+        (processed_files::Entity::find().count(&self.db).await).unwrap_or(0)
+    }
+
+    /// Returns the current path being initialized if a path is being
+    /// initialized
+    pub async fn initializing_path(&self) -> Option<String> {
+        self.path_initializing.lock().await.clone()
+    }
+
     /// Initializes the path by walking the entire tree. All changed, removed and new files
     /// are returned as debounced events
     pub async fn initialize_path(&mut self, path: &Path) -> Vec<DebouncedEvent> {
         let mut debounced_events = Vec::new();
         let root_uri = utils::path_to_uri(path);
         let files = DashMap::new();
+        self.path_initializing
+            .lock()
+            .await
+            .replace(root_uri.clone());
 
         // will not ignore hidden since we need to include .git files
         let walker = WalkBuilder::new(path).hidden(false).build();
@@ -533,6 +555,7 @@ impl SpyglassFileWatcher {
         }
         log::debug!("Returning {:?} updates", files.len());
 
+        *self.path_initializing.lock().await = None;
         debounced_events
     }
 }
@@ -617,6 +640,13 @@ pub async fn configure_watcher(state: AppState) {
     }
 }
 
+pub async fn is_watcher_enabled(db: &DatabaseConnection) -> bool {
+    match lens::find_by_name("local-file-importer", db).await {
+        Ok(Some(lens)) => lens.is_enabled,
+        _ => false,
+    }
+}
+
 /// Helper method use to process updates from a watched path
 async fn _process_messages(
     state: AppState,
@@ -694,7 +724,7 @@ async fn _process_file_and_dir(
     }
 
     if !enqueue_list.is_empty() {
-        let tags = vec![(TagType::Lens, String::from("files"))];
+        let tags = vec![(TagType::Lens, String::from(FILES_LENS))];
         let enqueue_settings = EnqueueSettings {
             crawl_type: CrawlType::Normal,
             is_recrawl: true,

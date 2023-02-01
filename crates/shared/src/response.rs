@@ -65,6 +65,15 @@ impl Default for InstallStatus {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+pub enum LensType {
+    #[default]
+    Lens,
+    Plugin,
+    API,
+    Internal,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LensResult {
     /// Author of this lens
     pub author: String,
@@ -82,6 +91,7 @@ pub struct LensResult {
     pub html_url: Option<String>,
     pub download_url: Option<String>,
     pub progress: InstallStatus,
+    pub lens_type: LensType,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]

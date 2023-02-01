@@ -27,6 +27,7 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                         html_url: Some(lens.html_url.clone()),
                         download_url: Some(lens.download_url.clone()),
                         progress: InstallStatus::default(),
+                        lens_type: shared::response::LensType::Lens,
                     })
                     .collect();
 

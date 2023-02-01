@@ -49,6 +49,15 @@ pub fn uri_to_path(uri: &str) -> anyhow::Result<PathBuf> {
     }
 }
 
+// Converts a url to the path string when possible, otherwise url
+// string is used
+pub fn to_path_string(url: &Url) -> String {
+    match url.to_file_path() {
+        Ok(path) => path.display().to_string(),
+        Err(_) => url.to_string(),
+    }
+}
+
 /// Identifies if the provided path represents a windows shortcut
 pub fn is_windows_shortcut(path: &Path) -> bool {
     let ext = &path
