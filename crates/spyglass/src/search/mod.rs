@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::TermQuery;
@@ -250,6 +251,7 @@ impl Searcher {
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
 
+        let tag_checks = get_tag_checks(&_db, query_string).await;
         let index = &searcher.index;
         let reader = &searcher.reader;
         let fields = DocFields::as_fields();
@@ -261,6 +263,7 @@ impl Searcher {
             fields,
             query_string,
             applied_lenses,
+            &tag_checks,
         );
 
         let collector = TopDocs::with_limit(5);
@@ -283,6 +286,22 @@ impl Searcher {
             .filter(|(score, _)| *score > 0.0)
             .collect()
     }
+}
+
+// Helper method used to get the list of tag ids that should be included in the search
+async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<u64>> {
+    let lower = search.to_lowercase();
+    let tokens = lower.split(' ').collect::<Vec<&str>>();
+    let expr =
+        Expr::expr(Func::lower(Expr::col(entities::models::tag::Column::Value))).is_in(tokens);
+    let tag_rslt = entities::models::tag::Entity::find()
+        .filter(expr)
+        .all(db)
+        .await;
+    if let Ok(tags) = tag_rslt {
+        return Some(tags.iter().map(|tag| tag.id as u64).collect::<Vec<u64>>());
+    }
+    None
 }
 
 #[cfg(test)]
