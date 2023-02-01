@@ -8,6 +8,7 @@ use shared::config::Config;
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
+use crate::search::Searcher;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
 
@@ -244,17 +245,7 @@ pub async fn worker_task(
                                 log::debug!("committing {} new/updated docs in index", updated_docs);
                                 updated_docs = 0;
                                 tokio::spawn(async move {
-                                    match state.index.writer.lock() {
-                                        Ok(mut writer) => {
-                                            let _ = writer.commit();
-                                        }
-                                        Err(err) => {
-                                            log::debug!(
-                                                "Unable to acquire lock on index writer: {}",
-                                                err.to_string()
-                                            )
-                                        }
-                                    }
+                                    let _ = Searcher::save(&state).await;
                                 });
                             }
                         }
