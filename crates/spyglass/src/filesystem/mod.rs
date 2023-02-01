@@ -4,6 +4,7 @@ use entities::models::tag::{TagPair, TagType};
 use entities::models::{lens, processed_files};
 use entities::sea_orm::entity::prelude::*;
 use entities::sea_orm::DatabaseConnection;
+use entities::BATCH_SIZE;
 use ignore::gitignore::Gitignore;
 use ignore::WalkBuilder;
 
@@ -353,7 +354,7 @@ impl SpyglassFileWatcher {
     /// Checks if the path represents a hidden directory or
     /// or file ignored by a .gitignore file
     fn is_ignored(&self, path: &Path) -> bool {
-        if utils::is_in_hidden_dir(path) {
+        if utils::is_hidden(path) {
             return true;
         }
 
@@ -418,7 +419,7 @@ impl SpyglassFileWatcher {
         // will not ignore hidden since we need to include .git files
         let walker = WalkBuilder::new(path).hidden(false).build();
         for entry in walker.flatten() {
-            if !utils::is_in_hidden_dir(entry.path()) {
+            if !utils::is_hidden(entry.path()) {
                 if utils::is_ignore_file(entry.path()) {
                     self.add_ignore_file(entry.path());
                 }
@@ -496,11 +497,13 @@ impl SpyglassFileWatcher {
                 })
                 .collect::<Vec<processed_files::ActiveModel>>();
 
-            if let Err(error) = processed_files::Entity::insert_many(models)
-                .exec(&self.db)
-                .await
-            {
-                log::error!("Error inserting additions {:?}", error);
+            for chunk in models.chunks(BATCH_SIZE) {
+                if let Err(error) = processed_files::Entity::insert_many(chunk.to_vec())
+                    .exec(&self.db)
+                    .await
+                {
+                    log::error!("Error inserting additions {:?}", error);
+                }
             }
         }
 
@@ -785,12 +788,18 @@ fn _path_to_result(url: &Url, path: &Path) -> Option<CrawlResult> {
     let content_hash = hex::encode(&hasher.finalize()[..]);
     let tags = build_file_tags(path);
     if path.is_file() || path.is_dir() {
+        let title = url
+            .to_file_path()
+            .unwrap_or_else(|_| Path::new(url.as_str()).to_path_buf())
+            .display()
+            .to_string();
+
         Some(CrawlResult {
             content_hash: Some(content_hash),
             content: Some(file_name.clone()),
             // Does a file have a description? Pull the first part of the file
-            description: Some(file_name.clone()),
-            title: Some(url.to_string()),
+            description: None,
+            title: Some(title),
             url: url.to_string(),
             open_url: Some(url.to_string()),
             links: Default::default(),

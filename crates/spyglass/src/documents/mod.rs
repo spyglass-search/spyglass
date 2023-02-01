@@ -141,7 +141,7 @@ pub async fn process_crawl_results(
                 updates.push(indexed_document::ActiveModel {
                     domain: Set(url_host.to_string()),
                     url: Set(url.to_string()),
-                    open_url: Set(Some(url.to_string())),
+                    open_url: Set(crawl_result.open_url.clone()),
                     doc_id: Set(doc_id),
                     ..Default::default()
                 });
@@ -173,8 +173,9 @@ pub async fn process_crawl_results(
     tx.commit().await?;
 
     log::debug!(
-        "Took {:?} to process crawl results",
-        now.elapsed().as_millis()
+        "Took {:?} to process crawl {} results",
+        now.elapsed().as_millis(),
+        num_entries,
     );
 
     let num_updates = existing.len();
