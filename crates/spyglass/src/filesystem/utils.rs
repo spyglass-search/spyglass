@@ -196,6 +196,11 @@ pub fn is_hidden(path: &Path) -> bool {
             if name == ".DS_Store" {
                 return true;
             }
+
+            #[cfg(target_os = "windows")]
+            if name.starts_with("~$") {
+                return true;
+            }
         }
     }
 

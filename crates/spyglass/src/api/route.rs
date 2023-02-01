@@ -274,14 +274,17 @@ async fn build_filesystem_information(
         let ref_watcher = watcher.as_ref();
         if let Some(watcher) = ref_watcher {
             let total_paths = watcher.processed_path_count().await as u32;
-            let indexed = match lens_stats {
-                Some(stats) => stats.indexed as u32,
-                None => 0,
-            };
+            let mut indexed: u32 = 0;
+            let mut failed: u32 = 0;
+            if let Some(stats) = lens_stats {
+                indexed = stats.indexed as u32;
+                failed = stats.failed as u32;
+            }
+            let total_finished = indexed + failed;
 
             let path = watcher.initializing_path().await;
             let mut status = InstallStatus::Finished { num_docs: indexed };
-            if total_paths != indexed {
+            if total_finished < total_paths {
                 let percent = ((indexed * 100) / total_paths) as i32;
                 let status_msg = match path {
                     Some(path) => format!("Walking path {path}"),

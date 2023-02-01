@@ -17,57 +17,76 @@ use std::{
  * and returns it as a String
  */
 pub fn parse(file_path: &Path) -> io::Result<String> {
-    let docx = DocxFile::from_file(file_path).unwrap();
-    let result = docx.parse();
-    match result {
+    let docx = DocxFile::from_file(file_path);
+    match docx {
         Ok(docx) => {
-            let mut text: Vec<String> = Vec::new();
-            docx.document
-                .body
-                .content
-                .iter()
-                .for_each(|body_content| match body_content {
-                    BodyContent::Paragraph(paragraph) => {
-                        let mut str = String::from("");
-                        paragraph.content.iter().for_each(|paragraph_content| {
-                            str.push_str(process_paragraph_content(paragraph_content).as_str())
-                        });
-                        text.push(str);
-                    }
-                    BodyContent::Table(table) => {
-                        table
-                            .rows
-                            .iter()
-                            .flat_map(|row| row.cells.iter())
-                            .flat_map(|cell| cell.content.iter())
-                            .for_each(|table_cell| {
+            let result = docx.parse();
+            match result {
+                Ok(docx) => {
+                    let mut text: Vec<String> = Vec::new();
+                    docx.document
+                        .body
+                        .content
+                        .iter()
+                        .for_each(|body_content| match body_content {
+                            BodyContent::Paragraph(paragraph) => {
                                 let mut str = String::from("");
-                                match table_cell {
-                                    TableCellContent::Paragraph(p) => {
-                                        p.content.iter().for_each(|pc| {
-                                            str.push_str(process_paragraph_content(pc).as_str())
-                                        });
-                                    }
-                                }
-
+                                paragraph.content.iter().for_each(|paragraph_content| {
+                                    str.push_str(
+                                        process_paragraph_content(paragraph_content).as_str(),
+                                    )
+                                });
                                 text.push(str);
-                            });
-                    }
-                });
+                            }
+                            BodyContent::Table(table) => {
+                                table
+                                    .rows
+                                    .iter()
+                                    .flat_map(|row| row.cells.iter())
+                                    .flat_map(|cell| cell.content.iter())
+                                    .for_each(|table_cell| {
+                                        let mut str = String::from("");
+                                        match table_cell {
+                                            TableCellContent::Paragraph(p) => {
+                                                p.content.iter().for_each(|pc| {
+                                                    str.push_str(
+                                                        process_paragraph_content(pc).as_str(),
+                                                    )
+                                                });
+                                            }
+                                        }
 
-            let output = text.join(" ");
-            log::trace!("Document: {:?}", output);
-            Ok(output)
+                                        text.push(str);
+                                    });
+                            }
+                        });
+
+                    let output = text.join(" ");
+                    log::trace!("Document: {:?}", output);
+                    Ok(output)
+                }
+                Err(DocxError::Xml(xml_err)) => {
+                    log::warn!("Error reading Docx file {:?}", xml_err);
+                    Err(Error::new(ErrorKind::InvalidData, xml_err))
+                }
+                Err(doc_err) => {
+                    log::warn!("Error reading Docx file {:?}", doc_err);
+                    Err(Error::new(
+                        ErrorKind::InvalidData,
+                        format!("Error reading Docx file {doc_err:?}"),
+                    ))
+                }
+            }
         }
-        Err(DocxError::Xml(xml_err)) => {
-            log::warn!("Error reading Docx file {:?}", xml_err);
-            Err(Error::new(ErrorKind::InvalidData, xml_err))
-        }
-        Err(doc_err) => {
-            log::warn!("Error reading Docx file {:?}", doc_err);
+        Err(error) => {
+            log::error!(
+                "Error processing docx file {:?}, Error: {:?} ",
+                file_path,
+                error
+            );
             Err(Error::new(
-                ErrorKind::InvalidData,
-                format!("Error reading Docx file {doc_err:?}"),
+                ErrorKind::InvalidInput,
+                format!("Error reading docx file {error:?}"),
             ))
         }
     }
