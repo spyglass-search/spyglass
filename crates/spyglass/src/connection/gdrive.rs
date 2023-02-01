@@ -1,3 +1,4 @@
+use entities::models::connection;
 use entities::models::crawl_queue;
 use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType, TagValue};
@@ -81,6 +82,7 @@ impl Connection for DriveConnection {
 
     async fn sync(&mut self, state: &AppState) {
         log::debug!("syncing w/ connection");
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
 
         // Ignore shortcuts
         let ignore_query = "mimeType != 'application/vnd.google-apps.shortcut'".to_string();
@@ -130,6 +132,7 @@ impl Connection for DriveConnection {
             }
         }
 
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
         log::debug!("synced {} files", num_files);
     }
 

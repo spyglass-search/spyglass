@@ -1,4 +1,7 @@
-use entities::models::tag::{TagPair, TagType, TagValue};
+use entities::models::{
+    connection,
+    tag::{TagPair, TagType, TagValue},
+};
 use jsonrpsee::core::async_trait;
 use libgithub::types::{Issue, Repo};
 use libgithub::GithubClient;
@@ -87,10 +90,6 @@ impl GithubConnection {
                 if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
                 {
                     log::error!("Unable to add issue: {}", err);
-                }
-
-                if let Err(err) = Searcher::save(state).await {
-                    log::error!("Unable to save repos: {}", err);
                 }
 
                 buffer.clear();
@@ -203,9 +202,11 @@ impl Connection for GithubConnection {
 
     async fn sync(&mut self, state: &AppState) {
         log::debug!("syncing w/ connection: {}", &Self::id());
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
         self.sync_issues(state).await;
         self.sync_repos(state).await;
         self.sync_starred(state).await;
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
     }
 
     async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError> {

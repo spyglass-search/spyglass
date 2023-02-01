@@ -210,18 +210,25 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
         let path = if let Some(segments) = url.path_segments() {
             let mut segs = segments
                 .into_iter()
-                .map(|f| f.to_string())
+                .filter_map(|f| {
+                    if f.is_empty() {
+                        None
+                    } else {
+                        Some(f.to_string().replace("%3A", ":"))
+                    }
+                })
                 .collect::<Vec<String>>();
-
-            let num_segs = segs.len();
-            if num_segs > max_segments {
-                segs = segs[(num_segs - 1 - max_segments)..].to_vec();
-                segs.insert(0, "...".to_string());
-            }
 
             if !show_file_name {
                 segs.pop();
             }
+
+            let num_segs = segs.len();
+            if num_segs > max_segments {
+                segs = segs[(num_segs - max_segments)..].to_vec();
+                segs.insert(0, "...".to_string());
+            }
+
             segs.join(" › ")
         } else {
             url.path().to_string()

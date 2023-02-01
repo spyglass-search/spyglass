@@ -25,6 +25,7 @@ mod m20230104_000001_add_column_n_index;
 mod m20230111_000001_add_lens_column;
 mod m20230112_000001_migrate_search_schema;
 mod m20230126_000001_create_file_table;
+mod m20230131_000001_add_is_syncing_to_connection_table;
 mod utils;
 
 pub struct Migrator;
