@@ -26,6 +26,7 @@ mod m20230111_000001_add_lens_column;
 mod m20230112_000001_migrate_search_schema;
 mod m20230126_000001_create_file_table;
 mod m20230131_000001_add_is_syncing_to_connection_table;
+mod m20230201_000001_add_tag_index;
 mod utils;
 
 pub struct Migrator;
@@ -57,6 +58,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230112_000001_migrate_search_schema::Migration),
             Box::new(m20230126_000001_create_file_table::Migration),
             Box::new(m20230131_000001_add_is_syncing_to_connection_table::Migration),
+            Box::new(m20230201_000001_add_tag_index::Migration),
         ]
     }
 }
