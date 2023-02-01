@@ -8,6 +8,7 @@ use entities::{
         ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set,
         Statement, TransactionTrait,
     },
+    BATCH_SIZE,
 };
 use sea_orm_migration::prelude::*;
 use shared::config::{Config, LensConfig};
@@ -51,7 +52,7 @@ where
         .collect::<Vec<crawl_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates
-    for chunk in task_tags.chunks(5000) {
+    for chunk in task_tags.chunks(BATCH_SIZE) {
         crawl_tag::Entity::insert_many(chunk.to_vec())
             .on_conflict(
                 sea_orm::sea_query::OnConflict::columns(vec![

@@ -28,14 +28,14 @@ export let invoke = async (func_name, params) => {
                 score: 1.0
             }, {
                 doc_id: "123",
-                domain: "example.com",
-                title: "This is an example title",
+                domain: "localhost",
+                title: "/Users/Blah/Documents/Special Information",
                 description: "",
-                crawl_uri: "https://example.com/this/is/a/path",
-                url: "https://example.com/this/is/a/path",
+                crawl_uri: "file:///Users/Blah/Documents/Special%20Information",
+                url: "file:///Users/Blah/Documents/Special%20Information",
                 tags: [
-                    ['source', 'drive.google.com'],
-                    ['Lens', 'example'],
+                    ['Lens', 'files'],
+                    ['type', 'directory'],
                 ],
                 score: 1.0
             }, {

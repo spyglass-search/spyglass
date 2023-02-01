@@ -190,14 +190,20 @@ pub fn patterns_from_file(path: &Path) -> Result<Gitignore, Error> {
 /// In this case a "hidden" directory is any directory that starts with "." Example:
 /// .git
 /// .ssh
-pub fn is_in_hidden_dir(path: &Path) -> bool {
+pub fn is_hidden(path: &Path) -> bool {
+    if path.is_file() {
+        if let Some(name) = path.file_name().and_then(|x| x.to_str()) {
+            if name == ".DS_Store" {
+                return true;
+            }
+        }
+    }
+
     path.ancestors().any(|ancestor| {
         if ancestor.is_dir() {
-            if let Some(name) = ancestor.file_name() {
-                if let Some(name_str) = name.to_str() {
-                    if name_str.starts_with('.') {
-                        return true;
-                    }
+            if let Some(name) = ancestor.file_name().and_then(|s| s.to_str()) {
+                if name.starts_with('.') {
+                    return true;
                 }
             }
         }

@@ -28,12 +28,16 @@ fn render_icon(result: &SearchResult) -> Html {
                 icons::connection_icon(connection, "h-8", "w-8")
             }
             "file" => {
-                if let Some((_, ext)) = result.title.rsplit_once('.') {
+                let is_directory = result.tags.iter().any(|(label, value)| {
+                    label.to_lowercase() == "type" && value.to_lowercase() == "directory"
+                });
+
+                if is_directory {
+                    html! { <icons::FolderIcon height="h-8" width="w-8" classes="bg-color-white m-auto" /> }
+                } else if let Some((_, ext)) = result.title.rsplit_once('.') {
                     html! { <icons::FileExtIcon ext={ext.to_string()} class={icon_size} /> }
                 } else {
-                    html! {
-                        <img class={icon_size} alt="File" src={format!("https://favicon.spyglass.workers.dev/{}", domain.clone())} />
-                    }
+                    html! { <icons::FileExtIcon ext={"txt"} class={icon_size} /> }
                 }
             }
             _ => {
@@ -55,34 +59,12 @@ fn render_metadata(result: &SearchResult) -> Html {
 
     let url = Url::parse(&result.crawl_uri);
     if let Ok(url) = url {
-        match url.scheme() {
-            "file" => {
-                // Attempt to grab the folder this file resides
-                let path = if let Some(segments) = url.path_segments() {
-                    let mut segs = segments
-                        .into_iter()
-                        .map(|f| f.to_string())
-                        .collect::<Vec<String>>();
-
-                    let num_segs = segs.len();
-                    if num_segs > 3 {
-                        segs = segs[(num_segs - 1 - 3)..].to_vec();
-                        segs.insert(0, "...".to_string());
-                    }
-
-                    segs.pop();
-                    segs.join(" › ")
-                } else {
-                    url.path().to_string()
-                };
-
-                meta.push(html! { <span>{path}</span> });
-            }
-            _ => {
-                meta.push(html! {
-                    <span>{format!(" {}", result.domain.clone())}</span>
-                });
-            }
+        if let Some(path) = shorten_file_path(&url, 3, false) {
+            meta.push(html! { <span>{path}</span> });
+        } else {
+            meta.push(html! {
+                <span>{format!(" {}", result.domain.clone())}</span>
+            });
         }
     }
 
@@ -151,6 +133,15 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     let icon = render_icon(result);
     let metadata = render_metadata(result);
 
+    let mut title = result.title.clone();
+    if result.url.starts_with("file://") {
+        if let Ok(url) = Url::parse(&result.url) {
+            if let Some(path) = shorten_file_path(&url, 3, true) {
+                title = path;
+            }
+        }
+    }
+
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
             <div class="flex flex-none pl-6 pr-2">
@@ -160,7 +151,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             </div>
             <div class="grow">
                 <h2 class="text-lg truncate font-bold w-[30rem]">
-                    {result.title.clone()}
+                    {title}
                 </h2>
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-14 overflow-hidden">
                     {result.description.clone()}
@@ -211,4 +202,33 @@ pub fn lens_result_component(props: &LensResultProps) -> Html {
             </div>
         </div>
     }
+}
+
+fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Option<String> {
+    if url.scheme() == "file" {
+        // Attempt to grab the folder this file resides
+        let path = if let Some(segments) = url.path_segments() {
+            let mut segs = segments
+                .into_iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<String>>();
+
+            let num_segs = segs.len();
+            if num_segs > max_segments {
+                segs = segs[(num_segs - 1 - max_segments)..].to_vec();
+                segs.insert(0, "...".to_string());
+            }
+
+            if !show_file_name {
+                segs.pop();
+            }
+            segs.join(" › ")
+        } else {
+            url.path().to_string()
+        };
+
+        return Some(path);
+    }
+
+    None
 }

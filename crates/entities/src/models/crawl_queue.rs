@@ -13,11 +13,11 @@ use url::Url;
 use super::crawl_tag;
 use super::indexed_document;
 use super::tag::{self, get_or_create, TagPair};
+use crate::BATCH_SIZE;
 use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
-const BATCH_SIZE: usize = 5_000;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
