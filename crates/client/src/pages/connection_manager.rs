@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
+use gloo::timers::callback::Interval;
 use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
-use shared::response::{ListConnectionResult, SupportedConnection, UserConnection, LibraryStats};
+use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -16,23 +17,22 @@ use crate::components::{
 use crate::utils::RequestState;
 use crate::{listen, tauri_invoke};
 
+#[derive(Default)]
 struct ConnectionStatus {
     is_authorizing: RequestState,
     error: String,
 }
 
+#[derive(Default)]
 pub struct ConnectionsManagerPage {
     conn_status: ConnectionStatus,
     fetch_connection_state: RequestState,
-    fetch_stats_state: RequestState,
     fetch_error: String,
     is_add_view: bool,
-    resync_requested: HashSet<(String, String)>,
-    revoke_requested: HashSet<(String, String)>,
     supported_connections: Vec<SupportedConnection>,
     supported_map: HashMap<String, SupportedConnection>,
     user_connections: Vec<UserConnection>,
-    library_stats: HashMap<String, LibraryStats>,
+    update_interval_handle: Option<Interval>,
 }
 
 #[allow(dead_code)]
@@ -44,23 +44,17 @@ pub enum Msg {
     // Authorization finished!
     AuthFinished,
     FetchConnections,
-    FetchStats,
     FetchError(String),
     StartAdd,
     CancelAdd,
     RevokeConnection { id: String, account: String },
     ResyncConnection { id: String, account: String },
     UpdateConnections(ListConnectionResult),
-    UpdateStats(HashMap<String, LibraryStats>)
 }
 
 impl ConnectionsManagerPage {
     pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
         tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await
-    }
-
-    pub async fn fetch_stats() -> Result<HashMap<String, LibraryStats>, String> {
-        tauri_invoke(ClientInvoke::GetLibraryStats, "".to_string()).await
     }
 
     fn add_view(&self, ctx: &Context<Self>) -> Html {
@@ -151,7 +145,8 @@ impl Component for ConnectionsManagerPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
-        link.send_message_batch(vec![Msg::FetchConnections, Msg::FetchStats]);
+        link.send_message(Msg::FetchConnections);
+
         // Listen to changes in authorized connections
         {
             let link = link.clone();
@@ -165,21 +160,20 @@ impl Component for ConnectionsManagerPage {
             });
         }
 
+        let interval = {
+            let link = link.clone();
+            Interval::new(10_000, move || link.send_message(Msg::FetchConnections))
+        };
+
         Self {
-            conn_status: ConnectionStatus {
-                is_authorizing: RequestState::NotStarted,
-                error: "".to_string(),
-            },
-            fetch_connection_state: RequestState::NotStarted,
-            fetch_stats_state: RequestState::NotStarted,
-            fetch_error: String::new(),
-            is_add_view: false,
-            resync_requested: HashSet::new(),
-            revoke_requested: HashSet::new(),
-            supported_connections: Vec::new(),
-            supported_map: HashMap::new(),
-            user_connections: Vec::new(),
-            library_stats: HashMap::new(),
+            update_interval_handle: Some(interval),
+            ..Default::default()
+        }
+    }
+
+    fn destroy(&mut self, _ctx: &Context<Self>) {
+        if let Some(handle) = self.update_interval_handle.take() {
+            handle.cancel();
         }
     }
 
@@ -230,20 +224,6 @@ impl Component for ConnectionsManagerPage {
                 });
                 false
             }
-            Msg::FetchStats => {
-                if self.fetch_stats_state.in_progress() {
-                    return false;
-                }
-
-                self.fetch_stats_state = RequestState::InProgress;
-                link.send_future(async {
-                    match Self::fetch_stats().await {
-                        Ok(stats) => Msg::UpdateStats(stats),
-                        Err(err) => Msg::FetchError(err)
-                    }
-                });
-                false
-            }
             Msg::FetchError(error) => {
                 log::error!("Error fetching: {}", error);
                 self.fetch_connection_state = RequestState::Error;
@@ -251,8 +231,7 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::RevokeConnection { id, account } => {
-                self.revoke_requested.insert((id.clone(), account.clone()));
-                link.send_future(async move {
+                spawn_local(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
                         ClientInvoke::RevokeConnection,
@@ -262,14 +241,12 @@ impl Component for ConnectionsManagerPage {
                         },
                     )
                     .await;
-                    Msg::FetchConnections
                 });
 
                 true
             }
             Msg::ResyncConnection { id, account } => {
-                self.resync_requested.insert((id.clone(), account.clone()));
-                link.send_future(async move {
+                spawn_local(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
                         ClientInvoke::ResyncConnection,
@@ -279,12 +256,11 @@ impl Component for ConnectionsManagerPage {
                         },
                     )
                     .await;
-                    Msg::FetchConnections
                 });
-
                 true
             }
             Msg::UpdateConnections(conns) => {
+                log::debug!("get conns: {:?}", conns);
                 self.fetch_connection_state = RequestState::Finished;
 
                 self.supported_connections = conns.supported.clone();
@@ -301,12 +277,6 @@ impl Component for ConnectionsManagerPage {
                     Ordering::Equal => a.account.cmp(&b.account),
                     ord => ord,
                 });
-
-                true
-            }
-            Msg::UpdateStats(stats) => {
-                self.fetch_stats_state = RequestState::Finished;
-                self.library_stats = stats;
 
                 true
             }
@@ -327,41 +297,41 @@ impl Component for ConnectionsManagerPage {
         }
 
         let link = ctx.link();
+        if self.user_connections.is_empty() {
+            return self.add_view(ctx);
+        }
 
-        let conns = if self.user_connections.is_empty() {
-            html! {
-                <div class="col-span-3 text-neutral-300">{"Add a connection to get started!"}</div>
-            }
-        } else {
-            self.user_connections
-                .iter()
-                .map(|conn| {
-                    let label = self
-                        .supported_map
-                        .get(&conn.id)
-                        .map(|m| m.label.clone())
-                        .unwrap_or_else(|| conn.id.clone());
+        let conns = self.user_connections
+            .iter()
+            .map(|conn| {
+                let label = self
+                    .supported_map
+                    .get(&conn.id)
+                    .map(|m| m.label.clone())
+                    .unwrap_or_else(|| conn.id.clone());
 
-                    let resync_msg = Msg::ResyncConnection {
-                        id: conn.id.clone(),
-                        account: conn.account.clone(),
-                    };
-                    let revoke_msg = Msg::RevokeConnection {
-                        id: conn.id.clone(),
-                        account: conn.account.clone(),
-                    };
+                let resync_msg = Msg::ResyncConnection {
+                    id: conn.id.clone(),
+                    account: conn.account.clone(),
+                };
+                let revoke_msg = Msg::RevokeConnection {
+                    id: conn.id.clone(),
+                    account: conn.account.clone(),
+                };
 
-                    html! {
-                        <Connection
-                            label={label}
-                            connection={conn.clone()}
-                            on_resync={link.callback(move |_| resync_msg.clone())}
-                            on_revoke={link.callback(move |_| revoke_msg.clone())}
-                        />
-                    }
-                })
-                .collect::<Html>()
-        };
+                log::debug!("{} - {} - {}", conn.id, conn.account, conn.is_syncing);
+
+                html! {
+                    <Connection
+                        label={label}
+                        connection={conn.clone()}
+                        is_syncing={conn.is_syncing}
+                        on_resync={link.callback(move |_| resync_msg.clone())}
+                        on_revoke={link.callback(move |_| revoke_msg.clone())}
+                    />
+                }
+            })
+            .collect::<Html>();
 
         html! {
             <div>
@@ -402,29 +372,45 @@ struct ConnectionProps {
 #[function_component(Connection)]
 fn connection_comp(props: &ConnectionProps) -> Html {
     let is_resyncing = use_state(|| false);
+    is_resyncing.set(props.is_syncing);
+
     let is_revoking = use_state(|| false);
 
+    let is_resync = is_resyncing.clone();
+    let on_resync_cb = props.on_resync.clone();
+    let resync_cb = Callback::from(move |e| {
+        is_resync.set(true);
+        on_resync_cb.emit(e);
+    });
+
+    log::debug!("{} - {}", props.is_syncing, *is_resyncing);
     let resync_btn = html! {
-        <btn::Btn
-            disabled={*is_resyncing}
-            size={BtnSize::Xs}
-            onclick={props.on_resync.clone()}
-        >
-            <icons::RefreshIcon width="w-4" height="h-4" />
-            { if *is_resyncing { "Resyncing" } else { "Resync"} }
+        <btn::Btn disabled={*is_resyncing} size={BtnSize::Xs} onclick={resync_cb}>
+            <icons::RefreshIcon width="w-4" height="h-4" animate_spin={*is_resyncing} />
+            { if *is_resyncing { "Syncing" } else { "Resync"} }
         </btn::Btn>
     };
 
-    let revoke_btn = html! {
-        <btn::Btn
-            disabled={*is_revoking}
-            size={BtnSize::Xs}
-            _type={BtnType::Danger}
-            onclick={props.on_revoke.clone()}
-        >
-            <icons::TrashIcon width="w-4" height="h-4" />
-            { if *is_revoking { "Deleting" } else { "Delete"} }
-        </btn::Btn>
+    let is_revoke = is_revoking.clone();
+    let on_revoke_cb = props.on_revoke.clone();
+    let revoke_cb = Callback::from(move |e| {
+        is_revoke.set(true);
+        on_revoke_cb.emit(e);
+    });
+
+    let revoke_btn = if *is_revoking {
+        html! {
+            <btn::Btn disabled={true} size={BtnSize::Xs} _type={BtnType::Danger}>
+                {"Deleting"}
+            </btn::Btn>
+        }
+    } else {
+        html! {
+            <btn::Btn disabled={*is_revoking} size={BtnSize::Xs} _type={BtnType::Danger} onclick={revoke_cb}>
+                <icons::TrashIcon width="w-4" height="h-4" />
+                {"Delete"}
+            </btn::Btn>
+        }
     };
 
     html! {

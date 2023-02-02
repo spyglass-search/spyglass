@@ -1,6 +1,8 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::Set;
+use sea_orm::{QuerySelect, Set};
 use serde::{Deserialize, Serialize};
+
+use super::{crawl_queue, indexed_document};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct Scopes {
@@ -93,6 +95,51 @@ pub async fn get_by_id(
         .filter(Column::Account.eq(account))
         .one(db)
         .await
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+enum QueryAs {
+    Id,
+}
+
+/// Removes relevant information from DB, but DOES NOT DELETE FROM SEARCH INDEX
+pub async fn revoke_connection(
+    db: &DatabaseConnection,
+    api_id: &str,
+    account: &str,
+) -> Result<(), DbErr> {
+    let url_like = format!("api://{api_id}@{account}%");
+
+    // Remove from connections list
+    let _ = Entity::delete_many()
+        .filter(Column::ApiId.eq(api_id))
+        .filter(Column::Account.eq(account))
+        .exec(db)
+        .await;
+
+    // Remove any crawl queue items
+    let cqids = crawl_queue::Entity::find()
+        .column_as(crawl_queue::Column::Id, QueryAs::Id)
+        .filter(crawl_queue::Column::Domain.eq(api_id))
+        .filter(crawl_queue::Column::Url.like(&url_like))
+        .into_values::<_, QueryAs>()
+        .all(db)
+        .await
+        .unwrap_or_default();
+    crawl_queue::delete_many_by_id(db, &cqids).await?;
+
+    // Remove from indexed_docs
+    let dbids: Vec<i64> = indexed_document::Entity::find()
+        .column_as(indexed_document::Column::Id, QueryAs::Id)
+        .filter(indexed_document::Column::Domain.eq(api_id))
+        .filter(indexed_document::Column::Url.like(&url_like))
+        .into_values::<_, QueryAs>()
+        .all(db)
+        .await
+        .unwrap_or_default();
+    indexed_document::delete_many_by_id(db, &dbids).await?;
+
+    Ok(())
 }
 
 pub async fn set_sync_status(

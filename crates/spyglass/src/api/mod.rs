@@ -1,7 +1,8 @@
 use entities::get_library_stats;
+use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
-use libspyglass::search;
+use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use std::collections::HashMap;
@@ -94,15 +95,23 @@ impl RpcServer for SpyglassRpc {
     /// Remove connection from list of connections
     async fn revoke_connection(&self, api_id: String, account: String) -> Result<(), Error> {
         use entities::models::connection;
-        // Remove from connections list
-        let _ = connection::Entity::delete_many()
-            .filter(connection::Column::ApiId.eq(api_id.clone()))
-            .filter(connection::Column::Account.eq(account))
-            .exec(&self.state.db)
-            .await;
+        let url_like = format!("api://{}@{}%", api_id.clone(), account.clone());
 
-        // Remove from index
-        let _ = route::delete_domain(self.state.clone(), domain).await;
+        // Delete from search index
+        let docs = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Domain.eq(api_id.clone()))
+            .filter(indexed_document::Column::Url.like(&url_like))
+            .all(&self.state.db)
+            .await
+            .unwrap_or_default();
+
+        let doc_ids = docs
+            .iter()
+            .map(|m| m.doc_id.clone())
+            .collect::<Vec<String>>();
+        let _ = connection::revoke_connection(&self.state.db, &api_id, &account).await;
+        let _ = Searcher::delete_many_by_id(&self.state, &doc_ids, false).await;
+
         Ok(())
     }
 
