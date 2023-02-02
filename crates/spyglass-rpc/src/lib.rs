@@ -27,9 +27,6 @@ pub trait Rpc {
     #[method(name = "delete_doc")]
     async fn delete_doc(&self, id: String) -> Result<(), Error>;
 
-    #[method(name = "delete_domain")]
-    async fn delete_domain(&self, domain: String) -> Result<(), Error>;
-
     #[method(name = "get_library_stats")]
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error>;
 

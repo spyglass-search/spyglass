@@ -36,16 +36,14 @@ impl RpcServer for SpyglassRpc {
         route::app_status(self.state.clone()).await
     }
 
+    /// Default folders used in the local file indexer
     async fn default_indices(&self) -> Result<DefaultIndices, Error> {
         Ok(route::default_indices().await)
     }
 
+    /// Delete a single doc
     async fn delete_doc(&self, id: String) -> Result<(), Error> {
         route::delete_doc(self.state.clone(), id).await
-    }
-
-    async fn delete_domain(&self, domain: String) -> Result<(), Error> {
-        route::delete_domain(self.state.clone(), domain).await
     }
 
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
@@ -104,7 +102,7 @@ impl RpcServer for SpyglassRpc {
             .await;
 
         // Remove from index
-        let _ = self.delete_domain(api_id).await;
+        let _ = route::delete_domain(self.state.clone(), domain).await;
         Ok(())
     }
 

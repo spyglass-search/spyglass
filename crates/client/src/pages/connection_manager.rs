@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
-use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
+use shared::response::{ListConnectionResult, SupportedConnection, UserConnection, LibraryStats};
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -24,6 +24,7 @@ struct ConnectionStatus {
 pub struct ConnectionsManagerPage {
     conn_status: ConnectionStatus,
     fetch_connection_state: RequestState,
+    fetch_stats_state: RequestState,
     fetch_error: String,
     is_add_view: bool,
     resync_requested: HashSet<(String, String)>,
@@ -31,6 +32,7 @@ pub struct ConnectionsManagerPage {
     supported_connections: Vec<SupportedConnection>,
     supported_map: HashMap<String, SupportedConnection>,
     user_connections: Vec<UserConnection>,
+    library_stats: HashMap<String, LibraryStats>,
 }
 
 #[allow(dead_code)]
@@ -42,20 +44,23 @@ pub enum Msg {
     // Authorization finished!
     AuthFinished,
     FetchConnections,
+    FetchStats,
     FetchError(String),
     StartAdd,
     CancelAdd,
     RevokeConnection { id: String, account: String },
     ResyncConnection { id: String, account: String },
     UpdateConnections(ListConnectionResult),
+    UpdateStats(HashMap<String, LibraryStats>)
 }
 
 impl ConnectionsManagerPage {
     pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
-        match tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await {
-            Ok(results) => Ok(results),
-            Err(e) => Err(format!("Error fetching connections: {e:?}")),
-        }
+        tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await
+    }
+
+    pub async fn fetch_stats() -> Result<HashMap<String, LibraryStats>, String> {
+        tauri_invoke(ClientInvoke::GetLibraryStats, "".to_string()).await
     }
 
     fn add_view(&self, ctx: &Context<Self>) -> Html {
@@ -146,8 +151,7 @@ impl Component for ConnectionsManagerPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
-        link.send_message(Msg::FetchConnections);
-
+        link.send_message_batch(vec![Msg::FetchConnections, Msg::FetchStats]);
         // Listen to changes in authorized connections
         {
             let link = link.clone();
@@ -167,6 +171,7 @@ impl Component for ConnectionsManagerPage {
                 error: "".to_string(),
             },
             fetch_connection_state: RequestState::NotStarted,
+            fetch_stats_state: RequestState::NotStarted,
             fetch_error: String::new(),
             is_add_view: false,
             resync_requested: HashSet::new(),
@@ -174,6 +179,7 @@ impl Component for ConnectionsManagerPage {
             supported_connections: Vec::new(),
             supported_map: HashMap::new(),
             user_connections: Vec::new(),
+            library_stats: HashMap::new(),
         }
     }
 
@@ -220,6 +226,20 @@ impl Component for ConnectionsManagerPage {
                     match Self::fetch_connections().await {
                         Ok(conns) => Msg::UpdateConnections(conns),
                         Err(err) => Msg::FetchError(err),
+                    }
+                });
+                false
+            }
+            Msg::FetchStats => {
+                if self.fetch_stats_state.in_progress() {
+                    return false;
+                }
+
+                self.fetch_stats_state = RequestState::InProgress;
+                link.send_future(async {
+                    match Self::fetch_stats().await {
+                        Ok(stats) => Msg::UpdateStats(stats),
+                        Err(err) => Msg::FetchError(err)
                     }
                 });
                 false
@@ -281,6 +301,12 @@ impl Component for ConnectionsManagerPage {
                     Ordering::Equal => a.account.cmp(&b.account),
                     ord => ord,
                 });
+
+                true
+            }
+            Msg::UpdateStats(stats) => {
+                self.fetch_stats_state = RequestState::Finished;
+                self.library_stats = stats;
 
                 true
             }
@@ -366,6 +392,7 @@ impl Component for ConnectionsManagerPage {
 struct ConnectionProps {
     label: String,
     connection: UserConnection,
+    is_syncing: bool,
     #[prop_or_default]
     on_resync: Callback<MouseEvent>,
     #[prop_or_default]
