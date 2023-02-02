@@ -31,6 +31,8 @@ pub fn build_query<I>(
     applied_lenses: &Vec<u64>,
     // Boosts based on implicit/explicit tag detection
     tag_boosts: I,
+    // Id of favorited boost
+    favorite_boost: Option<i64>,
 ) -> BooleanQuery
 where
     I: Iterator<Item = i64>,
@@ -80,7 +82,19 @@ where
         ))
     }
 
-    BooleanQuery::new(vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))])
+    let mut t: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
+    // Greatly boost content that have our terms + a favorite.
+    if let Some(favorite_boost) = favorite_boost {
+        t.push((
+            Occur::Should,
+            _boosted_term(
+                Term::from_field_u64(fields.tags, favorite_boost as u64),
+                3.0,
+            ),
+        ));
+    }
+
+    BooleanQuery::new(t)
 }
 
 /**

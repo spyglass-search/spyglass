@@ -253,17 +253,18 @@ impl Searcher {
         let start_timer = Instant::now();
 
         let mut tag_boosts = HashSet::new();
-        if let Ok(Some(favorited)) = tag::Entity::find()
+        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
             .filter(tag::Column::Label.eq(tag::TagType::Favorited))
             .one(&db)
             .await
         {
-            tag_boosts.insert(favorited.id);
-        }
+            Some(favorited.id)
+        } else {
+            None
+        };
 
         let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
         tag_boosts.extend(tag_checks);
-        log::debug!("TAG_BOOSTS: {:?}", tag_boosts);
 
         let index = &searcher.index;
         let reader = &searcher.reader;
@@ -277,6 +278,7 @@ impl Searcher {
             query_string,
             applied_lenses,
             tag_boosts.into_iter(),
+            favorite_boost,
         );
 
         let collector = TopDocs::with_limit(5);
