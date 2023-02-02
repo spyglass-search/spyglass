@@ -67,9 +67,9 @@ wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
 
 # Spyglass libs
-auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "eda139af0d050b73d0e797fd503b845d07056dd8" }
-github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "eda139af0d050b73d0e797fd503b845d07056dd8" }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "eda139af0d050b73d0e797fd503b845d07056dd8" }
+auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2ab239c595b31ef07eea11f0be20cb67b134f273" }
+github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2ab239c595b31ef07eea11f0be20cb67b134f273" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2ab239c595b31ef07eea11f0be20cb67b134f273" }
 
 [lib]
 name = "libspyglass"
