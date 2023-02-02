@@ -22,14 +22,19 @@ fn _boosted_phrase(terms: Vec<Term>, boost: Score) -> Box<BoostQuery> {
     Box::new(BoostQuery::new(Box::new(PhraseQuery::new(terms)), boost))
 }
 
-pub fn build_query(
+pub fn build_query<I>(
     schema: Schema,
     tokenizers: TokenizerManager,
     fields: DocFields,
     query_string: &str,
+    // Applied filters
     applied_lenses: &Vec<u64>,
-    search_tags: &Option<Vec<u64>>,
-) -> BooleanQuery {
+    // Boosts based on implicit/explicit tag detection
+    tag_boosts: I,
+) -> BooleanQuery
+where
+    I: Iterator<Item = i64>,
+{
     let content_terms = terms_for_field(&schema, &tokenizers, query_string, fields.content);
     let title_terms: Vec<Term> = terms_for_field(&schema, &tokenizers, query_string, fields.title);
 
@@ -67,14 +72,12 @@ pub fn build_query(
         ))
     }
 
-    // Tags that might be represented by search terms
-    if let Some(tags) = search_tags {
-        for tag_id in tags {
-            term_query.push((
-                Occur::Should,
-                _boosted_term(Term::from_field_u64(fields.tags, *tag_id), 1.0),
-            ))
-        }
+    // Tags that might be represented by search terms (e.g. "repository" or "file")
+    for tag_id in tag_boosts {
+        term_query.push((
+            Occur::Should,
+            _boosted_term(Term::from_field_u64(fields.tags, tag_id as u64), 1.5),
+        ))
     }
 
     BooleanQuery::new(vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))])

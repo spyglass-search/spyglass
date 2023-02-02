@@ -1,9 +1,10 @@
+use chrono::Utc;
 use entities::{
     models::{
         crawl_queue, indexed_document,
         tag::{self, TagPair},
     },
-    sea_orm::DatabaseConnection,
+    sea_orm::{ActiveModelTrait, DatabaseConnection},
 };
 use std::{collections::HashMap, time::Instant};
 
@@ -39,7 +40,7 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
     // build a hash map of Url to the doc id
     let mut id_map = HashMap::new();
     for model in &existing {
-        let _ = id_map.insert(model.url.to_string(), model.doc_id.clone());
+        id_map.insert(model.url.to_string(), model.doc_id.clone());
     }
 
     // build a list of doc ids to delete from the index
@@ -88,10 +89,12 @@ pub async fn process_crawl_results(
         .unwrap_or_default();
 
     // build a hash map of Url to the doc id
-    let id_map = existing
-        .iter()
-        .map(|model| (model.url.to_string(), model.doc_id.to_string()))
-        .collect::<HashMap<String, String>>();
+    let mut id_map = HashMap::new();
+    let mut model_map = HashMap::new();
+    for model in &existing {
+        id_map.insert(model.url.to_string(), model.doc_id.to_string());
+        model_map.insert(model.doc_id.to_string(), model.clone());
+    }
 
     // build a list of doc ids to delete from the index
     let doc_id_list = id_map.values().cloned().collect::<Vec<String>>();
@@ -108,6 +111,7 @@ pub async fn process_crawl_results(
     let global_tids = _get_tag_ids(&state.db, global_tags, &mut tag_cache).await;
 
     // Keep track of document upserts
+    let mut inserts = Vec::new();
     let mut updates = Vec::new();
     let mut added_docs = Vec::new();
 
@@ -138,19 +142,29 @@ pub async fn process_crawl_results(
 
             if !id_map.contains_key(&doc_id) {
                 added_docs.push(url.to_string());
-                updates.push(indexed_document::ActiveModel {
+                inserts.push(indexed_document::ActiveModel {
                     domain: Set(url_host.to_string()),
                     url: Set(url.to_string()),
                     open_url: Set(crawl_result.open_url.clone()),
                     doc_id: Set(doc_id),
+                    updated_at: Set(Utc::now()),
                     ..Default::default()
                 });
+            } else if let Some(model) = model_map.get(&doc_id) {
+                // Touch the existing model so we know it's been checked recently.
+                let mut update: indexed_document::ActiveModel = model.to_owned().into();
+                update.updated_at = Set(Utc::now());
+                updates.push(update);
             }
         }
     }
 
     // Insert docs & save everything.
-    indexed_document::insert_many(&tx, updates).await?;
+    indexed_document::insert_many(&tx, inserts).await?;
+    for update in updates {
+        let _ = update.save(&tx).await;
+    }
+
     tx.commit().await?;
     let _ = Searcher::save(state).await;
 

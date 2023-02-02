@@ -140,7 +140,7 @@ pub async fn insert_many(
     Entity::insert_many(docs)
         .on_conflict(
             OnConflict::columns(vec![Column::Url])
-                .do_nothing()
+                .update_column(Column::UpdatedAt)
                 .to_owned(),
         )
         .exec(db)
@@ -154,6 +154,14 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
 ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
     // Remove dupes before adding
     let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
+    let doc_ids: Vec<i64> = docs.iter().map(|m| m.id).collect();
+
+    // Remove existing tags for doc
+    let _ = document_tag::Entity::delete_many()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids))
+        .exec(db)
+        .await;
+
     // create connections for each tag
     let doc_tags = docs
         .iter()
