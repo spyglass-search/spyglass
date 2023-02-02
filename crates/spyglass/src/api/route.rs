@@ -3,7 +3,10 @@ use entities::get_library_stats;
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
 use entities::models::tag::TagType;
-use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens, tag};
+use entities::models::{
+    bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
+    lens, tag,
+};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm;
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
@@ -237,29 +240,32 @@ async fn add_connections_information(
     lenses: &mut Vec<LensResult>,
     stats: &HashMap<String, LibraryStats>,
 ) {
-    let connections = connection::get_connection_ids(&state.db).await;
+    let connections = get_all_connections(&state.db).await;
     for connection in connections {
-        let lens_name = connection::api_id_to_lens(connection.as_str());
-        if let Some(lens_name) = lens_name {
-            if let Some(stats) = stats.get(lens_name) {
-                if let Some((title, description)) =
-                    connection::get_api_description(connection.as_str())
-                {
-                    lenses.push(LensResult {
-                        author: String::from("spyglass-search"),
-                        name: connection.clone(),
-                        label: String::from(title),
-                        description: String::from(description),
-                        hash: String::from("N/A"),
-                        file_path: None,
-                        progress: InstallStatus::Finished {
-                            num_docs: stats.indexed as u32,
-                        },
-                        html_url: None,
-                        download_url: None,
-                        lens_type: shared::response::LensType::API,
-                    });
-                }
+        let api_id = connection.api_id;
+        let lens_name = connection::api_id_to_lens(&api_id);
+        if let Some(stats) = lens_name.and_then(|s| stats.get(s)) {
+            if let Some((title, description)) = connection::get_api_description(&api_id) {
+                let progress = if connection.is_syncing {
+                    InstallStatus::Installing {
+                        percent: 0,
+                        status: "Syncing...".into(),
+                    }
+                } else {
+                    InstallStatus::Finished {
+                        num_docs: stats.indexed as u32,
+                    }
+                };
+
+                lenses.push(LensResult {
+                    author: String::from("spyglass-search"),
+                    name: api_id.clone(),
+                    label: String::from(title),
+                    description: String::from(description),
+                    progress,
+                    lens_type: shared::response::LensType::API,
+                    ..Default::default()
+                });
             }
         }
     }
@@ -529,7 +535,6 @@ pub async fn search_lenses(
     param: request::SearchLensesParam,
 ) -> Result<SearchLensesResp, Error> {
     let mut results = Vec::new();
-
     let query_result = tag::Entity::find()
         .column_as(tag::Column::Value, "name")
         .column_as(lens::Column::Author, "author")
