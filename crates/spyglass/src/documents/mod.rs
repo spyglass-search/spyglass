@@ -4,7 +4,7 @@ use entities::{
         crawl_queue, indexed_document,
         tag::{self, TagPair},
     },
-    sea_orm::DatabaseConnection,
+    sea_orm::{ActiveModelTrait, DatabaseConnection},
 };
 use std::{collections::HashMap, time::Instant};
 
@@ -111,6 +111,7 @@ pub async fn process_crawl_results(
     let global_tids = _get_tag_ids(&state.db, global_tags, &mut tag_cache).await;
 
     // Keep track of document upserts
+    let mut inserts = Vec::new();
     let mut updates = Vec::new();
     let mut added_docs = Vec::new();
 
@@ -141,7 +142,7 @@ pub async fn process_crawl_results(
 
             if !id_map.contains_key(&doc_id) {
                 added_docs.push(url.to_string());
-                updates.push(indexed_document::ActiveModel {
+                inserts.push(indexed_document::ActiveModel {
                     domain: Set(url_host.to_string()),
                     url: Set(url.to_string()),
                     open_url: Set(crawl_result.open_url.clone()),
@@ -159,7 +160,11 @@ pub async fn process_crawl_results(
     }
 
     // Insert docs & save everything.
-    indexed_document::insert_many(&tx, updates).await?;
+    indexed_document::insert_many(&tx, inserts).await?;
+    for update in updates {
+        let _ = update.save(&tx).await;
+    }
+
     tx.commit().await?;
     let _ = Searcher::save(state).await;
 

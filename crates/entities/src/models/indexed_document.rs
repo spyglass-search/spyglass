@@ -140,7 +140,7 @@ pub async fn insert_many(
     Entity::insert_many(docs)
         .on_conflict(
             OnConflict::columns(vec![Column::Url])
-                .do_nothing()
+                .update_column(Column::UpdatedAt)
                 .to_owned(),
         )
         .exec(db)
