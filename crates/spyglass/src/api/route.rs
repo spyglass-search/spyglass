@@ -162,6 +162,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
                 .map(|conn| UserConnection {
                     id: conn.api_id.clone(),
                     account: conn.account.clone(),
+                    is_syncing: conn.is_syncing,
                 })
                 .collect::<Vec<UserConnection>>();
 

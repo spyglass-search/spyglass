@@ -114,7 +114,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::choose_folder,
             cmd::default_indices,
             cmd::delete_doc,
-            cmd::delete_domain,
             cmd::escape,
             cmd::get_library_stats,
             cmd::get_shortcut,

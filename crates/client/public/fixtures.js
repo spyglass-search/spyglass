@@ -311,10 +311,6 @@ export async function deleteDoc(id) {
     return await invoke('delete_doc', { id });
 }
 
-export async function delete_domain(domain) {
-    return await invoke('delete_domain', { domain });
-}
-
 export async function network_change(isOffline) {
     return await invoke('network_change', { isOffline });
 }

@@ -17,6 +17,7 @@ pub struct SupportedConnection {
 pub struct UserConnection {
     pub id: String,
     pub account: String,
+    pub is_syncing: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

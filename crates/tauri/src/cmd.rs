@@ -170,23 +170,6 @@ pub async fn delete_doc<'r>(window: tauri::Window, id: &str) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub async fn delete_domain<'r>(window: tauri::Window, domain: &str) -> Result<(), String> {
-    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        match rpc.client.delete_domain(domain.to_string()).await {
-            Ok(_) => {
-                let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
-            }
-            Err(err) => {
-                log::error!("delete_domain err: {}", err);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn network_change(
     win: tauri::Window,
     paused: State<'_, Arc<PauseState>>,
