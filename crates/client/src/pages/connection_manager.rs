@@ -301,7 +301,8 @@ impl Component for ConnectionsManagerPage {
             return self.add_view(ctx);
         }
 
-        let conns = self.user_connections
+        let conns = self
+            .user_connections
             .iter()
             .map(|conn| {
                 let label = self
