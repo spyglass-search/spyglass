@@ -95,7 +95,8 @@ impl RpcServer for SpyglassRpc {
     /// Remove connection from list of connections
     async fn revoke_connection(&self, api_id: String, account: String) -> Result<(), Error> {
         use entities::models::connection;
-        let url_like = format!("api://{}@{}%", api_id.clone(), account.clone());
+        let url_like = format!("api://{account}@{api_id}%");
+        log::debug!("revoking conn: {url_like}");
 
         // Delete from search index
         let docs = indexed_document::Entity::find()
@@ -111,7 +112,7 @@ impl RpcServer for SpyglassRpc {
             .collect::<Vec<String>>();
         let _ = connection::revoke_connection(&self.state.db, &api_id, &account).await;
         let _ = Searcher::delete_many_by_id(&self.state, &doc_ids, false).await;
-
+        log::debug!("revoked & deleted {} docs", doc_ids.len());
         Ok(())
     }
 
