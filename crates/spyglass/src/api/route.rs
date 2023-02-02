@@ -1,19 +1,23 @@
 use directories::UserDirs;
 use entities::get_library_stats;
+use entities::models::crawl_queue::CrawlStatus;
+use entities::models::lens::LensType;
+use entities::models::tag::TagType;
+use entities::models::{
+    bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
+    lens, tag,
+};
+use entities::schema::{DocFields, SearchDocument};
+use entities::sea_orm;
+use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use entities::sea_orm::{FromQueryResult, JoinType, QuerySelect};
 use jsonrpsee::core::Error;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::filesystem;
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::time::SystemTime;
-use tracing::instrument;
-use url::Url;
-
-use entities::models::crawl_queue::CrawlStatus;
-use entities::models::lens::LensType;
-use entities::models::{bootstrap_queue, crawl_queue, fetch_history, indexed_document, lens, tag};
-use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use libspyglass::plugin::PluginCommand;
+use libspyglass::search::Searcher;
+use libspyglass::state::AppState;
+use libspyglass::task::{AppPause, CleanupTask, ManagerCommand};
 use shared::config::Config;
 use shared::metrics::{self, Event};
 use shared::request;
@@ -22,11 +26,11 @@ use shared::response::{
     PluginResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection,
     UserConnection,
 };
-
-use libspyglass::plugin::PluginCommand;
-use libspyglass::search::Searcher;
-use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CleanupTask, ManagerCommand};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::time::SystemTime;
+use tracing::instrument;
+use url::Url;
 
 use super::response;
 
@@ -236,29 +240,32 @@ async fn add_connections_information(
     lenses: &mut Vec<LensResult>,
     stats: &HashMap<String, LibraryStats>,
 ) {
-    let connections = connection::get_connection_ids(&state.db).await;
+    let connections = get_all_connections(&state.db).await;
     for connection in connections {
-        let lens_name = connection::api_id_to_lens(connection.as_str());
-        if let Some(lens_name) = lens_name {
-            if let Some(stats) = stats.get(lens_name) {
-                if let Some((title, description)) =
-                    connection::get_api_description(connection.as_str())
-                {
-                    lenses.push(LensResult {
-                        author: String::from("spyglass-search"),
-                        name: connection.clone(),
-                        label: String::from(title),
-                        description: String::from(description),
-                        hash: String::from("N/A"),
-                        file_path: None,
-                        progress: InstallStatus::Finished {
-                            num_docs: stats.indexed as u32,
-                        },
-                        html_url: None,
-                        download_url: None,
-                        lens_type: shared::response::LensType::API,
-                    });
-                }
+        let api_id = connection.api_id;
+        let lens_name = connection::api_id_to_lens(&api_id);
+        if let Some(stats) = lens_name.and_then(|s| stats.get(s)) {
+            if let Some((title, description)) = connection::get_api_description(&api_id) {
+                let progress = if connection.is_syncing {
+                    InstallStatus::Installing {
+                        percent: 0,
+                        status: "Syncing...".into(),
+                    }
+                } else {
+                    InstallStatus::Finished {
+                        num_docs: stats.indexed as u32,
+                    }
+                };
+
+                lenses.push(LensResult {
+                    author: String::from("spyglass-search"),
+                    name: api_id.clone(),
+                    label: String::from(title),
+                    description: String::from(description),
+                    progress,
+                    lens_type: shared::response::LensType::API,
+                    ..Default::default()
+                });
             }
         }
     }
@@ -514,6 +521,13 @@ pub async fn search(
     Ok(SearchResults { results, meta })
 }
 
+#[derive(FromQueryResult)]
+struct LensSearch {
+    author: Option<String>,
+    name: String,
+    description: Option<String>,
+}
+
 /// Search the user's installed lenses
 #[instrument(skip(state))]
 pub async fn search_lenses(
@@ -521,47 +535,39 @@ pub async fn search_lenses(
     param: request::SearchLensesParam,
 ) -> Result<SearchLensesResp, Error> {
     let mut results = Vec::new();
-
-    let query_results = lens::Entity::find()
-        // Filter either by the trigger name, which is configurable by the user.
-        .filter(lens::Column::Trigger.like(&format!("%{}%", &param.query)))
-        // Ignored disabled lenses
-        .filter(lens::Column::IsEnabled.eq(true))
+    let query_result = tag::Entity::find()
+        .column_as(tag::Column::Value, "name")
+        .column_as(lens::Column::Author, "author")
+        .column_as(lens::Column::Description, "description")
+        .filter(tag::Column::Label.eq(TagType::Lens))
+        .filter(tag::Column::Value.like(&format!("%{}%", &param.query)))
+        // Pull in lens metadata
+        .join_rev(
+            JoinType::LeftJoin,
+            lens::Entity::belongs_to(tag::Entity)
+                .from(lens::Column::Name)
+                .to(tag::Column::Value)
+                .into(),
+        )
         // Order by trigger name, case insensitve
-        .order_by_asc(Expr::cust("lower(trigger)"))
+        .order_by_asc(Expr::cust("lower(value)"))
+        .into_model::<LensSearch>()
         .all(&state.db)
-        .await;
+        .await
+        .unwrap_or_default();
 
-    match query_results {
-        Ok(query_results) => {
-            for lens in query_results {
-                let label = lens
-                    .trigger
-                    .map(|label| {
-                        if label.is_empty() {
-                            lens.name.clone()
-                        } else {
-                            label
-                        }
-                    })
-                    .unwrap_or_else(|| lens.name.clone());
-
-                results.push(LensResult {
-                    author: lens.author,
-                    name: lens.name,
-                    label,
-                    description: lens.description.unwrap_or_default(),
-                    ..Default::default()
-                });
-            }
-
-            Ok(SearchLensesResp { results })
-        }
-        Err(err) => {
-            log::error!("Unable to search lenses: {:?}", err);
-            Err(Error::Custom(err.to_string()))
-        }
+    for lens in query_result {
+        let label = lens.name.clone();
+        results.push(LensResult {
+            author: lens.author.unwrap_or("spyglass-search".into()),
+            name: label.clone(),
+            label,
+            description: lens.description.unwrap_or_default(),
+            ..Default::default()
+        });
     }
+
+    Ok(SearchLensesResp { results })
 }
 
 #[instrument(skip(state))]
