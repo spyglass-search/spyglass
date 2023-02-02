@@ -139,6 +139,13 @@ fn get_by_id(id_field: Field, reader: &IndexReader, doc_id: &str) -> Option<Docu
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let config = Config::new();
+        let old_index_path = config.index_dir();
+        let new_index_path = old_index_path
+            .parent()
+            .expect("Expected parent path")
+            .join("migrated_index");
+
         let result = manager
             .get_connection()
             .query_all(Statement::from_string(
@@ -149,15 +156,11 @@ impl MigrationTrait for Migration {
 
         // No docs yet, nothing to migrate.
         if result.is_empty() {
+            // Removing the old index folder will also remove any metadata that lingers
+            // from an empty index.
+            let _ = std::fs::remove_dir_all(old_index_path);
             return Ok(());
         }
-
-        let config = Config::new();
-        let old_index_path = config.index_dir();
-        let new_index_path = old_index_path
-            .parent()
-            .expect("Expected parent path")
-            .join("migrated_index");
 
         if !new_index_path.exists() {
             if let Err(e) = std::fs::create_dir(new_index_path.clone()) {
