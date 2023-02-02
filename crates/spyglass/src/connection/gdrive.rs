@@ -111,6 +111,7 @@ impl Connection for DriveConnection {
                 for file in &buffer {
                     let api_uri = self.to_url(&file.id);
                     if let Ok(metadata) = self.client.get_file_metadata(&file.id).await {
+                        log::debug!("file: {} - {}", metadata.name, metadata.mime_type);
                         crawls.push(file_to_crawl(&api_uri, &metadata, None));
                         if self.is_indexable_mimetype(&metadata.mime_type) {
                             to_download.push(api_uri.to_string());
@@ -122,6 +123,8 @@ impl Connection for DriveConnection {
                 if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
                 {
                     log::error!("Unable to add files: {}", err);
+                } else {
+                    log::debug!("synced buffer");
                 }
 
                 // Enqueue the ones we want to download & index the content
@@ -216,6 +219,23 @@ fn file_to_crawl(
         result
             .tags
             .push((TagType::Favorited, TagValue::Favorited.to_string()));
+    }
+
+    if file.mime_type == "application/vnd.google-apps.folder" {
+        result
+            .tags
+            .push((TagType::Type, TagValue::Directory.to_string()))
+    } else if file.mime_type.starts_with("image/") {
+        result
+            .tags
+            .push((TagType::Type, TagValue::Image.to_string()));
+        result
+            .tags
+            .push((TagType::Type, TagValue::File.to_string()));
+    } else {
+        result
+            .tags
+            .push((TagType::Type, TagValue::File.to_string()));
     }
 
     result

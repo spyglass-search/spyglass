@@ -112,6 +112,7 @@ impl RpcServer for SpyglassRpc {
             .collect::<Vec<String>>();
         let _ = connection::revoke_connection(&self.state.db, &api_id, &account).await;
         let _ = Searcher::delete_many_by_id(&self.state, &doc_ids, false).await;
+        let _ = Searcher::save(&self.state).await;
         log::debug!("revoked & deleted {} docs", doc_ids.len());
         Ok(())
     }

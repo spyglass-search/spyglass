@@ -1,6 +1,6 @@
 use dashmap::DashMap;
 use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
-use entities::models::tag::{TagPair, TagType};
+use entities::models::tag::{TagPair, TagType, TagValue};
 use entities::models::{lens, processed_files};
 use entities::sea_orm::entity::prelude::*;
 use entities::sea_orm::DatabaseConnection;
@@ -758,9 +758,9 @@ pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
     let mut tags = Vec::new();
     tags.push((TagType::Lens, String::from("files")));
     if path.is_dir() {
-        tags.push((TagType::Type, String::from("directory")));
+        tags.push((TagType::Type, TagValue::Directory.to_string()));
     } else if path.is_file() {
-        tags.push((TagType::Type, String::from("file")));
+        tags.push((TagType::Type, TagValue::File.to_string()));
         let ext = path
             .extension()
             .and_then(|x| x.to_str())
@@ -771,7 +771,7 @@ pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
     }
 
     if path.is_symlink() {
-        tags.push((TagType::Type, String::from("symlink")))
+        tags.push((TagType::Type, TagValue::Symlink.to_string()))
     }
 
     let guess = new_mime_guess::from_path(path);
