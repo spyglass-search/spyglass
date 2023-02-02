@@ -286,6 +286,11 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::CancelAdd => {
+                if self.conn_status.is_authorizing.in_progress() {
+                    self.conn_status.is_authorizing = RequestState::Error;
+                    self.conn_status.error = "Cancelled auth request".to_string();
+                }
+
                 self.is_add_view = false;
                 true
             }

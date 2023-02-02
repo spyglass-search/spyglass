@@ -12,7 +12,8 @@ use crate::state::AppState;
 
 use super::{handle_sync_credentials, load_credentials, Connection};
 
-const BUFFER_SYNC_SIZE: usize = 500;
+// Smaller buffer size so we can start downloading indexable files quicker.
+const BUFFER_SYNC_SIZE: usize = 50;
 
 /// The api id for google drive connections
 pub const API_ID: &str = "drive.google.com";
