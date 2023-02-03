@@ -402,19 +402,19 @@ pub fn search_icon(props: &IconProps) -> Html {
     }
 }
 
-pub fn connection_icon(id: &str, height: &str, width: &str) -> Html {
+pub fn connection_icon(id: &str, height: &str, width: &str, classes: Classes) -> Html {
     let height = height.to_string();
     let width = width.to_string();
 
     if id == "calendar.google.com" {
-        html! { <GoogleCalendar {height} {width} classes="m-auto" /> }
+        html! { <GoogleCalendar {height} {width} {classes} /> }
     } else if id == "drive.google.com" {
-        html! { <GDrive {height} {width} classes="m-auto" /> }
+        html! { <GDrive {height} {width} {classes} /> }
     } else if id == "mail.google.com" {
-        html! { <Gmail {height} {width} classes="m-auto" /> }
+        html! { <Gmail {height} {width} {classes} /> }
     } else if id == "api.github.com" {
-        html! { <GitHub {height} {width} classes="m-auto" /> }
+        html! { <GitHub {height} {width} {classes} /> }
     } else {
-        html! { <ShareIcon {height} {width} classes="m-auto" /> }
+        html! { <ShareIcon {height} {width} {classes} /> }
     }
 }

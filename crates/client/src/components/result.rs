@@ -18,14 +18,49 @@ pub struct SearchResultProps {
 
 fn render_icon(result: &SearchResult) -> Html {
     let url = Url::parse(&result.crawl_uri);
-    let icon_size = classes!("w-8", "h-8", "m-auto");
+    let icon_size = classes!("w-8", "h-8", "m-auto", "mt-2");
+
+    let is_directory = result.tags.iter().any(|(label, value)| {
+        label.to_lowercase() == "type" && value.to_lowercase() == "directory"
+    });
+
+    let is_file = result
+        .tags
+        .iter()
+        .any(|(label, value)| label.to_lowercase() == "type" && value.to_lowercase() == "file");
+
+    let ext = if let Some((_, ext)) = result.title.rsplit_once('.') {
+        ext.to_string()
+    } else {
+        "txt".to_string()
+    };
 
     let icon = if let Ok(url) = &url {
         let domain = url.domain().unwrap_or("example.com").to_owned();
         match url.scheme() {
             "api" => {
                 let connection = url.host_str().unwrap_or_default();
-                icons::connection_icon(connection, "h-8", "w-8")
+                if is_directory {
+                    html! {
+                        <>
+                            <icons::FolderIcon height="h-8" width="w-8" classes="m-auto mt-2" />
+                            <div class="absolute bg-cyan-500 bottom-0 right-0 w-5 h-5 p-0.5 rounded">
+                                {icons::connection_icon(connection, "h-4", "w-4", classes!())}
+                            </div>
+                        </>
+                    }
+                } else if is_file {
+                    html! {
+                        <>
+                            <icons::FileExtIcon {ext} class={icon_size} />
+                            <div class="absolute bg-cyan-500 bottom-0 right-0 w-5 h-5 p-0.5 rounded">
+                                {icons::connection_icon(connection, "h-4", "w-4", classes!())}
+                            </div>
+                        </>
+                    }
+                } else {
+                    icons::connection_icon(connection, "h-8", "w-8", classes!("m-auto", "mt-2"))
+                }
             }
             "file" => {
                 let is_directory = result.tags.iter().any(|(label, value)| {
@@ -33,11 +68,9 @@ fn render_icon(result: &SearchResult) -> Html {
                 });
 
                 if is_directory {
-                    html! { <icons::FolderIcon height="h-8" width="w-8" classes="bg-color-white m-auto" /> }
-                } else if let Some((_, ext)) = result.title.rsplit_once('.') {
-                    html! { <icons::FileExtIcon ext={ext.to_string()} class={icon_size} /> }
+                    html! { <icons::FolderIcon height="h-8" width="w-8" classes="bg-color-white m-auto mt-2" /> }
                 } else {
-                    html! { <icons::FileExtIcon ext={"txt"} class={icon_size} /> }
+                    html! { <icons::FileExtIcon {ext} class={icon_size} /> }
                 }
             }
             _ => {
@@ -145,7 +178,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
             <div class="flex flex-none pl-6 pr-2">
-                <div class="flex flex-none bg-neutral-700 rounded h-12 w-12 items-center">
+                <div class="relative flex-none bg-neutral-700 rounded h-12 w-12 items-center">
                     {icon}
                 </div>
             </div>

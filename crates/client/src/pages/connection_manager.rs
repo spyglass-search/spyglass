@@ -98,7 +98,7 @@ impl ConnectionsManagerPage {
                 html! {
                     <div class="pb-8 flex flex-row items-center gap-8">
                         <div class="flex-none">
-                            {icons::connection_icon(&con.id, "h-6", "w-6")}
+                            {icons::connection_icon(&con.id, "h-6", "w-6", classes!())}
                         </div>
                         <div class="flex-1">
                             <div><h2 class="text-lg">{con.label.clone()}</h2></div>
@@ -424,7 +424,7 @@ fn connection_comp(props: &ConnectionProps) -> Html {
     html! {
         <div class="rounded-md bg-neutral-700 p-4 text-white shadow-md flex flex-row gap-4 items-center">
             <div>
-                {icons::connection_icon(&props.connection.id, "h-6", "w-6")}
+                {icons::connection_icon(&props.connection.id, "h-6", "w-6", classes!())}
             </div>
             <div>
                 <div class="text-xs font-bold text-cyan-500">{props.label.clone()}</div>
