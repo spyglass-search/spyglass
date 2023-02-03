@@ -5,9 +5,11 @@ use std::collections::HashMap;
 
 use strum_macros::{AsRefStr, Display};
 
+#[allow(dead_code)]
 const ENDPOINT: &str = "https://api.mixpanel.com/track";
 const PROJECT_TOKEN: &str = "51d84766a0838458d63998f1e4566d3b";
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Metrics {
     client: reqwest::Client,
@@ -116,6 +118,7 @@ impl Metrics {
             }
         }
 
+        #[cfg(not(debug_assertions))]
         let _ = self.client.post(ENDPOINT).json(&vec![data]).send().await;
     }
 }
