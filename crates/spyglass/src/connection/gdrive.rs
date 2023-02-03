@@ -58,6 +58,10 @@ impl DriveConnection {
     pub fn is_indexable_mimetype(&self, mime_type: &str) -> bool {
         mime_type == "application/vnd.google-apps.document"
             || mime_type == "application/vnd.google-apps.presentation"
+            || mime_type == "application/vnd.google-apps.spreadsheet"
+            // Uploaded Word/Excel docs
+            || mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            || mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     }
 
     pub fn to_url(&self, file_id: &str) -> Url {
@@ -124,8 +128,6 @@ impl Connection for DriveConnection {
                 if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
                 {
                     log::error!("Unable to add files: {}", err);
-                } else {
-                    log::debug!("synced buffer");
                 }
 
                 // Enqueue the ones we want to download & index the content
@@ -175,11 +177,20 @@ impl Connection for DriveConnection {
             self.client.download_file(file_id).await.map_or_else(
                 |_| None,
                 |b| {
-                    // TODO: Pass through to parsers for spreadsheets/etc.
-                    if let Ok(s) = std::str::from_utf8(&b) {
-                        Some(s.to_string())
-                    } else {
-                        None
+                    match metadata.mime_type.as_str() {
+                        // Pass to docx parser
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+                            crate::parser::docx_parser::parse_bytes(b).ok()
+                        }
+                        // Pass to xlxs parser
+                        "application/vnd.google-apps.spreadsheet" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
+                            crate::parser::xlsx_parser::parse_bytes(b).ok()
+                        }
+                        _ => if let Ok(s) = std::str::from_utf8(&b) {
+                            Some(s.to_string())
+                        } else {
+                            None
+                        }
                     }
                 },
             )

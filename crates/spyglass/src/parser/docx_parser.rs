@@ -1,93 +1,86 @@
+use anyhow::anyhow;
+use bytes::Bytes;
 use docx::{
     document::ParagraphContent,
     document::Run,
     document::RunContent,
     document::{BodyContent, TableCellContent},
-    DocxError, DocxFile,
+    DocxFile,
 };
-use std::{
-    borrow::Borrow,
-    io,
-    io::{Error, ErrorKind},
-    path::Path,
-};
+use std::{borrow::Borrow, io::Cursor, path::Path};
 
+fn process_file(docx: &DocxFile) -> anyhow::Result<String> {
+    let result = match docx.parse() {
+        Ok(res) => res,
+        Err(err) => return Err(anyhow!(format!("Error parsing file: {err:?}"))),
+    };
+
+    let mut text: Vec<String> = Vec::new();
+    result
+        .document
+        .body
+        .content
+        .iter()
+        .for_each(|body_content| match body_content {
+            BodyContent::Paragraph(paragraph) => {
+                let mut str = String::from("");
+                paragraph.content.iter().for_each(|paragraph_content| {
+                    str.push_str(process_paragraph_content(paragraph_content).as_str())
+                });
+                text.push(str);
+            }
+            BodyContent::Table(table) => {
+                table
+                    .rows
+                    .iter()
+                    .flat_map(|row| row.cells.iter())
+                    .flat_map(|cell| cell.content.iter())
+                    .for_each(|table_cell| {
+                        let mut str = String::from("");
+                        match table_cell {
+                            TableCellContent::Paragraph(p) => {
+                                p.content.iter().for_each(|pc| {
+                                    str.push_str(process_paragraph_content(pc).as_str())
+                                });
+                            }
+                        }
+
+                        text.push(str);
+                    });
+            }
+        });
+
+    let output = text.join(" ");
+    log::trace!("Document: {:?}", output);
+    Ok(output)
+}
+
+pub fn parse_bytes(b: Bytes) -> anyhow::Result<String> {
+    let c = Cursor::new(b);
+    match DocxFile::from_reader(c) {
+        Ok(docx) => process_file(&docx),
+        Err(err) => {
+            log::error!("Error processing docx file: {err:?}");
+            Err(anyhow!(format!("Error reading Docx file {err:?}")))
+        }
+    }
+}
 /*
  * Reads the provided file as a DOCX, pulls out all paragraph text
  * and returns it as a String
  */
-pub fn parse(file_path: &Path) -> io::Result<String> {
-    let docx = DocxFile::from_file(file_path);
-    match docx {
-        Ok(docx) => {
-            let result = docx.parse();
-            match result {
-                Ok(docx) => {
-                    let mut text: Vec<String> = Vec::new();
-                    docx.document
-                        .body
-                        .content
-                        .iter()
-                        .for_each(|body_content| match body_content {
-                            BodyContent::Paragraph(paragraph) => {
-                                let mut str = String::from("");
-                                paragraph.content.iter().for_each(|paragraph_content| {
-                                    str.push_str(
-                                        process_paragraph_content(paragraph_content).as_str(),
-                                    )
-                                });
-                                text.push(str);
-                            }
-                            BodyContent::Table(table) => {
-                                table
-                                    .rows
-                                    .iter()
-                                    .flat_map(|row| row.cells.iter())
-                                    .flat_map(|cell| cell.content.iter())
-                                    .for_each(|table_cell| {
-                                        let mut str = String::from("");
-                                        match table_cell {
-                                            TableCellContent::Paragraph(p) => {
-                                                p.content.iter().for_each(|pc| {
-                                                    str.push_str(
-                                                        process_paragraph_content(pc).as_str(),
-                                                    )
-                                                });
-                                            }
-                                        }
-
-                                        text.push(str);
-                                    });
-                            }
-                        });
-
-                    let output = text.join(" ");
-                    log::trace!("Document: {:?}", output);
-                    Ok(output)
-                }
-                Err(DocxError::Xml(xml_err)) => {
-                    log::warn!("Error reading Docx file {:?}", xml_err);
-                    Err(Error::new(ErrorKind::InvalidData, xml_err))
-                }
-                Err(doc_err) => {
-                    log::warn!("Error reading Docx file {:?}", doc_err);
-                    Err(Error::new(
-                        ErrorKind::InvalidData,
-                        format!("Error reading Docx file {doc_err:?}"),
-                    ))
-                }
-            }
-        }
+pub fn parse(file_path: &Path) -> anyhow::Result<String> {
+    match DocxFile::from_file(file_path) {
+        Ok(docx) => process_file(&docx),
         Err(error) => {
             log::error!(
                 "Error processing docx file {:?}, Error: {:?} ",
                 file_path,
                 error
             );
-            Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!("Error reading docx file {error:?}"),
-            ))
+            Err(anyhow!(format!(
+                "Error reading Docx file {file_path:?} - {error:?}"
+            )))
         }
     }
 }
