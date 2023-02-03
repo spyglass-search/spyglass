@@ -67,13 +67,6 @@ where
         term_query.push((Occur::Should, _boosted_term(term, 2.0)));
     }
 
-    for id in applied_lenses {
-        term_query.push((
-            Occur::Must,
-            _boosted_term(Term::from_field_u64(fields.tags, *id), 0.0),
-        ))
-    }
-
     // Tags that might be represented by search terms (e.g. "repository" or "file")
     for tag_id in tag_boosts {
         term_query.push((
@@ -82,10 +75,18 @@ where
         ))
     }
 
-    let mut t: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
+    let mut combined: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
+
+    for id in applied_lenses {
+        combined.push((
+            Occur::Must,
+            _boosted_term(Term::from_field_u64(fields.tags, *id), 0.0),
+        ));
+    }
+
     // Greatly boost content that have our terms + a favorite.
     if let Some(favorite_boost) = favorite_boost {
-        t.push((
+        combined.push((
             Occur::Should,
             _boosted_term(
                 Term::from_field_u64(fields.tags, favorite_boost as u64),
@@ -94,7 +95,7 @@ where
         ));
     }
 
-    BooleanQuery::new(t)
+    BooleanQuery::new(combined)
 }
 
 /**
