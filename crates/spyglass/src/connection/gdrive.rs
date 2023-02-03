@@ -1,6 +1,5 @@
 use entities::models::connection;
-use entities::models::crawl_queue;
-use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType, TagValue};
 use jsonrpsee::core::async_trait;
 use libgoog::GoogClient;
@@ -8,9 +7,13 @@ use url::Url;
 
 use super::credentials::connection_secret;
 use crate::crawler::{CrawlError, CrawlResult};
+use crate::documents::process_crawl_results;
 use crate::state::AppState;
 
 use super::{handle_sync_credentials, load_credentials, Connection};
+
+// Smaller buffer size so we can start downloading indexable files quicker.
+const BUFFER_SYNC_SIZE: usize = 50;
 
 /// The api id for google drive connections
 pub const API_ID: &str = "drive.google.com";
@@ -55,6 +58,10 @@ impl DriveConnection {
     pub fn is_indexable_mimetype(&self, mime_type: &str) -> bool {
         mime_type == "application/vnd.google-apps.document"
             || mime_type == "application/vnd.google-apps.presentation"
+            || mime_type == "application/vnd.google-apps.spreadsheet"
+            // Uploaded Word/Excel docs
+            || mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            || mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     }
 
     pub fn to_url(&self, file_id: &str) -> Url {
@@ -90,41 +97,61 @@ impl Connection for DriveConnection {
         // stream pages of files from the integration & add them to the crawl queue
         let mut next_page = None;
         let mut num_files = 0;
+        let mut buffer = Vec::new();
 
         // Grab the next page of files
-        while let Ok(files) = self
+        while let Ok(resp) = self
             .client
             .list_files(next_page.clone(), Some(ignore_query.clone()))
             .await
         {
-            next_page = files.next_page_token;
-            num_files += files.files.len();
+            next_page = resp.next_page_token;
+            num_files += resp.files.len();
+            buffer.extend(resp.files);
 
-            let urls = files
-                .files
-                .iter()
-                .map(|file| self.to_url(&file.id).to_string())
-                .collect::<Vec<String>>();
+            if buffer.len() > BUFFER_SYNC_SIZE || next_page.is_none() {
+                let mut crawls = Vec::new();
+                let mut to_download = Vec::new();
 
-            // Enqueue URIs
-            let enqueue_settings = EnqueueSettings {
-                crawl_type: CrawlType::Api,
-                tags: self.default_tags(),
-                force_allow: true,
-                is_recrawl: true,
-            };
+                for file in &buffer {
+                    let api_uri = self.to_url(&file.id);
+                    if let Ok(metadata) = self.client.get_file_metadata(&file.id).await {
+                        log::debug!("file: {} - {}", metadata.name, metadata.mime_type);
+                        crawls.push(file_to_crawl(&api_uri, &metadata, None));
+                        if self.is_indexable_mimetype(&metadata.mime_type) {
+                            to_download.push(api_uri.to_string());
+                        }
+                    }
+                }
 
-            if let Err(err) = crawl_queue::enqueue_all(
-                &state.db,
-                &urls,
-                &[],
-                &state.user_settings,
-                &enqueue_settings,
-                None,
-            )
-            .await
-            {
-                log::error!("Unable to enqueue: {}", err.to_string());
+                // Add to index
+                if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
+                {
+                    log::error!("Unable to add files: {}", err);
+                }
+
+                // Enqueue the ones we want to download & index the content
+                let enqueue_settings = EnqueueSettings {
+                    crawl_type: CrawlType::Api,
+                    tags: self.default_tags(),
+                    force_allow: true,
+                    is_recrawl: true,
+                };
+
+                if let Err(err) = crawl_queue::enqueue_all(
+                    &state.db,
+                    &to_download,
+                    &[],
+                    &state.user_settings,
+                    &enqueue_settings,
+                    None,
+                )
+                .await
+                {
+                    log::error!("Unable to enqueue: {}", err.to_string());
+                }
+
+                buffer.clear();
             }
 
             if next_page.is_none() {
@@ -146,37 +173,82 @@ impl Connection for DriveConnection {
         log::debug!("fetching file {} - {:?}", file_id, metadata);
 
         // Grab text for supported mimetypes
-        let content: String = if self.is_indexable_mimetype(&metadata.mime_type) {
+        let content: Option<String> = if self.is_indexable_mimetype(&metadata.mime_type) {
             self.client.download_file(file_id).await.map_or_else(
-                |_| "".to_string(),
+                |_| None,
                 |b| {
-                    // TODO: Pass through to parsers for spreadsheets/etc.
-                    if let Ok(s) = std::str::from_utf8(&b) {
-                        s.to_string()
-                    } else {
-                        "".to_string()
+                    match metadata.mime_type.as_str() {
+                        // Pass to docx parser
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+                            crate::parser::docx_parser::parse_bytes(b).ok()
+                        }
+                        // Pass to xlxs parser
+                        "application/vnd.google-apps.spreadsheet" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
+                            crate::parser::xlsx_parser::parse_bytes(b).ok()
+                        }
+                        _ => if let Ok(s) = std::str::from_utf8(&b) {
+                            Some(s.to_string())
+                        } else {
+                            None
+                        }
                     }
                 },
             )
         } else {
-            "".to_string()
+            None
         };
 
         // Extract and apply tags to crawl result.
-        let mut tags: Vec<TagPair> = vec![(TagType::MimeType, metadata.mime_type)];
-        if metadata.starred {
-            tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
-        }
-
-        let mut crawl = CrawlResult::new(
-            uri,
-            Some(metadata.web_view_link),
-            &content,
-            &metadata.name,
-            None,
-        );
-        crawl.tags = tags;
-
-        Ok(crawl)
+        Ok(file_to_crawl(uri, &metadata, content))
     }
+}
+
+fn file_to_crawl(
+    api_url: &Url,
+    file: &libgoog::types::File,
+    content: Option<String>,
+) -> CrawlResult {
+    let mut result = CrawlResult::new(
+        api_url,
+        Some(file.web_view_link.clone()),
+        &content.unwrap_or(file.description.clone()),
+        &file.name.clone(),
+        Some(file.description.clone()),
+    );
+
+    for owner in &file.owners {
+        let name = owner
+            .email_address
+            .clone()
+            .unwrap_or(owner.display_name.clone());
+        result.tags.push((TagType::Owner, name.clone()));
+    }
+
+    result
+        .tags
+        .push((TagType::MimeType, file.mime_type.clone()));
+    if file.starred {
+        result
+            .tags
+            .push((TagType::Favorited, TagValue::Favorited.to_string()));
+    }
+
+    if file.mime_type == "application/vnd.google-apps.folder" {
+        result
+            .tags
+            .push((TagType::Type, TagValue::Directory.to_string()))
+    } else if file.mime_type.starts_with("image/") {
+        result
+            .tags
+            .push((TagType::Type, TagValue::Image.to_string()));
+        result
+            .tags
+            .push((TagType::Type, TagValue::File.to_string()));
+    } else {
+        result
+            .tags
+            .push((TagType::Type, TagValue::File.to_string()));
+    }
+
+    result
 }

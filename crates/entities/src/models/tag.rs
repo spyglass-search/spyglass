@@ -58,8 +58,16 @@ pub enum TagType {
 
 #[derive(AsRefStr, Display, EnumString)]
 pub enum TagValue {
+    #[strum(serialize = "directory")]
+    Directory,
     #[strum(serialize = "favorited")]
     Favorited,
+    #[strum(serialize = "file")]
+    File,
+    #[strum(serialize = "image")]
+    Image,
+    #[strum(serialize = "symlink")]
+    Symlink,
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]

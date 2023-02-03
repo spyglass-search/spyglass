@@ -40,15 +40,16 @@ export let invoke = async (func_name, params) => {
                 score: 1.0
             }, {
                 doc_id: "123",
-                domain: "example.com",
+                domain: "drive.google.com",
                 title: "This is an example super long title to demonstrate very long titles that go on for a very long time and then some.",
                 description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-                crawl_uri: "https://example.com/this/is/a/path",
-                url: "https://example.com/this/is/a/path",
+                crawl_uri: "api://account@drive.google.com/1540812340985",
+                url: "https://example.com",
                 tags: [
                     ['mimetype', 'application/pdf'],
                     ['source', 'drive.google.com'],
-                    ['Lens', 'example'],
+                    ['type', 'file'],
+                    ['Lens', 'GDrive'],
                     ['Owner', 'bob.dole@example.com'],
                 ],
                 score: 1.0

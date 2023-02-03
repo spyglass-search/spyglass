@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use gloo::timers::callback::Interval;
 use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
@@ -32,6 +32,7 @@ pub struct ConnectionsManagerPage {
     supported_connections: Vec<SupportedConnection>,
     supported_map: HashMap<String, SupportedConnection>,
     user_connections: Vec<UserConnection>,
+    revoke_requested: HashSet<String>,
     update_interval_handle: Option<Interval>,
 }
 
@@ -97,7 +98,7 @@ impl ConnectionsManagerPage {
                 html! {
                     <div class="pb-8 flex flex-row items-center gap-8">
                         <div class="flex-none">
-                            {icons::connection_icon(&con.id, "h-6", "w-6")}
+                            {icons::connection_icon(&con.id, "h-6", "w-6", classes!())}
                         </div>
                         <div class="flex-1">
                             <div><h2 class="text-lg">{con.label.clone()}</h2></div>
@@ -231,6 +232,7 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::RevokeConnection { id, account } => {
+                self.revoke_requested.insert(format!("{account}@{id}"));
                 spawn_local(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
@@ -260,7 +262,6 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::UpdateConnections(conns) => {
-                log::debug!("get conns: {:?}", conns);
                 self.fetch_connection_state = RequestState::Finished;
 
                 self.supported_connections = conns.supported.clone();
@@ -285,6 +286,11 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::CancelAdd => {
+                if self.conn_status.is_authorizing.in_progress() {
+                    self.conn_status.is_authorizing = RequestState::Error;
+                    self.conn_status.error = "Cancelled auth request".to_string();
+                }
+
                 self.is_add_view = false;
                 true
             }
@@ -320,13 +326,13 @@ impl Component for ConnectionsManagerPage {
                     account: conn.account.clone(),
                 };
 
-                log::debug!("{} - {} - {}", conn.id, conn.account, conn.is_syncing);
-
+                let uid = format!("{}@{}", conn.account, conn.id);
                 html! {
                     <Connection
                         label={label}
                         connection={conn.clone()}
                         is_syncing={conn.is_syncing}
+                        is_revoking={self.revoke_requested.contains(&uid)}
                         on_resync={link.callback(move |_| resync_msg.clone())}
                         on_revoke={link.callback(move |_| revoke_msg.clone())}
                     />
@@ -364,6 +370,7 @@ struct ConnectionProps {
     label: String,
     connection: UserConnection,
     is_syncing: bool,
+    is_revoking: bool,
     #[prop_or_default]
     on_resync: Callback<MouseEvent>,
     #[prop_or_default]
@@ -372,10 +379,11 @@ struct ConnectionProps {
 
 #[function_component(Connection)]
 fn connection_comp(props: &ConnectionProps) -> Html {
-    let is_resyncing = use_state(|| false);
+    let is_resyncing = use_state_eq(|| false);
     is_resyncing.set(props.is_syncing);
 
-    let is_revoking = use_state(|| false);
+    let is_revoking = use_state_eq(|| false);
+    is_revoking.set(props.is_revoking);
 
     let is_resync = is_resyncing.clone();
     let on_resync_cb = props.on_resync.clone();
@@ -384,7 +392,6 @@ fn connection_comp(props: &ConnectionProps) -> Html {
         on_resync_cb.emit(e);
     });
 
-    log::debug!("{} - {}", props.is_syncing, *is_resyncing);
     let resync_btn = html! {
         <btn::Btn disabled={*is_resyncing} size={BtnSize::Xs} onclick={resync_cb}>
             <icons::RefreshIcon width="w-4" height="h-4" animate_spin={*is_resyncing} />
@@ -417,7 +424,7 @@ fn connection_comp(props: &ConnectionProps) -> Html {
     html! {
         <div class="rounded-md bg-neutral-700 p-4 text-white shadow-md flex flex-row gap-4 items-center">
             <div>
-                {icons::connection_icon(&props.connection.id, "h-6", "w-6")}
+                {icons::connection_icon(&props.connection.id, "h-6", "w-6", classes!())}
             </div>
             <div>
                 <div class="text-xs font-bold text-cyan-500">{props.label.clone()}</div>

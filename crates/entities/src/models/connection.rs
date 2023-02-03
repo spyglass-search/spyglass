@@ -108,7 +108,7 @@ pub async fn revoke_connection(
     api_id: &str,
     account: &str,
 ) -> Result<(), DbErr> {
-    let url_like = format!("api://{api_id}@{account}%");
+    let url_like = format!("api://{account}@{api_id}%");
 
     // Remove from connections list
     let _ = Entity::delete_many()

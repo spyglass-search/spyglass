@@ -284,6 +284,7 @@ pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn revoke_connection(win: tauri::Window, id: &str, account: &str) -> Result<(), String> {
+    log::debug!("revoking connection: {}@{}", account, id);
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
         if let Err(err) = rpc
@@ -292,6 +293,8 @@ pub async fn revoke_connection(win: tauri::Window, id: &str, account: &str) -> R
             .await
         {
             return Err(err.to_string());
+        } else {
+            let _ = win.emit(ClientEvent::RefreshConnections.as_ref(), true);
         }
     }
 
