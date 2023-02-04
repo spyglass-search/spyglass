@@ -464,7 +464,7 @@ pub async fn search(
                             .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                             .collect::<Vec<(String, String)>>();
 
-                        let mut result = SearchResult {
+                        let result = SearchResult {
                             doc_id: doc_id.to_string(),
                             domain: domain.as_text().unwrap_or_default().to_string(),
                             title: title.as_text().unwrap_or_default().to_string(),
@@ -475,7 +475,6 @@ pub async fn search(
                             score,
                         };
 
-                        result.description.truncate(256);
                         results.push(result);
                     }
                     _ => {
