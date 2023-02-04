@@ -6,7 +6,7 @@ pub struct Migration;
 
 impl MigrationName for Migration {
     fn name(&self) -> &str {
-        "m20230201_000001_add_tag_index.rs"
+        "m20230203_000001_add_indexed_document_index.rs"
     }
 }
 
@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE INDEX IF NOT EXISTS `idx-tag-value` ON `tags` (`value`);".to_string(),
+                "CREATE INDEX IF NOT EXISTS `idx-indexed_document-doc_id` ON `indexed_document` (`doc_id`);".to_string(),
             ))
             .await?;
 
