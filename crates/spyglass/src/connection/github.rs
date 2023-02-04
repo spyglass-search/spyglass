@@ -85,12 +85,13 @@ impl GithubConnection {
         }
     }
 
-    async fn sync_issues(&mut self, state: &AppState) {
+    async fn sync_issues(&mut self, state: &AppState) -> anyhow::Result<()> {
         let mut page = Some(1);
         let mut total_synced = 0;
         let mut buffer = Vec::new();
 
-        while let Ok(resp) = self.client.list_issues(page).await {
+        loop {
+            let resp = self.client.list_issues(page).await?;
             page = resp.next_page;
             total_synced += resp.result.len();
             buffer.extend(resp.result);
@@ -118,14 +119,16 @@ impl GithubConnection {
         }
 
         log::debug!("synced {} issues", total_synced);
+        Ok(())
     }
 
-    async fn sync_repos(&mut self, state: &AppState) {
+    async fn sync_repos(&mut self, state: &AppState) -> anyhow::Result<()> {
         let mut page = Some(1);
         let mut total_synced = 0;
         let mut buffer = Vec::new();
 
-        while let Ok(resp) = self.client.list_repos(page).await {
+        loop {
+            let resp = self.client.list_repos(page).await?;
             page = resp.next_page;
             total_synced += resp.result.len();
             buffer.extend(resp.result);
@@ -158,9 +161,10 @@ impl GithubConnection {
         }
 
         log::debug!("synced {} repos", total_synced);
+        Ok(())
     }
 
-    async fn sync_starred(&mut self, state: &AppState) {
+    async fn sync_starred(&mut self, state: &AppState) -> anyhow::Result<()> {
         let mut page = Some(1);
         let mut total_synced = 0;
         let mut buffer = Vec::new();
@@ -168,7 +172,8 @@ impl GithubConnection {
         let mut tags = self.default_tags().clone();
         tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
 
-        while let Ok(resp) = self.client.list_starred(page).await {
+        loop {
+            let resp = self.client.list_starred(page).await?;
             page = resp.next_page;
             total_synced += resp.result.len();
             buffer.extend(resp.result);
@@ -200,6 +205,7 @@ impl GithubConnection {
         }
 
         log::debug!("synced {} repos", total_synced);
+        Ok(())
     }
 
     async fn check_unsynced(&mut self, state: &AppState, sync_time: DateTime<Utc>) {
@@ -249,10 +255,18 @@ impl Connection for GithubConnection {
         log::debug!("syncing w/ connection: {}", &Self::id());
         let sync_time = Utc::now();
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
-        self.sync_issues(state).await;
-        self.sync_repos(state).await;
-        self.sync_starred(state).await;
-        self.check_unsynced(state, sync_time).await;
+
+        let mut api_results: Vec<bool> = Vec::new();
+        api_results.push(self.sync_issues(state).await.is_ok());
+        api_results.push(self.sync_repos(state).await.is_ok());
+        api_results.push(self.sync_starred(state).await.is_ok());
+        // Only check for unsynced if all syncs are successful
+        if api_results.iter().all(|f| *f) {
+            self.check_unsynced(state, sync_time).await;
+        } else {
+            log::error!("Unable to sync with GitHub, check auth!");
+        }
+
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
     }
 
