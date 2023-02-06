@@ -755,6 +755,8 @@ mod test {
             .await
             .expect("Unable to find indexed docs");
         assert_eq!(indexed.len(), 0);
+        // Add a small delay so that the documents can be properly committed
+        std::thread::sleep(std::time::Duration::from_millis(500));
         assert_eq!(state.index.reader.searcher().num_docs(), 0);
     }
 }

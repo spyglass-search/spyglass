@@ -1,9 +1,12 @@
+
 use shared::config::Config;
 use strum_macros::{Display, EnumString};
 use tauri::{
-    utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu,
+    utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu,
     SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu,
 };
+#[cfg(not(target_os = "linux"))]
+use tauri::{MenuItem, Submenu};
 
 #[derive(Display, Debug, EnumString)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -95,16 +98,16 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_item(quit)
 }
 
-pub fn get_app_menu(ctx: &Context<EmbeddedAssets>) -> Menu {
-    if cfg!(target_os = "linux") {
-        return Menu::new();
-    }
+pub fn get_app_menu(_ctx: &Context<EmbeddedAssets>) -> Menu {
+    #[cfg(target_os = "linux")]
+    return Menu::new();
 
+    #[cfg(not(target_os = "linux"))]
     Menu::new().add_submenu(Submenu::new(
-        &ctx.package_info().name,
+        &_ctx.package_info().name,
         Menu::new()
             .add_native_item(MenuItem::About(
-                ctx.package_info().name.to_string(),
+                _ctx.package_info().name.to_string(),
                 Default::default(),
             ))
             // Currently we need to include these so that the shortcuts for these
