@@ -17,12 +17,13 @@ pub fn regex_for_domain(domain: &str) -> String {
 }
 
 pub fn regex_for_prefix(prefix: &str) -> String {
-    let prefix = regex::escape(prefix);
     if prefix.ends_with('$') {
-        return format!("^{prefix}");
+        let escaped = regex::escape(prefix.strip_suffix('$').unwrap());
+        format!("^{escaped}$")
+    } else {
+        let escaped = regex::escape(prefix);
+        format!("^{escaped}.*")
     }
-
-    format!("^{prefix}.*")
 }
 
 /// Convert a robots.txt rule into a proper regex string
@@ -134,5 +135,10 @@ mod test {
         ] {
             assert!(!regex.is_match(test));
         }
+
+        let prefix = "https://en.wikipedia.org/wiki/\'($";
+        let regex = Regex::new(&regex_for_prefix(prefix)).unwrap();
+        dbg!(&regex);
+        assert!(regex.is_match("https://en.wikipedia.org/wiki/\'("));
     }
 }
