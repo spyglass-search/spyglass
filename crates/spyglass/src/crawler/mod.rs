@@ -16,6 +16,7 @@ use entities::sea_orm::prelude::*;
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
+use crate::filesystem;
 use crate::parser;
 use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use crate::state::AppState;
@@ -330,7 +331,7 @@ impl Crawler {
         // handle any fetching/parsing.
         match url.scheme() {
             "api" => self.handle_api_fetch(state, &crawl, &url).await,
-            "file" => self.handle_file_fetch(&crawl, &url).await,
+            "file" => self.handle_file_fetch(state, &crawl, &url).await,
             "http" | "https" => {
                 self.handle_http_fetch(&state.db, &crawl, &url, parse_results)
                     .await
@@ -360,6 +361,7 @@ impl Crawler {
 
     async fn handle_file_fetch(
         &self,
+        state: &AppState,
         _: &crawl_queue::Model,
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
@@ -371,7 +373,7 @@ impl Crawler {
 
         let path = Path::new(&file_path);
         // Is this a file and does this exist?
-        if !path.exists() || !path.is_file() {
+        if !path.exists() {
             return Err(CrawlError::NotFound);
         }
 
@@ -381,48 +383,7 @@ impl Crawler {
             .map(|x| x.to_string())
             .expect("Unable to convert path file name to string");
 
-        // Attempt to read file
-        let contents = match path.extension() {
-            Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
-                Err(err) => return Err(CrawlError::ParseError(err.to_string())),
-                Ok(contents) => contents,
-            },
-            _ => match std::fs::read_to_string(path) {
-                Ok(x) => x,
-                Err(err) => {
-                    return Err(CrawlError::FetchError(err.to_string()));
-                }
-            },
-        };
-
-        let mut hasher = Sha256::new();
-        hasher.update(contents.as_bytes());
-        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-
-        // TODO: Better description building for text files?
-        let description = if !contents.is_empty() {
-            let desc = contents
-                .split(' ')
-                .into_iter()
-                .take(DEFAULT_DESC_LENGTH)
-                .collect::<Vec<&str>>()
-                .join(" ");
-            Some(desc)
-        } else {
-            None
-        };
-
-        Ok(CrawlResult {
-            content_hash,
-            content: Some(contents.clone()),
-            // Does a file have a description? Pull the first part of the file
-            description,
-            title: Some(file_name),
-            url: url.to_string(),
-            open_url: Some(url.to_string()),
-            links: Default::default(),
-            ..Default::default()
-        })
+        _process_path(state, path, file_name, url).await
     }
 
     /// Handle HTTP related requests
@@ -504,6 +465,73 @@ impl Crawler {
     }
 }
 
+fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
+    // Attempt to read file
+    let contents = match path.extension() {
+        Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
+            Err(err) => return Err(CrawlError::ParseError(err.to_string())),
+            Ok(contents) => contents,
+        },
+        _ => match std::fs::read_to_string(path) {
+            Ok(x) => x,
+            Err(err) => {
+                return Err(CrawlError::FetchError(err.to_string()));
+            }
+        },
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(contents.as_bytes());
+    let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+
+    // TODO: Better description building for text files?
+    let description = if !contents.is_empty() {
+        let desc = contents
+            .split(' ')
+            .into_iter()
+            .take(DEFAULT_DESC_LENGTH)
+            .collect::<Vec<&str>>()
+            .join(" ");
+        Some(desc)
+    } else {
+        None
+    };
+
+    let tags = filesystem::build_file_tags(path);
+    Ok(CrawlResult {
+        content_hash,
+        content: Some(contents.clone()),
+        // Does a file have a description? Pull the first part of the file
+        description,
+        title: Some(file_name),
+        url: url.to_string(),
+        open_url: Some(url.to_string()),
+        links: Default::default(),
+        tags,
+    })
+}
+
+async fn _process_path(
+    _state: &AppState,
+    path: &Path,
+    file_name: String,
+    url: &Url,
+) -> Result<CrawlResult, CrawlError> {
+    if path.is_file() {
+        return _process_file(path, file_name, url);
+    }
+    Err(CrawlError::NotFound)
+}
+
+fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {
+    let ext = &path
+        .extension()
+        .and_then(|x| x.to_str())
+        .map(|x| x.to_string())
+        .unwrap_or_default();
+    extension.contains(ext)
+}
+
 #[cfg(test)]
 mod test {
     use entities::models::crawl_queue::CrawlType;
@@ -526,7 +554,7 @@ mod test {
 
         assert_eq!(result.title, Some("Old School RuneScape Wiki".to_string()));
         assert_eq!(result.url, "https://oldschool.runescape.wiki/".to_string());
-        assert!(result.links.len() > 0);
+        assert!(!result.links.is_empty());
     }
 
     #[tokio::test]
@@ -641,27 +669,27 @@ mod test {
         let url = "https://example.com";
 
         assert_eq!(
-            normalize_href(&url, "http://foo.com"),
+            normalize_href(url, "http://foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            normalize_href(&url, "https://foo.com"),
+            normalize_href(url, "https://foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            normalize_href(&url, "//foo.com"),
+            normalize_href(url, "//foo.com"),
             Some("https://foo.com/".into())
         );
         assert_eq!(
-            normalize_href(&url, "/foo.html"),
+            normalize_href(url, "/foo.html"),
             Some("https://example.com/foo.html".into())
         );
         assert_eq!(
-            normalize_href(&url, "/foo"),
+            normalize_href(url, "/foo"),
             Some("https://example.com/foo".into())
         );
         assert_eq!(
-            normalize_href(&url, "foo.html"),
+            normalize_href(url, "foo.html"),
             Some("https://example.com/foo.html".into())
         );
     }
@@ -734,6 +762,9 @@ mod test {
 
         // Add resource rule to stop the crawl above
         let res = crawler.fetch_by_job(&state, model.id, true).await;
-        assert!(res.is_ok());
+        if let Err(error) = res {
+            log::error!("Error processing crawl {:?}", error);
+            assert!(false);
+        }
     }
 }

@@ -1,18 +1,28 @@
-use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::connection;
+use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType, TagValue};
-use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
-use libgoog::auth::{AccessToken, RefreshToken};
-use libgoog::{Credentials, GoogClient};
-use std::time::Duration;
-
-use crate::crawler::{CrawlError, CrawlResult};
-use crate::oauth;
-use crate::state::AppState;
-use entities::models::{connection, crawl_queue};
+use libgoog::GoogClient;
 use url::Url;
 
-use super::Connection;
+use super::credentials::connection_secret;
+use crate::crawler::{CrawlError, CrawlResult};
+use crate::documents::process_crawl_results;
+use crate::state::AppState;
+
+use super::{handle_sync_credentials, load_credentials, Connection};
+
+// Smaller buffer size so we can start downloading indexable files quicker.
+const BUFFER_SYNC_SIZE: usize = 50;
+
+/// The api id for google drive connections
+pub const API_ID: &str = "drive.google.com";
+/// The lens name for indexed documents from google drive
+pub const LENS: &str = "GDrive";
+/// The title for google drive connections
+pub const TITLE: &str = "Google Drive";
+/// The description for google drive connections
+pub const DESCRIPTION: &str = "Adds indexing support for Google drive. This will allow you to search for through documents, spreadsheets, and presentations.";
 
 pub struct DriveConnection {
     client: GoogClient,
@@ -21,70 +31,37 @@ pub struct DriveConnection {
 
 impl DriveConnection {
     pub async fn new(state: &AppState, account: &str) -> anyhow::Result<Self> {
-        // Load credentials from db
-        let creds = connection::get_by_id(&state.db, &Self::id(), account)
-            .await?
+        let credentials = load_credentials(&state.db, &Self::id(), account)
+            .await
             .expect("No credentials matching that id");
 
-        let credentials = Credentials {
-            access_token: AccessToken::new(creds.access_token),
-            refresh_token: creds.refresh_token.map(RefreshToken::new),
-            requested_at: creds.granted_at,
-            expires_in: creds.expires_in.map(|d| Duration::from_secs(d as u64)),
-        };
+        let (client_id, client_secret, _) =
+            connection_secret(&Self::id()).expect("Connection not supported");
 
-        if let Some((client_id, client_secret, _)) = oauth::connection_secret(&Self::id()) {
-            let mut client = GoogClient::new(
-                libgoog::ClientType::Drive,
-                &client_id,
-                &client_secret,
-                "http://localhost:0",
-                credentials,
-            )?;
+        let mut client = GoogClient::new(
+            libgoog::ClientType::Drive,
+            &client_id,
+            &client_secret,
+            "http://localhost:0",
+            credentials,
+        )?;
 
-            // Update credentials in database whenever we refresh the token.
-            {
-                let account = account.to_string();
-                let state = state.clone();
-                client.set_on_refresh(move |new_creds| {
-                    log::debug!("received new credentials");
-                    let state = state.clone();
-                    let account = account.clone();
-                    let new_creds = new_creds.clone();
-                    tokio::spawn(async move {
-                        if let Ok(Some(conn)) =
-                            connection::get_by_id(&state.db, &Self::id(), &account).await
-                        {
-                            let mut update: connection::ActiveModel = conn.into();
-                            update.access_token = Set(new_creds.access_token.secret().to_string());
-                            // Refresh tokens are optionally sent
-                            if let Some(refresh_token) = new_creds.refresh_token {
-                                update.refresh_token =
-                                    Set(Some(refresh_token.secret().to_string()));
-                            }
-                            update.expires_in = Set(new_creds
-                                .expires_in
-                                .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)));
-                            update.granted_at = Set(chrono::Utc::now());
-                            let res = update.save(&state.db).await;
-                            log::debug!("credentials updated: {:?}", res);
-                        }
-                    });
-                });
-            }
+        // Update credentials in database whenever we refresh the token.
+        handle_sync_credentials(&mut client, &state.db, &Self::id(), account).await;
 
-            Ok(Self {
-                client,
-                user: account.to_string(),
-            })
-        } else {
-            Err(anyhow::anyhow!("Connection not supported"))
-        }
+        Ok(Self {
+            client,
+            user: account.to_string(),
+        })
     }
 
     pub fn is_indexable_mimetype(&self, mime_type: &str) -> bool {
         mime_type == "application/vnd.google-apps.document"
             || mime_type == "application/vnd.google-apps.presentation"
+            || mime_type == "application/vnd.google-apps.spreadsheet"
+            // Uploaded Word/Excel docs
+            || mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            || mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     }
 
     pub fn to_url(&self, file_id: &str) -> Url {
@@ -99,15 +76,20 @@ impl DriveConnection {
 #[async_trait]
 impl Connection for DriveConnection {
     fn id() -> String {
-        "drive.google.com".to_string()
+        API_ID.to_string()
     }
 
     fn user(&self) -> String {
         self.user.clone()
     }
 
+    fn default_tags(&self) -> Vec<TagPair> {
+        vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
+    }
+
     async fn sync(&mut self, state: &AppState) {
         log::debug!("syncing w/ connection");
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
 
         // Ignore shortcuts
         let ignore_query = "mimeType != 'application/vnd.google-apps.shortcut'".to_string();
@@ -115,41 +97,61 @@ impl Connection for DriveConnection {
         // stream pages of files from the integration & add them to the crawl queue
         let mut next_page = None;
         let mut num_files = 0;
+        let mut buffer = Vec::new();
 
         // Grab the next page of files
-        while let Ok(files) = self
+        while let Ok(resp) = self
             .client
             .list_files(next_page.clone(), Some(ignore_query.clone()))
             .await
         {
-            next_page = files.next_page_token;
-            num_files += files.files.len();
+            next_page = resp.next_page_token;
+            num_files += resp.files.len();
+            buffer.extend(resp.files);
 
-            let urls = files
-                .files
-                .iter()
-                .map(|file| self.to_url(&file.id).to_string())
-                .collect::<Vec<String>>();
+            if buffer.len() > BUFFER_SYNC_SIZE || next_page.is_none() {
+                let mut crawls = Vec::new();
+                let mut to_download = Vec::new();
 
-            // Enqueue URIs
-            let enqueue_settings = EnqueueSettings {
-                crawl_type: CrawlType::Api,
-                tags: vec![(TagType::Source, Self::id())],
-                force_allow: true,
-                is_recrawl: true,
-            };
+                for file in &buffer {
+                    let api_uri = self.to_url(&file.id);
+                    if let Ok(metadata) = self.client.get_file_metadata(&file.id).await {
+                        log::debug!("file: {} - {}", metadata.name, metadata.mime_type);
+                        crawls.push(file_to_crawl(&api_uri, &metadata, None));
+                        if self.is_indexable_mimetype(&metadata.mime_type) {
+                            to_download.push(api_uri.to_string());
+                        }
+                    }
+                }
 
-            if let Err(err) = crawl_queue::enqueue_all(
-                &state.db,
-                &urls,
-                &[],
-                &state.user_settings,
-                &enqueue_settings,
-                None,
-            )
-            .await
-            {
-                log::error!("Unable to enqueue: {}", err.to_string());
+                // Add to index
+                if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
+                {
+                    log::error!("Unable to add files: {}", err);
+                }
+
+                // Enqueue the ones we want to download & index the content
+                let enqueue_settings = EnqueueSettings {
+                    crawl_type: CrawlType::Api,
+                    tags: self.default_tags(),
+                    force_allow: true,
+                    is_recrawl: true,
+                };
+
+                if let Err(err) = crawl_queue::enqueue_all(
+                    &state.db,
+                    &to_download,
+                    &[],
+                    &state.user_settings,
+                    &enqueue_settings,
+                    None,
+                )
+                .await
+                {
+                    log::error!("Unable to enqueue: {}", err.to_string());
+                }
+
+                buffer.clear();
             }
 
             if next_page.is_none() {
@@ -157,6 +159,7 @@ impl Connection for DriveConnection {
             }
         }
 
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
         log::debug!("synced {} files", num_files);
     }
 
@@ -170,37 +173,82 @@ impl Connection for DriveConnection {
         log::debug!("fetching file {} - {:?}", file_id, metadata);
 
         // Grab text for supported mimetypes
-        let content: String = if self.is_indexable_mimetype(&metadata.mime_type) {
+        let content: Option<String> = if self.is_indexable_mimetype(&metadata.mime_type) {
             self.client.download_file(file_id).await.map_or_else(
-                |_| "".to_string(),
+                |_| None,
                 |b| {
-                    // TODO: Pass through to parsers for spreadsheets/etc.
-                    if let Ok(s) = std::str::from_utf8(&b) {
-                        s.to_string()
-                    } else {
-                        "".to_string()
+                    match metadata.mime_type.as_str() {
+                        // Pass to docx parser
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+                            crate::parser::docx_parser::parse_bytes(b).ok()
+                        }
+                        // Pass to xlxs parser
+                        "application/vnd.google-apps.spreadsheet" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
+                            crate::parser::xlsx_parser::parse_bytes(b).ok()
+                        }
+                        _ => if let Ok(s) = std::str::from_utf8(&b) {
+                            Some(s.to_string())
+                        } else {
+                            None
+                        }
                     }
                 },
             )
         } else {
-            "".to_string()
+            None
         };
 
         // Extract and apply tags to crawl result.
-        let mut tags: Vec<TagPair> = vec![(TagType::MimeType, metadata.mime_type)];
-        if metadata.starred {
-            tags.push((TagType::Favorited, TagValue::Favorited.as_ref().to_owned()));
-        }
-
-        let mut crawl = CrawlResult::new(
-            uri,
-            Some(metadata.web_view_link),
-            &content,
-            &metadata.name,
-            None,
-        );
-        crawl.tags = tags;
-
-        Ok(crawl)
+        Ok(file_to_crawl(uri, &metadata, content))
     }
+}
+
+fn file_to_crawl(
+    api_url: &Url,
+    file: &libgoog::types::File,
+    content: Option<String>,
+) -> CrawlResult {
+    let mut result = CrawlResult::new(
+        api_url,
+        Some(file.web_view_link.clone()),
+        &content.unwrap_or(file.description.clone()),
+        &file.name.clone(),
+        Some(file.description.clone()),
+    );
+
+    for owner in &file.owners {
+        let name = owner
+            .email_address
+            .clone()
+            .unwrap_or(owner.display_name.clone());
+        result.tags.push((TagType::Owner, name.clone()));
+    }
+
+    result
+        .tags
+        .push((TagType::MimeType, file.mime_type.clone()));
+    if file.starred {
+        result
+            .tags
+            .push((TagType::Favorited, TagValue::Favorited.to_string()));
+    }
+
+    if file.mime_type == "application/vnd.google-apps.folder" {
+        result
+            .tags
+            .push((TagType::Type, TagValue::Directory.to_string()))
+    } else if file.mime_type.starts_with("image/") {
+        result
+            .tags
+            .push((TagType::Type, TagValue::Image.to_string()));
+        result
+            .tags
+            .push((TagType::Type, TagValue::File.to_string()));
+    } else {
+        result
+            .tags
+            .push((TagType::Type, TagValue::File.to_string()));
+    }
+
+    result
 }

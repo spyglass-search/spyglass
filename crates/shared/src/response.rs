@@ -13,10 +13,11 @@ pub struct SupportedConnection {
     pub description: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UserConnection {
     pub id: String,
     pub account: String,
+    pub is_syncing: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -65,6 +66,15 @@ impl Default for InstallStatus {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+pub enum LensType {
+    #[default]
+    Lens,
+    Plugin,
+    API,
+    Internal,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LensResult {
     /// Author of this lens
     pub author: String,
@@ -82,6 +92,7 @@ pub struct LensResult {
     pub html_url: Option<String>,
     pub download_url: Option<String>,
     pub progress: InstallStatus,
+    pub lens_type: LensType,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -130,6 +141,7 @@ pub struct LibraryStats {
     pub crawled: i32,
     pub enqueued: i32,
     pub indexed: i32,
+    pub failed: i32,
 }
 
 impl LibraryStats {
@@ -139,6 +151,7 @@ impl LibraryStats {
             crawled: 0,
             enqueued: 0,
             indexed: 0,
+            failed: 0,
         }
     }
 

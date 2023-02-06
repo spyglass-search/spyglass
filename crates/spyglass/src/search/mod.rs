@@ -1,8 +1,10 @@
+use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::TermQuery;
@@ -12,7 +14,7 @@ use uuid::Uuid;
 
 use crate::search::query::build_query;
 use crate::state::AppState;
-use entities::models::{document_tag, indexed_document};
+use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
@@ -46,7 +48,7 @@ pub struct DocumentUpdate<'a> {
     pub domain: &'a str,
     pub url: &'a str,
     pub content: &'a str,
-    pub tags: &'a Option<Vec<u64>>,
+    pub tags: &'a Option<Vec<i64>>,
 }
 
 impl Debug for Searcher {
@@ -234,7 +236,7 @@ impl Searcher {
         doc.add_text(fields.url, doc_update.url);
         if let Some(tag) = doc_update.tags {
             for t in tag {
-                doc.add_u64(fields.tags, *t);
+                doc.add_u64(fields.tags, *t as u64);
             }
         }
         writer.add_document(doc)?;
@@ -243,12 +245,26 @@ impl Searcher {
     }
 
     pub async fn search_with_lens(
-        _db: DatabaseConnection,
+        db: DatabaseConnection,
         applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
+
+        let mut tag_boosts = HashSet::new();
+        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
+            .filter(tag::Column::Label.eq(tag::TagType::Favorited))
+            .one(&db)
+            .await
+        {
+            Some(favorited.id)
+        } else {
+            None
+        };
+
+        let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
+        tag_boosts.extend(tag_checks);
 
         let index = &searcher.index;
         let reader = &searcher.reader;
@@ -261,6 +277,8 @@ impl Searcher {
             fields,
             query_string,
             applied_lenses,
+            tag_boosts.into_iter(),
+            favorite_boost,
         );
 
         let collector = TopDocs::with_limit(5);
@@ -283,6 +301,23 @@ impl Searcher {
             .filter(|(score, _)| *score > 0.0)
             .collect()
     }
+}
+
+// Helper method used to get the list of tag ids that should be included in the search
+async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64>> {
+    let lower = search.to_lowercase();
+    let tokens = lower.split(' ').collect::<Vec<&str>>();
+    let expr =
+        Expr::expr(Func::lower(Expr::col(entities::models::tag::Column::Value))).is_in(tokens);
+    let tag_rslt = entities::models::tag::Entity::find()
+        .filter(expr)
+        .all(db)
+        .await;
+
+    if let Ok(tags) = tag_rslt {
+        return Some(tags.iter().map(|tag| tag.id).collect::<Vec<i64>>());
+    }
+    None
 }
 
 #[cfg(test)]
@@ -310,7 +345,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![1 as u64]),
+                tags: &Some(vec![1_i64]),
             },
         )
         .expect("Unable to add doc");
@@ -332,7 +367,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![2 as u64]),
+                tags: &Some(vec![2_i64]),
             },
         )
         .expect("Unable to add doc");
@@ -352,7 +387,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-                tags: &Some(vec![2 as u64]),
+                tags: &Some(vec![2_i64]),
             },
         )
         .expect("Unable to add doc");
@@ -369,13 +404,13 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-             tags: &Some(vec![1 as u64]),}
+             tags: &Some(vec![1_i64]),}
         )
         .expect("Unable to add doc");
 
         let res = writer.commit();
         if let Err(err) = res {
-            println!("{:?}", err);
+            println!("{err:?}");
         }
 
         // add a small delay so that the documents can be properly committed
@@ -396,7 +431,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -416,7 +451,7 @@ mod test {
 
         _build_test_index(&mut searcher);
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -436,7 +471,7 @@ mod test {
         _build_test_index(&mut searcher);
 
         let query = "salinasd";
-        let results = Searcher::search_with_lens(db, &vec![2 as u64], &searcher, query).await;
+        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
         assert_eq!(results.len(), 0);
     }
 }

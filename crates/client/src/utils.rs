@@ -15,6 +15,12 @@ pub enum RequestState {
     Error,
 }
 
+impl Default for RequestState {
+    fn default() -> Self {
+        Self::NotStarted
+    }
+}
+
 impl RequestState {
     pub fn is_done(&self) -> bool {
         *self == Self::Finished || *self == Self::Error

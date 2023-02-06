@@ -1,7 +1,8 @@
 use entities::get_library_stats;
+use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
-use libspyglass::search;
+use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use std::collections::HashMap;
@@ -14,7 +15,6 @@ use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::RpcServer;
 
-mod auth;
 mod response;
 mod route;
 
@@ -37,20 +37,18 @@ impl RpcServer for SpyglassRpc {
         route::app_status(self.state.clone()).await
     }
 
+    /// Default folders used in the local file indexer
     async fn default_indices(&self) -> Result<DefaultIndices, Error> {
         Ok(route::default_indices().await)
     }
 
+    /// Delete a single doc
     async fn delete_doc(&self, id: String) -> Result<(), Error> {
         route::delete_doc(self.state.clone(), id).await
     }
 
-    async fn delete_domain(&self, domain: String) -> Result<(), Error> {
-        route::delete_domain(self.state.clone(), domain).await
-    }
-
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
-        match get_library_stats(self.state.db.clone()).await {
+        match get_library_stats(&self.state.db).await {
             Ok(stats) => Ok(stats),
             Err(err) => {
                 log::error!("Unable to get library stats: {}", err);
@@ -97,15 +95,25 @@ impl RpcServer for SpyglassRpc {
     /// Remove connection from list of connections
     async fn revoke_connection(&self, api_id: String, account: String) -> Result<(), Error> {
         use entities::models::connection;
-        // Remove from connections list
-        let _ = connection::Entity::delete_many()
-            .filter(connection::Column::ApiId.eq(api_id.clone()))
-            .filter(connection::Column::Account.eq(account))
-            .exec(&self.state.db)
-            .await;
+        let url_like = format!("api://{account}@{api_id}%");
+        log::debug!("revoking conn: {url_like}");
 
-        // Remove from index
-        let _ = self.delete_domain(api_id).await;
+        // Delete from search index
+        let docs = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Domain.eq(api_id.clone()))
+            .filter(indexed_document::Column::Url.like(&url_like))
+            .all(&self.state.db)
+            .await
+            .unwrap_or_default();
+
+        let doc_ids = docs
+            .iter()
+            .map(|m| m.doc_id.clone())
+            .collect::<Vec<String>>();
+        let _ = connection::revoke_connection(&self.state.db, &api_id, &account).await;
+        let _ = Searcher::delete_many_by_id(&self.state, &doc_ids, false).await;
+        let _ = Searcher::save(&self.state).await;
+        log::debug!("revoked & deleted {} docs", doc_ids.len());
         Ok(())
     }
 

@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
+use gloo::timers::callback::Interval;
 use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
 use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
 
@@ -8,25 +9,31 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::{btn, icons, Header};
+use crate::components::{
+    btn,
+    btn::{BtnSize, BtnType},
+    icons, Header,
+};
 use crate::utils::RequestState;
 use crate::{listen, tauri_invoke};
 
+#[derive(Default)]
 struct ConnectionStatus {
     is_authorizing: RequestState,
     error: String,
 }
 
+#[derive(Default)]
 pub struct ConnectionsManagerPage {
     conn_status: ConnectionStatus,
     fetch_connection_state: RequestState,
     fetch_error: String,
     is_add_view: bool,
-    resync_requested: HashSet<(String, String)>,
-    revoke_requested: HashSet<(String, String)>,
     supported_connections: Vec<SupportedConnection>,
     supported_map: HashMap<String, SupportedConnection>,
     user_connections: Vec<UserConnection>,
+    revoke_requested: HashSet<String>,
+    update_interval_handle: Option<Interval>,
 }
 
 #[allow(dead_code)]
@@ -48,34 +55,7 @@ pub enum Msg {
 
 impl ConnectionsManagerPage {
     pub async fn fetch_connections() -> Result<ListConnectionResult, String> {
-        match tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await {
-            Ok(results) => Ok(results),
-            Err(e) => Err(format!("Error fetching connections: {e:?}")),
-        }
-    }
-
-    pub fn connection_icon(&self, id: &str) -> Html {
-        if id == "calendar.google.com" {
-            html! {
-                <svg class="h-6 w-6" role="img" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/>
-                </svg>
-            }
-        } else if id == "drive.google.com" {
-            html! {
-                <svg class="h-6 w-6" role="img" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z"/>
-                </svg>
-            }
-        } else if id == "mail.google.com" {
-            html! {
-                <svg class="h-6 w-6" role="img" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
-                </svg>
-            }
-        } else {
-            html! { <icons::ShareIcon height="h-6" width="w-6" /> }
-        }
+        tauri_invoke(ClientInvoke::ListConnections, "".to_string()).await
     }
 
     fn add_view(&self, ctx: &Context<Self>) -> Html {
@@ -118,7 +98,7 @@ impl ConnectionsManagerPage {
                 html! {
                     <div class="pb-8 flex flex-row items-center gap-8">
                         <div class="flex-none">
-                            {self.connection_icon(&con.id)}
+                            {icons::connection_icon(&con.id, "h-6", "w-6", classes!())}
                         </div>
                         <div class="flex-1">
                             <div><h2 class="text-lg">{con.label.clone()}</h2></div>
@@ -181,19 +161,20 @@ impl Component for ConnectionsManagerPage {
             });
         }
 
+        let interval = {
+            let link = link.clone();
+            Interval::new(10_000, move || link.send_message(Msg::FetchConnections))
+        };
+
         Self {
-            conn_status: ConnectionStatus {
-                is_authorizing: RequestState::NotStarted,
-                error: "".to_string(),
-            },
-            fetch_connection_state: RequestState::NotStarted,
-            fetch_error: String::new(),
-            is_add_view: false,
-            resync_requested: HashSet::new(),
-            revoke_requested: HashSet::new(),
-            supported_connections: Vec::new(),
-            supported_map: HashMap::new(),
-            user_connections: Vec::new(),
+            update_interval_handle: Some(interval),
+            ..Default::default()
+        }
+    }
+
+    fn destroy(&mut self, _ctx: &Context<Self>) {
+        if let Some(handle) = self.update_interval_handle.take() {
+            handle.cancel();
         }
     }
 
@@ -251,8 +232,8 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::RevokeConnection { id, account } => {
-                self.revoke_requested.insert((id.clone(), account.clone()));
-                link.send_future(async move {
+                self.revoke_requested.insert(format!("{account}@{id}"));
+                spawn_local(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
                         ClientInvoke::RevokeConnection,
@@ -262,14 +243,12 @@ impl Component for ConnectionsManagerPage {
                         },
                     )
                     .await;
-                    Msg::FetchConnections
                 });
 
                 true
             }
             Msg::ResyncConnection { id, account } => {
-                self.resync_requested.insert((id.clone(), account.clone()));
-                link.send_future(async move {
+                spawn_local(async move {
                     // Revoke & then refresh connections
                     let _ = tauri_invoke::<_, ()>(
                         ClientInvoke::ResyncConnection,
@@ -279,9 +258,7 @@ impl Component for ConnectionsManagerPage {
                         },
                     )
                     .await;
-                    Msg::FetchConnections
                 });
-
                 true
             }
             Msg::UpdateConnections(conns) => {
@@ -309,6 +286,11 @@ impl Component for ConnectionsManagerPage {
                 true
             }
             Msg::CancelAdd => {
+                if self.conn_status.is_authorizing.in_progress() {
+                    self.conn_status.is_authorizing = RequestState::Error;
+                    self.conn_status.error = "Cancelled auth request".to_string();
+                }
+
                 self.is_add_view = false;
                 true
             }
@@ -321,99 +303,137 @@ impl Component for ConnectionsManagerPage {
         }
 
         let link = ctx.link();
+        if self.user_connections.is_empty() {
+            return self.add_view(ctx);
+        }
 
-        let conns = if self.user_connections.is_empty() {
-            html! {
-                <div class="col-span-3 text-neutral-300">{"Add a connection to get started!"}</div>
-            }
-        } else {
-            self
-                .user_connections
-                .iter()
-                .map(|conn| {
-                    let label = self
-                        .supported_map
-                        .get(&conn.id)
-                        .map(|m| m.label.clone())
-                        .unwrap_or_else(|| conn.id.clone());
+        let conns = self
+            .user_connections
+            .iter()
+            .map(|conn| {
+                let label = self
+                    .supported_map
+                    .get(&conn.id)
+                    .map(|m| m.label.clone())
+                    .unwrap_or_else(|| conn.id.clone());
 
-                    let resync_msg = Msg::ResyncConnection { id: conn.id.clone(), account: conn.account.clone() };
-                    let delete_msg = Msg::RevokeConnection { id: conn.id.clone(), account: conn.account.clone() };
+                let resync_msg = Msg::ResyncConnection {
+                    id: conn.id.clone(),
+                    account: conn.account.clone(),
+                };
+                let revoke_msg = Msg::RevokeConnection {
+                    id: conn.id.clone(),
+                    account: conn.account.clone(),
+                };
 
-                    html! {
-                        <>
-                            <div>{label}</div>
-                            <div>{conn.account.clone()}</div>
-                            <div class="place-self-end flex flex-row gap-8">
-                                {
-                                    if self.resync_requested.contains(&(conn.id.clone(), conn.account.clone())) {
-                                        html! {
-                                            <div class="text-xs text-neutral-500">
-                                                {"Resyncing"}
-                                            </div>
-                                        }
-                                    } else {
-                                        html! {
-                                            <button
-                                                onclick={link.callback(move |_| resync_msg.clone())}
-                                                class="text-xs flex flex-row gap-2 hover:text-cyan-500"
-                                            >
-                                                <icons::RefreshIcon width="w-4" height="h-4" />
-                                                {"Resync"}
-                                            </button>
-                                        }
-                                    }
-                                }
-                                {
-                                    if self.revoke_requested.contains(&(conn.id.clone(), conn.account.clone())) {
-                                        html! {
-                                            <div class="text-xs text-neutral-500">
-                                                {"Revoking"}
-                                            </div>
-                                        }
-                                    } else {
-                                        html! {
-                                            <button
-                                                onclick={link.callback(move |_| delete_msg.clone())}
-                                                class="text-xs flex flex-row gap-2 hover:text-red-500"
-                                            >
-                                                <icons::TrashIcon width="w-4" height="h-4" />
-                                                {"Delete"}
-                                            </button>
-                                        }
-                                    }
-                                }
-                            </div>
-                        </>
-                    }
-                })
-                .collect::<Html>()
-        };
+                let uid = format!("{}@{}", conn.account, conn.id);
+                html! {
+                    <Connection
+                        label={label}
+                        connection={conn.clone()}
+                        is_syncing={conn.is_syncing}
+                        is_revoking={self.revoke_requested.contains(&uid)}
+                        on_resync={link.callback(move |_| resync_msg.clone())}
+                        on_revoke={link.callback(move |_| revoke_msg.clone())}
+                    />
+                }
+            })
+            .collect::<Html>();
 
         html! {
             <div>
                 <Header label="Connections">
                     <btn::Btn onclick={link.callback(|_| Msg::StartAdd)}>{"Add"}</btn::Btn>
                 </Header>
-                <div class="px-8 py-4 bg-neutral-800">
-                    <div class="font-bold mb-2">{"Connected Accounts"}</div>
-                    <div class="grid grid-cols-3 gap-4 content-center text-xs border-1 rounded-md bg-stone-700 p-2">
-                        {
-                            if self.fetch_connection_state.in_progress() {
-                                html! {
-                                    <div class="flex justify-center">
-                                        <div class="p-16">
-                                            <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
-                                        </div>
+                <div class="flex flex-col gap-4 p-4">
+                    {
+                        if self.fetch_connection_state.in_progress() {
+                            html! {
+                                <div class="flex justify-center">
+                                    <div class="p-16">
+                                        <icons::RefreshIcon height={"h-16"} width={"w-16"} animate_spin={true} />
                                     </div>
-                                }
-                            } else {
-                                conns
+                                </div>
                             }
+                        } else {
+                            conns
                         }
-                    </div>
+                    }
                 </div>
             </div>
         }
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ConnectionProps {
+    label: String,
+    connection: UserConnection,
+    is_syncing: bool,
+    is_revoking: bool,
+    #[prop_or_default]
+    on_resync: Callback<MouseEvent>,
+    #[prop_or_default]
+    on_revoke: Callback<MouseEvent>,
+}
+
+#[function_component(Connection)]
+fn connection_comp(props: &ConnectionProps) -> Html {
+    let is_resyncing = use_state_eq(|| false);
+    is_resyncing.set(props.is_syncing);
+
+    let is_revoking = use_state_eq(|| false);
+    is_revoking.set(props.is_revoking);
+
+    let is_resync = is_resyncing.clone();
+    let on_resync_cb = props.on_resync.clone();
+    let resync_cb = Callback::from(move |e| {
+        is_resync.set(true);
+        on_resync_cb.emit(e);
+    });
+
+    let resync_btn = html! {
+        <btn::Btn disabled={*is_resyncing} size={BtnSize::Xs} onclick={resync_cb}>
+            <icons::RefreshIcon width="w-4" height="h-4" animate_spin={*is_resyncing} />
+            { if *is_resyncing { "Syncing" } else { "Resync"} }
+        </btn::Btn>
+    };
+
+    let is_revoke = is_revoking.clone();
+    let on_revoke_cb = props.on_revoke.clone();
+    let revoke_cb = Callback::from(move |e| {
+        is_revoke.set(true);
+        on_revoke_cb.emit(e);
+    });
+
+    let revoke_btn = if *is_revoking {
+        html! {
+            <btn::Btn disabled={true} size={BtnSize::Xs} _type={BtnType::Danger}>
+                {"Deleting"}
+            </btn::Btn>
+        }
+    } else {
+        html! {
+            <btn::Btn disabled={*is_revoking} size={BtnSize::Xs} _type={BtnType::Danger} onclick={revoke_cb}>
+                <icons::TrashIcon width="w-4" height="h-4" />
+                {"Delete"}
+            </btn::Btn>
+        }
+    };
+
+    html! {
+        <div class="rounded-md bg-neutral-700 p-4 text-white shadow-md flex flex-row gap-4 items-center">
+            <div>
+                {icons::connection_icon(&props.connection.id, "h-6", "w-6", classes!())}
+            </div>
+            <div>
+                <div class="text-xs font-bold text-cyan-500">{props.label.clone()}</div>
+                <div class="text-sm">{props.connection.account.clone()}</div>
+            </div>
+            <div class="flex flex-row gap-4 grow place-content-end">
+                {resync_btn}
+                {revoke_btn}
+            </div>
+        </div>
     }
 }

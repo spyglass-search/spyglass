@@ -325,8 +325,8 @@ mod test {
             let ext = if idx % 5 == 0 { ".txt" } else { "" };
 
             std::fs::write(
-                test_folder.join(format!("{}{}", idx, ext)),
-                format!("file contents {}", idx),
+                test_folder.join(format!("{idx}{ext}")),
+                format!("file contents {idx}"),
             )
             .expect("Unable to write test file");
         }

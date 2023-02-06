@@ -1,7 +1,7 @@
-use sea_orm::Set;
 use sea_orm::{entity::prelude::*, ConnectionTrait};
+use sea_orm::{Condition, Set};
 use serde::{Deserialize, Serialize};
-use strum_macros::{AsRefStr, EnumString};
+use strum_macros::{AsRefStr, Display, EnumString};
 
 use super::{crawl_queue, indexed_document};
 
@@ -22,31 +22,52 @@ pub type TagPair = (TagType, String);
 )]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum TagType {
-    // Marked as liked/starred/hearted/etc.
+    /// Marked as liked/starred/hearted/etc.
     #[sea_orm(string_value = "favorited")]
     Favorited,
-    // Mimetype of the document. TODO: Need to keep a mapping between file extension and
-    // mimetypes somewhere
+    /// Mimetype of the document. TODO: Need to keep a mapping between file extension and
+    /// mimetypes somewhere
     #[sea_orm(string_value = "mimetype")]
     MimeType,
-    // where this document came from,
+    /// General type tag, Used for high level types ex: File, directory. The MimeType
+    /// would be used as a more specific type.
+    /// For non-file docs, can be used to differentiate from others in this category.
+    /// e.g. for a GitHub connection we can have an "Issue" or "Repo".
+    ///     for a D&D lens we have equipment, magic items, skills, etc.
+    #[sea_orm(string_value = "type")]
+    Type,
+    /// where this document came from,
     #[sea_orm(string_value = "source")]
     Source,
-    // Owner of a doc/item, if relevant.
+    /// Owner of a doc/item, if relevant.
     #[sea_orm(string_value = "owner")]
     Owner,
-    // Shared/invited to a doc/event/etc.
+    /// Shared/invited to a doc/event/etc.
     #[sea_orm(string_value = "shared")]
     SharedWith,
-    // Part of this/these lens(es)
+    /// Part of this/these lens(es)
     #[sea_orm(string_value = "lens")]
     Lens,
+    /// Part of a specific repo
+    #[sea_orm(string_value = "repository")]
+    Repository,
+    /// For file based content this tag
+    #[sea_orm(string_value = "fileext")]
+    FileExt,
 }
 
-#[derive(AsRefStr)]
+#[derive(AsRefStr, Display, EnumString)]
 pub enum TagValue {
+    #[strum(serialize = "directory")]
+    Directory,
     #[strum(serialize = "favorited")]
     Favorited,
+    #[strum(serialize = "file")]
+    File,
+    #[strum(serialize = "image")]
+    Image,
+    #[strum(serialize = "symlink")]
+    Symlink,
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
@@ -58,6 +79,12 @@ pub struct Model {
     pub value: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+}
+
+impl Model {
+    pub fn tag_pair(&self) -> TagPair {
+        (self.label.clone(), self.value.clone())
+    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -144,6 +171,46 @@ where
         _ => Err(DbErr::RecordNotFound(format!(
             "label: {label}, value: {value}"
         ))),
+    }
+}
+
+pub async fn get_or_create_many<C>(db: &C, tags: &Vec<TagPair>) -> Result<Vec<Model>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let tag_models = tags
+        .iter()
+        .map(|(label, value)| ActiveModel {
+            label: Set(label.clone()),
+            value: Set(value.to_string()),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
+        })
+        .collect::<Vec<ActiveModel>>();
+
+    let _ = Entity::insert_many(tag_models)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_with_returning(db)
+        .await;
+
+    let mut condition = Condition::any();
+    for (label, value) in tags {
+        condition = condition.add(
+            Condition::all()
+                .add(Column::Label.eq(label.clone()))
+                .add(Column::Value.eq(value.clone())),
+        );
+    }
+    let db_tags = Entity::find().filter(condition).all(db).await;
+
+    match db_tags {
+        Ok(models) => Ok(models),
+        Err(err) => Err(err),
     }
 }
 

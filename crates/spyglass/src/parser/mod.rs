@@ -1,12 +1,9 @@
-use std::{
-    ffi::OsStr,
-    io,
-    io::{Error, ErrorKind},
-    path::Path,
-};
+use std::{ffi::OsStr, path::Path};
 
-mod docx_parser;
-mod xlsx_parser;
+use anyhow::anyhow;
+
+pub mod docx_parser;
+pub mod xlsx_parser;
 
 /*
  * Processes the file extension to identify if there is a special
@@ -27,7 +24,7 @@ pub fn supports_filetype(extension: &OsStr) -> bool {
 /*
  * Parses the specified file
  */
-pub fn parse_file(extension: &OsStr, file_path: &Path) -> io::Result<String> {
+pub fn parse_file(extension: &OsStr, file_path: &Path) -> anyhow::Result<String> {
     if extension.eq_ignore_ascii_case("docx") {
         return docx_parser::parse(file_path);
     } else if extension.eq_ignore_ascii_case("xlsx")
@@ -36,8 +33,5 @@ pub fn parse_file(extension: &OsStr, file_path: &Path) -> io::Result<String> {
     {
         return xlsx_parser::parse(file_path);
     }
-    Err(Error::new(
-        ErrorKind::Unsupported,
-        format!("Extension {extension:?} not supported"),
-    ))
+    Err(anyhow!(format!("Extension {extension:?} not supported")))
 }

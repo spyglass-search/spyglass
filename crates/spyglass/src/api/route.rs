@@ -1,35 +1,37 @@
 use directories::UserDirs;
 use entities::get_library_stats;
+use entities::models::crawl_queue::CrawlStatus;
+use entities::models::lens::LensType;
+use entities::models::tag::TagType;
+use entities::models::{
+    bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
+    lens, tag,
+};
+use entities::schema::{DocFields, SearchDocument};
+use entities::sea_orm;
+use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
+use entities::sea_orm::{FromQueryResult, JoinType, QuerySelect};
 use jsonrpsee::core::Error;
-use std::collections::HashSet;
+use libspyglass::connection::{self, credentials, handle_authorize_connection};
+use libspyglass::filesystem;
+use libspyglass::plugin::PluginCommand;
+use libspyglass::search::Searcher;
+use libspyglass::state::AppState;
+use libspyglass::task::{AppPause, CleanupTask, ManagerCommand};
+use shared::config::Config;
+use shared::metrics::{self, Event};
+use shared::request;
+use shared::response::{
+    AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
+    PluginResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection,
+    UserConnection,
+};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
 
-use entities::models::crawl_queue::CrawlStatus;
-use entities::models::lens::LensType;
-use entities::models::{
-    bootstrap_queue, connection, crawl_queue, fetch_history, indexed_document, lens, tag,
-};
-use entities::schema::{DocFields, SearchDocument};
-use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
-use shared::config::Config;
-use shared::metrics::{self, Event};
-use shared::request;
-use shared::response::{
-    AppStatus, DefaultIndices, InstallStatus, LensResult, ListConnectionResult, PluginResult,
-    SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection, UserConnection,
-};
-
-use libgoog::{ClientType, Credentials, GoogClient};
-use libspyglass::oauth::{self, connection_secret};
-use libspyglass::plugin::PluginCommand;
-use libspyglass::search::Searcher;
-use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CleanupTask, CollectTask, ManagerCommand};
-
-use super::auth::create_auth_listener;
 use super::response;
 
 /// Add url to queue
@@ -68,76 +70,12 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
         })
         .await;
 
-    if let Some((client_id, client_secret, scopes)) = connection_secret(&api_id) {
-        let mut listener = create_auth_listener().await;
-        let client_type = match api_id.as_str() {
-            "calendar.google.com" => ClientType::Calendar,
-            "drive.google.com" => ClientType::Drive,
-            _ => ClientType::Drive,
-        };
-        let mut client = GoogClient::new(
-            client_type,
-            &client_id,
-            &client_secret,
-            &format!("http://127.0.0.1:{}", listener.port()),
-            Default::default(),
-        )?;
-
-        let request = client.authorize(&scopes);
-        let _ = open::that(request.url.to_string());
-
-        log::debug!("listening for auth code");
-        if let Some(auth) = listener.listen(60 * 5).await {
-            log::debug!("received oauth credentials: {:?}", auth);
-            match client
-                .token_exchange(&auth.code, &request.pkce_verifier)
-                .await
-            {
-                Ok(token) => {
-                    let mut creds = Credentials::default();
-                    creds.refresh_token(&token);
-                    let _ = client.set_credentials(&creds);
-
-                    let user = client
-                        .get_user()
-                        .await
-                        .expect("Unable to get account information");
-
-                    let new_conn = connection::ActiveModel::new(
-                        api_id.clone(),
-                        user.email.clone(),
-                        creds.access_token.secret().to_string(),
-                        creds.refresh_token.map(|t| t.secret().to_string()),
-                        creds
-                            .expires_in
-                            .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)),
-                        auth.scopes,
-                    );
-                    let res = new_conn.insert(&state.db).await;
-                    match res {
-                        Ok(_) => {
-                            log::debug!("saved connection {} for {}", user.email.clone(), api_id);
-                            let _ = state
-                                .schedule_work(ManagerCommand::Collect(
-                                    CollectTask::ConnectionSync {
-                                        api_id,
-                                        account: user.email,
-                                    },
-                                ))
-                                .await;
-                        }
-                        Err(err) => log::error!("Unable to save connection: {}", err.to_string()),
-                    }
-                }
-                Err(err) => log::error!("unable to exchange token: {}", err),
-            }
-        }
-
-        Ok(())
-    } else {
+    if let Err(err) = handle_authorize_connection(&state, &api_id).await {
         Err(Error::Custom(format!(
-            "Connection <{api_id}> not supported"
+            "Unable to authorize {api_id}: {err}"
         )))
+    } else {
+        Ok(())
     }
 }
 
@@ -206,10 +144,13 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
 #[instrument(skip(state))]
 pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, Error> {
-    match connection::Entity::find().all(&state.db).await {
+    match entities::models::connection::Entity::find()
+        .all(&state.db)
+        .await
+    {
         Ok(enabled) => {
             // TODO: Move this into a config / db table?
-            let all_conns = oauth::supported_connections();
+            let all_conns = credentials::supported_connections();
             let supported = all_conns
                 .values()
                 .cloned()
@@ -221,6 +162,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
                 .map(|conn| UserConnection {
                     id: conn.api_id.clone(),
                     account: conn.account.clone(),
+                    is_syncing: conn.is_syncing,
                 })
                 .collect::<Vec<UserConnection>>();
 
@@ -236,7 +178,7 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
 /// List of installed lenses
 #[instrument(skip(state))]
 pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, Error> {
-    let stats = get_library_stats(state.db).await.unwrap_or_default();
+    let stats = get_library_stats(&state.db).await.unwrap_or_default();
     let mut lenses: Vec<LensResult> = state
         .lenses
         .iter()
@@ -275,13 +217,111 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                 progress,
                 html_url: None,
                 download_url: None,
+                lens_type: shared::response::LensType::Lens,
             }
         })
         .collect();
 
+    if let Some(result) =
+        build_filesystem_information(&state, stats.get(filesystem::FILES_LENS)).await
+    {
+        lenses.push(result);
+    }
+
+    add_connections_information(&state, &mut lenses, &stats).await;
+
     lenses.sort_by(|x, y| x.label.to_lowercase().cmp(&y.label.to_lowercase()));
 
     Ok(lenses)
+}
+
+// Helper method used to add a len result for all api connections
+async fn add_connections_information(
+    state: &AppState,
+    lenses: &mut Vec<LensResult>,
+    stats: &HashMap<String, LibraryStats>,
+) {
+    let connections = get_all_connections(&state.db).await;
+    for connection in connections {
+        let api_id = connection.api_id;
+        let lens_name = connection::api_id_to_lens(&api_id);
+        if let Some(stats) = lens_name.and_then(|s| stats.get(s)) {
+            if let Some((title, description)) = connection::get_api_description(&api_id) {
+                let progress = if connection.is_syncing {
+                    InstallStatus::Installing {
+                        percent: 0,
+                        status: "Syncing...".into(),
+                    }
+                } else {
+                    InstallStatus::Finished {
+                        num_docs: stats.indexed as u32,
+                    }
+                };
+
+                lenses.push(LensResult {
+                    author: String::from("spyglass-search"),
+                    name: api_id.clone(),
+                    label: String::from(title),
+                    description: String::from(description),
+                    progress,
+                    lens_type: shared::response::LensType::API,
+                    ..Default::default()
+                });
+            }
+        }
+    }
+}
+
+// Helper method used to build a len result for the filesystem
+async fn build_filesystem_information(
+    state: &AppState,
+    lens_stats: Option<&LibraryStats>,
+) -> Option<LensResult> {
+    if filesystem::is_watcher_enabled(&state.db).await {
+        let watcher = state.file_watcher.lock().await;
+        let ref_watcher = watcher.as_ref();
+        if let Some(watcher) = ref_watcher {
+            let total_paths = watcher.processed_path_count().await as u32;
+            let mut indexed: u32 = 0;
+            let mut failed: u32 = 0;
+            if let Some(stats) = lens_stats {
+                indexed = stats.indexed as u32;
+                failed = stats.failed as u32;
+            }
+            let total_finished = indexed + failed;
+
+            let path = watcher.initializing_path().await;
+            let mut status = InstallStatus::Finished { num_docs: indexed };
+            if total_finished < total_paths {
+                let percent = ((indexed * 100) / total_paths) as i32;
+                let status_msg = match path {
+                    Some(path) => format!("Walking path {path}"),
+                    None => String::from("Processing local files..."),
+                };
+                status = InstallStatus::Installing {
+                    percent,
+                    status: status_msg,
+                }
+            }
+
+            Some(LensResult {
+            author: String::from("spyglass-search"),
+            name: String::from("local-file-system"),
+            label: String::from("Local File System"),
+            description: String::from("Provides indexing for local files. All content is processed locally and stored locally! Contents of supported file types will be indexed. All unsupported file types and directories will be indexed based on their path, name and extension."),
+            hash: String::from("N/A"),
+            file_path: None,
+            progress: status,
+            html_url: None,
+            download_url: None,
+            lens_type: shared::response::LensType::Internal
+        })
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {
@@ -424,7 +464,7 @@ pub async fn search(
                             .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                             .collect::<Vec<(String, String)>>();
 
-                        let mut result = SearchResult {
+                        let result = SearchResult {
                             doc_id: doc_id.to_string(),
                             domain: domain.as_text().unwrap_or_default().to_string(),
                             title: title.as_text().unwrap_or_default().to_string(),
@@ -435,7 +475,6 @@ pub async fn search(
                             score,
                         };
 
-                        result.description.truncate(256);
                         results.push(result);
                     }
                     _ => {
@@ -482,6 +521,13 @@ pub async fn search(
     Ok(SearchResults { results, meta })
 }
 
+#[derive(FromQueryResult)]
+struct LensSearch {
+    author: Option<String>,
+    name: String,
+    description: Option<String>,
+}
+
 /// Search the user's installed lenses
 #[instrument(skip(state))]
 pub async fn search_lenses(
@@ -489,47 +535,39 @@ pub async fn search_lenses(
     param: request::SearchLensesParam,
 ) -> Result<SearchLensesResp, Error> {
     let mut results = Vec::new();
-
-    let query_results = lens::Entity::find()
-        // Filter either by the trigger name, which is configurable by the user.
-        .filter(lens::Column::Trigger.like(&format!("%{}%", &param.query)))
-        // Ignored disabled lenses
-        .filter(lens::Column::IsEnabled.eq(true))
+    let query_result = tag::Entity::find()
+        .column_as(tag::Column::Value, "name")
+        .column_as(lens::Column::Author, "author")
+        .column_as(lens::Column::Description, "description")
+        .filter(tag::Column::Label.eq(TagType::Lens))
+        .filter(tag::Column::Value.like(&format!("%{}%", &param.query)))
+        // Pull in lens metadata
+        .join_rev(
+            JoinType::LeftJoin,
+            lens::Entity::belongs_to(tag::Entity)
+                .from(lens::Column::Name)
+                .to(tag::Column::Value)
+                .into(),
+        )
         // Order by trigger name, case insensitve
-        .order_by_asc(Expr::cust("lower(trigger)"))
+        .order_by_asc(Expr::cust("lower(value)"))
+        .into_model::<LensSearch>()
         .all(&state.db)
-        .await;
+        .await
+        .unwrap_or_default();
 
-    match query_results {
-        Ok(query_results) => {
-            for lens in query_results {
-                let label = lens
-                    .trigger
-                    .map(|label| {
-                        if label.is_empty() {
-                            lens.name.clone()
-                        } else {
-                            label
-                        }
-                    })
-                    .unwrap_or_else(|| lens.name.clone());
-
-                results.push(LensResult {
-                    author: lens.author,
-                    name: lens.name,
-                    label,
-                    description: lens.description.unwrap_or_default(),
-                    ..Default::default()
-                });
-            }
-
-            Ok(SearchLensesResp { results })
-        }
-        Err(err) => {
-            log::error!("Unable to search lenses: {:?}", err);
-            Err(Error::Custom(err.to_string()))
-        }
+    for lens in query_result {
+        let label = lens.name.clone();
+        results.push(LensResult {
+            author: lens.author.unwrap_or("spyglass-search".into()),
+            name: label.clone(),
+            label,
+            description: lens.description.unwrap_or_default(),
+            ..Default::default()
+        });
     }
+
+    Ok(SearchLensesResp { results })
 }
 
 #[instrument(skip(state))]
@@ -697,7 +735,7 @@ mod test {
 
         let model = doc.insert(&db).await.expect("Unable to insert doc");
         let doc: indexed_document::ActiveModel = model.into();
-        doc.insert_tags(&db, &vec![(TagType::Lens, lens.name.clone())])
+        doc.insert_tags(&db, &[(TagType::Lens, lens.name.clone())])
             .await
             .expect("Unable to insert tags");
 

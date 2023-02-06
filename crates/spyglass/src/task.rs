@@ -8,11 +8,12 @@ use shared::config::Config;
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;
 use crate::search::lens::{load_lenses, read_lenses};
+use crate::search::Searcher;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
 
 mod manager;
-mod worker;
+pub mod worker;
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -124,7 +125,7 @@ pub async fn manager_task(
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             } else {
-                                queue_check_interval = tokio::time::interval(Duration::from_millis(100));
+                                queue_check_interval = tokio::time::interval(Duration::from_millis(50));
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             }
@@ -244,17 +245,7 @@ pub async fn worker_task(
                                 log::debug!("committing {} new/updated docs in index", updated_docs);
                                 updated_docs = 0;
                                 tokio::spawn(async move {
-                                    match state.index.writer.lock() {
-                                        Ok(mut writer) => {
-                                            let _ = writer.commit();
-                                        }
-                                        Err(err) => {
-                                            log::debug!(
-                                                "Unable to acquire lock on index writer: {}",
-                                                err.to_string()
-                                            )
-                                        }
-                                    }
+                                    let _ = Searcher::save(&state).await;
                                 });
                             }
                         }

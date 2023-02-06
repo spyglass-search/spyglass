@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
+use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, Set, Statement,
 };
@@ -130,28 +133,42 @@ pub async fn indexed_stats(
     Ok(res)
 }
 
-/// Inserts an entry into the tag table for each document and
-/// tag pair provided
-pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &[Model],
+pub async fn insert_many(
+    db: &impl ConnectionTrait,
+    docs: Vec<ActiveModel>,
+) -> Result<InsertResult<ActiveModel>, DbErr> {
+    Entity::insert_many(docs)
+        .on_conflict(
+            OnConflict::columns(vec![Column::Url])
+                .update_column(Column::UpdatedAt)
+                .to_owned(),
+        )
+        .exec(db)
+        .await
+}
+
+pub async fn insert_tags_for_docs<C: ConnectionTrait>(
     db: &C,
-    tags: &[TagPair],
+    docs: &[Model],
+    tags: &[i64],
 ) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
-    let mut tag_models: Vec<tag::Model> = Vec::new();
-    for (label, value) in tags.iter() {
-        match get_or_create(db, label.to_owned(), value).await {
-            Ok(tag) => tag_models.push(tag),
-            Err(err) => log::error!("{}", err),
-        }
-    }
+    // Remove dupes before adding
+    let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
+    let doc_ids: Vec<i64> = docs.iter().map(|m| m.id).collect();
+
+    // Remove existing tags for doc
+    let _ = document_tag::Entity::delete_many()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids))
+        .exec(db)
+        .await;
 
     // create connections for each tag
     let doc_tags = docs
         .iter()
         .flat_map(|model| {
-            tag_models.iter().map(|t| document_tag::ActiveModel {
+            tags.iter().map(|t| document_tag::ActiveModel {
                 indexed_document_id: Set(model.id),
-                tag_id: Set(t.id),
+                tag_id: Set(*t),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
                 ..Default::default()
@@ -173,9 +190,27 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
         .await
 }
 
+/// Inserts an entry into the tag table for each document and
+/// tag pair provided
+pub async fn insert_tags_many<C: ConnectionTrait>(
+    db: &C,
+    docs: &[Model],
+    tags: &[TagPair],
+) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+    let mut tag_ids: Vec<i64> = Vec::new();
+    for (label, value) in tags.iter() {
+        match get_or_create(db, label.to_owned(), value).await {
+            Ok(tag) => tag_ids.push(tag.id),
+            Err(err) => log::error!("{}", err),
+        }
+    }
+
+    insert_tags_for_docs(db, docs, &tag_ids).await
+}
+
 /// Remove documents from the indexed_document table that match `rule`. Rule is expected
 /// to be a SQL like statement.
-pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {
+pub async fn delete_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Result<Vec<String>> {
     let matching = Entity::find()
         .filter(Column::Url.like(rule))
         .all(db)
@@ -188,16 +223,7 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
 
     if !removed.is_empty() {
         let ids = removed.iter().map(|(id, _)| *id).collect::<Vec<i64>>();
-        let _ = document_tag::Entity::delete_many()
-            .filter(document_tag::Column::IndexedDocumentId.is_in(ids))
-            .exec(db)
-            .await?;
-
-        let _ = Entity::delete_many()
-            .filter(Column::Url.like(rule))
-            .exec(db)
-            .await?;
-
+        delete_many_by_id(db, &ids).await?;
         log::info!("removed {} docs due to '{}'", removed.len(), rule);
     }
 
@@ -205,6 +231,43 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .into_iter()
         .map(|(_id, doc_id)| doc_id)
         .collect::<Vec<String>>())
+}
+
+/// Helper method used to delete multiple documents by id. This method will first
+/// delete all related tag references before deleting the documents
+pub async fn delete_many_by_id(
+    db: &DatabaseConnection,
+    dbids: &[i64],
+) -> Result<u64, sea_orm::DbErr> {
+    // Delete all associated tags
+    document_tag::Entity::delete_many()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(dbids.to_owned()))
+        .exec(db)
+        .await?;
+
+    // Delete item
+    let res = Entity::delete_many()
+        .filter(Column::Id.is_in(dbids.to_owned()))
+        .exec(db)
+        .await?;
+
+    Ok(res.rows_affected)
+}
+
+/// Helper method used to delete multiple documents by url. This method will first
+/// delete all related tag references before deleting the documents
+pub async fn delete_many_by_url(
+    db: &DatabaseConnection,
+    urls: Vec<String>,
+) -> Result<u64, sea_orm::DbErr> {
+    let entries = Entity::find()
+        .filter(Column::Url.is_in(urls))
+        .all(db)
+        .await?;
+
+    let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
+
+    delete_many_by_id(db, &id_list).await
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -240,7 +303,7 @@ mod test {
     use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, ModelTrait, Set};
 
     #[tokio::test]
-    async fn test_remove_by_rule() {
+    async fn test_delete_by_rule() {
         let db = setup_test_db().await;
 
         let doc = super::ActiveModel {
@@ -258,7 +321,7 @@ mod test {
         };
         doc.save(&db).await.unwrap();
 
-        let removed = super::remove_by_rule(&db, "https://en.wikipedia.com/%action=%")
+        let removed = super::delete_by_rule(&db, "https://en.wikipedia.com/%action=%")
             .await
             .unwrap();
         assert_eq!(removed.len(), 1);

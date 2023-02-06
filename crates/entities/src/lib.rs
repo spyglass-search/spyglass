@@ -6,6 +6,9 @@ pub mod test;
 pub use sea_orm;
 use sea_orm::{DatabaseConnection, DbBackend, DbErr, FromQueryResult, Statement};
 use shared::response::LibraryStats;
+
+pub const BATCH_SIZE: usize = 5000;
+
 #[derive(Debug, FromQueryResult)]
 pub struct CountByStatus {
     count: i32,
@@ -14,7 +17,7 @@ pub struct CountByStatus {
 }
 
 pub async fn get_library_stats(
-    db: DatabaseConnection,
+    db: &DatabaseConnection,
 ) -> Result<HashMap<String, LibraryStats>, DbErr> {
     let counts = CountByStatus::find_by_statement(Statement::from_string(
         DbBackend::Sqlite,
@@ -37,7 +40,7 @@ pub async fn get_library_stats(
         "#
         .to_string(),
     ))
-    .all(&db)
+    .all(db)
     .await?;
 
     let mut stats: HashMap<String, LibraryStats> = HashMap::new();
@@ -46,8 +49,12 @@ pub async fn get_library_stats(
             .entry(count.name.clone())
             .or_insert_with(|| LibraryStats::new(&count.name));
         match count.status.as_str() {
-            "Completed" | "Failed" => {
+            "Completed" => {
                 entry.crawled += count.count;
+            }
+            "Failed" => {
+                entry.crawled += count.count;
+                entry.failed += count.count;
             }
             "Queued" | "Processing" => {
                 entry.enqueued += count.count;

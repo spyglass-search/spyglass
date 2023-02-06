@@ -69,42 +69,6 @@ pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
     }
 }
 
-#[derive(Properties, PartialEq)]
-pub struct DeleteDomainButtonProps {
-    pub domain: String,
-    pub ondelete: Option<Callback<MouseEvent>>,
-}
-
-#[function_component(DeleteDomainButton)]
-pub fn delete_button(props: &DeleteDomainButtonProps) -> Html {
-    let onclick = {
-        let domain = props.domain.clone();
-        let callback = props.ondelete.clone();
-
-        Callback::from(move |me| {
-            let domain = domain.clone();
-            let callback = callback.clone();
-
-            spawn_local(async move {
-                let _ = crate::delete_domain(domain.clone()).await;
-            });
-
-            if let Some(callback) = callback {
-                callback.emit(me);
-            }
-        })
-    };
-
-    html! {
-        <button
-            {onclick}
-            class="hover:text-red-600 text-neutral-600 group flex flex-row">
-            <icons::TrashIcon height={"h-4"} width={"w-4"} />
-            <span class="pl-1">{"Delete"}</span>
-        </button>
-    }
-}
-
 #[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
     Default,

@@ -86,3 +86,14 @@ run-client-dev:
 
 run-client-headless:
 	cd ./crates/client && HEADLESS_CLIENT=true trunk serve
+
+upload-debug-symbols-windows:
+	cargo build -p spyglass --profile sentry
+	npx sentry-cli difutil check target/sentry/spyglass.exe
+	npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass.exe
+	mkdir -p crates/tauri/binaries
+	cp target/sentry/spyglass.exe crates/tauri/binaries/spyglass-server-x86_64-pc-windows-msvc.exe
+	cd crates/client && trunk build
+	cargo build -p spyglass-app --profile sentry
+	npx sentry-cli difutil check target/sentry/spyglass-app.exe
+	npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app.exe

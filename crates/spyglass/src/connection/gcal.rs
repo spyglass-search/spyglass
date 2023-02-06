@@ -1,19 +1,27 @@
-use entities::models::crawl_queue::{CrawlType, EnqueueSettings};
+use entities::models::connection;
 use entities::models::tag::{TagPair, TagType};
-use entities::sea_orm::{ActiveModelTrait, Set};
 use jsonrpsee::core::async_trait;
-use libgoog::auth::{AccessToken, RefreshToken};
-use libgoog::{Credentials, GoogClient};
-use std::time::Duration;
+use libgoog::types::CalendarEvent;
+use libgoog::GoogClient;
 
 use crate::crawler::{CrawlError, CrawlResult};
-use crate::oauth;
+use crate::documents::process_crawl_results;
 use crate::state::AppState;
-use entities::models::{connection, crawl_queue};
 use url::Url;
 
-use super::Connection;
+use super::credentials::connection_secret;
+use super::{handle_sync_credentials, load_credentials, Connection};
 
+/// The api id for google calendar connections
+pub const API_ID: &str = "calendar.google.com";
+/// The lens name for indexed documents from google calendar
+pub const LENS: &str = "Calendar";
+/// The title for google calendar connections
+pub const TITLE: &str = "Google Calendar";
+/// The description for google calendar connections
+pub const DESCRIPTION: &str = "Adds indexing support for Google calendar events.";
+
+const BUFFER_SYNC_SIZE: usize = 500;
 pub struct GCalConnection {
     client: GoogClient,
     user: String,
@@ -21,65 +29,24 @@ pub struct GCalConnection {
 
 impl GCalConnection {
     pub async fn new(state: &AppState, account: &str) -> anyhow::Result<Self> {
-        // Load credentials from db
-        let creds = connection::get_by_id(&state.db, &Self::id(), account)
-            .await?
-            .expect("No credentials matching that id");
+        let credentials = load_credentials(&state.db, &Self::id(), account).await?;
+        let (client_id, client_secret, _) =
+            connection_secret(&Self::id()).expect("Connection not supported");
 
-        let credentials = Credentials {
-            access_token: AccessToken::new(creds.access_token),
-            refresh_token: creds.refresh_token.map(RefreshToken::new),
-            requested_at: creds.granted_at,
-            expires_in: creds.expires_in.map(|d| Duration::from_secs(d as u64)),
-        };
+        let mut client = GoogClient::new(
+            libgoog::ClientType::Calendar,
+            &client_id,
+            &client_secret,
+            "http://localhost:0",
+            credentials,
+        )?;
 
-        if let Some((client_id, client_secret, _)) = oauth::connection_secret(&Self::id()) {
-            let mut client = GoogClient::new(
-                libgoog::ClientType::Calendar,
-                &client_id,
-                &client_secret,
-                "http://localhost:0",
-                credentials,
-            )?;
+        handle_sync_credentials(&mut client, &state.db, &Self::id(), account).await;
 
-            // Update credentials in database whenever we refresh the token.
-            {
-                let state = state.clone();
-                let account = account.to_string();
-                client.set_on_refresh(move |new_creds| {
-                    log::debug!("received new credentials");
-                    let account = account.clone();
-                    let state = state.clone();
-                    let new_creds = new_creds.clone();
-                    tokio::spawn(async move {
-                        if let Ok(Some(conn)) =
-                            connection::get_by_id(&state.db, &Self::id(), &account).await
-                        {
-                            let mut update: connection::ActiveModel = conn.into();
-                            update.access_token = Set(new_creds.access_token.secret().to_string());
-                            // Refresh tokens are optionally sent
-                            if let Some(refresh_token) = new_creds.refresh_token {
-                                update.refresh_token =
-                                    Set(Some(refresh_token.secret().to_string()));
-                            }
-                            update.expires_in = Set(new_creds
-                                .expires_in
-                                .map_or_else(|| None, |dur| Some(dur.as_secs() as i64)));
-                            update.granted_at = Set(chrono::Utc::now());
-                            let res = update.save(&state.db).await;
-                            log::debug!("credentials updated: {:?}", res);
-                        }
-                    });
-                });
-            }
-
-            Ok(Self {
-                client,
-                user: account.to_string(),
-            })
-        } else {
-            Err(anyhow::anyhow!("Connection not supported"))
-        }
+        Ok(Self {
+            client,
+            user: account.to_string(),
+        })
     }
 
     pub fn to_url(&self, cal_id: &str, event_id: &str) -> Url {
@@ -94,50 +61,47 @@ impl GCalConnection {
 #[async_trait]
 impl Connection for GCalConnection {
     fn id() -> String {
-        "calendar.google.com".to_string()
+        API_ID.to_string()
     }
 
     fn user(&self) -> String {
         self.user.clone()
     }
 
+    fn default_tags(&self) -> Vec<TagPair> {
+        vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
+    }
+
     async fn sync(&mut self, state: &AppState) {
-        log::debug!("syncing w/ connection");
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
+        log::debug!("syncing w/ connection: {}", &Self::id());
 
         // stream pages of files from the integration & add them to the crawl queue
         let mut next_page = None;
         let mut num_events = 0;
 
+        let mut buffer = Vec::new();
+
         // Grab the next page of files
         while let Ok(events) = self.client.list_calendar_events("primary", next_page).await {
             next_page = events.next_page_token;
             num_events += events.items.len();
+            buffer.extend(events.items);
 
-            let urls = events
-                .items
-                .iter()
-                .map(|event| self.to_url("primary", &event.id).to_string())
-                .collect::<Vec<String>>();
+            if buffer.len() > BUFFER_SYNC_SIZE || next_page.is_none() {
+                let mut events = Vec::new();
+                for event in &buffer {
+                    let api_uri = self.to_url("primary", &event.id);
+                    log::debug!("gcal event: {}", event.summary);
+                    events.push(event_to_crawl(&api_uri, event));
+                }
 
-            // Enqueue URIs
-            let enqueue_settings = EnqueueSettings {
-                crawl_type: CrawlType::Api,
-                tags: vec![(TagType::Source, GCalConnection::id())],
-                force_allow: true,
-                is_recrawl: true,
-            };
+                if let Err(err) = process_crawl_results(state, &events, &self.default_tags()).await
+                {
+                    log::error!("Unable to add gcal events: {}", err);
+                }
 
-            if let Err(err) = crawl_queue::enqueue_all(
-                &state.db,
-                &urls,
-                &[],
-                &state.user_settings,
-                &enqueue_settings,
-                None,
-            )
-            .await
-            {
-                log::error!("Unable to enqueue: {}", err.to_string());
+                buffer.clear();
             }
 
             if next_page.is_none() {
@@ -145,6 +109,7 @@ impl Connection for GCalConnection {
             }
         }
 
+        let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
         log::debug!("synced {} events", num_events);
     }
 
@@ -163,37 +128,9 @@ impl Connection for GCalConnection {
                 .await
             {
                 Ok(event) => {
-                    let mut tags: Vec<TagPair> = Vec::new();
-                    for attendee in &event.attendees {
-                        if attendee.is_organizer {
-                            tags.push((TagType::Owner, attendee.email.clone()));
-                        } else {
-                            tags.push((TagType::SharedWith, attendee.email.clone()));
-                        }
-                    }
-
-                    let content = if event.attendees.is_empty() {
-                        event.description.unwrap_or_default()
-                    } else {
-                        let attendees = event
-                            .attendees
-                            .iter()
-                            .map(|item| format!("{} <{}>", item.email, item.display_name))
-                            .collect::<Vec<String>>()
-                            .join(";");
-
-                        format!(
-                            "Attendees: {}\n{}",
-                            attendees,
-                            &event.description.unwrap_or_default()
-                        )
-                    };
-                    let title = format!("{} ({})", &event.summary, event.start.date);
-                    let mut crawl_result =
-                        CrawlResult::new(uri, Some(event.html_link), &content, &title, None);
-                    crawl_result.tags = tags;
-
-                    Ok(crawl_result)
+                    let mut event = event_to_crawl(uri, &event);
+                    event.tags.extend(self.default_tags());
+                    Ok(event)
                 }
                 Err(err) => Err(CrawlError::FetchError(err.to_string())),
             };
@@ -201,4 +138,28 @@ impl Connection for GCalConnection {
 
         Err(CrawlError::FetchError("Invalid URL".to_string()))
     }
+}
+
+fn event_to_crawl(api_url: &Url, event: &CalendarEvent) -> CrawlResult {
+    let mut tags: Vec<TagPair> = Vec::new();
+    for attendee in &event.attendees {
+        if attendee.is_organizer {
+            tags.push((TagType::Owner, attendee.email.clone()));
+        } else {
+            tags.push((TagType::SharedWith, attendee.email.clone()));
+        }
+    }
+
+    let content = event.description.clone().unwrap_or_default();
+    let title = format!("{} ({})", &event.summary, event.start.date);
+    let mut crawl_result = CrawlResult::new(
+        api_url,
+        Some(event.html_link.clone()),
+        &content,
+        &title,
+        None,
+    );
+    crawl_result.tags = tags;
+
+    crawl_result
 }
