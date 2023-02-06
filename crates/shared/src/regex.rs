@@ -17,6 +17,7 @@ pub fn regex_for_domain(domain: &str) -> String {
 }
 
 pub fn regex_for_prefix(prefix: &str) -> String {
+    let prefix = regex::escape(prefix);
     if prefix.ends_with('$') {
         return format!("^{prefix}");
     }
