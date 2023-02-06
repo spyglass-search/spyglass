@@ -267,7 +267,7 @@ dependencies = [
 [[package]]
 name = "auth_core"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2ab239c595b31ef07eea11f0be20cb67b134f273#2ab239c595b31ef07eea11f0be20cb67b134f273"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -282,6 +282,7 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
+ "thiserror",
  "tokio",
  "url",
 ]
@@ -2102,7 +2103,7 @@ dependencies = [
 [[package]]
 name = "github"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2ab239c595b31ef07eea11f0be20cb67b134f273#2ab239c595b31ef07eea11f0be20cb67b134f273"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2370,7 +2371,7 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2ab239c595b31ef07eea11f0be20cb67b134f273#2ab239c595b31ef07eea11f0be20cb67b134f273"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
 dependencies = [
  "anyhow",
  "async-trait",
