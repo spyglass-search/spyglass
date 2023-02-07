@@ -48,9 +48,9 @@
 - [x] Google Calendar events.
 - [x] Google Drive docs.
 - [x] GitHub repos, starred repos, & issues.
-- [] Gmail
-- [] YouTube playlists & favorited.
-- [] Reddit saved/upvoted posts.
+- [ ] Gmail
+- [ ] YouTube playlists & favorited.
+- [ ] Reddit saved/upvoted posts.
 
 
 ## Introduction
