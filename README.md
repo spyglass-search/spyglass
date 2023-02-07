@@ -36,7 +36,7 @@
 
 <p align="center">
     <br/>
-    <img src="docs/spyglass-poc.gif">
+    <img src="docs/spyglass-showcase.gif" style="border-radius: 8px">
 </p>
 
 ## Introduction
