@@ -36,8 +36,22 @@
 
 <p align="center">
     <br/>
-    <img src="docs/spyglass-poc.gif">
+    <img src="docs/spyglass-showcase.gif" style="border-radius: 8px">
 </p>
+
+
+## Create your library from:
+- [x] Local documents/folders
+- [x] Different internet topics (https://lenses.spyglass.fyi).
+    - Lots of developer docs (Rustlang, Go, etc.)
+    - Wikpedia, game wikis, etc.
+- [x] Google Calendar events.
+- [x] Google Drive docs.
+- [x] GitHub repos, starred repos, & issues.
+- [] Gmail
+- [] YouTube playlists & favorited.
+- [] Reddit saved/upvoted posts.
+
 
 ## Introduction
 
@@ -76,6 +90,9 @@ Spyglass expands on the ideas outlined in [this paper][googles-paper] by the
 Brave Search Team. There are currently a simple set of rules that will point Spyglass
 at a website and crawl only what you want. When available, crawling is
 bootstrapped w/ data from the Internet Archive to not overwhelm smaller websites.
+
+**For community lenses, we precrawl & preprocess these lenses so that you can get started
+searching through those topics immediately.**
 
 Not all websites & not all data can be crawled by Spyglass. If you have something
 that you'd like to index and would like some help, feel free to ping me on
