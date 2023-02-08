@@ -1202,7 +1202,8 @@ mod test {
             "https://www.reddit.com/submit?title=The%20Epic%20of%20Humanity&url=https://bahaiworld.bahai.org/library/the-epic-of-humanity".into()
         ];
 
-        let mut filtered = filter_urls(&[lens], &settings, &overrides, &to_enqueue);
+        let mut filtered = filter_urls(&[lens], &settings, &overrides, &to_enqueue)
+            .expect("Unable to filter urls");
         assert_eq!(filtered.len(), 1);
         assert_eq!(
             filtered.pop(),
