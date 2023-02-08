@@ -75,10 +75,18 @@ pub fn get_shortcut_destination(path: &Path) -> Option<PathBuf> {
     if let Ok(shortcut) = shortcut {
         if let Some(link_info) = &shortcut.link_info() {
             if link_info.local_base_path().is_some() {
-                return Some(PathBuf::from(link_info.local_base_path().clone().unwrap()));
+                return Some(PathBuf::from(
+                    link_info
+                        .local_base_path()
+                        .clone()
+                        .expect("Expected local_base_path"),
+                ));
             } else if link_info.local_base_path_unicode().is_some() {
                 return Some(PathBuf::from(
-                    link_info.local_base_path_unicode().clone().unwrap(),
+                    link_info
+                        .local_base_path_unicode()
+                        .clone()
+                        .expect("Expected local_base_path_unicode"),
                 ));
             }
         }
@@ -139,14 +147,16 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
 pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
     let plugin_settings = state.user_settings.plugin_settings.clone();
     if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
-        let dir_list = local_file_settings.get("FOLDERS_LIST");
+        let dir_list = local_file_settings
+            .get("FOLDERS_LIST")
+            .map(|f| f.to_owned())
+            .unwrap_or_default();
 
-        let directories =
-            if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(dir_list.unwrap().as_str()) {
-                dirs
-            } else {
-                HashSet::new()
-            };
+        let directories = if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(&dir_list) {
+            dirs
+        } else {
+            HashSet::new()
+        };
 
         directories
             .iter()
@@ -163,8 +173,11 @@ pub fn get_supported_file_extensions(state: &AppState) -> HashSet<String> {
     let plugin_settings = state.user_settings.plugin_settings.clone();
 
     if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
-        let ext_list = local_file_settings.get("EXTS_LIST");
-        if let Ok(exts) = serde_json::from_str::<HashSet<String>>(ext_list.unwrap().as_str()) {
+        let ext_list = local_file_settings
+            .get("EXTS_LIST")
+            .map(|s| s.to_owned())
+            .unwrap_or_default();
+        if let Ok(exts) = serde_json::from_str::<HashSet<String>>(&ext_list) {
             return exts;
         }
     }
@@ -180,10 +193,14 @@ pub fn is_ignore_file(path: &Path) -> bool {
 }
 
 /// Helper method used to convert a gitignore file into a processed gitignore object
-pub fn patterns_from_file(path: &Path) -> Result<Gitignore, Error> {
-    let mut builder = ignore::gitignore::GitignoreBuilder::new(path.parent().unwrap());
-    builder.add(path);
-    builder.build()
+pub fn patterns_from_file(path: &Path) -> anyhow::Result<Gitignore, Error> {
+    if let Some(parent) = path.parent() {
+        let mut builder = ignore::gitignore::GitignoreBuilder::new(parent);
+        builder.add(path);
+        builder.build()
+    } else {
+        Err(ignore::Error::InvalidDefinition)
+    }
 }
 
 /// Helper method used to identify if the provided path is in a "hidden" directory.

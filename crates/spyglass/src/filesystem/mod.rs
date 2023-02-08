@@ -467,20 +467,36 @@ impl SpyglassFileWatcher {
                 match files.remove(&item.file_path) {
                     Some((file_path, file_last_mod)) => {
                         if file_last_mod > item.last_modified {
-                            debounced_events.push(DebouncedEvent {
-                                path: utils::uri_to_path(&file_path).unwrap(),
-                                kind: DebouncedEventKind::Any,
-                            });
-                            to_recrawl.push((item.file_path, file_last_mod));
+                            match utils::uri_to_path(&file_path) {
+                                Ok(path) => {
+                                    debounced_events.push(DebouncedEvent {
+                                        path,
+                                        kind: DebouncedEventKind::Any,
+                                    });
+                                    to_recrawl.push((item.file_path, file_last_mod));
+                                }
+                                Err(err) => {
+                                    log::error!(
+                                        "uri_to_path failed on {} due to {}",
+                                        file_path,
+                                        err
+                                    );
+                                }
+                            }
                         }
                     }
-                    None => {
-                        debounced_events.push(DebouncedEvent {
-                            path: utils::uri_to_path(&item.file_path).unwrap(),
-                            kind: DebouncedEventKind::Any,
-                        });
-                        to_delete.push(item.id)
-                    }
+                    None => match utils::uri_to_path(&item.file_path) {
+                        Ok(path) => {
+                            debounced_events.push(DebouncedEvent {
+                                path,
+                                kind: DebouncedEventKind::Any,
+                            });
+                            to_delete.push(item.id)
+                        }
+                        Err(err) => {
+                            log::error!("uri_to_path failed on {} due to {}", item.file_path, err);
+                        }
+                    },
                 }
             }
         }
@@ -505,17 +521,21 @@ impl SpyglassFileWatcher {
         if !files.is_empty() {
             let models = files
                 .iter()
-                .map(|path_ref| {
-                    debounced_events.push(DebouncedEvent {
-                        path: utils::uri_to_path(path_ref.key()).unwrap(),
-                        kind: DebouncedEventKind::Any,
-                    });
+                .filter_map(|path_ref| {
+                    if let Ok(path) = utils::uri_to_path(path_ref.key()) {
+                        debounced_events.push(DebouncedEvent {
+                            path,
+                            kind: DebouncedEventKind::Any,
+                        });
 
-                    let mut active_model = processed_files::ActiveModel::new();
-                    active_model.file_path = Set(path_ref.key().clone());
-                    active_model.last_modified = Set(*path_ref.value());
+                        let mut active_model = processed_files::ActiveModel::new();
+                        active_model.file_path = Set(path_ref.key().clone());
+                        active_model.last_modified = Set(*path_ref.value());
 
-                    active_model
+                        Some(active_model)
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<processed_files::ActiveModel>>();
 
