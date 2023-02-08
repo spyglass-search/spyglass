@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use regex::RegexSet;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
@@ -8,6 +6,8 @@ use sea_orm::{
     QueryOrder, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use thiserror::Error;
 use url::Url;
 
 use super::crawl_tag;
@@ -18,6 +18,14 @@ use shared::config::{LensConfig, LensRule, Limit, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
+
+#[derive(Debug, Error)]
+pub enum EnqueueError {
+    #[error("Database error: {0}")]
+    DbError(#[from] sea_orm::DbErr),
+    #[error("other enqueue error: {0}")]
+    Other(#[from] anyhow::Error),
+}
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
@@ -431,7 +439,7 @@ fn filter_urls(
     settings: &UserSettings,
     overrides: &EnqueueSettings,
     urls: &[String],
-) -> Vec<String> {
+) -> anyhow::Result<Vec<String>> {
     let mut allow_list: Vec<String> = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
     let mut restrict_list: Vec<String> = Vec::new();
@@ -447,12 +455,13 @@ fn filter_urls(
         restrict_list.extend(ruleset.restrict_list);
     }
 
-    let allow_list = RegexSet::new(allow_list).expect("Unable to create allow list");
-    let skip_list = RegexSet::new(skip_list).expect("Unable to create skip list");
-    let restrict_list = RegexSet::new(restrict_list).expect("Unable to create restrict list");
+    let allow_list = RegexSet::new(allow_list)?;
+    let skip_list = RegexSet::new(skip_list)?;
+    let restrict_list = RegexSet::new(restrict_list)?;
 
     // Ignore invalid URLs
-    urls.iter()
+    let res = urls
+        .iter()
         .filter_map(|url| {
             if let Ok(mut parsed) = Url::parse(url) {
                 // Check that we can handle this scheme
@@ -496,7 +505,9 @@ fn filter_urls(
 
             None
         })
-        .collect::<Vec<String>>()
+        .collect::<Vec<String>>();
+
+    Ok(res)
 }
 
 pub async fn enqueue_local_files(
@@ -558,9 +569,9 @@ pub async fn enqueue_all(
     settings: &UserSettings,
     overrides: &EnqueueSettings,
     pipeline: Option<String>,
-) -> anyhow::Result<(), sea_orm::DbErr> {
+) -> anyhow::Result<(), EnqueueError> {
     // Filter URLs
-    let urls = filter_urls(lenses, settings, overrides, urls);
+    let urls = filter_urls(lenses, settings, overrides, urls).unwrap_or_default();
 
     // Ignore urls already indexed
     let mut is_indexed: HashSet<String> = HashSet::with_capacity(urls.len());
@@ -586,7 +597,7 @@ pub async fn enqueue_all(
                 if let Ok(parsed) = Url::parse(&url) {
                     let domain = match parsed.scheme() {
                         "file" => "localhost",
-                        _ => parsed.host_str().expect("Invalid URL host"),
+                        _ => parsed.host_str()?,
                     };
 
                     result = Some(ActiveModel {
