@@ -15,8 +15,8 @@ use shared::request::{SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::RpcServer;
 
+mod handler;
 mod response;
-mod route;
 
 pub struct SpyglassRpc {
     state: AppState,
@@ -30,21 +30,21 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {
-        route::authorize_connection(self.state.clone(), id).await
+        handler::authorize_connection(self.state.clone(), id).await
     }
 
     async fn app_status(&self) -> Result<resp::AppStatus, Error> {
-        route::app_status(self.state.clone()).await
+        handler::app_status(self.state.clone()).await
     }
 
     /// Default folders used in the local file indexer
     async fn default_indices(&self) -> Result<DefaultIndices, Error> {
-        Ok(route::default_indices().await)
+        Ok(handler::default_indices().await)
     }
 
     /// Delete a single doc
     async fn delete_doc(&self, id: String) -> Result<(), Error> {
-        route::delete_doc(self.state.clone(), id).await
+        handler::delete_doc(self.state.clone(), id).await
     }
 
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
@@ -58,11 +58,11 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn list_connections(&self) -> Result<resp::ListConnectionResult, Error> {
-        route::list_connections(self.state.clone()).await
+        handler::list_connections(self.state.clone()).await
     }
 
     async fn list_installed_lenses(&self) -> Result<Vec<resp::LensResult>, Error> {
-        route::list_installed_lenses(self.state.clone()).await
+        handler::list_installed_lenses(self.state.clone()).await
     }
 
     async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
@@ -73,11 +73,11 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn list_plugins(&self) -> Result<Vec<resp::PluginResult>, Error> {
-        route::list_plugins(self.state.clone()).await
+        handler::list_plugins(self.state.clone()).await
     }
 
     async fn recrawl_domain(&self, domain: String) -> Result<(), Error> {
-        route::recrawl_domain(self.state.clone(), domain).await
+        handler::recrawl_domain(self.state.clone(), domain).await
     }
 
     async fn resync_connection(&self, api_id: String, account: String) -> Result<(), Error> {
@@ -118,26 +118,26 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn search_docs(&self, query: SearchParam) -> Result<resp::SearchResults, Error> {
-        route::search(self.state.clone(), query).await
+        handler::search::search_docs(self.state.clone(), query).await
     }
 
     async fn search_lenses(
         &self,
         query: SearchLensesParam,
     ) -> Result<resp::SearchLensesResp, Error> {
-        route::search_lenses(self.state.clone(), query).await
+        handler::search::search_lenses(self.state.clone(), query).await
     }
 
     async fn toggle_pause(&self, is_paused: bool) -> Result<(), Error> {
-        route::toggle_pause(self.state.clone(), is_paused).await
+        handler::toggle_pause(self.state.clone(), is_paused).await
     }
 
     async fn toggle_plugin(&self, name: String, enabled: bool) -> Result<(), Error> {
-        route::toggle_plugin(self.state.clone(), name, enabled).await
+        handler::toggle_plugin(self.state.clone(), name, enabled).await
     }
 
     async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
-        route::uninstall_lens(self.state.clone(), &self.config, &name).await
+        handler::uninstall_lens(self.state.clone(), &self.config, &name).await
     }
 }
 

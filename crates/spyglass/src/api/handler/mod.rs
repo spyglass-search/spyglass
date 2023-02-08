@@ -2,36 +2,34 @@ use directories::UserDirs;
 use entities::get_library_stats;
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
-use entities::models::tag::TagType;
 use entities::models::{
     bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
-    lens, tag,
+    lens,
 };
-use entities::sea_orm;
-use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
-use entities::sea_orm::{FromQueryResult, JoinType, QuerySelect};
+
+use entities::sea_orm::{prelude::*, sea_query, Set};
 use jsonrpsee::core::Error;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::{document_to_struct, Searcher};
+use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, CleanupTask, ManagerCommand};
+use libspyglass::task::AppPause;
 use shared::config::Config;
-use shared::metrics::{self, Event};
+use shared::metrics::Event;
 use shared::request;
 use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
-    PluginResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, SupportedConnection,
-    UserConnection,
+    PluginResult, SupportedConnection, UserConnection,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::SystemTime;
 use tracing::instrument;
 use url::Url;
 
 use super::response;
+
+pub mod search;
 
 /// Add url to queue
 #[allow(dead_code)]
@@ -389,175 +387,6 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<(), Error
     }
 
     Ok(())
-}
-
-/// Search the user's indexed documents
-#[instrument(skip(state))]
-pub async fn search(
-    state: AppState,
-    search_req: request::SearchParam,
-) -> Result<SearchResults, Error> {
-    state
-        .metrics
-        .track(metrics::Event::Search {
-            filters: search_req.lenses.clone(),
-        })
-        .await;
-
-    let start = SystemTime::now();
-    let index = &state.index;
-    let searcher = index.reader.searcher();
-
-    let tags = tag::Entity::find()
-        .filter(tag::Column::Label.eq(tag::TagType::Lens))
-        .filter(tag::Column::Value.is_in(search_req.lenses))
-        .all(&state.db)
-        .await
-        .unwrap_or_default();
-    let tag_ids = tags
-        .iter()
-        .map(|model| model.id as u64)
-        .collect::<Vec<u64>>();
-
-    let docs =
-        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &search_req.query).await;
-
-    let mut results: Vec<SearchResult> = Vec::new();
-    let mut missing: Vec<(String, String)> = Vec::new();
-
-    let terms = search_req.query.split_whitespace().collect::<HashSet<_>>();
-    for (score, doc_addr) in docs {
-        if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
-            log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
-                .one(&state.db)
-                .await;
-
-            let crawl_uri = doc.url;
-            match indexed {
-                Ok(Some(indexed)) => {
-                    let tags = indexed
-                        .find_related(tag::Entity)
-                        .all(&state.db)
-                        .await
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
-                        .collect::<Vec<(String, String)>>();
-
-                    let matched_indices = doc
-                        .content
-                        .split_whitespace()
-                        .enumerate()
-                        .filter(|(_, w)| terms.contains(w))
-                        .map(|(idx, _)| idx)
-                        .collect::<Vec<_>>();
-
-                    dbg!(matched_indices);
-                    let result = SearchResult {
-                        doc_id: doc.doc_id.clone(),
-                        domain: doc.domain,
-                        title: doc.title,
-                        crawl_uri: crawl_uri.clone(),
-                        description: doc.description,
-                        url: indexed.open_url.unwrap_or(crawl_uri),
-                        tags,
-                        score,
-                    };
-
-                    results.push(result);
-                }
-                _ => {
-                    missing.push((doc.doc_id.to_owned(), crawl_uri.to_owned()));
-                }
-            }
-        }
-    }
-
-    let wall_time_ms = SystemTime::now()
-        .duration_since(start)
-        .map_or_else(|_| 0, |duration| duration.as_millis() as u64);
-
-    let meta = SearchMeta {
-        query: search_req.query,
-        num_docs: searcher.num_docs() as u32,
-        wall_time_ms: wall_time_ms as u32,
-    };
-
-    let domains: HashSet<String> = HashSet::from_iter(results.iter().map(|r| r.domain.clone()));
-    state
-        .metrics
-        .track(metrics::Event::SearchResult {
-            num_results: results.len(),
-            domains: domains.iter().cloned().collect(),
-            wall_time_ms,
-        })
-        .await;
-
-    // Send cleanup task for any missing docs
-    if !missing.is_empty() {
-        let mut cmd_tx = state.manager_cmd_tx.lock().await;
-        match &mut *cmd_tx {
-            Some(cmd_tx) => {
-                let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
-                    missing_docs: missing,
-                }));
-            }
-            None => {}
-        }
-    }
-
-    Ok(SearchResults { results, meta })
-}
-
-#[derive(FromQueryResult)]
-struct LensSearch {
-    author: Option<String>,
-    name: String,
-    description: Option<String>,
-}
-
-/// Search the user's installed lenses
-#[instrument(skip(state))]
-pub async fn search_lenses(
-    state: AppState,
-    param: request::SearchLensesParam,
-) -> Result<SearchLensesResp, Error> {
-    let mut results = Vec::new();
-    let query_result = tag::Entity::find()
-        .column_as(tag::Column::Value, "name")
-        .column_as(lens::Column::Author, "author")
-        .column_as(lens::Column::Description, "description")
-        .filter(tag::Column::Label.eq(TagType::Lens))
-        .filter(tag::Column::Value.like(&format!("%{}%", &param.query)))
-        // Pull in lens metadata
-        .join_rev(
-            JoinType::LeftJoin,
-            lens::Entity::belongs_to(tag::Entity)
-                .from(lens::Column::Name)
-                .to(tag::Column::Value)
-                .into(),
-        )
-        // Order by trigger name, case insensitve
-        .order_by_asc(Expr::cust("lower(value)"))
-        .into_model::<LensSearch>()
-        .all(&state.db)
-        .await
-        .unwrap_or_default();
-
-    for lens in query_result {
-        let label = lens.name.clone();
-        results.push(LensResult {
-            author: lens.author.unwrap_or("spyglass-search".into()),
-            name: label.clone(),
-            label,
-            description: lens.description.unwrap_or_default(),
-            ..Default::default()
-        });
-    }
-
-    Ok(SearchLensesResp { results })
 }
 
 #[instrument(skip(state))]
