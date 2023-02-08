@@ -61,8 +61,7 @@ pub async fn initialize_pipelines(
     // Grab all pipelines
     let configured_pipelines: HashSet<String> = lens_map
         .iter()
-        .filter(|entry| entry.value().pipeline.as_ref().is_some())
-        .map(|entry| entry.value().pipeline.as_ref().unwrap().clone())
+        .filter_map(|entry| entry.value().pipeline.clone())
         .collect();
 
     let mut pipelines: HashMap<String, PipelineConfiguration> = HashMap::new();
@@ -81,7 +80,7 @@ pub async fn initialize_pipelines(
                 app_state.clone(),
                 config.clone(),
                 pipeline.clone(),
-                pipelines.get(&pipeline).unwrap().clone(),
+                pipelines.get(&pipeline).expect("Expected pipeline").clone(),
                 pipeline_cmd_rx,
             ));
         } else {
