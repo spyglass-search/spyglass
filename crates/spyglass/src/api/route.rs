@@ -7,7 +7,6 @@ use entities::models::{
     bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
     lens, tag,
 };
-use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm;
 use entities::sea_orm::{prelude::*, sea_query, sea_query::Expr, QueryOrder, Set};
 use entities::sea_orm::{FromQueryResult, JoinType, QuerySelect};
@@ -15,7 +14,7 @@ use jsonrpsee::core::Error;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::Searcher;
+use libspyglass::search::{document_to_struct, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, CleanupTask, ManagerCommand};
 use shared::config::Config;
@@ -406,8 +405,6 @@ pub async fn search(
         .await;
 
     let start = SystemTime::now();
-    let fields = DocFields::as_fields();
-
     let index = &state.index;
     let searcher = index.reader.searcher();
 
@@ -427,59 +424,52 @@ pub async fn search(
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
+
+    let terms = search_req.query.split_whitespace().collect::<HashSet<_>>();
     for (score, doc_addr) in docs {
-        if let Ok(retrieved) = searcher.doc(doc_addr) {
-            let doc_id = retrieved
-                .get_first(fields.id)
-                .expect("Missing doc_id in schema");
-            let domain = retrieved
-                .get_first(fields.domain)
-                .expect("Missing domain in schema");
-            let title = retrieved
-                .get_first(fields.title)
-                .expect("Missing title in schema");
-            let description = retrieved
-                .get_first(fields.description)
-                .expect("Missing description in schema");
-            let url = retrieved
-                .get_first(fields.url)
-                .expect("Missing url in schema");
+        if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
+            log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
+            let indexed = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
+                .one(&state.db)
+                .await;
 
-            log::debug!("Got id with url {:?} {:?}", doc_id, url);
-            if let Some(doc_id) = doc_id.as_text() {
-                let indexed = indexed_document::Entity::find()
-                    .filter(indexed_document::Column::DocId.eq(doc_id))
-                    .one(&state.db)
-                    .await;
+            let crawl_uri = doc.url;
+            match indexed {
+                Ok(Some(indexed)) => {
+                    let tags = indexed
+                        .find_related(tag::Entity)
+                        .all(&state.db)
+                        .await
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
+                        .collect::<Vec<(String, String)>>();
 
-                let crawl_uri = url.as_text().unwrap_or_default().to_string();
-                match indexed {
-                    Ok(Some(indexed)) => {
-                        let tags = indexed
-                            .find_related(tag::Entity)
-                            .all(&state.db)
-                            .await
-                            .unwrap_or_default()
-                            .iter()
-                            .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
-                            .collect::<Vec<(String, String)>>();
+                    let matched_indices = doc
+                        .content
+                        .split_whitespace()
+                        .enumerate()
+                        .filter(|(_, w)| terms.contains(w))
+                        .map(|(idx, _)| idx)
+                        .collect::<Vec<_>>();
 
-                        let result = SearchResult {
-                            doc_id: doc_id.to_string(),
-                            domain: domain.as_text().unwrap_or_default().to_string(),
-                            title: title.as_text().unwrap_or_default().to_string(),
-                            crawl_uri: crawl_uri.clone(),
-                            description: description.as_text().unwrap_or_default().to_string(),
-                            url: indexed.open_url.unwrap_or(crawl_uri),
-                            tags,
-                            score,
-                        };
+                    dbg!(matched_indices);
+                    let result = SearchResult {
+                        doc_id: doc.doc_id.clone(),
+                        domain: doc.domain,
+                        title: doc.title,
+                        crawl_uri: crawl_uri.clone(),
+                        description: doc.description,
+                        url: indexed.open_url.unwrap_or(crawl_uri),
+                        tags,
+                        score,
+                    };
 
-                        results.push(result);
-                    }
-                    _ => {
-                        missing.push((doc_id.to_owned(), crawl_uri.to_owned()));
-                    }
+                    results.push(result);
+                }
+                _ => {
+                    missing.push((doc.doc_id.to_owned(), crawl_uri.to_owned()));
                 }
             }
         }
