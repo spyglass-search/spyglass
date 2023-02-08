@@ -476,6 +476,8 @@ impl SpyglassFileWatcher {
                                     to_recrawl.push((item.file_path, file_last_mod));
                                 }
                                 Err(err) => {
+                                    // delete any invalid paths from db
+                                    to_delete.push(item.id);
                                     log::error!(
                                         "uri_to_path failed on {} due to {}",
                                         file_path,
@@ -494,6 +496,8 @@ impl SpyglassFileWatcher {
                             to_delete.push(item.id)
                         }
                         Err(err) => {
+                            // delete any invalid paths from db
+                            to_delete.push(item.id);
                             log::error!("uri_to_path failed on {} due to {}", item.file_path, err);
                         }
                     },
