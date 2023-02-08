@@ -1,6 +1,7 @@
 use js_sys::decode_uri_component;
 use url::Url;
 use yew::prelude::*;
+use js_sys::{decode_uri_component, JsString};
 
 use super::btn::DeleteButton;
 use super::{
@@ -90,18 +91,6 @@ fn render_icon(result: &SearchResult) -> Html {
 // TODO: Pull this special metadata from tags provided by the backend.
 fn render_metadata(result: &SearchResult) -> Html {
     let mut meta = Vec::new();
-
-    let url = Url::parse(&result.crawl_uri);
-    if let Ok(url) = url {
-        if let Some(path) = shorten_file_path(&url, 3, false) {
-            meta.push(html! { <span>{path}</span> });
-        } else {
-            meta.push(html! {
-                <span>{format!(" {}", result.domain.clone())}</span>
-            });
-        }
-    }
-
     // Generate the icons/labels required for tags
     let mut priority_tags = Vec::new();
     let mut normal_tags = Vec::new();
@@ -118,23 +107,12 @@ fn render_metadata(result: &SearchResult) -> Html {
         }
     }
 
-    let mut joined = Vec::new();
     meta.extend(priority_tags);
     meta.extend(normal_tags);
 
-    if !meta.is_empty() {
-        let last_idx = meta.len() - 1;
-        for (idx, node) in meta.iter().enumerate() {
-            joined.push(node.to_owned());
-            if idx != last_idx {
-                joined.push(html! { <span class="text-neutral-500 font-bold">{"•"}</span> });
-            }
-        }
-    }
-
     html! {
-        <div class="text-xs place-items-center flex flex-row flex-wrap gap-1.5 text-cyan-500 py-0.5 mt-1">
-            {joined}
+        <div class="text-xs place-items-center flex flex-row flex-wrap gap-2 text-cyan-500 py-0.5 mt-1">
+            {meta}
         </div>
     }
 }
@@ -149,7 +127,6 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "flex",
         "flex-row",
         "gap-4",
-        "items-center",
         "border-t",
         "border-neutral-600",
         "py-4",
@@ -176,14 +153,29 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         }
     }
 
+    let url = Url::parse(&result.crawl_uri);
+
+    let domain = if let Ok(url) = url {
+        if let Some(path) = shorten_file_path(&url, 3, false) {
+            html! { <span>{path}</span> }
+        } else {
+            html! {
+            <span>{format!(" {}", result.domain.clone())}</span>
+            }
+        }
+    } else {
+        html! {}
+    };
+
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
-            <div class="flex flex-none pl-6 pr-2">
+            <div class="mt-1 flex flex-none pl-6 pr-2">
                 <div class="relative flex-none bg-neutral-700 rounded h-12 w-12 items-center">
                     {icon}
                 </div>
             </div>
             <div class="grow">
+                <div class="text-xs text-cyan-500">{domain}</div>
                 <h2 class="text-lg truncate font-bold w-[30rem]">
                     {title}
                 </h2>
