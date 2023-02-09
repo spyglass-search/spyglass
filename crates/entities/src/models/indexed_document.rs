@@ -182,6 +182,10 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
         .collect::<Vec<document_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates
+    if doc_tags.is_empty() {
+        return Ok(());
+    }
+
     document_tag::Entity::insert_many(doc_tags)
         .on_conflict(
             sea_orm::sea_query::OnConflict::columns(vec![

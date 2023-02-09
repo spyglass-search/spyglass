@@ -105,9 +105,16 @@ impl GithubConnection {
                     crawls.push(issue_to_crawl(&api_url, issue));
                 }
 
-                if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
-                {
-                    log::error!("Unable to add issue: {}", err);
+                if !crawls.is_empty() {
+                    if let Err(err) =
+                        process_crawl_results(state, &crawls, &self.default_tags()).await
+                    {
+                        log::error!("Unable to add issue: {}", err);
+                    }
+
+                    if let Err(err) = Searcher::save(state).await {
+                        log::error!("Unable to save issues: {}", err);
+                    }
                 }
 
                 buffer.clear();
@@ -142,13 +149,16 @@ impl GithubConnection {
                     crawls.push(repo_to_crawl(&api_url, res));
                 }
 
-                if let Err(err) = process_crawl_results(state, &crawls, &self.default_tags()).await
-                {
-                    log::error!("Unable to add repo: {}", err);
-                }
+                if !crawls.is_empty() {
+                    if let Err(err) =
+                        process_crawl_results(state, &crawls, &self.default_tags()).await
+                    {
+                        log::error!("Unable to add repo: {}", err);
+                    }
 
-                if let Err(err) = Searcher::save(state).await {
-                    log::error!("Unable to save repos: {}", err);
+                    if let Err(err) = Searcher::save(state).await {
+                        log::error!("Unable to save repos: {}", err);
+                    }
                 }
 
                 // clear buffer
@@ -187,12 +197,14 @@ impl GithubConnection {
                     crawls.push(repo_to_crawl(&api_url, res));
                 }
 
-                if let Err(err) = process_crawl_results(state, &crawls, &tags).await {
-                    log::error!("Unable to add repo: {}", err);
-                }
+                if !crawls.is_empty() {
+                    if let Err(err) = process_crawl_results(state, &crawls, &tags).await {
+                        log::error!("Unable to add repo: {}", err);
+                    }
 
-                if let Err(err) = Searcher::save(state).await {
-                    log::error!("Unable to save repos: {}", err);
+                    if let Err(err) = Searcher::save(state).await {
+                        log::error!("Unable to save repos: {}", err);
+                    }
                 }
 
                 // clear buffer
