@@ -539,7 +539,7 @@ impl SpyglassFileWatcher {
 
                         Some(active_model)
                     } else {
-                        log::info!("Failed to process uri {:?}", path_ref);
+                        log::info!("Failed to process uri {:?}", path_ref.key());
                         None
                     }
                 })
@@ -707,7 +707,7 @@ async fn _process_file_and_dir(
     events: Vec<DebouncedEvent>,
     extensions: &HashSet<String>,
 ) -> anyhow::Result<()> {
-    log::info("Processing received updates");
+    log::info!("Processing received updates");
     let mut enqueue_list = Vec::new();
     let mut general_processing = Vec::new();
     let mut delete_list = Vec::new();
@@ -774,7 +774,7 @@ async fn _process_file_and_dir(
     }
 
     if !delete_list.is_empty() {
-        log::info("Deleting {} documents", delete_list.len())
+        log::info!("Deleting {} documents", delete_list.len());
         documents::delete_documents_by_uri(state, delete_list).await;
     }
 
