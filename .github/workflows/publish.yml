@@ -9,7 +9,6 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-latest, 'ubuntu-20.04', 'windows-latest']
-
     runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
@@ -27,9 +26,11 @@ jobs:
     - name: install wasm32-wasi toolchain
       run: rustup target add wasm32-wasi
     # Install macos specific targets
-    - name: install arm64 rust target (macos only)
+    - name: install intel & arm64 rust target (macos only)
       if: matrix.platform == 'macos-latest'
-      run: rustup target add aarch64-apple-darwin
+      run: |
+        rustup target add aarch64-apple-darwin
+        rustup target add x86_64-apple-darwin
     # Install tauri build deps
     - name: install tauri-cli & tauri-build
       run: cargo install tauri-cli --version "^1.1"
@@ -52,11 +53,6 @@ jobs:
       run: |
         echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
         echo "target_ext=" >> $GITHUB_ENV
-    - name: setup arch target - macos
-      if: ${{startsWith(matrix.platform, 'macos')}}
-      run: |
-        echo "target_arch=x86_64-apple-darwin" >> $GITHUB_ENV
-        echo "target_ext=" >> $GITHUB_ENV
     - name: Setup arch target (windows only)
       if: ${{startsWith(matrix.platform, 'windows')}}
       run: |
@@ -64,10 +60,21 @@ jobs:
         echo "target_ext=.exe" >> $env:GITHUB_ENV
     # Build stuff
     - name: build sidecar (windows/linux)
+      if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
       run: |
         cargo build -p spyglass --verbose --release
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+    - name: build sidecar (macos)
+      run: |
+        cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
+        cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
+        mkdir -p crates/tauri/binaries;
+        cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
+        cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+        lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
+          target/x86_64-apple-darwin/release/spyglass \
+          target/aarch64-apple-darwin/release/spyglass;
     - name: build default plugins
       run: make build-plugins-release
     - name: import windows certificate
@@ -81,7 +88,7 @@ jobs:
         certutil -decode certificate/tempCert.txt certificate/certificate.pfx
         Remove-Item -path certificate -include tempCert.txt
         Import-PfxCertificate -FilePath certificate/certificate.pfx -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText)
-    - uses: tauri-apps/tauri-action@v0
+    - uses: tauri-apps/tauri-action@dev
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -94,6 +101,8 @@ jobs:
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       with:
+        # Build universal binary on macOS
+        args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
         # the action automatically replaces \_\_VERSION\_\_ with the app version
         tagName: v20__VERSION__
         tauriScript: cargo tauri
