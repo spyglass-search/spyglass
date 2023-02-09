@@ -95,60 +95,11 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        # required for macOS code signing
-        ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
-        APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-        APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        # disable code signing for now
+        ENABLE_CODE_SIGNING: ""
       with:
         # Build universal binary on macOS
         args: --target universal-apple-darwin
-        # the action automatically replaces \_\_VERSION\_\_ with the app version
-        tagName: test__VERSION__
-        tauriScript: cargo tauri
-        releaseName: "universal macOS binary"
-        releaseBody: "See the assets to download this version and install."
-        releaseDraft: true
-        prerelease: false
-    - uses: tauri-apps/tauri-action@dev
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-        TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        # required for macOS code signing
-        ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
-        APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-        APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      with:
-        # Build universal binary on macOS
-        args: --target x86_64-apple-darwin
-        # the action automatically replaces \_\_VERSION\_\_ with the app version
-        tagName: test__VERSION__
-        tauriScript: cargo tauri
-        releaseName: "universal macOS binary"
-        releaseBody: "See the assets to download this version and install."
-        releaseDraft: true
-        prerelease: false
-    - uses: tauri-apps/tauri-action@dev
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-        TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        # required for macOS code signing
-        ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
-        APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-        APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        APPLE_ID: ${{ secrets.APPLE_ID }}
-        APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      with:
-        # Build universal binary on macOS
-        args: --target aarch64-apple-darwin
         # the action automatically replaces \_\_VERSION\_\_ with the app version
         tagName: test__VERSION__
         tauriScript: cargo tauri
