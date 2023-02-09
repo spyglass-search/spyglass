@@ -430,6 +430,7 @@ impl SpyglassFileWatcher {
     /// Initializes the path by walking the entire tree. All changed, removed and new files
     /// are returned as debounced events
     pub async fn initialize_path(&mut self, path: &Path) -> Vec<DebouncedEvent> {
+        log::info!("Initializing Path {:?}", path);
         let mut debounced_events = Vec::new();
         let root_uri = utils::path_to_uri(path);
         let files = DashMap::new();
@@ -505,7 +506,7 @@ impl SpyglassFileWatcher {
             }
         }
 
-        log::debug!(
+        log::info!(
             "Added: {:?} Deleted: {:?} Updated: {:?}",
             files.len(),
             to_delete.len(),
@@ -538,6 +539,7 @@ impl SpyglassFileWatcher {
 
                         Some(active_model)
                     } else {
+                        log::info!("Failed to process uri {:?}", path_ref.key());
                         None
                     }
                 })
@@ -577,7 +579,7 @@ impl SpyglassFileWatcher {
                 log::error!("Error updated recrawls {:?}", error);
             }
         }
-        log::debug!("Returning {:?} updates", files.len());
+        log::info!("Returning {:?} updates", files.len());
 
         *self.path_initializing.lock().await = None;
         debounced_events
@@ -678,7 +680,7 @@ async fn _process_messages(
     initial: Vec<DebouncedEvent>,
     extensions: HashSet<String>,
 ) {
-    log::debug!("Processing {:?} initial updates.", initial.len());
+    log::info!("Processing {:?} initial updates.", initial.len());
     if let Err(error) = _process_file_and_dir(&state, initial, &extensions).await {
         log::error!("Error processing initial files {:?}", error);
     }
@@ -705,6 +707,7 @@ async fn _process_file_and_dir(
     events: Vec<DebouncedEvent>,
     extensions: &HashSet<String>,
 ) -> anyhow::Result<()> {
+    log::info!("Processing received updates");
     let mut enqueue_list = Vec::new();
     let mut general_processing = Vec::new();
     let mut delete_list = Vec::new();
@@ -764,13 +767,14 @@ async fn _process_file_and_dir(
     }
 
     if !general_processing.is_empty() {
-        log::debug!("Adding {} general documents", general_processing.len());
+        log::info!("Adding {} general documents", general_processing.len());
         for general_chunk in general_processing.chunks(500) {
             _process_general_file(state, general_chunk).await;
         }
     }
 
     if !delete_list.is_empty() {
+        log::info!("Deleting {} documents", delete_list.len());
         documents::delete_documents_by_uri(state, delete_list).await;
     }
 
