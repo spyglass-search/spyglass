@@ -29,3 +29,10 @@ input:checked ~ .dot {
 *::-webkit-scrollbar-thumb:hover {
     background: #164e63;
 }
+
+mark {
+    color: rgb(255 255 255);
+    background-color: rgb(14 116 144 / var(--tw-bg-opacity));
+    padding-left: 0.125rem;
+    padding-right: 0.125rem;
+}

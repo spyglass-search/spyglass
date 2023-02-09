@@ -1,7 +1,6 @@
 use js_sys::decode_uri_component;
 use url::Url;
 use yew::prelude::*;
-use js_sys::{decode_uri_component, JsString};
 
 use super::btn::DeleteButton;
 use super::{
@@ -180,7 +179,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     {title}
                 </h2>
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-14 overflow-hidden">
-                    {result.description.clone()}
+                    {Html::from_html_unchecked(result.description.clone().into())}
                 </div>
                 {metadata}
             </div>

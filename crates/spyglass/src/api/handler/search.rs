@@ -1,8 +1,8 @@
 use entities::models::tag::TagType;
 use entities::models::{indexed_document, lens, tag};
-use entities::sea_orm;
-use entities::sea_orm::{prelude::*, sea_query::Expr, QueryOrder};
-use entities::sea_orm::{FromQueryResult, JoinType, QuerySelect};
+use entities::sea_orm::{
+    self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
+};
 use jsonrpsee::core::Error;
 use libspyglass::search::{document_to_struct, Searcher};
 use libspyglass::state::AppState;
@@ -13,6 +13,85 @@ use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, S
 use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct WordRange {
+    start: usize,
+    end: usize,
+    matches: Vec<usize>,
+}
+
+impl WordRange {
+    pub fn new(start: usize, end: usize, match_idx: usize) -> Self {
+        Self {
+            start,
+            end,
+            matches: vec![match_idx],
+        }
+    }
+
+    pub fn overlaps(&self, other: &WordRange) -> bool {
+        self.start <= other.start && other.start <= self.end
+            || self.start <= other.end && other.end <= self.end
+    }
+
+    pub fn merge(&mut self, other: &WordRange) {
+        self.start = self.start.min(other.start);
+        self.end = self.end.max(other.end);
+        self.matches.extend(other.matches.iter());
+    }
+}
+
+/// Creates a short preview from content based on the search query terms by
+/// finding matches for words and creating a window around each match, joining
+/// together overlaps & returning the final string.
+fn generate_highlight_preview(terms: &HashSet<String>, tokens: &[String]) -> String {
+    let matched_indices = tokens
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| {
+            let normalized = w.to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>();
+            terms.contains(&normalized)
+        })
+        .map(|(idx, _)| idx)
+        .collect::<Vec<_>>();
+
+    // Create word ranges from the indices
+    let mut ranges: Vec<WordRange> = Vec::new();
+    for idx in matched_indices {
+        let start = (idx as i32 - 5).max(0) as usize;
+        let end = (idx + 5).min(tokens.len() - 1);
+        let new_range = WordRange::new(start, end, idx);
+
+        if let Some(last) = ranges.last_mut() {
+            if last.overlaps(&new_range) {
+                last.merge(&new_range);
+                continue;
+            }
+        }
+
+        ranges.push(new_range);
+    }
+
+    // Create preview from word ranges
+    let mut desc: Vec<String> = Vec::new();
+    for range in ranges {
+        let mut slice = tokens[range.start..=range.end].to_vec();
+        if !slice.is_empty() {
+            for idx in range.matches {
+                let slice_idx = idx - range.start;
+                slice[slice_idx] = format!("<mark>{}</mark>", &slice[slice_idx]);
+            }
+            desc.extend(slice);
+            desc.push("...".to_string());
+        }
+    }
+
+    format!("<span>{}</span>", desc.join(" "))
+}
 
 /// Search the user's indexed documents
 #[instrument(skip(state))]
@@ -48,7 +127,12 @@ pub async fn search_docs(
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
 
-    let terms = search_req.query.split_whitespace().collect::<HashSet<_>>();
+    let terms = search_req
+        .query
+        .split_whitespace()
+        .map(|s| s.to_owned())
+        .collect::<HashSet<_>>();
+
     for (score, doc_addr) in docs {
         if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
@@ -69,21 +153,18 @@ pub async fn search_docs(
                         .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                         .collect::<Vec<(String, String)>>();
 
-                    let matched_indices = doc
+                    let tokens = doc
                         .content
                         .split_whitespace()
-                        .enumerate()
-                        .filter(|(_, w)| terms.contains(w))
-                        .map(|(idx, _)| idx)
+                        .map(|s| s.to_string())
                         .collect::<Vec<_>>();
-
-                    dbg!(matched_indices);
+                    let description = generate_highlight_preview(&terms, &tokens);
                     let result = SearchResult {
                         doc_id: doc.doc_id.clone(),
                         domain: doc.domain,
                         title: doc.title,
                         crawl_uri: crawl_uri.clone(),
-                        description: doc.description,
+                        description,
                         url: indexed.open_url.unwrap_or(crawl_uri),
                         tags,
                         score,
@@ -186,44 +267,18 @@ pub async fn search_lenses(
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use crate::api::handler::search::generate_highlight_preview;
 
     #[test]
     fn test_find_highlights() {
         let terms = HashSet::from(["rust".to_string(), "programming".to_string()]);
-
-        let blurb = r#"Rust is a multi-paradigm, high-level, general-purpose programming language.
-            Rust emphasizes performance, type safety, and concurrency. Rust enforces memory safety—that is,
-            that all references point to valid memory—without requiring the use of a garbage collector or
-            reference counting present in other memory-safe languages. To simultaneously enforce memory safety
-            and prevent concurrent data races, Rust's "borrow checker" tracks the object lifetime of all
-            references in a program during compilation. Rust is popular for systems programming but also offers
-            high-level features including some functional programming constructs."#;
-
-        let words = blurb
+        let blurb = r#"Rust rust is a multi-paradigm, high-level, general-purpose programming"#;
+        let tokens = blurb
             .split_whitespace()
             .map(|s| s.to_string())
             .collect::<Vec<_>>();
 
-        let matched_indices = words
-            .iter()
-            .enumerate()
-            .filter(|(_, w)| terms.contains(&w.to_lowercase()))
-            .map(|(idx, _)| idx)
-            .collect::<Vec<_>>();
-
-        // create a summary from the first 3 matches
-        let mut desc: Vec<String> = Vec::new();
-        let mut ranges = Vec::new();
-
-        for idx in matched_indices {
-            let start = (idx as i32 - 5).max(0) as usize;
-            let end = (idx + 5).min(words.len() - 1);
-            let range = Range { start, end };
-
-            ranges.push(range);
-            desc.extend(words[start..end].iter().map(|s| s.to_owned()));
-        }
-
-        dbg!(desc.join(" "));
+        let desc = generate_highlight_preview(&terms, &tokens);
+        assert_eq!(desc, "<span><mark>Rust</mark> <mark>rust</mark> is a multi-paradigm, high-level, general-purpose <mark>programming</mark> ...</span>");
     }
 }
