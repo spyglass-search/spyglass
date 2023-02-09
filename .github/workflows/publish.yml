@@ -3,14 +3,12 @@ on:
   push:
     branches:
       - release
-      - ci/build-macos-universal
 jobs:
   publish-tauri:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest]
-
+        platform: [macos-latest, 'ubuntu-20.04', 'windows-latest']
     runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
@@ -104,11 +102,11 @@ jobs:
         APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       with:
         # Build universal binary on macOS
-        args: --target universal-apple-darwin
+        args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
         # the action automatically replaces \_\_VERSION\_\_ with the app version
-        tagName: test__VERSION__
+        tagName: v20__VERSION__
         tauriScript: cargo tauri
-        releaseName: "universal macOS binary"
+        releaseName: "Spyglass v20__VERSION__"
         releaseBody: "See the assets to download this version and install."
         releaseDraft: true
         prerelease: false
