@@ -95,6 +95,14 @@ impl AppState {
         }
     }
 
+    pub fn reload_config(&mut self) {
+        log::debug!("reloading config...");
+        let config = Config::new();
+
+        self.user_settings = config.user_settings.clone();
+        self.config = config;
+    }
+
     pub fn builder() -> AppStateBuilder {
         AppStateBuilder::new()
     }
