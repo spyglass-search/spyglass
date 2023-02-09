@@ -763,7 +763,7 @@ mod test {
         // Add resource rule to stop the crawl above
         let res = crawler.fetch_by_job(&state, model.id, true).await;
         if let Err(error) = res {
-            log::error!("Error processing crawl {:?}", error);
+            eprintln!("Error processing crawl {:?}", error);
             assert!(false);
         }
     }
