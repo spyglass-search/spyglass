@@ -66,6 +66,7 @@ jobs:
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
     - name: build sidecar (macos)
+      if: matrix.platform == 'macos-latest'
       run: |
         cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
         cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
