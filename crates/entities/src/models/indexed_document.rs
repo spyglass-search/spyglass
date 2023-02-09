@@ -4,7 +4,8 @@ use crate::models::{document_tag, tag};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, Set, Statement,
+    ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set,
+    Statement,
 };
 
 use super::tag::{get_or_create, TagPair};
@@ -186,7 +187,7 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
         return Ok(());
     }
 
-    document_tag::Entity::insert_many(doc_tags)
+    let query = document_tag::Entity::insert_many(doc_tags)
         .on_conflict(
             sea_orm::sea_query::OnConflict::columns(vec![
                 document_tag::Column::IndexedDocumentId,
@@ -195,8 +196,12 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
             .do_nothing()
             .to_owned(),
         )
-        .exec(db)
-        .await?;
+        .build(DatabaseBackend::Sqlite);
+
+    if let Err(err) = db.execute(query.clone()).await {
+        log::error!("Unable to execute: {} due to {}", query.to_string(), err);
+        return Err(err);
+    }
 
     Ok(())
 }
