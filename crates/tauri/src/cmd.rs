@@ -339,6 +339,7 @@ pub async fn wizard_finished(
     // Only do this is we're enabling the plugin.
     if toggle_file_indexer {
         let field = "FOLDERS_LIST";
+        let ext = "EXTS_LIST";
 
         // TODO: Make this waaaay less involved to get & update a single field.
         let plugin_configs = config.load_plugin_config();
@@ -373,6 +374,29 @@ pub async fn wizard_finished(
                     }
                 }
             }
+
+            if let Some(field_opts) = plugin_config.user_settings.get(ext) {
+                let merged = if let Some(extensions) = to_update.get(ext) {
+                    let mut extensions =
+                        serde_json::from_str::<Vec<String>>(extensions).map_or(Vec::new(), |x| x);
+                    for extension in default_indices.extensions.iter() {
+                        if !extensions.contains(extension) {
+                            extensions.push(extension.to_string());
+                        }
+                    }
+
+                    extensions
+                } else {
+                    default_indices.extensions
+                };
+
+                if let Ok(extensions) = serde_json::to_string(&merged) {
+                    if let Ok(val) = field_opts.form_type.validate(&extensions) {
+                        log::debug!("Updating {}.{} w/ {}", plugin_name, ext, val);
+                        to_update.insert(ext.into(), val);
+                    }
+                }
+            }
         }
     }
 
@@ -404,5 +428,6 @@ pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, Strin
 
     Ok(DefaultIndices {
         file_paths: Vec::new(),
+        extensions: Vec::new(),
     })
 }

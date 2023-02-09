@@ -671,7 +671,13 @@ pub async fn default_indices() -> DefaultIndices {
     // }
 
     file_paths.retain(|f| f.exists());
-    DefaultIndices { file_paths }
+    DefaultIndices {
+        file_paths,
+        extensions: libspyglass::filesystem::DEFAULT_EXTENSIONS
+            .iter()
+            .map(|val| String::from(*val))
+            .collect(),
+    }
 }
 
 #[cfg(test)]
