@@ -452,6 +452,8 @@ pub async fn plugin_load(
             plug.is_enabled = lens_config.is_enabled;
         }
 
+        tokio::spawn(crate::filesystem::configure_watcher(state.clone()));
+
         if cmds
             .send(PluginCommand::Initialize(plug.clone()))
             .await
