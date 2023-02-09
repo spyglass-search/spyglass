@@ -38,6 +38,8 @@ pub mod utils;
 /// The lens name for indexed files
 pub const FILES_LENS: &str = "files";
 
+pub const DEFAULT_EXTENSIONS: &[&str] = &["docx", "html", "md", "txt", "ods", "xls", "xlsx"];
+
 /// Watcher responsible for processing paths on the file system.
 /// All filesystem updates will be run through the debouncer to
 /// batch updates then processed through any found git ignore files.
