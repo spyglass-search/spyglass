@@ -405,22 +405,29 @@ pub async fn plugin_load(
 
     for (_, plugin_config) in plugin_user_settings {
         let mut plug = plugin_config.clone();
-        let user_settings = user_plugin_settings
-            .entry(plug.name.clone())
-            .or_insert_with(HashMap::new);
+        let mut settings_changed = false;
+
+        let user_settings = if let Some(user_settings) = user_plugin_settings.get_mut(&plug.name) {
+            user_settings
+        } else {
+            settings_changed = true;
+            user_plugin_settings.entry(plug.name.clone()).or_default()
+        };
 
         // Loop through plugin settings and use any user overrides found.
         for (key, value) in plug.user_settings.iter_mut() {
-            let user_override = user_settings
-                .entry(key.to_string())
-                .or_insert_with(|| value.value.to_string());
-            value.value = user_override.to_string();
+            if let Some(user_override) = user_settings.get(key) {
+                value.value = user_override.to_string();
+            } else {
+                settings_changed = true;
+                user_settings.insert(key.to_owned(), value.value.to_string());
+            };
         }
 
-        // Update the user settings file in case any new setting entries
-        // were added.
-        config.user_settings.plugin_settings = user_plugin_settings.clone();
-        let _ = config.save_user_settings(&config.user_settings);
+        if settings_changed {
+            config.user_settings.plugin_settings = user_plugin_settings.clone();
+            let _ = config.save_user_settings(&config.user_settings);
+        }
 
         // Enable plugins that are lenses, this is the only type right so technically they
         // all will be enabled as a lens.
