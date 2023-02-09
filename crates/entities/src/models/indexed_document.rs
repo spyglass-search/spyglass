@@ -151,7 +151,12 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
     db: &C,
     docs: &[Model],
     tags: &[i64],
-) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+) -> Result<(), DbErr> {
+    // Nothing to do if we have no docs or tags
+    if docs.is_empty() || tags.is_empty() {
+        return Ok(());
+    }
+
     // Remove dupes before adding
     let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
     let doc_ids: Vec<i64> = docs.iter().map(|m| m.id).collect();
@@ -177,6 +182,10 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
         .collect::<Vec<document_tag::ActiveModel>>();
 
     // Insert connections, ignoring duplicates
+    if doc_tags.is_empty() {
+        return Ok(());
+    }
+
     document_tag::Entity::insert_many(doc_tags)
         .on_conflict(
             sea_orm::sea_query::OnConflict::columns(vec![
@@ -187,7 +196,9 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
             .to_owned(),
         )
         .exec(db)
-        .await
+        .await?;
+
+    Ok(())
 }
 
 /// Inserts an entry into the tag table for each document and
@@ -196,7 +207,7 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
     db: &C,
     docs: &[Model],
     tags: &[TagPair],
-) -> Result<InsertResult<document_tag::ActiveModel>, DbErr> {
+) -> Result<(), DbErr> {
     let mut tag_ids: Vec<i64> = Vec::new();
     for (label, value) in tags.iter() {
         match get_or_create(db, label.to_owned(), value).await {

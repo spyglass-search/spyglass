@@ -1542,6 +1542,7 @@ dependencies = [
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "tantivy",
+ "thiserror",
  "tokio",
  "url",
 ]
@@ -6054,7 +6055,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass"
-version = "23.2.1"
+version = "23.2.2"
 dependencies = [
  "addr",
  "anyhow",

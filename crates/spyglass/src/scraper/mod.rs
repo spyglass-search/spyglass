@@ -30,7 +30,7 @@ fn filter_p_nodes(root: &NodeRef<Node>, p_list: &mut Vec<String>) {
     for child in root.children() {
         let node = child.value();
         if node.is_element() {
-            let element = node.as_element().unwrap();
+            let element = node.as_element().expect("Expected node to be element");
             if element.name().eq_ignore_ascii_case("p") {
                 let mut p_content = String::from("");
                 let mut links = HashSet::new();
@@ -74,10 +74,10 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, links: &mut HashSet
     for child in root.children() {
         let node = child.value();
         if node.is_text() {
-            doc.push_str(node.as_text().unwrap());
+            doc.push_str(node.as_text().expect("Expected text node"));
         } else if node.is_element() {
             // Ignore elements on the ignore list
-            let element = node.as_element().unwrap();
+            let element = node.as_element().expect("Expected element node");
             if ignore_list.contains(&element.name()) {
                 continue;
             }
@@ -85,16 +85,35 @@ fn filter_text_nodes(root: &NodeRef<Node>, doc: &mut String, links: &mut HashSet
             // Ignore elements whose role is "navigation"
             // TODO: Filter out full-list of ARIA roles that are not content
             if element.attrs.contains_key(&role_key)
-                && (element.attrs.get(&role_key).unwrap().to_string() == *"navigation"
-                    || element.attrs.get(&role_key).unwrap().to_string() == *"contentinfo"
-                    || element.attrs.get(&role_key).unwrap().to_string() == *"button")
+                && (element
+                    .attrs
+                    .get(&role_key)
+                    .expect("Expected role_key")
+                    .to_string()
+                    == *"navigation"
+                    || element
+                        .attrs
+                        .get(&role_key)
+                        .expect("Expected role_key")
+                        .to_string()
+                        == *"contentinfo"
+                    || element
+                        .attrs
+                        .get(&role_key)
+                        .expect("Expected role_key")
+                        .to_string()
+                        == *"button")
             {
                 continue;
             }
 
             // Save links
             if element.name() == "a" && element.attrs.contains_key(&href_key) {
-                let href = element.attrs.get(&href_key).unwrap().to_string();
+                let href = element
+                    .attrs
+                    .get(&href_key)
+                    .expect("Expected href_key")
+                    .to_string();
                 // Ignore anchor links
                 if !href.starts_with('#') {
                     links.insert(href.to_string());
@@ -134,10 +153,10 @@ pub fn html_to_text(doc: &str) -> ScrapeResult {
     filter_text_nodes(&root, &mut content, &mut links);
     content = content.trim().to_string();
 
-    let mut description = if meta.contains_key("description") {
-        meta.get("description").unwrap().to_string()
-    } else if meta.contains_key("og:description") {
-        meta.get("og:description").unwrap().to_string()
+    let mut description = if let Some(desc) = meta.get("description") {
+        desc.to_owned()
+    } else if let Some(desc) = meta.get("og:description") {
+        desc.to_owned()
     } else {
         "".to_string()
     };

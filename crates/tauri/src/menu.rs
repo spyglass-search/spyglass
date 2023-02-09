@@ -1,9 +1,8 @@
-
 use shared::config::Config;
 use strum_macros::{Display, EnumString};
 use tauri::{
-    utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu,
-    SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu,
+    utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, SystemTrayMenu,
+    SystemTrayMenuItem, SystemTraySubmenu,
 };
 #[cfg(not(target_os = "linux"))]
 use tauri::{MenuItem, Submenu};

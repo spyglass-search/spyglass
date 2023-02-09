@@ -59,6 +59,7 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
     }
 }
 
+#[derive(Default)]
 pub struct AddUpdateResult {
     pub num_added: usize,
     pub num_updated: usize,
@@ -74,6 +75,10 @@ pub async fn process_crawl_results(
     results: &[CrawlResult],
     global_tags: &[TagPair],
 ) -> anyhow::Result<AddUpdateResult> {
+    if results.is_empty() {
+        return Ok(AddUpdateResult::default());
+    }
+
     let now = Instant::now();
     // get a list of all urls
     let parsed_urls = results

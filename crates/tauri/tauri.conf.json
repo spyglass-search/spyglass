@@ -1,7 +1,7 @@
 {
   "package": {
     "productName": "Spyglass",
-    "version": "23.2.1"
+    "version": "23.2.2"
   },
   "build": {
     "distDir": "../client/dist",
@@ -38,8 +38,8 @@
         "frameworks": [],
         "minimumSystemVersion": "",
         "exceptionDomain": "",
-        "signingIdentity": null,
-        "entitlements": null,
+        "signingIdentity": "Developer ID Application: Andrew Huynh (D436KBE6J9)",
+        "entitlements": "entitlements.plist",
         "providerShortName": "AndrewHuynh1092684215"
       },
       "windows": {

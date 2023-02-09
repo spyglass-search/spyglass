@@ -113,7 +113,7 @@ pub async fn check_resource_rules(db: &DatabaseConnection, client: &HTTPClient, 
 
         let res = client.get(&robots_url).await;
         match res {
-            Err(err) => log::error!("Unable to check robots.txt {}", err.to_string()),
+            Err(err) => log::warn!("Unable to check robots.txt {}", err.to_string()),
             Ok(res) => {
                 match res.status() {
                     StatusCode::OK => {

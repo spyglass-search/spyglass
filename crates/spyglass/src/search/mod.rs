@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use anyhow::anyhow;
 use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
@@ -318,6 +319,45 @@ async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64
         return Some(tags.iter().map(|tag| tag.id).collect::<Vec<i64>>());
     }
     None
+}
+
+pub struct RetrievedDocument {
+    pub doc_id: String,
+    pub domain: String,
+    pub title: String,
+    pub description: String,
+    pub content: String,
+    pub url: String,
+}
+
+fn field_to_string(doc: &Document, field: Field) -> String {
+    doc.get_first(field)
+        .map(|x| x.as_text().unwrap_or_default())
+        .map(|x| x.to_string())
+        .unwrap_or_default()
+}
+
+pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
+    let fields = DocFields::as_fields();
+    let doc_id = field_to_string(doc, fields.id);
+    if doc_id.is_empty() {
+        return Err(anyhow!("Invalid doc_id"));
+    }
+
+    let domain = field_to_string(doc, fields.domain);
+    let title = field_to_string(doc, fields.title);
+    let description = field_to_string(doc, fields.description);
+    let url = field_to_string(doc, fields.url);
+    let content = field_to_string(doc, fields.content);
+
+    Ok(RetrievedDocument {
+        doc_id,
+        domain,
+        title,
+        description,
+        content,
+        url,
+    })
 }
 
 #[cfg(test)]
