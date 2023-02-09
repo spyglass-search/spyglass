@@ -23,7 +23,7 @@ pub async fn read_lenses(config: &Config) -> anyhow::Result<DashMap<String, Lens
         let path = entry.path();
         if path.is_file() && path.extension().unwrap_or_default() == "ron" {
             match LensConfig::from_path(path) {
-                Err(err) => log::error!("Unable to load lens {:?}: {}", entry.path(), err),
+                Err(err) => log::warn!("Unable to load lens {:?}: {}", entry.path(), err),
                 Ok(lens) => {
                     if lens.is_enabled {
                         lens_map.insert(lens.name.clone(), lens);
