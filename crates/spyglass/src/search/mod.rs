@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::anyhow;
+use entities::BATCH_SIZE;
 use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
 use tantivy::directory::MmapDirectory;
@@ -72,6 +73,7 @@ impl Searcher {
         }
     }
 
+    /// Deletes a single entry from the database & index
     pub async fn delete_by_id(state: &AppState, doc_id: &str) -> anyhow::Result<()> {
         // Remove from search index, immediately.
         if let Ok(mut writer) = state.index.writer.lock() {
@@ -106,26 +108,31 @@ impl Searcher {
         if remove_documents {
             // Remove from indexed_doc table
             let doc_refs: Vec<&str> = doc_ids.iter().map(AsRef::as_ref).collect();
-            let docs = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.is_in(doc_refs.clone()))
-                .all(&state.db)
-                .await?;
+            // Chunk deletions
+            for doc_refs in doc_refs.chunks(BATCH_SIZE) {
+                let doc_refs = doc_refs.to_vec();
+                let docs = indexed_document::Entity::find()
+                    .filter(indexed_document::Column::DocId.is_in(doc_refs.clone()))
+                    .all(&state.db)
+                    .await?;
 
-            let dbids: Vec<i64> = docs.iter().map(|x| x.id).collect();
-            // Remove tags
-            document_tag::Entity::delete_many()
-                .filter(document_tag::Column::IndexedDocumentId.is_in(dbids))
-                .exec(&state.db)
-                .await?;
+                let dbids: Vec<i64> = docs.iter().map(|x| x.id).collect();
+                // Remove tags
+                document_tag::Entity::delete_many()
+                    .filter(document_tag::Column::IndexedDocumentId.is_in(dbids))
+                    .exec(&state.db)
+                    .await?;
 
-            indexed_document::Entity::delete_many()
-                .filter(indexed_document::Column::DocId.is_in(doc_refs))
-                .exec(&state.db)
-                .await?;
+                indexed_document::Entity::delete_many()
+                    .filter(indexed_document::Column::DocId.is_in(doc_refs))
+                    .exec(&state.db)
+                    .await?;
+            }
         }
         Ok(())
     }
 
+    /// Deletes a single entry from the database/index.
     pub async fn delete_by_url(state: &AppState, url: &str) -> anyhow::Result<()> {
         if let Some(model) = indexed_document::Entity::find()
             .filter(indexed_document::Column::Url.eq(url))
