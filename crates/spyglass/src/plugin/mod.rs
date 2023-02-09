@@ -403,10 +403,12 @@ pub async fn plugin_load(
     let mut user_plugin_settings = config.user_settings.plugin_settings.clone();
     let plugin_user_settings = config.load_plugin_config();
 
-    for (_, plugin_config) in plugin_user_settings {
+    // Loop through and load plugin settings. Update settings w/ default values if
+    // this is first run.
+    log::info!("Loading plugin settings...");
+    let mut settings_changed = false;
+    for plugin_config in plugin_user_settings.values() {
         let mut plug = plugin_config.clone();
-        let mut settings_changed = false;
-
         let user_settings = if let Some(user_settings) = user_plugin_settings.get_mut(&plug.name) {
             user_settings
         } else {
@@ -423,12 +425,19 @@ pub async fn plugin_load(
                 user_settings.insert(key.to_owned(), value.value.to_string());
             };
         }
+    }
 
-        if settings_changed {
-            config.user_settings.plugin_settings = user_plugin_settings.clone();
-            let _ = config.save_user_settings(&config.user_settings);
-        }
+    // Save any changed settings
+    if settings_changed {
+        log::info!("Saved default settings...");
+        config.user_settings.plugin_settings = user_plugin_settings.clone();
+        let _ = config.save_user_settings(&config.user_settings);
+    }
 
+    // Load and start plugins
+    log::info!("Starting enabled plugins...");
+    for plugin_config in plugin_user_settings.values() {
+        let mut plug = plugin_config.clone();
         // Enable plugins that are lenses, this is the only type right so technically they
         // all will be enabled as a lens.
         if plug.plugin_type == PluginType::Lens {
@@ -445,7 +454,7 @@ pub async fn plugin_load(
                 Ok((is_new, _model)) => {
                     log::info!("loaded plugin {}, new? {}", plug.name, is_new);
                 }
-                Err(e) => log::error!("Unable to add lens: {}", e),
+                Err(e) => log::error!("Unable to add plugin: {}", e),
             }
         }
 
@@ -459,8 +468,6 @@ pub async fn plugin_load(
             plug.is_enabled = lens_config.is_enabled;
         }
 
-        tokio::spawn(crate::filesystem::configure_watcher(state.clone()));
-
         if cmds
             .send(PluginCommand::Initialize(plug.clone()))
             .await
@@ -469,6 +476,9 @@ pub async fn plugin_load(
             log::info!("<{}> plugin found", &plug.name);
         }
     }
+
+    // Startup filesystem watcher
+    tokio::spawn(crate::filesystem::configure_watcher(state.clone()));
 }
 
 pub async fn plugin_init(
