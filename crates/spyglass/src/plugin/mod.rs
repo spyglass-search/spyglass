@@ -253,8 +253,11 @@ pub async fn plugin_event_loop(
                             .await;
                     }
                 }
+
                 if plugin_name.eq("local-file-importer") {
-                    tokio::spawn(filesystem::configure_watcher(state.clone()));
+                    let mut state = state.clone();
+                    state.reload_config();
+                    tokio::spawn(filesystem::configure_watcher(state));
                 }
             }
             Some(PluginCommand::HandleUpdate { plugin_id, event }) => {

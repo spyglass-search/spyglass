@@ -1,3 +1,4 @@
+use js_sys::decode_uri_component;
 use url::Url;
 use yew::prelude::*;
 
@@ -247,7 +248,9 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
                     if f.is_empty() {
                         None
                     } else {
-                        Some(f.to_string().replace("%3A", ":"))
+                        decode_uri_component(f)
+                            .map(|s| s.as_string())
+                            .unwrap_or_else(|_| Some(f.to_string()))
                     }
                 })
                 .collect::<Vec<String>>();
@@ -264,7 +267,11 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
 
             segs.join(" › ")
         } else {
-            url.path().to_string()
+            let path_str = url.path().to_string();
+            decode_uri_component(&path_str)
+                .map(|s| s.as_string())
+                .unwrap_or_else(|_| Some(path_str.to_string()))
+                .unwrap_or_else(|| path_str.to_string())
         };
 
         return Some(path);
