@@ -6067,9 +6067,7 @@ dependencies = [
  "dashmap",
  "digest 0.10.6",
  "directories",
- "dirs",
  "docx",
- "ego-tree",
  "entities",
  "flate2",
  "futures",
@@ -6077,8 +6075,6 @@ dependencies = [
  "glob",
  "google",
  "hex",
- "hostname",
- "html5ever 0.25.2",
  "http",
  "ignore",
  "jsonrpsee",
@@ -6208,9 +6204,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.1.11"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dbe9683f3e5879a0561e72a2b167fb2c473e93bf86e1f94ab831d2451070569"
+checksum = "151325f6890ad4aed8b09d73b21456fa93e620da339c4dff73c30a78d4ca280f"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6245,6 +6241,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid 1.2.2",
+ "walkdir",
  "warc",
 ]
 

@@ -1,24 +1,22 @@
-use std::collections::HashSet;
-use std::path::Path;
-
 use addr::parse_domain_name;
 use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
 use entities::models::tag::TagPair;
-use percent_encoding::percent_decode_str;
-use sha2::{Digest, Sha256};
-use thiserror::Error;
-use url::{Host, Url};
-
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
+use libnetrunner::parser::html::{html_to_text, DEFAULT_DESC_LENGTH};
+use percent_encoding::percent_decode_str;
+use sha2::{Digest, Sha256};
+use std::collections::HashSet;
+use std::path::Path;
+use thiserror::Error;
+use url::{Host, Url};
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
 use crate::parser;
-use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use crate::state::AppState;
 
 pub mod archive;
@@ -261,21 +259,16 @@ impl Crawler {
     }
 
     pub async fn scrape_page(&self, url: &Url, raw_body: &str) -> CrawlResult {
-        // TODO: Cache the raw_body on the filesystem?
-
         // Parse the html.
-        let parse_result = html_to_text(raw_body);
+        let parse_result = html_to_text(url.as_ref(), raw_body);
+        log::trace!("content hash: {:?}", parse_result.content_hash);
 
-        // Hash the body content, used to detect changes (eventually).
-        let mut hasher = Sha256::new();
-        hasher.update(parse_result.content.as_bytes());
-        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-        log::trace!("content hash: {:?}", content_hash);
+        let extracted = parse_result.canonical_url.and_then(|s| Url::parse(&s).ok());
 
-        let canonical_url = determine_canonical(url, parse_result.canonical_url);
+        let canonical_url = determine_canonical(url, extracted);
 
         CrawlResult {
-            content_hash,
+            content_hash: Some(parse_result.content_hash),
             content: Some(parse_result.content),
             description: Some(parse_result.description),
             title: parse_result.title,
