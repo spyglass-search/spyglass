@@ -339,7 +339,10 @@ pub async fn process_crawl(
         &to_enqueue,
         &lenses,
         &state.user_settings,
-        &Default::default(),
+        &EnqueueSettings {
+            tags: task_tags.clone(),
+            ..Default::default()
+        },
         None,
     )
     .await
