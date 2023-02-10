@@ -815,19 +815,24 @@ pub async fn delete_many_by_id(
     db: &DatabaseConnection,
     dbids: &[i64],
 ) -> Result<u64, sea_orm::DbErr> {
-    // Delete all associated tags
-    crawl_tag::Entity::delete_many()
-        .filter(crawl_tag::Column::CrawlQueueId.is_in(dbids.to_owned()))
-        .exec(db)
-        .await?;
+    let mut rows_affected = 0;
+    for chunk in dbids.chunks(BATCH_SIZE) {
+        // Delete all associated tags
+        crawl_tag::Entity::delete_many()
+            .filter(crawl_tag::Column::CrawlQueueId.is_in(chunk.to_owned()))
+            .exec(db)
+            .await?;
 
-    // Delete item
-    let res = Entity::delete_many()
-        .filter(Column::Id.is_in(dbids.to_owned()))
-        .exec(db)
-        .await?;
+        // Delete item
+        let res = Entity::delete_many()
+            .filter(Column::Id.is_in(chunk.to_owned()))
+            .exec(db)
+            .await?;
 
-    Ok(res.rows_affected)
+        rows_affected += res.rows_affected;
+    }
+
+    Ok(rows_affected)
 }
 
 /// Helper method used to delete multiple crawl entries by url. This method will first
