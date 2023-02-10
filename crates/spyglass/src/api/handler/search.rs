@@ -48,7 +48,9 @@ impl WordRange {
 /// together overlaps & returning the final string.
 fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> String {
     let fields = DocFields::as_fields();
-    let tokenizer = index.index.tokenizer_for_field(fields.content)
+    let tokenizer = index
+        .index
+        .tokenizer_for_field(fields.content)
         .expect("Unable to get tokenizer for content field");
 
     // tokenize search query
@@ -57,7 +59,6 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
     while let Some(t) = tokens.next() {
         terms.insert(t.text.clone());
     }
-
 
     let tokens = content
         .split_whitespace()
@@ -69,7 +70,9 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
         .split_whitespace()
         .enumerate()
         .filter(|(_, w)| {
-            let normalized = tokenizer.token_stream(w).next()
+            let normalized = tokenizer
+                .token_stream(w)
+                .next()
                 .map(|t| t.text.clone())
                 .unwrap_or_else(|| w.to_string());
             terms.contains(&normalized)
@@ -172,7 +175,8 @@ pub async fn search_docs(
                         .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                         .collect::<Vec<(String, String)>>();
 
-                    let description = generate_highlight_preview(&state.index, &query, &doc.content);
+                    let description =
+                        generate_highlight_preview(&state.index, &query, &doc.content);
                     let result = SearchResult {
                         doc_id: doc.doc_id.clone(),
                         domain: doc.domain,
@@ -280,8 +284,8 @@ pub async fn search_lenses(
 
 #[cfg(test)]
 mod test {
-    use libspyglass::search::{Searcher, IndexPath};
     use crate::api::handler::search::generate_highlight_preview;
+    use libspyglass::search::{IndexPath, Searcher};
 
     #[test]
     fn test_find_highlights() {
