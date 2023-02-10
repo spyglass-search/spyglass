@@ -31,7 +31,7 @@ export let invoke = async (func_name, params) => {
                 domain: "localhost",
                 title: "/Users/Blah/Documents/Special Information",
                 description: "",
-                crawl_uri: "file:///Users/Blah/Documents/Special%20Information",
+                crawl_uri: "file:///C%3A/Blah/Documents/Special%20Information",
                 url: "file:///Users/Blah/Documents/Special%20Information",
                 tags: [
                     ['Lens', 'files'],
