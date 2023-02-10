@@ -1,5 +1,6 @@
 use entities::models::tag::TagType;
 use entities::models::{indexed_document, lens, tag};
+use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
@@ -45,15 +46,32 @@ impl WordRange {
 /// Creates a short preview from content based on the search query terms by
 /// finding matches for words and creating a window around each match, joining
 /// together overlaps & returning the final string.
-fn generate_highlight_preview(terms: &HashSet<String>, tokens: &[String]) -> String {
-    let matched_indices = tokens
-        .iter()
+fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> String {
+    let fields = DocFields::as_fields();
+    let tokenizer = index.index.tokenizer_for_field(fields.content)
+        .expect("Unable to get tokenizer for content field");
+
+    // tokenize search query
+    let mut terms = HashSet::new();
+    let mut tokens = tokenizer.token_stream(query);
+    while let Some(t) = tokens.next() {
+        terms.insert(t.text.clone());
+    }
+
+
+    let tokens = content
+        .split_whitespace()
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
+    let matched_indices = content
+        .split_whitespace()
         .enumerate()
         .filter(|(_, w)| {
-            let normalized = w.to_lowercase()
-                .chars()
-                .filter(|c| c.is_alphanumeric())
-                .collect::<String>();
+            let normalized = tokenizer.token_stream(w).next()
+                .map(|t| t.text.clone())
+                .unwrap_or_else(|| w.to_string());
             terms.contains(&normalized)
         })
         .map(|(idx, _)| idx)
@@ -127,12 +145,7 @@ pub async fn search_docs(
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
 
-    let terms = search_req
-        .query
-        .split_whitespace()
-        .map(|s| s.to_owned())
-        .collect::<HashSet<_>>();
-
+    let query = search_req.query.clone();
     for (score, doc_addr) in docs {
         if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
@@ -153,12 +166,7 @@ pub async fn search_docs(
                         .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
                         .collect::<Vec<(String, String)>>();
 
-                    let tokens = doc
-                        .content
-                        .split_whitespace()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>();
-                    let description = generate_highlight_preview(&terms, &tokens);
+                    let description = generate_highlight_preview(&state.index, &query, &doc.content);
                     let result = SearchResult {
                         doc_id: doc.doc_id.clone(),
                         domain: doc.domain,
@@ -184,7 +192,7 @@ pub async fn search_docs(
         .map_or_else(|_| 0, |duration| duration.as_millis() as u64);
 
     let meta = SearchMeta {
-        query: search_req.query,
+        query: search_req.query.clone(),
         num_docs: searcher.num_docs() as u32,
         wall_time_ms: wall_time_ms as u32,
     };
@@ -266,19 +274,14 @@ pub async fn search_lenses(
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
+    use libspyglass::search::{Searcher, IndexPath};
     use crate::api::handler::search::generate_highlight_preview;
 
     #[test]
     fn test_find_highlights() {
-        let terms = HashSet::from(["rust".to_string(), "programming".to_string()]);
+        let searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         let blurb = r#"Rust rust is a multi-paradigm, high-level, general-purpose programming"#;
-        let tokens = blurb
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>();
-
-        let desc = generate_highlight_preview(&terms, &tokens);
+        let desc = generate_highlight_preview(&searcher, "rust programming", &blurb);
         assert_eq!(desc, "<span><mark>Rust</mark> <mark>rust</mark> is a multi-paradigm, high-level, general-purpose <mark>programming</mark> ...</span>");
     }
 }
