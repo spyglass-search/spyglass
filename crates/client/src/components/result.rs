@@ -110,7 +110,7 @@ fn render_metadata(result: &SearchResult) -> Html {
     meta.extend(normal_tags);
 
     html! {
-        <div class="text-xs place-items-center flex flex-row flex-wrap gap-2 text-cyan-500 py-0.5 mt-1">
+        <div class="text-xs place-items-center flex flex-row flex-wrap gap-2 text-cyan-500 py-0.5 mt-1.5">
             {meta}
         </div>
     }

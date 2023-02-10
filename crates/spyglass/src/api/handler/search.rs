@@ -96,6 +96,7 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
 
     // Create preview from word ranges
     let mut desc: Vec<String> = Vec::new();
+    let mut num_windows = 0;
     for range in ranges {
         let mut slice = tokens[range.start..=range.end].to_vec();
         if !slice.is_empty() {
@@ -105,6 +106,11 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
             }
             desc.extend(slice);
             desc.push("...".to_string());
+            num_windows += 1;
+
+            if num_windows > 3 {
+                break;
+            }
         }
     }
 
