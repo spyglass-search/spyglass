@@ -7,6 +7,7 @@ use shared::config::Config;
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;
+use crate::filesystem;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::search::Searcher;
 use crate::state::AppState;
@@ -51,6 +52,7 @@ pub enum ManagerCommand {
     /// General database cleanup command that sends a worker
     /// task request for cleanup
     CleanupDatabase(CleanupTask),
+    ToggleFilesystem(bool),
 }
 
 /// Send tasks to the worker
@@ -129,6 +131,16 @@ pub async fn manager_task(
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             }
+                        },
+                        ManagerCommand::ToggleFilesystem (enabled) => {
+                            let mut state = state.clone();
+                            if let Ok(mut loaded_settings) = Config::load_user_settings() {
+                                loaded_settings.filesystem_settings.enable_filesystem_scanning = enabled;
+                                let _ = Config::save_user_settings(&loaded_settings);
+                                state.user_settings = loaded_settings;
+                            }
+
+                            filesystem::configure_watcher(state).await;
                         }
                     }
                 }

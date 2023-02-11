@@ -3,7 +3,7 @@
 	setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
-PLUGINS := chrome-importer firefox-importer local-file-indexer
+PLUGINS := chrome-importer firefox-importer
 # Set this up if you're working on the plugins
 PLUGINS_DEV_FOLDER := ~/Library/Application\ Support/com.athlabs.spyglass-dev/
 

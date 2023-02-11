@@ -1,5 +1,6 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
+use sea_orm::DeleteResult;
 use sea_orm::Set;
 use serde::Serialize;
 use shared::config::LensConfig;
@@ -77,6 +78,11 @@ pub async fn find_by_name(
         .filter(Column::Name.eq(lens_name.to_owned()))
         .one(db)
         .await
+}
+
+// Deletes the lens that matches the id
+pub async fn delete_by_id(id: i64, db: &DatabaseConnection) -> Result<DeleteResult, DbErr> {
+    Entity::delete_by_id(id).exec(db).await
 }
 
 // Updates the lens row in the database with the new cache time

@@ -14,8 +14,8 @@ use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::AppPause;
-use shared::config::Config;
+use libspyglass::task::{AppPause, ManagerCommand};
+use shared::config::{self, Config};
 use shared::metrics::Event;
 use shared::request;
 use shared::response::{
@@ -274,7 +274,7 @@ async fn build_filesystem_information(
     state: &AppState,
     lens_stats: Option<&LibraryStats>,
 ) -> Option<LensResult> {
-    if filesystem::is_watcher_enabled(&state.db).await {
+    if filesystem::is_watcher_enabled() {
         let watcher = state.file_watcher.lock().await;
         let ref_watcher = watcher.as_ref();
         if let Some(watcher) = ref_watcher {
@@ -436,6 +436,19 @@ pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Resu
 }
 
 #[instrument(skip(state))]
+pub async fn toggle_filesystem(state: AppState, enabled: bool) -> Result<(), Error> {
+    let mut cmd_tx = state.manager_cmd_tx.lock().await;
+    match &mut *cmd_tx {
+        Some(cmd_tx) => {
+            let _ = cmd_tx.send(ManagerCommand::ToggleFilesystem(enabled));
+        }
+        None => {}
+    }
+
+    Ok(())
+}
+
+#[instrument(skip(state))]
 pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Result<(), Error> {
     // Remove from filesystem
     let lens_path = config.lenses_dir().join(format!("{name}.ron"));
@@ -502,7 +515,7 @@ pub async fn default_indices() -> DefaultIndices {
     file_paths.retain(|f| f.exists());
     DefaultIndices {
         file_paths,
-        extensions: libspyglass::filesystem::DEFAULT_EXTENSIONS
+        extensions: config::DEFAULT_EXTENSIONS
             .iter()
             .map(|val| String::from(*val))
             .collect(),

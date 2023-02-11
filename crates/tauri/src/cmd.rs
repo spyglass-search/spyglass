@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
@@ -268,6 +268,16 @@ pub async fn toggle_plugin(window: tauri::Window, name: &str, enabled: bool) -> 
 }
 
 #[tauri::command]
+pub async fn toggle_filesystem(window: tauri::Window, enabled: bool) -> Result<(), String> {
+    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        let _ = rpc.client.toggle_filesystem(enabled).await;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
     let app_handle = window.app_handle();
     if let Ok(updater) = app_handle.updater().check().await {
@@ -332,78 +342,13 @@ pub async fn wizard_finished(
     config: State<'_, Config>,
     toggle_file_indexer: bool,
 ) -> Result<(), String> {
-    let plugin_name = "local-file-importer";
     let mut current_settings = config.user_settings.clone();
     current_settings.run_wizard = true;
 
-    // Only do this is we're enabling the plugin.
-    if toggle_file_indexer {
-        let field = "FOLDERS_LIST";
-        let ext = "EXTS_LIST";
+    let _ = Config::save_user_settings(&current_settings);
 
-        // TODO: Make this waaaay less involved to get & update a single field.
-        let plugin_configs = config.load_plugin_config();
-        // Load the plugin configuration, grab the default paths & add to the plugin config.
-        let to_update = current_settings
-            .plugin_settings
-            .entry(plugin_name.to_string())
-            .or_default();
-        let default_indices = default_indices(win.clone())
-            .await
-            .expect("Should not fail getting defaults");
-        if let Some(plugin_config) = plugin_configs.get(plugin_name) {
-            if let Some(field_opts) = plugin_config.user_settings.get(field) {
-                let merged = if let Some(paths) = to_update.get(field) {
-                    let mut paths =
-                        serde_json::from_str::<Vec<PathBuf>>(paths).map_or(Vec::new(), |x| x);
-                    for path in default_indices.file_paths.iter() {
-                        if !paths.contains(path) {
-                            paths.push(path.to_path_buf());
-                        }
-                    }
-
-                    paths
-                } else {
-                    default_indices.file_paths
-                };
-
-                if let Ok(paths) = serde_json::to_string(&merged) {
-                    if let Ok(val) = field_opts.form_type.validate(&paths) {
-                        log::debug!("Updating {}.{} w/ {}", plugin_name, field, val);
-                        to_update.insert(field.into(), val);
-                    }
-                }
-            }
-
-            if let Some(field_opts) = plugin_config.user_settings.get(ext) {
-                let merged = if let Some(extensions) = to_update.get(ext) {
-                    let mut extensions =
-                        serde_json::from_str::<Vec<String>>(extensions).map_or(Vec::new(), |x| x);
-                    for extension in default_indices.extensions.iter() {
-                        if !extensions.contains(extension) {
-                            extensions.push(extension.to_string());
-                        }
-                    }
-
-                    extensions
-                } else {
-                    default_indices.extensions
-                };
-
-                if let Ok(extensions) = serde_json::to_string(&merged) {
-                    if let Ok(val) = field_opts.form_type.validate(&extensions) {
-                        log::debug!("Updating {}.{} w/ {}", plugin_name, ext, val);
-                        to_update.insert(ext.into(), val);
-                    }
-                }
-            }
-        }
-    }
-
-    // Save any updated settings based on onboarding flow.
-    let _ = config.save_user_settings(&current_settings);
-    // Turn on/off the plugin based on the user prefs.
-    let _ = toggle_plugin(win.clone(), plugin_name, toggle_file_indexer).await;
+    // Turn on/off the filesystem indexer
+    let _ = toggle_filesystem(win.clone(), toggle_file_indexer).await;
 
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {

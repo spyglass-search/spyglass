@@ -6,14 +6,14 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use entities::models::{crawl_queue, lens};
+use entities::models::{self, crawl_queue, lens};
 use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
 #[allow(unused_imports)]
 use migration::Migrator;
-use shared::config::Config;
+use shared::config::{self, Config};
 
 mod api;
 
@@ -37,7 +37,7 @@ struct CliArgs {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::new();
+    let mut config = Config::new();
     let args = CliArgs::parse();
 
     #[cfg(not(debug_assertions))]
@@ -122,6 +122,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if migration_status.is_err() {
             return Ok(());
         }
+    }
+
+    {
+        backend_rt.block_on(async {
+            // migrate plugin settings
+            let db = models::create_connection(&config, false)
+                .await
+                .expect("Unable to connect to db");
+
+            // state.user_settings
+            if let Ok(Some(model)) = lens::find_by_name(config::LEGACY_FILESYSTEM_PLUGIN, &db).await
+            {
+                let mut new_settings = config.user_settings.clone();
+                new_settings.filesystem_settings.enable_filesystem_scanning = model.is_enabled;
+                let _ = Config::save_user_settings(&new_settings);
+                if let Ok(settings) = Config::load_user_settings() {
+                    config.user_settings = settings;
+                }
+
+                if let Err(err) = lens::delete_by_id(model.id, &db).await {
+                    log::error!("Error deleting filesystem plugin lens {:?}", err);
+                }
+            }
+        });
     }
 
     // Initialize/Load user preferences
