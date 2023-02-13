@@ -338,7 +338,7 @@ mod test {
         bootstrap_queue::enqueue(&state.db, &lens.name, 10)
             .await
             .expect("Unable to add to bootstrap_queue");
-        assert!(!handle_cdx_collection(&state, &lens, None).await);
+        assert!(!handle_cdx_collection(&state, &lens, None).await.expect("unable to run"));
     }
 
     #[tokio::test]

@@ -130,17 +130,20 @@ mod test {
     // #[ignore]
     async fn test_bootstrap() {
         let db = setup_test_db().await;
-        let state = AppState::builder().with_db(db.clone()).build();
-
         let settings = UserSettings {
             domain_crawl_limit: Limit::Infinite,
             ..Default::default()
         };
 
+        let state = AppState::builder()
+            .with_db(db.clone())
+            .with_user_settings(&settings)
+            .build();
+
         let mut lens: LensConfig = Default::default();
         lens.urls.push("https://www.wikipedia.org$".to_string());
 
-        let res = bootstrap(&state, &lens, &db, &settings, Option::None)
+        let res = bootstrap(&state, &lens, Option::None)
             .await
             .expect("Unable to bootstrap");
         assert_eq!(res, 1);
