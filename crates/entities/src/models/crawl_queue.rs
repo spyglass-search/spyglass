@@ -1,4 +1,4 @@
-use regex::RegexSet;
+use regex::{RegexSet, RegexSetBuilder};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
@@ -436,6 +436,26 @@ pub struct EnqueueSettings {
     pub is_recrawl: bool,
 }
 
+fn url_is_allowed(
+    url: &str,
+    allow_list: &RegexSet,
+    restrict_list: &RegexSet,
+    skip_list: &RegexSet,
+) -> bool {
+    // Ignore domains on blacklist
+    if skip_list.is_match(url)
+    // Skip if any URLs do not match this restriction
+    || (!restrict_list.is_empty()
+        && !restrict_list.is_match(url))
+    {
+        return false;
+    }
+
+    // If external links are not allowed, only allow crawls specified
+    // in our lenses
+    !allow_list.is_empty() && allow_list.is_match(url)
+}
+
 fn filter_urls(
     lenses: &[LensConfig],
     settings: &UserSettings,
@@ -457,55 +477,71 @@ fn filter_urls(
         restrict_list.extend(ruleset.restrict_list);
     }
 
-    let allow_list = RegexSet::new(allow_list)?;
-    let skip_list = RegexSet::new(skip_list)?;
-    let restrict_list = RegexSet::new(restrict_list)?;
+    let allow_list = RegexSetBuilder::new(allow_list)
+        .size_limit(100_000_000)
+        .build()?;
+    let skip_list = RegexSetBuilder::new(skip_list)
+        .size_limit(100_000_000)
+        .build()?;
+    let restrict_list = RegexSetBuilder::new(restrict_list)
+        .size_limit(100_000_000)
+        .build()?;
 
     // Ignore invalid URLs
     let res = urls
         .iter()
+        // Only look at valid URLs
+        .flat_map(|s| Url::parse(s))
         .filter_map(|url| {
-            if let Ok(mut parsed) = Url::parse(url) {
-                // Check that we can handle this scheme
-                if parsed.scheme() != "http"
-                    && parsed.scheme() != "https"
-                    && parsed.scheme() != "file"
-                    && parsed.scheme() != "api"
-                {
-                    return None;
-                }
-
-                // Always ignore fragments, otherwise crawling
-                // https://wikipedia.org/Rust#Blah would be considered different than
-                // https://wikipedia.org/Rust
-                parsed.set_fragment(None);
-
-                let normalized = parsed.to_string();
-
-                // Ignore domains on blacklist
-                if skip_list.is_match(&normalized)
-                    // Skip if any URLs do not match this restriction
-                    || (!restrict_list.is_empty()
-                        && !restrict_list.is_match(&normalized))
-                {
-                    return None;
-                }
-
-                // Should we crawl external links?
-                if settings.crawl_external_links {
-                    return Some(normalized);
-                }
-
-                // If external links are not allowed, only allow crawls specified
-                // in our lenses
-                if overrides.force_allow
-                    || (!allow_list.is_empty() && allow_list.is_match(&normalized))
-                {
-                    return Some(normalized);
-                }
+            // Check that we can handle this scheme
+            if url.scheme() != "http"
+                && url.scheme() != "https"
+                && url.scheme() != "file"
+                && url.scheme() != "api"
+            {
+                None
+            } else {
+                Some(url)
+            }
+        })
+        .filter_map(|mut url| {
+            if overrides.force_allow {
+                return Some(url.to_string());
             }
 
-            None
+            // Always ignore fragments, otherwise crawling
+            // https://wikipedia.org/Rust#Blah would be considered different than
+            // https://wikipedia.org/Rust
+            url.set_fragment(None);
+
+            let normalized = url.to_string();
+            let no_end_slash = if normalized.ends_with('/') {
+                Some(normalized.trim_end_matches('/').to_string())
+            } else {
+                None
+            };
+
+            let mut checks = Vec::new();
+            checks.push(url_is_allowed(
+                &normalized,
+                &allow_list,
+                &restrict_list,
+                &skip_list,
+            ));
+            if let Some(no_end_slash) = no_end_slash {
+                checks.push(url_is_allowed(
+                    &no_end_slash,
+                    &allow_list,
+                    &restrict_list,
+                    &skip_list,
+                ));
+            }
+
+            if checks.iter().any(|f| *f) {
+                Some(normalized)
+            } else {
+                None
+            }
         })
         .collect::<Vec<String>>();
 

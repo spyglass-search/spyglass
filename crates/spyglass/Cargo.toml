@@ -24,7 +24,6 @@ ignore = "0.4"
 jsonrpsee = { version = "0.16.2", features = ["server"] }
 lnk = "0.5.1"
 log = "0.4"
-migration = { path = "../migrations" }
 mime = "0.3.16"
 new_mime_guess = "4.0.1"
 notify = { version = "5.1.0", default-features = false, features = ["serde", "macos_fsevent"] }
@@ -62,8 +61,9 @@ wasmer-wasi = "2.3.0"
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
 github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
 google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
+migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
-spyglass-netrunner = "0.1.13"
+spyglass-netrunner = "0.2.2"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 

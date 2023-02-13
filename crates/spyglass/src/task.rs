@@ -28,7 +28,6 @@ pub enum CollectTask {
     // Pull URLs from a CDX server
     CDXCollection {
         lens: String,
-        seed_url: String,
         pipeline: Option<String>,
     },
     // Connects to an integration and discovers all the crawlable URIs
@@ -207,14 +206,13 @@ pub async fn worker_task(
                             },
                             CollectTask::CDXCollection {
                                 lens,
-                                seed_url,
                                 pipeline,
                             } => {
-                                log::debug!("handling CDXCollection for {} - {}", lens, seed_url);
+                                log::debug!("handling CDXCollection for {}", lens);
                                 let state = state.clone();
                                 tokio::spawn(async move {
                                     if let Some(lens_config) = &state.lenses.get(&lens) {
-                                        worker::handle_bootstrap(&state, lens_config, &seed_url, pipeline)
+                                        worker::handle_cdx_collection(&state, lens_config, pipeline)
                                             .await;
                                     }
                                 });

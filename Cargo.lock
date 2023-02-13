@@ -5919,7 +5919,7 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
- "spyglass-lens 0.1.5",
+ "spyglass-lens 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "url",
@@ -6178,9 +6178,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81d7b2343d361a603809468953b6b960ae1d1ef623f5923bda23e272e78e7a32"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "blake2",
@@ -6193,6 +6191,8 @@ dependencies = [
 [[package]]
 name = "spyglass-lens"
 version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b6172dd4a7dc20612b121d8a7a4179645b66085a79ed4427b6240f14b8e5ee9"
 dependencies = [
  "anyhow",
  "blake2",
@@ -6204,9 +6204,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37d0a20fad06212ded32e4bed01bf25ff69009e704dec79e38ed4e7cd9a4f57d"
+checksum = "5d730620ff4a45b6c73553bddf77b629fa93f416063d0ada6ea9f2c8a110ac8b"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6232,7 +6232,7 @@ dependencies = [
  "rusoto_s3",
  "serde",
  "sitemap",
- "spyglass-lens 0.1.4",
+ "spyglass-lens 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",
  "texting_robots",
  "tokio",
