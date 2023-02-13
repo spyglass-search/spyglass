@@ -71,26 +71,20 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         }
     });
 
-    let mut next_label = String::new();
     let content = match props.stage {
         WizardStage::MenubarHelp => {
-            next_label = "Show/hide the searchbar".into();
             html! { <menubar_help::MenubarHelpPage /> }
         }
         WizardStage::DisplaySearchbarHelp => {
-            next_label = "Create your library".into();
             html! { <display_searchbar::DisplaySearchbarPage /> }
         }
         WizardStage::IndexFiles => {
-            next_label = "Connect your cloud".into();
             html! { <indexing_help::IndexFilesHelp toggle_file_indexer={*toggle_file_indexer} onchange={handle_onchange} /> }
         }
         WizardStage::IndexCloud => {
-            next_label = "Add web content".into();
             html! { <indexing_help::IndexCloudHelp /> }
         }
         WizardStage::IndexWeb => {
-            next_label = "Ready to go!".into();
             html! { <indexing_help::IndexWebHelp /> }
         }
         _ => html! {},
@@ -115,7 +109,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
             <div class="mt-auto mb-2 flex flex-row gap-4">
                 {back_btn}
                 <btn::Btn onclick={handle_next} classes={classes!("w-full")}>
-                    <div>{next_label.clone()}</div>
+                    <div>{"Next"}</div>
                     <icons::ChevronRightIcon height="h-8" width="w-8" classes="ml-auto float-right"/>
                 </btn::Btn>
             </div>
