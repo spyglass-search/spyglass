@@ -16,6 +16,7 @@ use percent_encoding::percent_decode_str;
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+use std::num::NonZeroU32;
 use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
@@ -152,7 +153,7 @@ pub struct Crawler {
 
 impl Default for Crawler {
     fn default() -> Self {
-        Self::new()
+        Self::new(10)
     }
 }
 
@@ -217,7 +218,7 @@ fn determine_canonical(original: &Url, extracted: Option<Url>) -> String {
 }
 
 impl Crawler {
-    pub fn new() -> Self {
+    pub fn new(queries_per_second: u32) -> Self {
         let client = reqwest::Client::builder()
             .user_agent(APP_USER_AGENT)
             // TODO: Make configurable
@@ -226,7 +227,13 @@ impl Crawler {
             .build()
             .expect("Unable to create reqwest client");
 
-        let quota = Quota::per_second(nonzero!(2u32));
+        let qps = if let Some(num) = NonZeroU32::new(queries_per_second) {
+            num
+        } else {
+            nonzero!(2u32)
+        };
+
+        let quota = Quota::per_second(qps);
 
         Crawler {
             client,
@@ -534,7 +541,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_crawl() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
         let result = crawler.crawl(&url, true).await.expect("success");
 
@@ -546,7 +553,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_fetch() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
 
         let db = setup_test_db().await;
         let url = Url::parse("https://oldschool.runescape.wiki/").unwrap();
@@ -569,7 +576,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_fetch_redirect() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
 
@@ -589,7 +596,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_fetch_bootstrap() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
 
@@ -620,7 +627,7 @@ mod test {
 
     #[tokio::test]
     async fn test_fetch_skip() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
 
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
@@ -720,7 +727,7 @@ mod test {
 
     #[tokio::test]
     async fn test_file_fetch() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
 
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();

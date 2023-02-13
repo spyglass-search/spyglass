@@ -284,7 +284,7 @@ mod test {
 
     #[tokio::test]
     async fn test_check_resource_rules() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let db = setup_test_db().await;
 
         let url = url::Url::parse("https://oldschool.runescape.wiki/").unwrap();
