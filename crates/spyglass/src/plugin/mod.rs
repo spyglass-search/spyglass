@@ -434,7 +434,7 @@ pub async fn plugin_load(
     if settings_changed {
         log::info!("Saved default settings...");
         config.user_settings.plugin_settings = user_plugin_settings.clone();
-        let _ = config.save_user_settings(&config.user_settings);
+        let _ = Config::save_user_settings(&config.user_settings);
     }
 
     // Load and start plugins

@@ -131,7 +131,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                 LensType::Internal => {
                     let onclick = Callback::from(move |_| {
                         navigator.push(&Route::SettingsPage {
-                            tab: pages::Tab::PluginsManager,
+                            tab: pages::Tab::UserSettings,
                         })
                     });
                     html! {

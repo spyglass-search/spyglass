@@ -136,6 +136,10 @@ impl RpcServer for SpyglassRpc {
         handler::toggle_plugin(self.state.clone(), name, enabled).await
     }
 
+    async fn toggle_filesystem(&self, enabled: bool) -> Result<(), Error> {
+        handler::toggle_filesystem(self.state.clone(), enabled).await
+    }
+
     async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
         handler::uninstall_lens(self.state.clone(), &self.config, &name).await
     }
