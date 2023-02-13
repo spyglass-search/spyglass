@@ -9,9 +9,8 @@
 use chrono::Utc;
 use entities::models::crawl_queue;
 use entities::models::tag::TagType;
-use entities::sea_orm::DatabaseConnection;
 use libnetrunner::bootstrap::Bootstrapper;
-use shared::config::{Config, LensConfig, UserSettings};
+use shared::config::{Config, LensConfig};
 
 use crate::pipeline::PipelineCommand;
 use crate::state::AppState;
@@ -65,10 +64,11 @@ pub async fn bootstrap_lens_cache(state: &AppState, config: &Config, lens: &Lens
 pub async fn bootstrap(
     state: &AppState,
     lens: &LensConfig,
-    db: &DatabaseConnection,
-    settings: &UserSettings,
     pipeline: Option<String>,
 ) -> anyhow::Result<usize> {
+    let db = &state.db;
+    let settings = &state.user_settings;
+
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     let overrides = crawl_queue::EnqueueSettings {

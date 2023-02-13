@@ -213,7 +213,7 @@ pub async fn worker_task(
                                 let state = state.clone();
                                 tokio::spawn(async move {
                                     if let Some(lens_config) = &state.lenses.get(&lens) {
-                                        worker::handle_cdx_collection(&state, lens_config, pipeline)
+                                        let _ = worker::handle_cdx_collection(&state, lens_config, pipeline)
                                             .await;
                                     }
                                 });

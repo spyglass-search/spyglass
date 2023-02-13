@@ -115,26 +115,23 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
 }
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
+/// - Returns true if we've successfully run bootstrap
+/// - Returns false if bootstrapping has been run already
+/// - Returns an Error if we're unable to bootstrap for some reason.
 #[tracing::instrument(skip(state, lens))]
 pub async fn handle_cdx_collection(
     state: &AppState,
     lens: &LensConfig,
     pipeline: Option<String>,
-) -> bool {
-    let db = &state.db;
-    let user_settings = &state.user_settings;
-
-    match bootstrap::bootstrap(state, lens, db, user_settings, pipeline).await {
-        Err(e) => {
-            log::error!("error bootstrapping: {e}");
-            false
-        }
-        Ok(cnt) => {
-            log::info!("bootstrapped {} w/ {} urls", lens.name, cnt);
-            let _ = bootstrap_queue::enqueue(db, &lens.name, cnt as i64).await;
-            true
-        }
+) -> anyhow::Result<bool> {
+    if bootstrap_queue::is_bootstrapped(&state.db, &lens.name).await? {
+        return Ok(false);
     }
+
+    let cnt = bootstrap::bootstrap(state, lens, pipeline).await?;
+    log::info!("bootstrapped {} w/ {} urls", lens.name, cnt);
+    let _ = bootstrap_queue::enqueue(&state.db, &lens.name, cnt as i64).await;
+    Ok(true)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -337,7 +334,7 @@ mod test {
             .with_index(&IndexPath::Memory)
             .build();
 
-        // Should skip this URL since we already have it.
+        // Should skip this lens since it's been bootstrapped already.
         bootstrap_queue::enqueue(&state.db, &lens.name, 10)
             .await
             .expect("Unable to add to bootstrap_queue");
