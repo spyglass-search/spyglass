@@ -1,6 +1,4 @@
 use entities::models::crawl_queue::EnqueueSettings;
-use shared::regex::{regex_for_robots, WildcardType};
-use url::Url;
 
 use entities::models::{
     bootstrap_queue, crawl_queue, crawl_tag, indexed_document,
@@ -8,7 +6,7 @@ use entities::models::{
 };
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use shared::config::{Config, LensConfig, LensRule, LensSource};
+use shared::config::{Config, LensConfig, LensSource};
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
@@ -39,133 +37,12 @@ pub async fn handle_bootstrap_lens(state: &AppState, config: &Config, lens: &Len
 
 // Process lens by kicking off a bootstrap for the lens
 async fn process_lens(state: &AppState, lens: &LensConfig) {
-    for domain in lens.domains.iter() {
-        let _ = state
-            .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
-                lens: lens.name.clone(),
-                seed_url: format!("https://{domain}"),
-                pipeline: lens.pipeline.as_ref().cloned(),
-            }))
-            .await;
-    }
-
-    process_urls(lens, state).await;
-    process_lens_rules(lens, state).await;
-}
-
-// Process the urls by adding them to the crawl queue or bootstrapping the urls
-async fn process_urls(lens: &LensConfig, state: &AppState) {
-    let pipeline_kind = lens.pipeline.as_ref().cloned();
-
-    for prefix in lens.urls.iter() {
-        // Handle singular URL matches. Simply add these to the crawl queue.
-        if prefix.ends_with('$') {
-            // Remove the '$' suffix and add to the crawl queue
-            let url = prefix.strip_suffix('$').expect("No $ at end of prefix");
-            if let Err(err) = crawl_queue::enqueue_all(
-                &state.db,
-                &[url.to_owned()],
-                &[],
-                &state.user_settings,
-                &EnqueueSettings {
-                    force_allow: true,
-                    ..Default::default()
-                },
-                pipeline_kind.clone(),
-            )
-            .await
-            {
-                log::warn!("unable to enqueue <{}> due to {}", prefix, err)
-            }
-        } else {
-            // Otherwise, bootstrap using this as a prefix.
-            let _ = state
-                .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
-                    lens: lens.name.clone(),
-                    seed_url: prefix.to_string(),
-                    pipeline: pipeline_kind.clone(),
-                }))
-                .await;
-        }
-    }
-}
-
-// Processes the len rules
-async fn process_lens_rules(lens: &LensConfig, state: &AppState) {
-    // Rules will go through and remove crawl tasks AND indexed_documents that match.
-    for rule in lens.rules.iter() {
-        match rule {
-            LensRule::SkipURL(rule_str) => {
-                if let Some(rule_like) = regex_for_robots(rule_str, WildcardType::Database) {
-                    // Remove matching crawl tasks
-                    let _ = crawl_queue::remove_by_rule(&state.db, &rule_like).await;
-                    // Remove matching indexed documents
-                    match indexed_document::delete_by_rule(&state.db, &rule_like).await {
-                        Ok(doc_ids) => {
-                            for doc_id in doc_ids {
-                                let _ = Searcher::delete_by_id(state, &doc_id).await;
-                            }
-                            let _ = Searcher::save(state).await;
-                        }
-                        Err(e) => log::error!("Unable to remove docs: {:?}", e),
-                    }
-                }
-            }
-            LensRule::LimitURLDepth(rule_str, _) => {
-                // Remove URLs that don't match this rule
-                // sqlite3 does support regexp, but this is _not_ guaranteed to
-                // be on all platforms, so we'll apply this in a brute-force way.
-                if let Ok(parsed) = Url::parse(rule_str) {
-                    if let Some(domain) = parsed.host_str() {
-                        // Remove none matchin URLs from crawl_queue
-                        let urls = crawl_queue::Entity::find()
-                            .filter(crawl_queue::Column::Domain.eq(domain))
-                            .all(&state.db)
-                            .await;
-
-                        let regex = regex::Regex::new(&rule.to_regex())
-                            .expect("Invalid LimitURLDepth regex");
-
-                        let mut num_removed = 0;
-                        if let Ok(urls) = urls {
-                            for crawl in urls {
-                                if !regex.is_match(&crawl.url) {
-                                    num_removed += 1;
-                                    let _ = crawl.delete(&state.db).await;
-                                }
-                            }
-                        }
-                        log::info!("removed {} docs from crawl_queue", num_removed);
-
-                        // Remove none matchin URLs from indexed documents
-                        let mut num_removed = 0;
-                        let indexed = indexed_document::Entity::find()
-                            .filter(indexed_document::Column::Domain.eq(domain))
-                            .all(&state.db)
-                            .await;
-
-                        let mut doc_ids = Vec::new();
-                        if let Ok(indexed) = indexed {
-                            for doc in indexed {
-                                if !regex.is_match(&doc.url) {
-                                    num_removed += 1;
-                                    doc_ids.push(doc.doc_id.clone());
-                                    let _ = doc.delete(&state.db).await;
-                                }
-                            }
-                        }
-
-                        for doc_id in doc_ids {
-                            let _ = Searcher::delete_by_id(state, &doc_id).await;
-                        }
-                        let _ = Searcher::save(state).await;
-
-                        log::info!("removed {} docs from indexed_documents", num_removed);
-                    }
-                }
-            }
-        }
-    }
+    let _ = state
+        .schedule_work(ManagerCommand::Collect(CollectTask::CDXCollection {
+            lens: lens.name.clone(),
+            pipeline: lens.pipeline.as_ref().cloned(),
+        }))
+        .await;
 }
 
 /// Helper used to cleanup the database when documents are in the index, but are missing from
@@ -238,43 +115,23 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
 }
 
 /// Check if we've already bootstrapped a prefix / otherwise add it to the queue.
+/// - Returns true if we've successfully run bootstrap
+/// - Returns false if bootstrapping has been run already
+/// - Returns an Error if we're unable to bootstrap for some reason.
 #[tracing::instrument(skip(state, lens))]
-pub async fn handle_bootstrap(
+pub async fn handle_cdx_collection(
     state: &AppState,
     lens: &LensConfig,
-    seed_url: &str,
     pipeline: Option<String>,
-) -> bool {
-    let db = &state.db;
-    let user_settings = &state.user_settings;
-
-    let url = Url::parse(seed_url);
-    if url.is_err() {
-        log::error!("{} is an invalid URL", seed_url);
-        return false;
+) -> anyhow::Result<bool> {
+    if bootstrap_queue::is_bootstrapped(&state.db, &lens.name).await? {
+        return Ok(false);
     }
 
-    let url = url.expect("invalid url");
-    if let Ok(false) = bootstrap_queue::has_seed_url(db, seed_url).await {
-        match bootstrap::bootstrap(state, lens, db, user_settings, &url, pipeline).await {
-            Err(e) => {
-                log::error!("error bootstrapping <{}>: {}", url.to_string(), e);
-                return false;
-            }
-            Ok(cnt) => {
-                log::info!("bootstrapped {} w/ {} urls", seed_url, cnt);
-                let _ = bootstrap_queue::enqueue(db, seed_url, cnt as i64).await;
-                return true;
-            }
-        }
-    } else {
-        log::info!(
-            "bootstrap queue already contains seed url: {}, skipping",
-            seed_url
-        );
-    }
-
-    false
+    let cnt = bootstrap::bootstrap(state, lens, pipeline).await?;
+    log::info!("bootstrapped {} w/ {} urls", lens.name, cnt);
+    let _ = bootstrap_queue::enqueue(&state.db, &lens.name, cnt as i64).await;
+    Ok(true)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -369,7 +226,7 @@ pub async fn process_crawl(
 
 #[tracing::instrument(skip(state))]
 pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
-    let crawler = Crawler::new();
+    let crawler = Crawler::new(state.user_settings.domain_crawl_limit.value());
     let result = crawler.fetch_by_job(&state, task.id, true).await;
 
     match result {
@@ -461,12 +318,15 @@ mod test {
     use entities::models::{bootstrap_queue, indexed_document};
     use entities::sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, Set};
     use entities::test::setup_test_db;
-    use shared::config::UserSettings;
+    use shared::config::{LensConfig, UserSettings};
 
-    use super::{handle_bootstrap, process_crawl, AppState, FetchResult};
+    use super::{handle_cdx_collection, process_crawl, AppState, FetchResult};
 
     #[tokio::test]
-    async fn test_handle_bootstrap() {
+    async fn test_handle_cdx_collection() {
+        let mut lens = LensConfig::default();
+        lens.name = "example_lens".to_string();
+
         let db = setup_test_db().await;
         let state = AppState::builder()
             .with_db(db)
@@ -474,11 +334,13 @@ mod test {
             .with_index(&IndexPath::Memory)
             .build();
 
-        let test = "https://example.com";
-
-        // Should skip this URL since we already have it.
-        bootstrap_queue::enqueue(&state.db, test, 10).await.unwrap();
-        assert!(!handle_bootstrap(&state, &Default::default(), test, None).await);
+        // Should skip this lens since it's been bootstrapped already.
+        bootstrap_queue::enqueue(&state.db, &lens.name, 10)
+            .await
+            .expect("Unable to add to bootstrap_queue");
+        assert!(!handle_cdx_collection(&state, &lens, None)
+            .await
+            .expect("unable to run"));
     }
 
     #[tokio::test]

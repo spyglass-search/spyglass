@@ -1,34 +1,42 @@
-use std::collections::HashSet;
-use std::path::Path;
-
 use addr::parse_domain_name;
 use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
 use entities::models::tag::TagPair;
-use percent_encoding::percent_decode_str;
-use sha2::{Digest, Sha256};
-use thiserror::Error;
-use url::{Host, Url};
-
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
+use governor::clock::QuantaClock;
+use governor::state::keyed::DashMapStateStore;
+use governor::Quota;
+use governor::RateLimiter;
+use libnetrunner::crawler::handle_crawl;
+use libnetrunner::parser::html::{html_to_text, DEFAULT_DESC_LENGTH};
+use nonzero_ext::nonzero;
+use percent_encoding::percent_decode_str;
+use reqwest::Client;
+use sha2::{Digest, Sha256};
+use std::collections::HashSet;
+use std::num::NonZeroU32;
+use std::path::Path;
+use std::sync::Arc;
+use thiserror::Error;
+use url::{Host, Url};
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
 use crate::parser;
-use crate::scraper::{html_to_text, DEFAULT_DESC_LENGTH};
 use crate::state::AppState;
 
 pub mod archive;
 pub mod bootstrap;
 pub mod cache;
-pub mod client;
 pub mod robots;
 
-use client::HTTPClient;
 use robots::check_resource_rules;
+
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+type RateLimit = RateLimiter<String, DashMapStateStore<String>, QuantaClock>;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
@@ -139,12 +147,13 @@ fn normalize_href(url: &str, href: &str) -> Option<String> {
 
 #[derive(Debug, Clone)]
 pub struct Crawler {
-    pub client: HTTPClient,
+    pub client: Client,
+    pub limiter: Arc<RateLimit>,
 }
 
 impl Default for Crawler {
     fn default() -> Self {
-        Self::new()
+        Self::new(10)
     }
 }
 
@@ -209,73 +218,57 @@ fn determine_canonical(original: &Url, extracted: Option<Url>) -> String {
 }
 
 impl Crawler {
-    pub fn new() -> Self {
+    pub fn new(queries_per_second: u32) -> Self {
+        let client = reqwest::Client::builder()
+            .user_agent(APP_USER_AGENT)
+            // TODO: Make configurable
+            .connect_timeout(std::time::Duration::from_secs(3))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .expect("Unable to create reqwest client");
+
+        let qps = if let Some(num) = NonZeroU32::new(queries_per_second) {
+            num
+        } else {
+            nonzero!(2u32)
+        };
+
+        let quota = Quota::per_second(qps);
+
         Crawler {
-            client: HTTPClient::new(),
+            client,
+            limiter: Arc::new(RateLimiter::<String, _, _>::keyed(quota)),
         }
     }
 
     /// Fetches and parses the content of a page.
     async fn crawl(&self, url: &Url, parse_results: bool) -> Result<CrawlResult, CrawlError> {
-        let url = url.clone();
-
-        // Fetch & store page data.
-        let res = self.client.get(&url).await;
-        if res.is_err() {
-            let err = res.unwrap_err();
-            // Log out reason for failure.
-            log::warn!("Unable to fetch <{}> due to {}", &url, err.to_string());
-            // Unable to connect to host
-            return Err(CrawlError::FetchError(err.to_string()));
-        }
-
-        let res = res.expect("Expected valid response");
-        match res.error_for_status() {
-            Ok(res) => {
-                // Pull URL from request, this handles cases where we are 301 redirected
-                // to a different URL.
-                let end_url = res.url().to_owned();
-                match res.text().await {
-                    Ok(raw_body) => {
-                        if parse_results {
-                            Ok(self.scrape_page(&end_url, &raw_body).await)
-                        } else {
-                            Ok(CrawlResult {
-                                url: end_url.to_string(),
-                                open_url: Some(end_url.to_string()),
-                                ..Default::default()
-                            })
-                        }
-                    }
-                    Err(err) => Err(CrawlError::ParseError(err.to_string())),
-                }
-            }
-            Err(err) => {
-                if err.status() == Some(reqwest::StatusCode::NOT_FOUND) {
-                    Err(CrawlError::NotFound)
+        match handle_crawl(&self.client, None, self.limiter.clone(), url).await {
+            Ok(crawl) => {
+                if parse_results {
+                    Ok(self.scrape_page(url, &crawl.content).await)
                 } else {
-                    Err(CrawlError::FetchError(err.to_string()))
+                    Ok(CrawlResult {
+                        url: crawl.url.clone(),
+                        open_url: Some(crawl.url),
+                        ..Default::default()
+                    })
                 }
             }
+            Err(err) => Err(CrawlError::FetchError(err.to_string())),
         }
     }
 
     pub async fn scrape_page(&self, url: &Url, raw_body: &str) -> CrawlResult {
-        // TODO: Cache the raw_body on the filesystem?
-
         // Parse the html.
-        let parse_result = html_to_text(raw_body);
+        let parse_result = html_to_text(url.as_ref(), raw_body);
+        log::trace!("content hash: {:?}", parse_result.content_hash);
 
-        // Hash the body content, used to detect changes (eventually).
-        let mut hasher = Sha256::new();
-        hasher.update(parse_result.content.as_bytes());
-        let content_hash = Some(hex::encode(&hasher.finalize()[..]));
-        log::trace!("content hash: {:?}", content_hash);
-
-        let canonical_url = determine_canonical(url, parse_result.canonical_url);
+        let extracted = parse_result.canonical_url.and_then(|s| Url::parse(&s).ok());
+        let canonical_url = determine_canonical(url, extracted);
 
         CrawlResult {
-            content_hash,
+            content_hash: Some(parse_result.content_hash),
             content: Some(parse_result.content),
             description: Some(parse_result.description),
             title: parse_result.title,
@@ -548,7 +541,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_crawl() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let url = Url::parse("https://oldschool.runescape.wiki").unwrap();
         let result = crawler.crawl(&url, true).await.expect("success");
 
@@ -560,7 +553,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_fetch() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
 
         let db = setup_test_db().await;
         let url = Url::parse("https://oldschool.runescape.wiki/").unwrap();
@@ -583,7 +576,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_fetch_redirect() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
 
@@ -603,7 +596,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_fetch_bootstrap() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
 
@@ -634,7 +627,7 @@ mod test {
 
     #[tokio::test]
     async fn test_fetch_skip() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
 
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();
@@ -734,7 +727,7 @@ mod test {
 
     #[tokio::test]
     async fn test_file_fetch() {
-        let crawler = Crawler::new();
+        let crawler = Crawler::default();
 
         let db = setup_test_db().await;
         let state = AppState::builder().with_db(db).build();

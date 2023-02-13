@@ -30,7 +30,7 @@ impl DefaultParser {
 
     pub fn new() -> Self {
         Self {
-            crawler: Crawler::new(),
+            crawler: Crawler::default(),
         }
     }
 }

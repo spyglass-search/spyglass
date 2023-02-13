@@ -6,7 +6,7 @@ use serde::Serialize;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    /// Domain/URL prefixed that was used to bootstrap
+    /// Name of lens that was bootstrapped.
     #[sea_orm(unique)]
     pub seed_url: String,
     /// Number of URLs added to the crawl queue
@@ -44,12 +44,12 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
-pub async fn has_seed_url(
+pub async fn is_bootstrapped(
     db: &DatabaseConnection,
-    seed_url: &str,
+    lens_name: &str,
 ) -> anyhow::Result<bool, sea_orm::DbErr> {
     let res = Entity::find()
-        .filter(Column::SeedUrl.eq(seed_url))
+        .filter(Column::SeedUrl.eq(lens_name))
         .one(db)
         .await?;
 

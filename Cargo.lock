@@ -5908,7 +5908,7 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
- "spyglass-lens 0.1.4",
+ "spyglass-lens 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "url",
@@ -6056,18 +6056,15 @@ dependencies = [
  "dashmap",
  "digest 0.10.6",
  "directories",
- "dirs",
  "docx",
- "ego-tree",
  "entities",
  "flate2",
  "futures",
  "github",
  "glob",
  "google",
+ "governor",
  "hex",
- "hostname",
- "html5ever 0.25.2",
  "http",
  "ignore",
  "jsonrpsee",
@@ -6076,6 +6073,7 @@ dependencies = [
  "migration",
  "mime",
  "new_mime_guess",
+ "nonzero_ext",
  "notify",
  "notify-debouncer-mini",
  "open",
@@ -6171,7 +6169,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "blake2",
@@ -6183,9 +6181,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81d7b2343d361a603809468953b6b960ae1d1ef623f5923bda23e272e78e7a32"
+checksum = "4b6172dd4a7dc20612b121d8a7a4179645b66085a79ed4427b6240f14b8e5ee9"
 dependencies = [
  "anyhow",
  "blake2",
@@ -6197,9 +6195,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.1.11"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dbe9683f3e5879a0561e72a2b167fb2c473e93bf86e1f94ab831d2451070569"
+checksum = "98a9eaffa134fb17478adb5adced1ec282e32804d13dcbd42224bfc4f843b928"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6207,6 +6205,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap 4.1.4",
+ "dashmap",
  "ego-tree",
  "feedfinder",
  "flate2",
@@ -6224,9 +6223,10 @@ dependencies = [
  "rusoto_s3",
  "serde",
  "sitemap",
- "spyglass-lens 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spyglass-lens 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",
  "texting_robots",
+ "thiserror",
  "tokio",
  "tokio-retry",
  "tracing",
@@ -6234,6 +6234,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid 1.2.2",
+ "walkdir",
  "warc",
 ]
 
