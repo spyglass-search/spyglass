@@ -321,12 +321,15 @@ mod test {
     use entities::models::{bootstrap_queue, indexed_document};
     use entities::sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, Set};
     use entities::test::setup_test_db;
-    use shared::config::UserSettings;
+    use shared::config::{LensConfig, UserSettings};
 
     use super::{handle_cdx_collection, process_crawl, AppState, FetchResult};
 
     #[tokio::test]
     async fn test_handle_cdx_collection() {
+        let mut lens = LensConfig::default();
+        lens.name = "example_lens".to_string();
+
         let db = setup_test_db().await;
         let state = AppState::builder()
             .with_db(db)
@@ -334,11 +337,11 @@ mod test {
             .with_index(&IndexPath::Memory)
             .build();
 
-        let test = "https://example.com";
-
         // Should skip this URL since we already have it.
-        bootstrap_queue::enqueue(&state.db, test, 10).await.unwrap();
-        assert!(!handle_cdx_collection(&state, &Default::default(), None).await);
+        bootstrap_queue::enqueue(&state.db, &lens.name, 10)
+            .await
+            .expect("Unable to add to bootstrap_queue");
+        assert!(!handle_cdx_collection(&state, &lens, None).await);
     }
 
     #[tokio::test]

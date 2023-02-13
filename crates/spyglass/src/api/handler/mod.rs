@@ -460,20 +460,14 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
         }
     }
 
-    // -- remove from crawl queue & bootstrap table
+    // -- remove from crawl queue
     if let Err(err) = crawl_queue::delete_by_lens(state.db.clone(), name).await {
         return Err(Error::Custom(err.to_string()));
     }
 
     // - remove seed urls from bootstrap queue table
     if let Some((_, config)) = config {
-        for url in &config.urls {
-            let _ = bootstrap_queue::dequeue(&state.db, url).await;
-        }
-
-        for url in &config.domains {
-            let _ = bootstrap_queue::dequeue(&state.db, url).await;
-        }
+        let _ = bootstrap_queue::dequeue(&state.db, &config.name).await;
     }
     Ok(())
 }

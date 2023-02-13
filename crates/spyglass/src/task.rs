@@ -1,9 +1,10 @@
+use entities::models::bootstrap_queue;
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
-use shared::config::Config;
+use shared::config::{Config, LensConfig};
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;
@@ -363,7 +364,16 @@ pub async fn lens_watcher(
                     let mut updated_lens = false;
                     for path in &event.paths {
                         if path.extension().unwrap_or_default() == "ron" {
-                            updated_lens = true;
+                            // Make sure it's a valid lens file before reloading
+                            let updated_lens_config = std::fs::read_to_string(path)
+                                .map(|s| ron::from_str::<LensConfig>(&s));
+
+                            if let Ok(Ok(lens_config)) = updated_lens_config {
+                                // remove from bootstrap queue so the config is rechecked.
+                                let _ =
+                                    bootstrap_queue::dequeue(&state.db, &lens_config.name).await;
+                                updated_lens = true;
+                            }
                         }
                     }
 
