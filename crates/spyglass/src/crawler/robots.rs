@@ -3,7 +3,7 @@
 /// - https://developers.google.com/search/docs/advanced/robots/intro
 /// - https://www.robotstxt.org/robotstxt.html
 use regex::RegexSet;
-use reqwest::StatusCode;
+use reqwest::{Client, StatusCode};
 use std::convert::From;
 use url::Url;
 
@@ -11,8 +11,6 @@ use entities::models::resource_rule;
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{DatabaseConnection, Set};
 use shared::regex::{regex_for_robots, WildcardType};
-
-use super::client::HTTPClient;
 
 #[derive(Clone, Debug)]
 pub struct ParsedRule {
@@ -96,7 +94,7 @@ pub fn parse(domain: &str, txt: &str) -> Vec<ParsedRule> {
 }
 
 // Checks whether we're allow to crawl this url
-pub async fn check_resource_rules(db: &DatabaseConnection, client: &HTTPClient, url: &Url) -> bool {
+pub async fn check_resource_rules(db: &DatabaseConnection, client: &Client, url: &Url) -> bool {
     let domain = url.host_str().unwrap_or_default();
     let path = url[url::Position::BeforePath..].to_string();
 
@@ -111,7 +109,7 @@ pub async fn check_resource_rules(db: &DatabaseConnection, client: &HTTPClient, 
         let mut robots_url = url.clone();
         robots_url.set_path("/robots.txt");
 
-        let res = client.get(&robots_url).await;
+        let res = client.get(robots_url).send().await;
         match res {
             Err(err) => log::warn!("Unable to check robots.txt {}", err.to_string()),
             Ok(res) => {
@@ -173,7 +171,7 @@ pub async fn check_resource_rules(db: &DatabaseConnection, client: &HTTPClient, 
     }
 
     // Check the content-type of the URL, only crawl HTML pages for now
-    match client.head(url).await {
+    match client.head(url.clone()).send().await {
         Err(err) => {
             log::info!("Unable to check content-type: {}", err.to_string());
             return false;

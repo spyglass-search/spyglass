@@ -6074,6 +6074,7 @@ dependencies = [
  "github",
  "glob",
  "google",
+ "governor",
  "hex",
  "http",
  "ignore",
@@ -6083,6 +6084,7 @@ dependencies = [
  "migration",
  "mime",
  "new_mime_guess",
+ "nonzero_ext",
  "notify",
  "notify-debouncer-mini",
  "open",
@@ -6204,9 +6206,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d730620ff4a45b6c73553bddf77b629fa93f416063d0ada6ea9f2c8a110ac8b"
+checksum = "67d983550a94522fe7819122fc059c5dbf8612efca6980074baafbd79105dbd7"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6235,6 +6237,7 @@ dependencies = [
  "spyglass-lens 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",
  "texting_robots",
+ "thiserror",
  "tokio",
  "tokio-retry",
  "tracing",
