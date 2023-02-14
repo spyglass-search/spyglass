@@ -924,6 +924,50 @@ pub async fn find_by_lens(
     .await
 }
 
+#[derive(Debug, FromQueryResult)]
+pub struct CrawlTaskIdsUrls {
+    pub id: i64,
+    pub url: String,
+}
+
+/// Helper method to access the urls for any extensions that have been removed
+/// and delete those from the crawl queue.
+pub async fn process_urls_for_removed_exts(
+    exts: Vec<String>,
+    db: &DatabaseConnection,
+) -> Result<Vec<CrawlTaskIdsUrls>, DbErr> {
+    let statement = Statement::from_string(
+        DatabaseBackend::Sqlite,
+        format!(
+            r#"
+            with tags_list as (
+                SELECT id FROM tags WHERE label = 'fileext' and value not in ({})
+            )
+            SELECT cq.id, cq.url 
+            FROM crawl_queue as cq join crawl_tag as ct on cq.id = ct.crawl_queue_id 
+            WHERE cq.url like 'file%' and ct.tag_id in tags_list order by cq.url
+            "#,
+            exts.iter()
+                .map(|str| format!("'{str}'"))
+                .collect::<Vec<String>>()
+                .join(",")
+        ),
+    );
+    let tasks = CrawlTaskIdsUrls::find_by_statement(statement)
+        .all(db)
+        .await?;
+
+    if !tasks.is_empty() {
+        let delete_rslt =
+            delete_many_by_id(db, &tasks.iter().map(|task| task.id).collect::<Vec<i64>>()).await;
+
+        if let Err(error) = delete_rslt {
+            log::error!("Error removing from crawl queue {:?}", error);
+        }
+    }
+    Ok(tasks)
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;

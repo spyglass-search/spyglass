@@ -289,7 +289,7 @@ impl SpyglassFileWatcher {
 
         if !removals.is_empty() {
             if let Err(error) = processed_files::Entity::delete_many()
-                .filter(processed_files::Column::Id.is_in(removals))
+                .filter(processed_files::Column::FilePath.is_in(removals))
                 .exec(&self.db)
                 .await
             {
@@ -605,6 +605,8 @@ pub async fn configure_watcher(state: AppState) {
             .map(|path| utils::path_to_uri(path))
             .collect::<Vec<String>>();
 
+        _handle_extension_reprocessing(&state, &extension).await;
+
         let mut watcher = state.file_watcher.lock().await;
         if let Some(watcher) = watcher.as_mut() {
             for path in paths {
@@ -638,12 +640,6 @@ pub async fn configure_watcher(state: AppState) {
                 error
             ),
         }
-
-    // TODO remove the content from extensions that are no longer being processed, this should be the
-    // purview of the document handling and not the file handling since we cannot make the assumption
-    // here of what happens to files that do not meet the expected extension.
-
-    // At the moment triggering a recrawl will work the best
     } else {
         log::info!("❌ Local file watcher is disabled");
 
@@ -665,6 +661,63 @@ pub async fn configure_watcher(state: AppState) {
                 error
             ),
         }
+    }
+}
+
+// Helper method used to process any updates required for changes in the configured
+// extensions
+async fn _handle_extension_reprocessing(state: &AppState, extension: &HashSet<String>) {
+    match crawl_queue::process_urls_for_removed_exts(extension.iter().cloned().collect(), &state.db)
+        .await
+    {
+        Ok(urls) => {
+            let reprocessed_docs = urls
+                .iter()
+                .map(|url| _uri_to_debounce(&url.url))
+                .collect::<Vec<DebouncedEvent>>();
+            if let Err(err) = _process_file_and_dir(state, reprocessed_docs, extension).await {
+                log::error!(
+                    "Error processing document updates for removed extensions {:?}",
+                    err
+                );
+            }
+        }
+        Err(error) => {
+            log::error!("Error running recrawl {:?}", error);
+        }
+    }
+
+    let mut updates: Vec<DebouncedEvent> = Vec::new();
+    for ext in extension {
+        match processed_files::get_files_to_recrawl(ext, &state.db).await {
+            Ok(recrawls) => {
+                if !recrawls.is_empty() {
+                    updates.extend(recrawls.iter().map(|uri| DebouncedEvent {
+                        kind: DebouncedEventKind::Any,
+                        path: utils::uri_to_path(uri).unwrap_or_default(),
+                    }));
+                }
+            }
+            Err(err) => {
+                log::error!("Error collecting recrawls {:?}", err);
+            }
+        }
+    }
+
+    if !updates.is_empty() {
+        if let Err(err) = _process_file_and_dir(state, updates, extension).await {
+            log::error!(
+                "Error processing updates for newly added extensions {:?}",
+                err
+            );
+        }
+    }
+}
+
+fn _uri_to_debounce(uri: &str) -> DebouncedEvent {
+    DebouncedEvent {
+        kind: DebouncedEventKind::Any,
+        path: utils::uri_to_path(uri).unwrap_or_default(),
     }
 }
 
