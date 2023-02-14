@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::Set;
+use sea_orm::{DatabaseBackend, FromQueryResult, Set, Statement};
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
@@ -70,5 +70,37 @@ pub async fn remove_unmatched_paths(
             Ok(items)
         }
         Err(error) => Err(anyhow::Error::from(error)),
+    }
+}
+
+#[derive(Debug, FromQueryResult)]
+struct FileUrls {
+    pub url: String,
+}
+
+pub async fn get_files_to_recrawl(
+    ext: &str,
+    db: &DatabaseConnection,
+) -> Result<Vec<String>, DbErr> {
+    let ext_filter = format!("%.{ext}");
+    let urls = FileUrls::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite,
+        r#"
+        with possible as (
+            select url 
+            from crawl_queue
+             where url like $1
+        )
+        select file_path as url
+        from processed_files 
+            where file_path like $1 and file_path not in possible;"#,
+        vec![ext_filter.into()],
+    ))
+    .all(db)
+    .await;
+
+    match urls {
+        Ok(urls) => Ok(urls.iter().map(|file| file.url.clone()).collect()),
+        Err(err) => Err(err),
     }
 }
