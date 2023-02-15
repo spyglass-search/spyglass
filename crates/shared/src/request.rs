@@ -25,7 +25,12 @@ pub struct UpdateStatusParam {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum RawDocType {
+    /// Raw HTML, typically from a page the user is currently on.
     Html,
+    /// Raw text
+    Text,
+    /// No content, just a URL, to be processed by the crawler.
+    Url,
 }
 
 #[derive(Debug, Deserialize, Display, EnumString, Serialize, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 use directories::UserDirs;
 use entities::get_library_stats;
-use entities::models::crawl_queue::CrawlStatus;
+use entities::models::crawl_queue::{CrawlStatus, EnqueueSettings};
 use entities::models::lens::LensType;
 use entities::models::tag::TagType;
 use entities::models::{
@@ -35,38 +35,77 @@ use super::response;
 
 pub mod search;
 
+/// Adds a raw document to the user's index.
 pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Result<(), Error> {
-    if req.doc_type == RawDocType::Html {
-        // Parse content
-        let res = html_to_text(&req.url, &req.content);
-        let url = if let Some(Ok(url)) = res.canonical_url.map(|s| Url::parse(&s)) {
-            url
+    // Validate tags and consolidate tags
+    let mut tags = Vec::new();
+    tags.push((TagType::Source, req.source.to_string()));
+    for (tag_type, tag_value) in req.tags.iter() {
+        if let Ok(ttype) = TagType::from_str(tag_type) {
+            if !tag_value.is_empty() {
+                tags.push((ttype, tag_value.to_owned()));
+            } else {
+                log::warn!("Invalid tag value `{tag_value}` for tag type: {tag_type}");
+            }
         } else {
-            log::warn!("Unable to index {}", req.url);
-            return Ok(());
-        };
+            log::warn!("Invalid tag type: {tag_type}");
+        }
+    }
 
-        let mut crawl = CrawlResult::new(
-            &url,
-            Some(url.to_string()),
-            &res.content,
-            &res.title.unwrap_or_default(),
-            None,
-        );
+    match req.doc_type {
+        RawDocType::Html => {
+            // Parse content
+            let res = html_to_text(&req.url, &req.content);
+            let url = match res.canonical_url.map(|s| Url::parse(&s)) {
+                Some(Ok(url)) => url,
+                _ => {
+                    return Err(Error::Custom(format!("Invalid URL: {}", req.url)));
+                }
+            };
 
-        // Add tags to document
-        crawl.tags.push((TagType::Source, req.source.to_string()));
-        for (tag_type, tag_value) in req.tags.iter() {
-            dbg!(&tag_type, &tag_value);
-            if let Ok(ttype) = TagType::from_str(tag_type) {
-                crawl.tags.push((ttype, tag_value.to_owned()));
+            let mut crawl = CrawlResult::new(
+                &url,
+                Some(url.to_string()),
+                &res.content,
+                &res.title.unwrap_or_default(),
+                None,
+            );
+
+            // Add tags to document
+            crawl.tags.extend(tags);
+
+            // Add to index
+            log::debug!("adding to index: {} - {:?}", crawl.url, crawl.tags);
+            if let Err(err) = process_crawl_results(&state, &[crawl], &Vec::new()).await {
+                log::error!("Unable to add from webext: {}", err);
             }
         }
+        // No need to process anything, we can add this directly to the index.
+        RawDocType::Text => {
+            log::debug!("RawDocType::Text is not supported yet");
+        }
+        // No need to process anything, simply add to the crawl queue for processing
+        RawDocType::Url => {
+            log::debug!("Enqueueing URL fro webext: {} - {:?}", req.url, &tags);
 
-        // Add to index
-        log::debug!("adding to index: {} - {:?}", crawl.url, crawl.tags);
-        if let Err(err) = process_crawl_results(&state, &[crawl], &Vec::new()).await {
-            log::error!("Unable to add from webext: {}", err);
+            let overrides = EnqueueSettings {
+                force_allow: true,
+                tags,
+                ..Default::default()
+            };
+
+            if let Err(err) = crawl_queue::enqueue_all(
+                &state.db,
+                &[req.url.clone()],
+                &[],
+                &state.user_settings,
+                &overrides,
+                None,
+            )
+            .await
+            {
+                return Err(Error::Custom(format!("Unable to queue URL: {}", err)));
+            }
         }
     }
 

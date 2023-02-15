@@ -59,8 +59,16 @@ impl RpcServer for SpyglassRpc {
         }
     }
 
-    async fn is_document_indexed(&self, _: String) -> Result<bool, Error> {
-        todo!()
+    async fn is_document_indexed(&self, url: String) -> Result<bool, Error> {
+        let result = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.eq(url))
+            .one(&self.state.db)
+            .await;
+
+        match result {
+            Ok(result) => Ok(result.is_some()),
+            Err(err) => Err(Error::Custom(format!("Unable to query db: {err}")))
+        }
     }
 
     async fn list_connections(&self) -> Result<resp::ListConnectionResult, Error> {
