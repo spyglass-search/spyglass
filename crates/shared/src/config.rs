@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use directories::ProjectDirs;
+use directories::{ProjectDirs, UserDirs};
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,6 +16,13 @@ use crate::{
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
+
+// Name of legacy file importer plugin
+pub const LEGACY_FILESYSTEM_PLUGIN: &str = "local-file-importer";
+// Folder containing legacy local file importer plugin
+pub const LEGACY_FILESYSTEM_PLUGIN_FOLDER: &str = "local-file-indexer";
+// The default extensions
+pub const DEFAULT_EXTENSIONS: &[&str] = &["docx", "html", "md", "txt", "ods", "xls", "xlsx"];
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -51,6 +59,51 @@ impl Limit {
 }
 
 pub type PluginSettings = HashMap<String, HashMap<String, String>>;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct FileSystemSettings {
+    #[serde(default)]
+    pub enable_filesystem_scanning: bool,
+    #[serde(default = "FileSystemSettings::default_paths")]
+    pub watched_paths: Vec<PathBuf>,
+    #[serde(default = "FileSystemSettings::default_extensions")]
+    pub supported_extensions: Vec<String>,
+}
+
+impl FileSystemSettings {
+    pub fn default_paths() -> Vec<PathBuf> {
+        let mut file_paths: Vec<PathBuf> = Vec::new();
+
+        if let Some(user_dirs) = UserDirs::new() {
+            if let Some(path) = user_dirs.desktop_dir() {
+                file_paths.push(path.to_path_buf());
+            }
+
+            if let Some(path) = user_dirs.document_dir() {
+                file_paths.push(path.to_path_buf());
+            }
+        }
+        file_paths
+    }
+
+    pub fn default_extensions() -> Vec<String> {
+        DEFAULT_EXTENSIONS
+            .iter()
+            .map(|val| String::from(*val))
+            .collect()
+    }
+}
+
+impl Default for FileSystemSettings {
+    fn default() -> Self {
+        FileSystemSettings {
+            enable_filesystem_scanning: false,
+            watched_paths: FileSystemSettings::default_paths(),
+            supported_extensions: FileSystemSettings::default_extensions(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UserSettings {
     /// Number of pages allowed per domain. Sub-domains are treated as
@@ -78,6 +131,8 @@ pub struct UserSettings {
     /// Should we disable telemetry
     #[serde(default)]
     pub disable_telemetry: bool,
+    #[serde(default)]
+    pub filesystem_settings: FileSystemSettings,
     /// Plugin settings
     #[serde(default)]
     pub plugin_settings: PluginSettings,
@@ -150,6 +205,24 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 form_type: FormType::Number,
                 help_text: Some("Port number used by the Spyglass background services. Only change this if you already have another serive running on this port.".into())
             }),
+            ("_.filesystem_settings.enable_filesystem_scanning".into(), SettingOpts {
+                label: "Enable Filesystem Indexing".into(),
+                value: settings.filesystem_settings.enable_filesystem_scanning.to_string(),
+                form_type: FormType::Bool,
+                help_text: Some("Enables and disables local filesystem indexing. When enabled configured folders will be scanned and indexed. Any supported file types will have their contents indexed.".into())
+            }),
+            ("_.filesystem_settings.watched_paths".into(), SettingOpts {
+                label: "Folder List".into(),
+                value: serde_json::to_string(&settings.filesystem_settings.watched_paths).unwrap_or(String::from("[]")),
+                form_type: FormType::PathList,
+                help_text: Some("List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specifiy the parent folder.".into())
+            }),
+            ("_.filesystem_settings.supported_extensions".into(), SettingOpts {
+                label: "Extension List".into(),
+                value: serde_json::to_string(&settings.filesystem_settings.supported_extensions).unwrap_or(String::from("[]")),
+                form_type: FormType::StringList,
+                help_text: Some("List of file types to index.".into())
+            }),
         ];
 
         if let Limit::Finite(val) = settings.inflight_crawl_limit {
@@ -202,6 +275,7 @@ impl Default for UserSettings {
             data_directory: UserSettings::default_data_dir(),
             crawl_external_links: false,
             disable_telemetry: false,
+            filesystem_settings: FileSystemSettings::default(),
             plugin_settings: Default::default(),
             disable_autolaunch: false,
             port: UserSettings::default_port(),
@@ -210,7 +284,7 @@ impl Default for UserSettings {
 }
 
 impl Config {
-    pub fn save_user_settings(&self, user_settings: &UserSettings) -> anyhow::Result<()> {
+    pub fn save_user_settings(user_settings: &UserSettings) -> anyhow::Result<()> {
         let prefs_path = Self::prefs_file();
         let serialized = ron::ser::to_string_pretty(user_settings, Default::default())
             .expect("Unable to serialize user settings");
@@ -244,6 +318,40 @@ impl Config {
         }
     }
 
+    pub fn migrate_user_settings(mut settings: UserSettings) -> anyhow::Result<UserSettings> {
+        // convert local-filesystem-config to user settings filesystem config
+        let mut modified: bool = false;
+        if let Some(local_file_settings) = settings.plugin_settings.remove(LEGACY_FILESYSTEM_PLUGIN)
+        {
+            modified = true;
+
+            let dir_list = local_file_settings
+                .get("FOLDERS_LIST")
+                .map(|f| f.to_owned())
+                .unwrap_or_default();
+
+            if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(&dir_list) {
+                settings.filesystem_settings.watched_paths =
+                    dirs.iter().map(PathBuf::from).collect::<Vec<PathBuf>>();
+            }
+
+            let ext_list = local_file_settings
+                .get("EXTS_LIST")
+                .map(|s| s.to_owned())
+                .unwrap_or_default();
+            if let Ok(exts) = serde_json::from_str::<HashSet<String>>(&ext_list) {
+                settings.filesystem_settings.supported_extensions = exts.iter().cloned().collect();
+            }
+        }
+
+        if modified {
+            let _ = Self::save_user_settings(&settings);
+            return Self::load_user_settings();
+        }
+
+        Ok(settings)
+    }
+
     /// Load & read plugin manifests to get plugin settings that are available.
     pub fn load_plugin_config(&self) -> HashMap<String, PluginConfig> {
         let plugins_dir = self.plugins_dir();
@@ -274,6 +382,15 @@ impl Config {
         }
 
         settings
+    }
+
+    fn cleanup_legacy_plugins(plugin_dir: &Path) {
+        let fs_plugin_path = plugin_dir.join(LEGACY_FILESYSTEM_PLUGIN_FOLDER);
+        if fs_plugin_path.exists() {
+            if let Err(err) = fs::remove_dir_all(fs_plugin_path) {
+                log::warn!("Error removing local filesystem plugin {:?}", err);
+            }
+        }
     }
 
     pub fn app_identifier() -> String {
@@ -355,6 +472,11 @@ impl Config {
             Default::default()
         });
 
+        let user_settings = Self::migrate_user_settings(user_settings).unwrap_or_else(|err| {
+            log::error!("Invalid user settings file! Reason: {}", err);
+            Default::default()
+        });
+
         let config = Config {
             lenses: HashMap::new(),
             pipelines: HashMap::new(),
@@ -377,7 +499,9 @@ impl Config {
         fs::create_dir_all(pipelines_dir).expect("Unable to create `pipelines` folder");
 
         let plugins_dir = config.plugins_dir();
-        fs::create_dir_all(plugins_dir).expect("Unable to create `plugin` folder");
+        fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
+
+        Self::cleanup_legacy_plugins(&plugins_dir);
 
         config
     }

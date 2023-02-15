@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use shared::config::FileSystemSettings;
 use tauri::Manager;
 use tauri::State;
 
@@ -13,7 +14,8 @@ pub async fn save_user_settings(
     config: State<'_, Config>,
     settings: HashMap<String, String>,
 ) -> Result<(), HashMap<String, String>> {
-    let mut current_settings = config.user_settings.clone();
+    let mut current_settings =
+        Config::load_user_settings().unwrap_or_else(|_| config.user_settings.clone());
 
     let config_list: Vec<(String, SettingOpts)> = config.user_settings.clone().into();
     let setting_configs: HashMap<String, SettingOpts> = config_list.into_iter().collect();
@@ -61,6 +63,24 @@ pub async fn save_user_settings(
                                         current_settings.port = serde_json::from_str(value)
                                             .unwrap_or_else(|_| UserSettings::default_port());
                                     }
+                                    "filesystem_settings.watched_paths" => {
+                                        current_settings.filesystem_settings.watched_paths =
+                                            serde_json::from_str(value).unwrap_or_else(|_| {
+                                                FileSystemSettings::default().watched_paths
+                                            })
+                                    }
+                                    "filesystem_settings.supported_extensions" => {
+                                        current_settings.filesystem_settings.supported_extensions =
+                                            serde_json::from_str(value).unwrap_or_else(|_| {
+                                                FileSystemSettings::default().supported_extensions
+                                            })
+                                    }
+                                    "filesystem_settings.enable_filesystem_scanning" => {
+                                        current_settings
+                                            .filesystem_settings
+                                            .enable_filesystem_scanning =
+                                            serde_json::from_str(value).unwrap_or_default()
+                                    }
                                     _ => {}
                                 }
                             }
@@ -100,7 +120,7 @@ pub async fn save_user_settings(
 
     // Only save settings if everything is valid.
     if errors.is_empty() && fields_updated > 0 {
-        let _ = config.save_user_settings(&current_settings);
+        let _ = Config::save_user_settings(&current_settings);
         let app = window.app_handle();
         app.restart();
         Ok(())

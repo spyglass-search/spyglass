@@ -22,7 +22,7 @@ def generate(assets):
         name = value['name']
         if name.endswith('.tar.gz') or name.endswith('.zip'):
             dl_url = value['browser_download_url']
-            if name == "Spyglass.app.tar.gz":
+            if name == "Spyglass_universal.app.tar.gz":
                 platforms[DARWIN_x86]['url'] = dl_url
                 platforms[DARWIN_ARM]['url'] = dl_url
             elif name.endswith('AppImage.tar.gz'):
@@ -33,7 +33,7 @@ def generate(assets):
             dl_url = value['browser_download_url']
             sig = requests.get(dl_url).text
 
-            if name.startswith('Spyglass.app'):
+            if name.startswith('Spyglass_universal.app'):
                 platforms[DARWIN_x86]['signature'] = sig
                 platforms[DARWIN_ARM]['signature'] = sig
             elif 'AppImage' in name:

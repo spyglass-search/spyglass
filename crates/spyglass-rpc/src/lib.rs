@@ -63,6 +63,9 @@ pub trait Rpc {
     #[method(name = "toggle_plugin")]
     async fn toggle_plugin(&self, name: String, enabled: bool) -> Result<(), Error>;
 
+    #[method(name = "toggle_filesystem")]
+    async fn toggle_filesystem(&self, enabled: bool) -> Result<(), Error>;
+
     #[method(name = "uninstall_lens")]
     async fn uninstall_lens(&self, name: String) -> Result<(), Error>;
 }

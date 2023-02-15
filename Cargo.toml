@@ -13,7 +13,6 @@ members = [
     # Default plugins
     "plugins/chrome-importer",
     "plugins/firefox-importer",
-    "plugins/local-file-indexer",
 ]
 
 [profile.release]

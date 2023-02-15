@@ -1,4 +1,4 @@
-use regex::RegexSet;
+use regex::{RegexSet, RegexSetBuilder};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
@@ -6,7 +6,7 @@ use sea_orm::{
     QueryOrder, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use url::Url;
 
@@ -32,6 +32,8 @@ pub enum EnqueueError {
 pub enum TaskErrorType {
     #[sea_orm(string_value = "Collect")]
     Collect,
+    #[sea_orm(string_value = "Duplicate")]
+    Duplicate,
     #[sea_orm(string_value = "Fetch")]
     Fetch,
     #[sea_orm(string_value = "Parse")]
@@ -434,6 +436,26 @@ pub struct EnqueueSettings {
     pub is_recrawl: bool,
 }
 
+fn url_is_allowed(
+    url: &str,
+    allow_list: &RegexSet,
+    restrict_list: &RegexSet,
+    skip_list: &RegexSet,
+) -> bool {
+    // Ignore domains on blacklist
+    if skip_list.is_match(url)
+    // Skip if any URLs do not match this restriction
+    || (!restrict_list.is_empty()
+        && !restrict_list.is_match(url))
+    {
+        return false;
+    }
+
+    // If external links are not allowed, only allow crawls specified
+    // in our lenses
+    !allow_list.is_empty() && allow_list.is_match(url)
+}
+
 fn filter_urls(
     lenses: &[LensConfig],
     settings: &UserSettings,
@@ -455,55 +477,71 @@ fn filter_urls(
         restrict_list.extend(ruleset.restrict_list);
     }
 
-    let allow_list = RegexSet::new(allow_list)?;
-    let skip_list = RegexSet::new(skip_list)?;
-    let restrict_list = RegexSet::new(restrict_list)?;
+    let allow_list = RegexSetBuilder::new(allow_list)
+        .size_limit(100_000_000)
+        .build()?;
+    let skip_list = RegexSetBuilder::new(skip_list)
+        .size_limit(100_000_000)
+        .build()?;
+    let restrict_list = RegexSetBuilder::new(restrict_list)
+        .size_limit(100_000_000)
+        .build()?;
 
     // Ignore invalid URLs
     let res = urls
         .iter()
+        // Only look at valid URLs
+        .flat_map(|s| Url::parse(s))
         .filter_map(|url| {
-            if let Ok(mut parsed) = Url::parse(url) {
-                // Check that we can handle this scheme
-                if parsed.scheme() != "http"
-                    && parsed.scheme() != "https"
-                    && parsed.scheme() != "file"
-                    && parsed.scheme() != "api"
-                {
-                    return None;
-                }
-
-                // Always ignore fragments, otherwise crawling
-                // https://wikipedia.org/Rust#Blah would be considered different than
-                // https://wikipedia.org/Rust
-                parsed.set_fragment(None);
-
-                let normalized = parsed.to_string();
-
-                // Ignore domains on blacklist
-                if skip_list.is_match(&normalized)
-                    // Skip if any URLs do not match this restriction
-                    || (!restrict_list.is_empty()
-                        && !restrict_list.is_match(&normalized))
-                {
-                    return None;
-                }
-
-                // Should we crawl external links?
-                if settings.crawl_external_links {
-                    return Some(normalized);
-                }
-
-                // If external links are not allowed, only allow crawls specified
-                // in our lenses
-                if overrides.force_allow
-                    || (!allow_list.is_empty() && allow_list.is_match(&normalized))
-                {
-                    return Some(normalized);
-                }
+            // Check that we can handle this scheme
+            if url.scheme() != "http"
+                && url.scheme() != "https"
+                && url.scheme() != "file"
+                && url.scheme() != "api"
+            {
+                None
+            } else {
+                Some(url)
+            }
+        })
+        .filter_map(|mut url| {
+            if overrides.force_allow {
+                return Some(url.to_string());
             }
 
-            None
+            // Always ignore fragments, otherwise crawling
+            // https://wikipedia.org/Rust#Blah would be considered different than
+            // https://wikipedia.org/Rust
+            url.set_fragment(None);
+
+            let normalized = url.to_string();
+            let no_end_slash = if normalized.ends_with('/') {
+                Some(normalized.trim_end_matches('/').to_string())
+            } else {
+                None
+            };
+
+            let mut checks = Vec::new();
+            checks.push(url_is_allowed(
+                &normalized,
+                &allow_list,
+                &restrict_list,
+                &skip_list,
+            ));
+            if let Some(no_end_slash) = no_end_slash {
+                checks.push(url_is_allowed(
+                    &no_end_slash,
+                    &allow_list,
+                    &restrict_list,
+                    &skip_list,
+                ));
+            }
+
+            if checks.iter().any(|f| *f) {
+                Some(normalized)
+            } else {
+                None
+            }
         })
         .collect::<Vec<String>>();
 
@@ -703,28 +741,18 @@ pub async fn mark_failed(db: &DatabaseConnection, id: i64, retry: bool) {
     }
 }
 
-/// Inserts an entry into the tag table for each crawl and
-/// tag pair provided
-pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &[Model],
+pub async fn insert_tags_by_id<C: ConnectionTrait>(
     db: &C,
-    tags: &[TagPair],
+    docs: &[Model],
+    tag_ids: &[i64],
 ) -> Result<InsertResult<crawl_tag::ActiveModel>, DbErr> {
-    let mut tag_models: Vec<tag::Model> = Vec::new();
-    for (label, value) in tags.iter() {
-        match get_or_create(db, label.to_owned(), value).await {
-            Ok(tag) => tag_models.push(tag),
-            Err(err) => log::error!("{}", err),
-        }
-    }
-
     // create connections for each tag
     let crawl_tags = docs
         .iter()
         .flat_map(|model| {
-            tag_models.iter().map(|t| crawl_tag::ActiveModel {
+            tag_ids.iter().map(|t| crawl_tag::ActiveModel {
                 crawl_queue_id: Set(model.id),
-                tag_id: Set(t.id),
+                tag_id: Set(*t),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
                 ..Default::default()
@@ -744,6 +772,23 @@ pub async fn insert_tags_many<C: ConnectionTrait>(
         )
         .exec(db)
         .await
+}
+
+/// Inserts an entry into the tag table for each crawl and
+/// tag pair provided
+pub async fn insert_tags_many<C: ConnectionTrait>(
+    docs: &[Model],
+    db: &C,
+    tags: &[TagPair],
+) -> Result<InsertResult<crawl_tag::ActiveModel>, DbErr> {
+    let mut tag_ids: Vec<i64> = Vec::new();
+    for (label, value) in tags.iter() {
+        match get_or_create(db, label.to_owned(), value).await {
+            Ok(tag) => tag_ids.push(tag.id),
+            Err(err) => log::error!("{}", err),
+        }
+    }
+    insert_tags_by_id(db, docs, &tag_ids).await
 }
 
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected
@@ -767,36 +812,76 @@ pub async fn remove_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
 pub async fn update_or_remove_task(
     db: &DatabaseConnection,
     id: i64,
-    url: &str,
+    canonical_url: &str,
 ) -> anyhow::Result<Model, DbErr> {
-    let existing_task = Entity::find().filter(Column::Url.eq(url)).one(db).await?;
+    let task = Entity::find_by_id(id).one(db).await?;
+    if let Some(task) = task {
+        let existing_task = Entity::find()
+            .filter(Column::Url.eq(canonical_url))
+            .one(db)
+            .await?;
 
-    // Task already exists w/ this URL, remove this one.
-    if let Some(existing) = existing_task {
-        if existing.id != id {
-            crawl_tag::Entity::delete_many()
-                .filter(crawl_tag::Column::CrawlQueueId.eq(id))
-                .exec(db)
-                .await?;
-            Entity::delete_by_id(id).exec(db).await?;
-        }
+        // Task already exists w/ this URL, mark this one as failed.
+        if let Some(existing) = existing_task {
+            if existing.id != id {
+                let mut data_map = HashMap::new();
+                data_map.insert("canonical_url", canonical_url);
 
-        Ok(existing)
-    } else {
-        let task = Entity::find_by_id(id).one(db).await?;
+                let mut update: ActiveModel = task.into();
+                update.status = Set(CrawlStatus::Failed);
+                if let Ok(data) = serde_json::to_string(&data_map) {
+                    update.data = Set(Some(data));
+                }
 
-        if let Some(mut task) = task {
-            if task.url != url {
-                let mut update: ActiveModel = task.clone().into();
-                update.url = Set(url.to_owned());
+                update.error = Set(Some(TaskError {
+                    error_type: TaskErrorType::Duplicate,
+                    msg: "Found different canonical URL".to_string(),
+                }));
                 let _ = update.save(db).await?;
-                task.url = url.to_owned();
             }
 
-            Ok(task)
+            Ok(existing)
+        } else if task.url != canonical_url {
+            let mut data_map = HashMap::new();
+            data_map.insert("canonical_url", canonical_url);
+
+            // Mark old task as a failed duplicate
+            let mut task_update: ActiveModel = task.clone().into();
+            task_update.status = Set(CrawlStatus::Failed);
+            if let Ok(data) = serde_json::to_string(&data_map) {
+                task_update.data = Set(Some(data));
+            }
+
+            task_update.error = Set(Some(TaskError {
+                error_type: TaskErrorType::Duplicate,
+                msg: "Found different canonical URL".to_string(),
+            }));
+            let _ = task_update.save(db).await?;
+
+            let tags = task
+                .find_related(tag::Entity)
+                .all(db)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|m| m.id)
+                .collect::<Vec<_>>();
+
+            let mut canonical = ActiveModel::new();
+            canonical.domain = Set(task.domain);
+            canonical.url = Set(canonical_url.to_string());
+            canonical.status = Set(CrawlStatus::Completed);
+
+            let inserted = canonical.insert(db).await?;
+            insert_tags_by_id(db, &[inserted.clone()], &tags).await?;
+
+            Ok(inserted)
         } else {
-            Err(DbErr::Custom("Task not found".to_owned()))
+            Ok(task)
         }
+    } else {
+        // deleted?
+        Err(DbErr::Custom("Task not found".to_owned()))
     }
 }
 
@@ -875,6 +960,50 @@ pub async fn find_by_lens(
     .await
 }
 
+#[derive(Debug, FromQueryResult)]
+pub struct CrawlTaskIdsUrls {
+    pub id: i64,
+    pub url: String,
+}
+
+/// Helper method to access the urls for any extensions that have been removed
+/// and delete those from the crawl queue.
+pub async fn process_urls_for_removed_exts(
+    exts: Vec<String>,
+    db: &DatabaseConnection,
+) -> Result<Vec<CrawlTaskIdsUrls>, DbErr> {
+    let statement = Statement::from_string(
+        DatabaseBackend::Sqlite,
+        format!(
+            r#"
+            with tags_list as (
+                SELECT id FROM tags WHERE label = 'fileext' and value not in ({})
+            )
+            SELECT cq.id, cq.url 
+            FROM crawl_queue as cq join crawl_tag as ct on cq.id = ct.crawl_queue_id 
+            WHERE cq.url like 'file%' and ct.tag_id in tags_list order by cq.url
+            "#,
+            exts.iter()
+                .map(|str| format!("'{str}'"))
+                .collect::<Vec<String>>()
+                .join(",")
+        ),
+    );
+    let tasks = CrawlTaskIdsUrls::find_by_statement(statement)
+        .all(db)
+        .await?;
+
+    if !tasks.is_empty() {
+        let delete_rslt =
+            delete_many_by_id(db, &tasks.iter().map(|task| task.id).collect::<Vec<i64>>()).await;
+
+        if let Err(error) = delete_rslt {
+            log::error!("Error removing from crawl queue {:?}", error);
+        }
+    }
+    Ok(tasks)
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;
@@ -884,7 +1013,7 @@ mod test {
     use shared::config::{LensConfig, LensRule, Limit, UserSettings};
     use shared::regex::{regex_for_robots, WildcardType};
 
-    use crate::models::crawl_queue::CrawlType;
+    use crate::models::crawl_queue::{CrawlStatus, CrawlType};
     use crate::models::{crawl_queue, indexed_document};
     use crate::test::setup_test_db;
 
@@ -1253,7 +1382,7 @@ mod test {
             url: Set("https://example.com".to_string()),
             ..Default::default()
         };
-        let first = model.save(&db).await.expect("saved");
+        let first = model.insert(&db).await.expect("saved");
 
         let model = crawl_queue::ActiveModel {
             crawl_type: Set(CrawlType::Normal),
@@ -1262,17 +1391,24 @@ mod test {
             url: Set("https://example.com/redirect".to_string()),
             ..Default::default()
         };
-        let task = model.save(&db).await.expect("saved");
+        let task = model.insert(&db).await.expect("saved");
 
-        let res = super::update_or_remove_task(&db, task.id.unwrap(), "https://example.com")
+        let res = super::update_or_remove_task(&db, task.id, "https://example.com")
             .await
             .expect("success");
 
         let all_tasks = crawl_queue::Entity::find().all(&db).await.expect("success");
 
-        // Should update the task URL, delete the duplicate, and return the first model
+        let task = crawl_queue::Entity::find_by_id(task.id)
+            .one(&db)
+            .await
+            .expect("success")
+            .expect("should exist");
+        // Old task should be marked as failed
+        assert_eq!(task.status, CrawlStatus::Failed);
+        // New model should have the canonical URL.
         assert_eq!(res.url, "https://example.com");
-        assert_eq!(res.id, first.id.unwrap());
-        assert_eq!(1, all_tasks.len());
+        assert_eq!(res.id, first.id);
+        assert_eq!(2, all_tasks.len());
     }
 }

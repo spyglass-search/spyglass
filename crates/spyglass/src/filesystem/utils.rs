@@ -145,43 +145,24 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
 /// Helper method used to access the configured file search directories from
 /// user settings.
 pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
-    let plugin_settings = state.user_settings.plugin_settings.clone();
-    if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
-        let dir_list = local_file_settings
-            .get("FOLDERS_LIST")
-            .map(|f| f.to_owned())
-            .unwrap_or_default();
-
-        let directories = if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(&dir_list) {
-            dirs
-        } else {
-            HashSet::new()
-        };
-
-        directories
-            .iter()
-            .map(PathBuf::from)
-            .collect::<Vec<PathBuf>>()
-    } else {
-        Vec::new()
-    }
+    state
+        .user_settings
+        .filesystem_settings
+        .watched_paths
+        .clone()
 }
 
 /// Helper method used to access the configured file extensions from
 /// user settings.
 pub fn get_supported_file_extensions(state: &AppState) -> HashSet<String> {
-    let plugin_settings = state.user_settings.plugin_settings.clone();
-
-    if let Some(local_file_settings) = plugin_settings.get("local-file-importer") {
-        let ext_list = local_file_settings
-            .get("EXTS_LIST")
-            .map(|s| s.to_owned())
-            .unwrap_or_default();
-        if let Ok(exts) = serde_json::from_str::<HashSet<String>>(&ext_list) {
-            return exts;
-        }
-    }
-    HashSet::new()
+    HashSet::from_iter(
+        state
+            .user_settings
+            .filesystem_settings
+            .supported_extensions
+            .iter()
+            .cloned(),
+    )
 }
 
 /// Helper method used to identify if the provided path represents a gitignore file
