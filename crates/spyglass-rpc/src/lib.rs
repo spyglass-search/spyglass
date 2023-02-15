@@ -2,7 +2,7 @@ use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
 use std::collections::HashMap;
 
-use shared::request::{SearchLensesParam, SearchParam, RawDocumentRequest};
+use shared::request::{RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
     SearchLensesResp, SearchResults,

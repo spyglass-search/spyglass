@@ -24,10 +24,12 @@ pub type TagPair = (TagType, String);
 pub enum TagType {
     /// Marked as liked/starred/hearted/etc.
     #[sea_orm(string_value = "favorited")]
+    #[strum(serialize = "favorited")]
     Favorited,
     /// Mimetype of the document. TODO: Need to keep a mapping between file extension and
     /// mimetypes somewhere
     #[sea_orm(string_value = "mimetype")]
+    #[strum(serialize = "mimetype")]
     MimeType,
     /// General type tag, Used for high level types ex: File, directory. The MimeType
     /// would be used as a more specific type.
@@ -35,24 +37,31 @@ pub enum TagType {
     /// e.g. for a GitHub connection we can have an "Issue" or "Repo".
     ///     for a D&D lens we have equipment, magic items, skills, etc.
     #[sea_orm(string_value = "type")]
+    #[strum(serialize = "type")]
     Type,
     /// where this document came from,
     #[sea_orm(string_value = "source")]
+    #[strum(serialize = "source")]
     Source,
     /// Owner of a doc/item, if relevant.
     #[sea_orm(string_value = "owner")]
+    #[strum(serialize = "owner")]
     Owner,
     /// Shared/invited to a doc/event/etc.
     #[sea_orm(string_value = "shared")]
+    #[strum(serialize = "shared")]
     SharedWith,
     /// Part of this/these lens(es)
     #[sea_orm(string_value = "lens")]
+    #[strum(serialize = "lens")]
     Lens,
     /// Part of a specific repo
     #[sea_orm(string_value = "repository")]
+    #[strum(serialize = "repository")]
     Repository,
     /// For file based content this tag
     #[sea_orm(string_value = "fileext")]
+    #[strum(serialize = "fileext")]
     FileExt,
 }
 

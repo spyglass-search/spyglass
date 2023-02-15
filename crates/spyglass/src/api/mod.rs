@@ -2,19 +2,16 @@ use entities::get_library_stats;
 use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
+use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
+use shared::config::Config;
+use shared::request::{RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::response::{self as resp, DefaultIndices, LibraryStats};
+use spyglass_rpc::RpcServer;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-use jsonrpsee::server::{ServerBuilder, ServerHandle};
-
-use shared::config::Config;
-use shared::request::{SearchLensesParam, SearchParam, RawDocumentRequest, RawDocType};
-use shared::response::{self as resp, DefaultIndices, LibraryStats};
-use libnetrunner::parser::html::html_to_text;
-use spyglass_rpc::RpcServer;
 
 mod handler;
 mod response;
@@ -27,17 +24,11 @@ pub struct SpyglassRpc {
 #[async_trait]
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
-        Ok("version1".into())
+        Ok("0.1.0".into())
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
-        if req.doc_type == RawDocType::Html {
-            // Parse content
-            let res = html_to_text(&req.url, &req.content);
-            dbg!(res);
-        }
-
-        Ok(())
+        handler::add_raw_document(self.state.clone(), &req).await
     }
 
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {

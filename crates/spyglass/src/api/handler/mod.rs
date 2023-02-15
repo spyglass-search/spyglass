@@ -2,14 +2,17 @@ use directories::UserDirs;
 use entities::get_library_stats;
 use entities::models::crawl_queue::CrawlStatus;
 use entities::models::lens::LensType;
+use entities::models::tag::TagType;
 use entities::models::{
     bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
     lens,
 };
-
 use entities::sea_orm::{prelude::*, sea_query, Set};
 use jsonrpsee::core::Error;
+use libnetrunner::parser::html::html_to_text;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
+use libspyglass::crawler::CrawlResult;
+use libspyglass::documents::process_crawl_results;
 use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
@@ -17,13 +20,14 @@ use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, ManagerCommand};
 use shared::config::{self, Config};
 use shared::metrics::Event;
-use shared::request;
+use shared::request::{RawDocType, RawDocumentRequest};
 use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tracing::instrument;
 use url::Url;
 
@@ -31,30 +35,42 @@ use super::response;
 
 pub mod search;
 
-/// Add url to queue
-#[allow(dead_code)]
-#[instrument(skip(state))]
-pub async fn add_queue(
-    state: AppState,
-    queue_item: request::QueueItemParam,
-) -> Result<String, Error> {
-    let db = &state.db;
-
-    if let Ok(parsed) = Url::parse(&queue_item.url) {
-        let new_task = crawl_queue::ActiveModel {
-            domain: Set(parsed.host_str().expect("Invalid host str").to_string()),
-            url: Set(queue_item.url.to_owned()),
-            crawl_type: Set(crawl_queue::CrawlType::Normal),
-            ..Default::default()
+pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Result<(), Error> {
+    if req.doc_type == RawDocType::Html {
+        // Parse content
+        let res = html_to_text(&req.url, &req.content);
+        let url = if let Some(Ok(url)) = res.canonical_url.map(|s| Url::parse(&s)) {
+            url
+        } else {
+            log::warn!("Unable to index {}", req.url);
+            return Ok(());
         };
 
-        return match new_task.insert(db).await {
-            Ok(_) => Ok("ok".to_string()),
-            Err(err) => Err(Error::Custom(err.to_string())),
-        };
+        let mut crawl = CrawlResult::new(
+            &url,
+            Some(url.to_string()),
+            &res.content,
+            &res.title.unwrap_or_default(),
+            None,
+        );
+
+        // Add tags to document
+        crawl.tags.push((TagType::Source, req.source.to_string()));
+        for (tag_type, tag_value) in req.tags.iter() {
+            dbg!(&tag_type, &tag_value);
+            if let Ok(ttype) = TagType::from_str(tag_type) {
+                crawl.tags.push((ttype, tag_value.to_owned()));
+            }
+        }
+
+        // Add to index
+        log::debug!("adding to index: {} - {:?}", crawl.url, crawl.tags);
+        if let Err(err) = process_crawl_results(&state, &[crawl], &Vec::new()).await {
+            log::error!("Unable to add from webext: {}", err);
+        }
     }
 
-    Ok("ok".to_string())
+    Ok(())
 }
 
 #[instrument(skip(state))]

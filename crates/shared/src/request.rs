@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchParam {
@@ -24,7 +25,15 @@ pub struct UpdateStatusParam {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum RawDocType {
-    Html
+    Html,
+}
+
+#[derive(Debug, Deserialize, Display, EnumString, Serialize, PartialEq, Eq)]
+pub enum RawDocSource {
+    #[strum(serialize = "cli")]
+    Cli,
+    #[strum(serialize = "web_extension")]
+    WebExtension,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -32,5 +41,6 @@ pub struct RawDocumentRequest {
     pub url: String,
     pub content: String,
     pub doc_type: RawDocType,
-    pub tags: Vec<(String, String)>
+    pub source: RawDocSource,
+    pub tags: Vec<(String, String)>,
 }
