@@ -6044,7 +6044,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass"
-version = "23.2.2"
+version = "23.2.3"
 dependencies = [
  "addr",
  "anyhow",
@@ -6195,9 +6195,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98a9eaffa134fb17478adb5adced1ec282e32804d13dcbd42224bfc4f843b928"
+checksum = "ba1fbd9d326a3917b6203a0f06d5dfe8dc29464f0ef67f619cb94fa0c56a21d6"
 dependencies = [
  "anyhow",
  "async-recursion",
