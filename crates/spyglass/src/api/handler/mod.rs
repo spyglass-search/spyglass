@@ -90,7 +90,7 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
 
 /// Remove a doc from the index
 #[instrument(skip(state))]
-pub async fn delete_doc(state: AppState, id: String) -> Result<(), Error> {
+pub async fn delete_document(state: AppState, id: String) -> Result<(), Error> {
     if let Err(e) = Searcher::delete_by_id(&state, &id).await {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));

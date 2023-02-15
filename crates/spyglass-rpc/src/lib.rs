@@ -2,18 +2,31 @@ use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
 use std::collections::HashMap;
 
-use shared::request::{SearchLensesParam, SearchParam};
+use shared::request::{SearchLensesParam, SearchParam, RawDocumentRequest};
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
     SearchLensesResp, SearchResults,
 };
 
 /// Rpc trait
-#[rpc(server, client, namespace = "state")]
+#[rpc(server, client, namespace = "spyglass")]
 pub trait Rpc {
     /// Returns a protocol version
     #[method(name = "protocol_version")]
     fn protocol_version(&self) -> Result<String, Error>;
+
+    /// Adds an unparsed document to the spyglass index.
+    #[method(name = "index.add_raw_document")]
+    async fn add_raw_document(&self, doc: RawDocumentRequest) -> Result<(), Error>;
+
+    /// Checks whether a URL has been indexed
+    #[method(name = "index.is_document_indexed")]
+    async fn is_document_indexed(&self, url: String) -> Result<bool, Error>;
+
+    /// Permanently deletes a document from the spyglass index and any associated
+    /// data.
+    #[method(name = "index.delete_document")]
+    async fn delete_document(&self, id: String) -> Result<(), Error>;
 
     #[method(name = "authorize_connection")]
     async fn authorize_connection(&self, id: String) -> Result<(), Error>;
@@ -23,9 +36,6 @@ pub trait Rpc {
 
     #[method(name = "default_indices")]
     async fn default_indices(&self) -> Result<DefaultIndices, Error>;
-
-    #[method(name = "delete_doc")]
-    async fn delete_doc(&self, id: String) -> Result<(), Error>;
 
     #[method(name = "get_library_stats")]
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error>;

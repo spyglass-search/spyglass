@@ -11,8 +11,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
 
 use shared::config::Config;
-use shared::request::{SearchLensesParam, SearchParam};
+use shared::request::{SearchLensesParam, SearchParam, RawDocumentRequest, RawDocType};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
+use libnetrunner::parser::html::html_to_text;
 use spyglass_rpc::RpcServer;
 
 mod handler;
@@ -29,6 +30,16 @@ impl RpcServer for SpyglassRpc {
         Ok("version1".into())
     }
 
+    async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
+        if req.doc_type == RawDocType::Html {
+            // Parse content
+            let res = html_to_text(&req.url, &req.content);
+            dbg!(res);
+        }
+
+        Ok(())
+    }
+
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {
         handler::authorize_connection(self.state.clone(), id).await
     }
@@ -43,8 +54,8 @@ impl RpcServer for SpyglassRpc {
     }
 
     /// Delete a single doc
-    async fn delete_doc(&self, id: String) -> Result<(), Error> {
-        handler::delete_doc(self.state.clone(), id).await
+    async fn delete_document(&self, id: String) -> Result<(), Error> {
+        handler::delete_document(self.state.clone(), id).await
     }
 
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
@@ -55,6 +66,10 @@ impl RpcServer for SpyglassRpc {
                 Ok(HashMap::new())
             }
         }
+    }
+
+    async fn is_document_indexed(&self, _: String) -> Result<bool, Error> {
+        todo!()
     }
 
     async fn list_connections(&self) -> Result<resp::ListConnectionResult, Error> {

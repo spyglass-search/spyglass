@@ -156,7 +156,7 @@ pub async fn search_lenses<'r>(
 pub async fn delete_doc<'r>(window: tauri::Window, id: &str) -> Result<(), String> {
     if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
-        match rpc.client.delete_doc(id.to_string()).await {
+        match rpc.client.delete_document(id.to_string()).await {
             Ok(_) => {
                 let _ = window.emit(ClientEvent::RefreshSearchResults.as_ref(), true);
             }
