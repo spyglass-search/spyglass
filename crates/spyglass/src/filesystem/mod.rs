@@ -366,19 +366,26 @@ impl SpyglassFileWatcher {
         }
 
         // well does this work
-        for map_ref in &self.ignore_files {
-            let root = map_ref.key();
-            let patterns = map_ref.value();
-            if let Some(parent) = root.parent() {
-                if path.starts_with(parent) {
-                    return patterns
-                        .matched_path_or_any_parents(path, path.is_dir())
-                        .is_ignore();
+        let gitignore_checks = self.ignore_files.iter()
+            .filter_map(|map_ref| {
+                let root = map_ref.key();
+                let patterns = map_ref.value();
+                if let Some(parent) = root.parent() {
+                    if path.starts_with(parent) {
+                        return Some(patterns
+                            .matched_path_or_any_parents(path, path.is_dir())
+                            .is_ignore());
+                    }
                 }
-            }
-        }
+                None
+            })
+            .collect::<Vec<bool>>();
 
-        false
+        if gitignore_checks.is_empty() {
+            false
+        } else {
+            gitignore_checks.iter().any(|b| *b)
+        }
     }
 
     /// Sets up a watcher for the specified path. If two watchers are registered
