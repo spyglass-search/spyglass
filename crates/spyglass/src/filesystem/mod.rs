@@ -366,15 +366,19 @@ impl SpyglassFileWatcher {
         }
 
         // well does this work
-        let gitignore_checks = self.ignore_files.iter()
+        let gitignore_checks = self
+            .ignore_files
+            .iter()
             .filter_map(|map_ref| {
                 let root = map_ref.key();
                 let patterns = map_ref.value();
                 if let Some(parent) = root.parent() {
                     if path.starts_with(parent) {
-                        return Some(patterns
-                            .matched_path_or_any_parents(path, path.is_dir())
-                            .is_ignore());
+                        return Some(
+                            patterns
+                                .matched_path_or_any_parents(path, path.is_dir())
+                                .is_ignore(),
+                        );
                     }
                 }
                 None
