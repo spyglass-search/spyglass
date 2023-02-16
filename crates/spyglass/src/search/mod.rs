@@ -75,20 +75,7 @@ impl Searcher {
 
     /// Deletes a single entry from the database & index
     pub async fn delete_by_id(state: &AppState, doc_id: &str) -> anyhow::Result<()> {
-        // Remove from search index, immediately.
-        if let Ok(mut writer) = state.index.writer.lock() {
-            Searcher::remove_from_index(&mut writer, doc_id)?;
-        };
-
-        // Remove from indexed_doc table
-        if let Some(model) = indexed_document::Entity::find()
-            .filter(indexed_document::Column::DocId.eq(doc_id))
-            .one(&state.db)
-            .await?
-        {
-            let _ = model.delete(&state.db).await;
-        }
-
+        Searcher::delete_many_by_id(state, &[doc_id.into()], true).await?;
         Ok(())
     }
 
