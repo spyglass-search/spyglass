@@ -1,6 +1,6 @@
 use entities::get_library_stats;
 use entities::models::indexed_document;
-use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use libspyglass::search::{self, Searcher};
@@ -73,7 +73,15 @@ impl RpcServer for SpyglassRpc {
 
     async fn is_document_indexed(&self, url: String) -> Result<bool, Error> {
         let result = indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.eq(url))
+            .filter(
+                Condition::any()
+                    // checks against raw urls that have been added
+                    .add(indexed_document::Column::Url.eq(url.clone()))
+                    // checks against URLs gathered through integrations,
+                    // e.g. A starred github repo should match against a github URL
+                    // if we have it.
+                    .add(indexed_document::Column::OpenUrl.eq(url)),
+            )
             .one(&self.state.db)
             .await;
 
