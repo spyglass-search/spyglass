@@ -49,6 +49,18 @@ impl RpcServer for SpyglassRpc {
         handler::delete_document(self.state.clone(), id).await
     }
 
+    async fn delete_document_by_url(&self, url: String) -> Result<(), Error> {
+        if let Ok(Some(doc)) = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.eq(url))
+            .one(&self.state.db)
+            .await
+        {
+            handler::delete_document(self.state.clone(), doc.doc_id).await
+        } else {
+            Ok(())
+        }
+    }
+
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
         match get_library_stats(&self.state.db).await {
             Ok(stats) => Ok(stats),
@@ -67,7 +79,7 @@ impl RpcServer for SpyglassRpc {
 
         match result {
             Ok(result) => Ok(result.is_some()),
-            Err(err) => Err(Error::Custom(format!("Unable to query db: {err}")))
+            Err(err) => Err(Error::Custom(format!("Unable to query db: {err}"))),
         }
     }
 

@@ -28,6 +28,9 @@ pub trait Rpc {
     #[method(name = "index.delete_document")]
     async fn delete_document(&self, id: String) -> Result<(), Error>;
 
+    #[method(name = "index.delete_document_by_url")]
+    async fn delete_document_by_url(&self, url: String) -> Result<(), Error>;
+
     #[method(name = "authorize_connection")]
     async fn authorize_connection(&self, id: String) -> Result<(), Error>;
 
