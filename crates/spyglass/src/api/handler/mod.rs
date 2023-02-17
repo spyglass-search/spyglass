@@ -627,8 +627,8 @@ mod test {
         };
 
         let model = doc.insert(&db).await.expect("Unable to insert doc");
-        let doc: indexed_document::ActiveModel = model.into();
-        doc.insert_tags(&db, &[(TagType::Lens, lens.name.clone())])
+        model
+            .insert_tags(&db, &[(TagType::Lens, lens.name.clone())])
             .await
             .expect("Unable to insert tags");
 

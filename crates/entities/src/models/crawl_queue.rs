@@ -153,7 +153,7 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
-impl ActiveModel {
+impl Model {
     pub async fn insert_tags<C: ConnectionTrait>(
         &self,
         db: &C,
@@ -171,7 +171,7 @@ impl ActiveModel {
         let doc_tags = tag_models
             .iter()
             .map(|t| crawl_tag::ActiveModel {
-                crawl_queue_id: self.id.clone(),
+                crawl_queue_id: Set(self.id),
                 tag_id: Set(t.id),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
@@ -712,12 +712,13 @@ pub async fn mark_done(
     tags: Option<Vec<TagPair>>,
 ) -> Option<Model> {
     if let Ok(Some(crawl)) = Entity::find_by_id(id).one(db).await {
-        let mut updated: ActiveModel = crawl.clone().into();
         if let Some(tags) = tags {
             if !tags.is_empty() {
-                let _ = updated.insert_tags(db, &tags).await;
+                let _ = crawl.insert_tags(db, &tags).await;
             }
         }
+
+        let mut updated: ActiveModel = crawl.into();
         updated.status = Set(CrawlStatus::Completed);
         updated.update(db).await.ok()
     } else {
@@ -979,8 +980,8 @@ pub async fn process_urls_for_removed_exts(
             with tags_list as (
                 SELECT id FROM tags WHERE label = 'fileext' and value not in ({})
             )
-            SELECT cq.id, cq.url 
-            FROM crawl_queue as cq join crawl_tag as ct on cq.id = ct.crawl_queue_id 
+            SELECT cq.id, cq.url
+            FROM crawl_queue as cq join crawl_tag as ct on cq.id = ct.crawl_queue_id
             WHERE cq.url like 'file%' and ct.tag_id in tags_list order by cq.url
             "#,
             exts.iter()
