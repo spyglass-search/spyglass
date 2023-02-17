@@ -77,10 +77,6 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
         _ => {}
     }
 
-    if let Some(ret) = started_task {
-        return ret;
-    }
-
     // No crawl tasks, check for recrawl tasks
     match crawl_queue::dequeue_recrawl(&state.db, &state.user_settings).await {
         Ok(Some(task)) => {
@@ -89,16 +85,21 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
             if queue.send(cmd).await.is_err() {
                 log::error!("unable to send command to worker");
             }
-            return true;
+
+            started_task = Some(true);
         }
         Err(err) => {
             log::error!("Unable to dequeue_recrawl jobs: {}", err.to_string());
-            return false;
+            started_task = Some(false);
         }
         _ => {}
     }
 
-    false
+    if let Some(ret) = started_task {
+        ret
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
