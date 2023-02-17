@@ -55,7 +55,13 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
     match req.doc_type {
         RawDocType::Html => {
             // Parse content
-            let res = html_to_text(&req.url, &req.content);
+            let content = req
+                .content
+                .as_ref()
+                .map(|s| s.to_owned())
+                .unwrap_or_default();
+
+            let res = html_to_text(&req.url, &content);
             let url = match res.canonical_url.map(|s| Url::parse(&s)) {
                 Some(Ok(url)) => url,
                 _ => {

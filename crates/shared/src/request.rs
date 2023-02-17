@@ -44,7 +44,7 @@ pub enum RawDocSource {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RawDocumentRequest {
     pub url: String,
-    pub content: String,
+    pub content: Option<String>,
     pub doc_type: RawDocType,
     pub source: RawDocSource,
     pub tags: Vec<(String, String)>,
