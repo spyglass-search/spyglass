@@ -93,9 +93,9 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
         // No need to process anything, simply add to the crawl queue for processing
         RawDocType::Url => {
             log::debug!("Enqueueing URL fro webext: {} - {:?}", req.url, &tags);
-
             let overrides = EnqueueSettings {
                 force_allow: true,
+                is_recrawl: true,
                 tags,
                 ..Default::default()
             };

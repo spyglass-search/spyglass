@@ -651,6 +651,22 @@ pub async fn enqueue_all(
         })
         .collect();
 
+    // If we have tags, update the tags for the already indexed URLs
+    if !overrides.tags.is_empty() && !is_indexed.is_empty() {
+        let to_update = Entity::find()
+            .filter(Column::Url.is_in(is_indexed))
+            .all(db)
+            .await
+            .unwrap_or_default();
+
+        if !to_update.is_empty() {
+            let result = insert_tags_many(&to_update, db, &overrides.tags).await;
+            if let Err(error) = result {
+                log::error!("Error inserting tags for crawl {:?}", error);
+            }
+        }
+    }
+
     if to_add.is_empty() {
         return Ok(());
     }

@@ -417,7 +417,7 @@ mod test {
         let tags = vec![
             (TagType::Lens, "lens".to_owned()),
             (TagType::Source, "original".to_owned()),
-            (TagType::Type, "remove".to_string())
+            (TagType::Type, "remove".to_string()),
         ];
         let _ = doc.insert_tags(&db, &tags).await;
 
@@ -448,7 +448,8 @@ mod test {
         assert!(insert_tags_for_docs(&db, &[doc], &tags).await.is_ok());
         let tags_after = document_tag::Entity::find()
             .all(&db)
-            .await.expect("Unable to grab tags")
+            .await
+            .expect("Unable to grab tags")
             .iter()
             .map(|x| (x.tag_id, x.to_owned()))
             .collect::<HashMap<_, _>>();
