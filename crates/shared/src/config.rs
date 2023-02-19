@@ -20,7 +20,9 @@ pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 // Name of legacy file importer plugin
 pub const LEGACY_FILESYSTEM_PLUGIN: &str = "local-file-importer";
 // Folder containing legacy local file importer plugin
-pub const LEGACY_FILESYSTEM_PLUGIN_FOLDER: &str = "local-file-indexer";
+pub const LEGACY_PLUGIN_FOLDERS: &[&str] =
+    &["local-file-indexer", "chrome-importer", "firefox-importer"];
+
 // The default extensions
 pub const DEFAULT_EXTENSIONS: &[&str] = &["docx", "html", "md", "txt", "ods", "xls", "xlsx"];
 
@@ -385,10 +387,12 @@ impl Config {
     }
 
     fn cleanup_legacy_plugins(plugin_dir: &Path) {
-        let fs_plugin_path = plugin_dir.join(LEGACY_FILESYSTEM_PLUGIN_FOLDER);
-        if fs_plugin_path.exists() {
-            if let Err(err) = fs::remove_dir_all(fs_plugin_path) {
-                log::warn!("Error removing local filesystem plugin {:?}", err);
+        for folder in LEGACY_PLUGIN_FOLDERS {
+            let fs_plugin_path = plugin_dir.join(folder);
+            if fs_plugin_path.exists() {
+                if let Err(err) = fs::remove_dir_all(fs_plugin_path) {
+                    log::warn!("Error removing plugin {folder} - {:?}", err);
+                }
             }
         }
     }
