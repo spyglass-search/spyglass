@@ -328,15 +328,6 @@ export let invoke = async (func_name, params) => {
             "Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.",
         },
       ],
-      [
-        "chrome-importer.CHROME_DATA_FOLDER",
-        {
-          label: "Chrome Data Folder",
-          value: "",
-          form_type: "Path",
-          help_text: "",
-        },
-      ],
     ];
   } else if (func_name == "plugin:tauri-plugin-startup|get_startup_progress") {
     return "Reticulating splines...";

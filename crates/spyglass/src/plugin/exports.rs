@@ -181,18 +181,6 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
     let rt = tokio::runtime::Handle::current();
     let urls = urls.clone();
 
-    // Hacky way to apply lenses to enqueues from the plugins.
-    let mut tags = vec![(TagType::Source, env.name.clone())];
-    match env.name.as_str() {
-        "chrome-importer" | "firefox-importer" => {
-            tags.push((TagType::Lens, "bookmarks".to_owned()));
-        }
-        "local-file-importer" => {
-            tags.push((TagType::Lens, "files".to_owned()));
-        }
-        _ => {}
-    }
-
     rt.spawn(async move {
         let state = state.clone();
         if let Err(e) = enqueue_all(
