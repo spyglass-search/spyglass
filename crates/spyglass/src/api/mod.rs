@@ -1,19 +1,17 @@
 use entities::get_library_stats;
 use entities::models::indexed_document;
-use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
+use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
-use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-use jsonrpsee::server::{ServerBuilder, ServerHandle};
-
 use shared::config::Config;
-use shared::request::{SearchLensesParam, SearchParam};
+use shared::request::{RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::RpcServer;
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod handler;
 mod response;
@@ -26,7 +24,11 @@ pub struct SpyglassRpc {
 #[async_trait]
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
-        Ok("version1".into())
+        Ok("0.1.0".into())
+    }
+
+    async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
+        handler::add_raw_document(self.state.clone(), &req).await
     }
 
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {
@@ -43,8 +45,20 @@ impl RpcServer for SpyglassRpc {
     }
 
     /// Delete a single doc
-    async fn delete_doc(&self, id: String) -> Result<(), Error> {
-        handler::delete_doc(self.state.clone(), id).await
+    async fn delete_document(&self, id: String) -> Result<(), Error> {
+        handler::delete_document(self.state.clone(), id).await
+    }
+
+    async fn delete_document_by_url(&self, url: String) -> Result<(), Error> {
+        if let Ok(Some(doc)) = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.eq(url))
+            .one(&self.state.db)
+            .await
+        {
+            handler::delete_document(self.state.clone(), doc.doc_id).await
+        } else {
+            Ok(())
+        }
     }
 
     async fn get_library_stats(&self) -> Result<HashMap<String, LibraryStats>, Error> {
@@ -54,6 +68,26 @@ impl RpcServer for SpyglassRpc {
                 log::error!("Unable to get library stats: {}", err);
                 Ok(HashMap::new())
             }
+        }
+    }
+
+    async fn is_document_indexed(&self, url: String) -> Result<bool, Error> {
+        let result = indexed_document::Entity::find()
+            .filter(
+                Condition::any()
+                    // checks against raw urls that have been added
+                    .add(indexed_document::Column::Url.eq(url.clone()))
+                    // checks against URLs gathered through integrations,
+                    // e.g. A starred github repo should match against a github URL
+                    // if we have it.
+                    .add(indexed_document::Column::OpenUrl.eq(url)),
+            )
+            .one(&self.state.db)
+            .await;
+
+        match result {
+            Ok(result) => Ok(result.is_some()),
+            Err(err) => Err(Error::Custom(format!("Unable to query db: {err}"))),
         }
     }
 

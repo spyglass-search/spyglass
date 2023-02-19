@@ -459,7 +459,7 @@ mod test {
             crawl_type: Set(CrawlType::Normal),
             ..Default::default()
         };
-        let task = model.save(&db).await.expect("Unable to save model");
+        let task = model.insert(&db).await.expect("Unable to save model");
         let _ = task
             .insert_tags(&db, &[(TagType::Source, "web".to_string())])
             .await;
@@ -472,7 +472,7 @@ mod test {
         };
 
         // Should consider this a new FetchResult
-        let task_id = task.id.unwrap();
+        let task_id = task.id;
         let result = process_crawl(&state, task_id, &crawl_result)
             .await
             .expect("success");
@@ -527,8 +527,8 @@ mod test {
         .insert(&db)
         .await
         .expect("Unable to save model");
-        let model: crawl_queue::ActiveModel = task.clone().into();
-        let _ = model
+
+        let _ = task
             .insert_tags(
                 &db,
                 &[
@@ -544,7 +544,7 @@ mod test {
             doc_id: Set("fake-doc-id".to_owned()),
             ..Default::default()
         };
-        let doc = doc.save(&db).await.expect("Unable to save indexed_doc");
+        let doc = doc.insert(&db).await.expect("Unable to save indexed_doc");
         let _ = doc
             .insert_tags(&db, &[(TagType::Source, "web".to_owned())])
             .await;
