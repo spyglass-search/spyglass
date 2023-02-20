@@ -128,7 +128,7 @@ pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
             } else {
                 Err(format!("Error invoking {}", fn_name))
             }
-        },
+        }
     }
 }
 
