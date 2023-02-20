@@ -190,7 +190,6 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             &state.user_settings,
             &EnqueueSettings {
                 force_allow: true,
-                tags: tags.clone(),
                 ..Default::default()
             },
             Option::None,
