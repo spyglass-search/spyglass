@@ -65,7 +65,7 @@ github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "d
 google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
-spyglass-netrunner = "0.2.8"
+spyglass-netrunner = "0.2.9"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 

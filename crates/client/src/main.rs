@@ -38,9 +38,6 @@ extern "C" {
     #[wasm_bindgen(js_name = "searchLenses", catch)]
     pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(js_name = "openResult", catch)]
-    pub async fn open(url: String) -> Result<(), JsValue>;
-
     #[wasm_bindgen(catch)]
     pub async fn open_folder_path(path: String) -> Result<(), JsValue>;
 
@@ -82,9 +79,6 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "searchLenses", catch)]
     pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
-
-    #[wasm_bindgen(js_name = "openResult", catch)]
-    pub async fn open(url: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn open_folder_path(path: String) -> Result<(), JsValue>;
@@ -128,7 +122,13 @@ pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
             Ok(parsed) => Ok(parsed),
             Err(err) => Err(err.to_string()),
         },
-        Err(e) => Err(format!("Error invoking {} - {:?}", fn_name, e.as_string())),
+        Err(e) => {
+            if let Some(e) = e.as_string() {
+                Err(e)
+            } else {
+                Err(format!("Error invoking {}", fn_name))
+            }
+        }
     }
 }
 
