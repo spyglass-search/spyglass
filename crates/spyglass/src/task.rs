@@ -141,7 +141,7 @@ pub async fn manager_task(
                                 state.user_settings = loaded_settings;
                             }
 
-                            filesystem::configure_watcher(state).await;
+                            tokio::spawn(filesystem::configure_watcher(state));
                         }
                     }
                 }
