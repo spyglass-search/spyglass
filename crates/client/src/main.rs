@@ -38,9 +38,6 @@ extern "C" {
     #[wasm_bindgen(js_name = "searchLenses", catch)]
     pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(js_name = "openResult", catch)]
-    pub async fn open(url: String) -> Result<(), JsValue>;
-
     #[wasm_bindgen(catch)]
     pub async fn open_folder_path(path: String) -> Result<(), JsValue>;
 
@@ -82,9 +79,6 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "searchLenses", catch)]
     pub async fn search_lenses(query: String) -> Result<JsValue, JsValue>;
-
-    #[wasm_bindgen(js_name = "openResult", catch)]
-    pub async fn open(url: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn open_folder_path(path: String) -> Result<(), JsValue>;

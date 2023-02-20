@@ -65,6 +65,8 @@ pub enum ClientInvoke {
     OpenFolder,
     #[strum(serialize = "open_lens_folder")]
     OpenLensFolder,
+    #[strum(serialize = "open_result")]
+    OpenResult,
     #[strum(serialize = "open_settings_folder")]
     OpenSettingsFolder,
     #[strum(serialize = "plugin:lens-updater|uninstall_lens")]
@@ -89,6 +91,11 @@ pub struct ResyncConnectionParams {
 #[derive(Deserialize, Serialize)]
 pub struct InstallLensParams {
     pub name: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct OpenResultParams {
+    pub url: String
 }
 
 #[derive(Deserialize, Serialize)]

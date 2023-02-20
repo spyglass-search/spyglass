@@ -33,10 +33,6 @@ export async function open_folder_path(path) {
     return await invoke('open_folder_path', { path });
 }
 
-export async function openResult(url) {
-    return await invoke('open_result', { url });
-}
-
 export async function resizeWindow(height) {
     return await invoke('resize_window', { height });
 }

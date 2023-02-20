@@ -75,28 +75,34 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
-    if let Ok(mut url) = url::Url::parse(url) {
-        // treat open files as a local action.
-        if url.scheme() == "file" {
-            let _ = url.set_host(None);
+    match url::Url::parse(url) {
+        Ok(mut url) => {
+            // treat open files as a local action.
+            if url.scheme() == "file" {
+                let _ = url.set_host(None);
 
-            #[cfg(target_os = "windows")]
-            {
-                use shared::url_to_file_path;
-                let path = url_to_file_path(url.path(), true);
-                if let Err(err) = open::that(format!("file://{path}")) {
-                    log::error!("Unable to open file://{path} due to: {err}");
+                #[cfg(target_os = "windows")]
+                {
+                    use shared::url_to_file_path;
+                    let path = url_to_file_path(url.path(), true);
+                    if let Err(err) = open::that(format!("file://{path}")) {
+                        log::warn!("Unable to open file://{path} due to: {err}");
+                        return Err(err.to_string());
+                    }
+
+                    return Ok(());
                 }
-
-                return Ok(());
             }
-        }
 
-        if let Err(err) = open::that(url.to_string()) {
-            log::error!("Unable to open {} due to: {}", url.to_string(), err);
+            if let Err(err) = open::that(url.to_string()) {
+                log::warn!("Unable to open {} due to: {}", url.to_string(), err);
+                return Err(err.to_string());
+            }
+
+            Ok(())
         }
+        Err(err) => Err(err.to_string())
     }
-    Ok(())
 }
 
 #[tauri::command]
