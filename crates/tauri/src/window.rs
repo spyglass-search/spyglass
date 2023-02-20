@@ -1,3 +1,4 @@
+use crate::menu::get_app_menu;
 use crate::{constants, platform};
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
@@ -69,6 +70,8 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
         let default_height = 101.0;
         let window =
             WindowBuilder::new(app, constants::SEARCH_WIN_NAME, WindowUrl::App("/".into()))
+                .menu(get_app_menu())
+                .title("Spyglass")
                 .decorations(false)
                 .transparent(true)
                 .disable_file_drop_handler()
