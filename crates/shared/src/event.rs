@@ -95,7 +95,7 @@ pub struct InstallLensParams {
 
 #[derive(Deserialize, Serialize)]
 pub struct OpenResultParams {
-    pub url: String
+    pub url: String,
 }
 
 #[derive(Deserialize, Serialize)]

@@ -101,7 +101,7 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
 
             Ok(())
         }
-        Err(err) => Err(err.to_string())
+        Err(err) => Err(err.to_string()),
     }
 }
 

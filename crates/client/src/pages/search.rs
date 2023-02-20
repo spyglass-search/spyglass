@@ -1,13 +1,13 @@
-use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
+use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, HtmlElement, HtmlInputElement};
+use web_sys::{HtmlElement, HtmlInputElement};
 use yew::{html::Scope, prelude::*};
 
 use shared::{
-    event::{ClientEvent, ClientInvoke},
+    event::{ClientEvent, ClientInvoke, OpenResultParams},
     response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
@@ -16,7 +16,7 @@ use crate::components::{
     result::{LensResultItem, SearchResultItem},
     SelectedLens,
 };
-use crate::{invoke, listen, open, resize_window, search_docs, search_lenses};
+use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke};
 
 #[wasm_bindgen]
 extern "C" {
@@ -83,7 +83,15 @@ impl SearchPage {
         let url = selected.url.clone();
         log::info!("open url: {}", url);
         spawn_local(async move {
-            let _ = open(url).await;
+            if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
+                ClientInvoke::OpenResult,
+                OpenResultParams { url },
+            )
+            .await
+            {
+                let window = window();
+                let _ = window.alert_with_message(&err);
+            }
         });
     }
 
@@ -129,7 +137,8 @@ impl Component for SearchPage {
         let link = ctx.link();
 
         // Listen to onblur events so we can hide the search bar
-        if let Some(wind) = window() {
+        {
+            let wind = window();
             let link_clone = link.clone();
             let on_blur = EventListener::new(&wind, "blur", move |_| {
                 link_clone.send_message(Msg::Blur);
@@ -259,11 +268,8 @@ impl Component for SearchPage {
                 true
             }
             Msg::HandleError(msg) => {
-                if let Some(window) = window() {
-                    let _ = window.alert_with_message(&msg);
-                } else {
-                    log::error!("{}", msg);
-                }
+                let window = window();
+                let _ = window.alert_with_message(&msg);
                 false
             }
             Msg::KeyboardEvent(e) => {
