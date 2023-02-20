@@ -23,9 +23,9 @@ export let invoke = async (func_name, params) => {
           url: "https://google.com/this/is/a/path",
           tags: [
             ["source", "web"],
-            ["Lens", "google"],
-            ["Lens", "search-engines"],
-            ["Favorited", "Favorited"],
+            ["lens", "google"],
+            ["lens", "search-engines"],
+            ["favorited", "Favorited"],
           ],
           score: 1.0,
         },
@@ -37,7 +37,7 @@ export let invoke = async (func_name, params) => {
           crawl_uri: "file:///C%3A/Blah/Documents/Special%20Information",
           url: "file:///Users/Blah/Documents/Special%20Information",
           tags: [
-            ["Lens", "files"],
+            ["lens", "files"],
             ["type", "directory"],
           ],
           score: 1.0,
@@ -55,8 +55,8 @@ export let invoke = async (func_name, params) => {
             ["mimetype", "application/pdf"],
             ["source", "drive.google.com"],
             ["type", "file"],
-            ["Lens", "GDrive"],
-            ["Owner", "bob.dole@example.com"],
+            ["lens", "GDrive"],
+            ["owner", "bob.dole@example.com"],
           ],
           score: 1.0,
         },
@@ -72,7 +72,7 @@ export let invoke = async (func_name, params) => {
           tags: [
             ["mimetype", "application/pdf"],
             ["source", "localhost"],
-            ["Lens", "files"],
+            ["lens", "files"],
           ],
           score: 1.0,
         },
@@ -87,7 +87,7 @@ export let invoke = async (func_name, params) => {
           tags: [
             ["mimetype", "application/pdf"],
             ["source", "drive.google.com"],
-            ["Lens", "Google Drive"],
+            ["lens", "Google Drive"],
           ],
           score: 1.0,
         },
@@ -404,10 +404,6 @@ export async function searchLenses(query) {
 
 export async function open_folder_path(path) {
   return await invoke("open_folder_path", { path });
-}
-
-export async function openResult(url) {
-  return await invoke("open_result", { url });
 }
 
 export async function resizeWindow(height) {

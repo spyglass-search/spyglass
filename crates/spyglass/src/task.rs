@@ -1,10 +1,11 @@
 use entities::models::bootstrap_queue;
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
+use shared::config::{Config, LensConfig};
+use std::sync::atomic::Ordering;
+use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
-
-use shared::config::{Config, LensConfig};
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;
@@ -140,7 +141,7 @@ pub async fn manager_task(
                                 state.user_settings = loaded_settings;
                             }
 
-                            filesystem::configure_watcher(state).await;
+                            tokio::spawn(filesystem::configure_watcher(state));
                         }
                     }
                 }
@@ -173,7 +174,7 @@ pub async fn worker_task(
 ) {
     log::info!("worker started");
     let mut is_paused = false;
-    let mut updated_docs = 0;
+    let updated_docs: Arc<AtomicI32> = Arc::new(AtomicI32::new(0i32));
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
@@ -252,29 +253,35 @@ pub async fn worker_task(
                         }
                         WorkerCommand::CommitIndex => {
                             let state = state.clone();
-                            if updated_docs > 0 {
-                                log::debug!("committing {} new/updated docs in index", updated_docs);
-                                updated_docs = 0;
+                            let num_updated = updated_docs.load(Ordering::Relaxed);
+                            if num_updated > 0 {
+                                log::debug!("committing {} new/updated docs in index", num_updated);
+                                updated_docs.store(0, Ordering::Relaxed);
                                 tokio::spawn(async move {
                                     let _ = Searcher::save(&state).await;
                                 });
                             }
                         }
                         WorkerCommand::Crawl { id } => {
-                            if let Ok(fetch_result) =
-                                tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
-                            {
-                                match fetch_result {
-                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                            let state = state.clone();
+                            let updated_docs = updated_docs.clone();
+                            tokio::spawn(async move {
+                                match worker::handle_fetch(state, CrawlTask { id }).await {
+                                    FetchResult::New | FetchResult::Updated => {
+                                        updated_docs.fetch_add(1, Ordering::Relaxed);
+                                    }
                                     _ => {}
                                 }
-                            }
+                            });
                         }
                         WorkerCommand::Recrawl { id } => {
-                            if let Ok(fetch_result) = tokio::spawn(worker::handle_fetch(state.clone(), CrawlTask { id })).await
-                            {
-                                match fetch_result {
-                                    FetchResult::New | FetchResult::Updated => updated_docs += 1,
+                            let state = state.clone();
+                            let updated_docs = updated_docs.clone();
+                            tokio::spawn(async move {
+                                match worker::handle_fetch(state.clone(), CrawlTask { id }).await {
+                                    FetchResult::New | FetchResult::Updated => {
+                                        updated_docs.fetch_add(1, Ordering::Relaxed);
+                                    }
                                     FetchResult::NotFound => {
                                         // URL no longer exists, delete from index.
                                         log::debug!("URI not found, deleting from index");
@@ -285,7 +292,7 @@ pub async fn worker_task(
                                     },
                                     FetchResult::Ignore => {}
                                 }
-                            }
+                            });
                         }
                         WorkerCommand::Tag => {}
                     }

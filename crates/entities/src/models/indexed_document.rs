@@ -1,6 +1,8 @@
 use std::collections::HashSet;
+use std::ops::Sub;
 
 use crate::models::{document_tag, tag};
+use crate::BATCH_SIZE;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
@@ -73,7 +75,7 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
-impl ActiveModel {
+impl Model {
     pub async fn insert_tags<C: ConnectionTrait>(
         &self,
         db: &C,
@@ -91,7 +93,7 @@ impl ActiveModel {
         let doc_tags = tag_models
             .iter()
             .map(|t| document_tag::ActiveModel {
-                indexed_document_id: self.id.clone(),
+                indexed_document_id: Set(self.id),
                 tag_id: Set(t.id),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
@@ -162,12 +164,25 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
     let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
     let doc_ids: Vec<i64> = docs.iter().map(|m| m.id).collect();
 
-    // Remove existing tags for doc
+    // Remove tags that are not in the tag set
     let _ = document_tag::Entity::delete_many()
-        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids))
+        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids.clone()))
+        .filter(document_tag::Column::TagId.is_not_in(tags.clone()))
         .exec(db)
         .await;
 
+    // Grab existing tags
+    let existing_tags = document_tag::Entity::find()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids))
+        .all(db)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|model| model.tag_id)
+        .collect::<HashSet<_>>();
+
+    // Only add tags that have not been added before.
+    let tags = tags.sub(&existing_tags);
     // create connections for each tag
     let doc_tags = docs
         .iter()
@@ -182,25 +197,28 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
         })
         .collect::<Vec<document_tag::ActiveModel>>();
 
-    // Insert connections, ignoring duplicates
+    // Nothing to add, great!
     if doc_tags.is_empty() {
         return Ok(());
     }
 
-    let query = document_tag::Entity::insert_many(doc_tags)
-        .on_conflict(
-            sea_orm::sea_query::OnConflict::columns(vec![
-                document_tag::Column::IndexedDocumentId,
-                document_tag::Column::TagId,
-            ])
-            .do_nothing()
-            .to_owned(),
-        )
-        .build(DatabaseBackend::Sqlite);
+    // Insert connections, ignoring duplicates
+    for chunk in doc_tags.chunks(BATCH_SIZE) {
+        let query = document_tag::Entity::insert_many(chunk.to_owned())
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![
+                    document_tag::Column::IndexedDocumentId,
+                    document_tag::Column::TagId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .build(DatabaseBackend::Sqlite);
 
-    if let Err(err) = db.execute(query.clone()).await {
-        log::error!("Unable to execute: {} due to {}", query.to_string(), err);
-        return Err(err);
+        if let Err(err) = db.execute(query.clone()).await {
+            log::error!("Unable to execute: {} due to {}", query.to_string(), err);
+            return Err(err);
+        }
     }
 
     Ok(())
@@ -314,7 +332,11 @@ pub async fn find_by_lens(
 
 #[cfg(test)]
 mod test {
-    use crate::models::{document_tag, tag};
+    use std::collections::HashMap;
+
+    use crate::models::document_tag;
+    use crate::models::indexed_document::insert_tags_for_docs;
+    use crate::models::tag::{self, TagType};
     use crate::test::setup_test_db;
     use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, ModelTrait, Set};
 
@@ -353,7 +375,7 @@ mod test {
             doc_id: Set("1".into()),
             ..Default::default()
         };
-        let doc = doc.save(&db).await.unwrap();
+        let doc = doc.insert(&db).await.unwrap();
 
         // Insert related tags
         let tags = vec![
@@ -370,14 +392,74 @@ mod test {
         let res = document_tag::Entity::find().all(&db).await?;
         assert_eq!(res.len(), 2);
 
-        let doc_res = super::Entity::find_by_id(doc.id.clone().unwrap())
+        let doc_res = super::Entity::find_by_id(doc.id.clone())
             .one(&db)
             .await?
             .unwrap();
 
         let doc_tags = doc_res.find_related(tag::Entity).all(&db).await?;
-        assert_eq!(doc_res.id, doc.id.unwrap());
+        assert_eq!(doc_res.id, doc.id);
         assert_eq!(doc_tags.len(), 2);
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_insert_tags_for_dcs() {
+        let db = setup_test_db().await;
+        let doc = super::ActiveModel {
+            domain: Set("en.wikipedia.com".into()),
+            url: Set("https://en.wikipedia.org/wiki/Rust_(programming_language)".into()),
+            doc_id: Set("1".into()),
+            ..Default::default()
+        };
+
+        let doc = doc.insert(&db).await.expect("Unable to add doc");
+        let tags = vec![
+            (TagType::Lens, "lens".to_owned()),
+            (TagType::Source, "original".to_owned()),
+            (TagType::Type, "remove".to_string()),
+        ];
+        let _ = doc.insert_tags(&db, &tags).await;
+
+        // Grab the original tags to compare against the update dones
+        let tags_before = document_tag::Entity::find()
+            .all(&db)
+            .await
+            .expect("Unable to grab tags")
+            .iter()
+            .map(|x| (x.tag_id, x.to_owned()))
+            .collect::<HashMap<_, _>>();
+        assert_eq!(tags_before.len(), 3);
+
+        let tags = vec![
+            // kept the same.
+            (TagType::Lens, "lens".to_owned()),
+            // updated from original
+            (TagType::Source, "new_source".to_owned()),
+            // removed type tag.
+        ];
+        let tags = tag::get_or_create_many(&db, &tags)
+            .await
+            .expect("Unable to get/create tags")
+            .iter()
+            .map(|m| m.id)
+            .collect::<Vec<_>>();
+
+        assert!(insert_tags_for_docs(&db, &[doc], &tags).await.is_ok());
+        let tags_after = document_tag::Entity::find()
+            .all(&db)
+            .await
+            .expect("Unable to grab tags")
+            .iter()
+            .map(|x| (x.tag_id, x.to_owned()))
+            .collect::<HashMap<_, _>>();
+        assert_eq!(tags_after.len(), 2);
+
+        for (id, model) in tags_before.iter() {
+            // The same tag should not have been changed in anyway
+            if let Some(model_after) = tags_after.get(&id) {
+                assert_eq!(model.id, model_after.id);
+            }
+        }
     }
 }
