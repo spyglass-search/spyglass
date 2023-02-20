@@ -97,18 +97,15 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_item(quit)
 }
 
-pub fn get_app_menu(_ctx: &Context<EmbeddedAssets>) -> Menu {
+pub fn get_app_menu() -> Menu {
     #[cfg(target_os = "linux")]
     return Menu::new();
 
     #[cfg(not(target_os = "linux"))]
     Menu::new().add_submenu(Submenu::new(
-        &_ctx.package_info().name,
+        "Spyglass".to_string(),
         Menu::new()
-            .add_native_item(MenuItem::About(
-                _ctx.package_info().name.to_string(),
-                Default::default(),
-            ))
+            .add_native_item(MenuItem::About("Spyglass".to_string(), Default::default()))
             // Currently we need to include these so that the shortcuts for these
             // actions work.
             .add_native_item(MenuItem::Copy)
