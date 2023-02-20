@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::update_and_restart,
             cmd::wizard_finished,
         ])
-        .menu(menu::get_app_menu(&ctx))
+        .menu(menu::get_app_menu())
         .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
         .setup(move |app| {
             let app_handle = app.app_handle();
