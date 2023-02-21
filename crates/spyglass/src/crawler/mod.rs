@@ -41,7 +41,7 @@ type RateLimit = RateLimiter<String, DashMapStateStore<String>, QuantaClock>;
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 pub enum CrawlError {
     #[error("crawl denied by rule {0}")]
     Denied(String),
@@ -49,9 +49,13 @@ pub enum CrawlError {
     FetchError(String),
     #[error("unable to parse document due to {0}")]
     ParseError(String),
+    #[error("unable to read document due to {0}")]
+    ReadError(#[from] std::io::Error),
     /// Document was not found.
     #[error("document not found")]
     NotFound,
+    #[error("document was not modified since last check")]
+    NotModified,
     #[error("document was recently fetched")]
     RecentlyFetched,
     /// Request timeout, crawler will try again later.
@@ -355,7 +359,7 @@ impl Crawler {
     async fn handle_file_fetch(
         &self,
         state: &AppState,
-        _: &crawl_queue::Model,
+        task: &crawl_queue::Model,
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
         // Attempt to convert from the URL to a file path
@@ -368,6 +372,15 @@ impl Crawler {
         // Is this a file and does this exist?
         if !path.exists() {
             return Err(CrawlError::NotFound);
+        }
+
+        // Check when this was last modified against our last updated field
+        let metadata = path.metadata()?;
+        if let Ok(last_mod) = metadata.modified() {
+            let last_modified: chrono::DateTime<Utc> = last_mod.into();
+            if last_modified > task.updated_at {
+                return Err(CrawlError::NotModified);
+            }
         }
 
         let file_name = path

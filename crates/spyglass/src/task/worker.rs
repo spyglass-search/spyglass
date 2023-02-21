@@ -137,7 +137,7 @@ pub async fn handle_cdx_collection(
 #[derive(Debug, Eq, PartialEq)]
 pub enum FetchResult {
     New,
-    Error(CrawlError),
+    Error(String),
     Ignore,
     NotFound,
     Updated,
@@ -237,14 +237,14 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
             }
             Err(err) => {
                 log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
-                FetchResult::Error(err)
+                FetchResult::Error(err.to_string())
             }
         },
         Err(err) => {
             log::warn!("Unable to crawl id: {} - {:?}", task.id, err);
             match err {
                 // Ignore skips, recently fetched crawls, or not found
-                CrawlError::Denied(_) | CrawlError::RecentlyFetched => {
+                CrawlError::Denied(_) | CrawlError::NotModified | CrawlError::RecentlyFetched => {
                     let _ = crawl_queue::mark_done(&state.db, task.id, None).await;
                     FetchResult::Ignore
                 }
@@ -256,16 +256,17 @@ pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
                 CrawlError::Timeout => {
                     log::info!("Retrying task {} if possible", task.id);
                     crawl_queue::mark_failed(&state.db, task.id, true).await;
-                    FetchResult::Error(err.clone())
+                    FetchResult::Error(err.to_string())
                 }
                 // No need to retry these, mark as failed.
                 CrawlError::FetchError(_)
                 | CrawlError::ParseError(_)
+                | CrawlError::ReadError(_)
                 | CrawlError::Unsupported(_)
                 | CrawlError::Other(_) => {
                     // mark crawl as failed
                     crawl_queue::mark_failed(&state.db, task.id, false).await;
-                    FetchResult::Error(err.clone())
+                    FetchResult::Error(err.to_string())
                 }
             }
         }
