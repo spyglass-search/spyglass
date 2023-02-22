@@ -736,6 +736,7 @@ pub async fn mark_done(
 
         let mut updated: ActiveModel = crawl.into();
         updated.status = Set(CrawlStatus::Completed);
+        updated.updated_at = Set(chrono::Utc::now());
         updated.update(db).await.ok()
     } else {
         None
