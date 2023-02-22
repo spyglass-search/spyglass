@@ -1,10 +1,8 @@
+use directories::{ProjectDirs, UserDirs};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use directories::{ProjectDirs, UserDirs};
-
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub use spyglass_lens::{LensConfig, LensRule, LensSource, PipelineConfiguration};
@@ -19,8 +17,13 @@ pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
 
 // Name of legacy file importer plugin
 pub const LEGACY_FILESYSTEM_PLUGIN: &str = "local-file-importer";
+pub const LEGACY_PLUGIN_SETTINGS: &[&str] =
+    &["local-file-importer", "chrome-importer", "firefox-importer"];
+
 // Folder containing legacy local file importer plugin
-pub const LEGACY_FILESYSTEM_PLUGIN_FOLDER: &str = "local-file-indexer";
+pub const LEGACY_PLUGIN_FOLDERS: &[&str] =
+    &["local-file-indexer", "chrome-importer", "firefox-importer"];
+
 // The default extensions
 pub const DEFAULT_EXTENSIONS: &[&str] = &["docx", "html", "md", "txt", "ods", "xls", "xlsx"];
 
@@ -321,26 +324,31 @@ impl Config {
     pub fn migrate_user_settings(mut settings: UserSettings) -> anyhow::Result<UserSettings> {
         // convert local-filesystem-config to user settings filesystem config
         let mut modified: bool = false;
-        if let Some(local_file_settings) = settings.plugin_settings.remove(LEGACY_FILESYSTEM_PLUGIN)
-        {
-            modified = true;
+        for setting in LEGACY_PLUGIN_SETTINGS {
+            let res = settings.plugin_settings.remove(&setting.to_string());
+            if setting == &"local-file-importer" {
+                if let Some(local_file_settings) = res {
+                    modified = true;
 
-            let dir_list = local_file_settings
-                .get("FOLDERS_LIST")
-                .map(|f| f.to_owned())
-                .unwrap_or_default();
+                    let dir_list = local_file_settings
+                        .get("FOLDERS_LIST")
+                        .map(|f| f.to_owned())
+                        .unwrap_or_default();
 
-            if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(&dir_list) {
-                settings.filesystem_settings.watched_paths =
-                    dirs.iter().map(PathBuf::from).collect::<Vec<PathBuf>>();
-            }
+                    if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(&dir_list) {
+                        settings.filesystem_settings.watched_paths =
+                            dirs.iter().map(PathBuf::from).collect::<Vec<PathBuf>>();
+                    }
 
-            let ext_list = local_file_settings
-                .get("EXTS_LIST")
-                .map(|s| s.to_owned())
-                .unwrap_or_default();
-            if let Ok(exts) = serde_json::from_str::<HashSet<String>>(&ext_list) {
-                settings.filesystem_settings.supported_extensions = exts.iter().cloned().collect();
+                    let ext_list = local_file_settings
+                        .get("EXTS_LIST")
+                        .map(|s| s.to_owned())
+                        .unwrap_or_default();
+                    if let Ok(exts) = serde_json::from_str::<HashSet<String>>(&ext_list) {
+                        settings.filesystem_settings.supported_extensions =
+                            exts.iter().cloned().collect();
+                    }
+                }
             }
         }
 
@@ -385,10 +393,12 @@ impl Config {
     }
 
     fn cleanup_legacy_plugins(plugin_dir: &Path) {
-        let fs_plugin_path = plugin_dir.join(LEGACY_FILESYSTEM_PLUGIN_FOLDER);
-        if fs_plugin_path.exists() {
-            if let Err(err) = fs::remove_dir_all(fs_plugin_path) {
-                log::warn!("Error removing local filesystem plugin {:?}", err);
+        for folder in LEGACY_PLUGIN_FOLDERS {
+            let fs_plugin_path = plugin_dir.join(folder);
+            if fs_plugin_path.exists() {
+                if let Err(err) = fs::remove_dir_all(fs_plugin_path) {
+                    log::warn!("Error removing plugin {folder} - {:?}", err);
+                }
             }
         }
     }
