@@ -72,22 +72,29 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn is_document_indexed(&self, url: String) -> Result<bool, Error> {
-        let result = indexed_document::Entity::find()
-            .filter(
-                Condition::any()
-                    // checks against raw urls that have been added
-                    .add(indexed_document::Column::Url.eq(url.clone()))
-                    // checks against URLs gathered through integrations,
-                    // e.g. A starred github repo should match against a github URL
-                    // if we have it.
-                    .add(indexed_document::Column::OpenUrl.eq(url)),
-            )
-            .one(&self.state.db)
-            .await;
+        // Normalize URL
+        if let Ok(mut url) = url::Url::parse(&url) {
+            url.set_fragment(None);
+            let url_str = url.to_string();
+            let result = indexed_document::Entity::find()
+                .filter(
+                    Condition::any()
+                        // checks against raw urls that have been added
+                        .add(indexed_document::Column::Url.eq(url_str.clone()))
+                        // checks against URLs gathered through integrations,
+                        // e.g. A starred github repo should match against a github URL
+                        // if we have it.
+                        .add(indexed_document::Column::OpenUrl.eq(url_str)),
+                )
+                .one(&self.state.db)
+                .await;
 
-        match result {
-            Ok(result) => Ok(result.is_some()),
-            Err(err) => Err(Error::Custom(format!("Unable to query db: {err}"))),
+            match result {
+                Ok(result) => Ok(result.is_some()),
+                Err(err) => Err(Error::Custom(format!("Unable to query db: {err}"))),
+            }
+        } else {
+            Ok(false)
         }
     }
 
