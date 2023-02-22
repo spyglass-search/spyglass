@@ -110,7 +110,7 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
             )
             .await
             {
-                return Err(Error::Custom(format!("Unable to queue URL: {}", err)));
+                return Err(Error::Custom(format!("Unable to queue URL: {err}")));
             }
         }
     }
