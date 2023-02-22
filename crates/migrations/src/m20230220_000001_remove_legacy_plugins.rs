@@ -17,7 +17,8 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "DELETE FROM lens WHERE name = 'chrome-importer' or name = 'firefox-importer'".to_string(),
+                "DELETE FROM lens WHERE name = 'chrome-importer' or name = 'firefox-importer'"
+                    .to_string(),
             ))
             .await?;
 
