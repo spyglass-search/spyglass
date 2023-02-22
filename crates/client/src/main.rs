@@ -126,7 +126,7 @@ pub async fn tauri_invoke<T: Serialize, R: DeserializeOwned>(
             if let Some(e) = e.as_string() {
                 Err(e)
             } else {
-                Err(format!("Error invoking {}", fn_name))
+                Err(format!("Error invoking {fn_name}"))
             }
         }
     }

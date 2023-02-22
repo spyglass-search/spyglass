@@ -246,7 +246,13 @@ impl Crawler {
         match handle_crawl(&self.client, None, self.limiter.clone(), url).await {
             Ok(crawl) => {
                 if parse_results {
-                    Ok(self.scrape_page(url, &crawl.content).await)
+                    let result = self.scrape_page(url, &crawl.headers, &crawl.content).await;
+                    match result {
+                        Some(crawl) => Ok(crawl),
+                        None => Err(CrawlError::Unsupported(format!(
+                            "Content Type unsupported {url:?}"
+                        ))),
+                    }
                 } else {
                     Ok(CrawlResult {
                         url: crawl.url.clone(),
@@ -259,15 +265,30 @@ impl Crawler {
         }
     }
 
-    pub async fn scrape_page(&self, url: &Url, raw_body: &str) -> CrawlResult {
+    pub async fn scrape_page(
+        &self,
+        url: &Url,
+        headers: &[(String, String)],
+        raw_body: &str,
+    ) -> Option<CrawlResult> {
         // Parse the html.
+        log::info!("Scraping page {:?}", url);
+        let content_type = headers
+            .iter()
+            .find(|(header, _value)| header.eq("content-type"));
+        if let Some((_header, value)) = content_type {
+            if !is_html_content(value) {
+                log::info!("Skipping content type {:?}", value);
+                return None;
+            }
+        }
         let parse_result = html_to_text(url.as_ref(), raw_body);
-        log::trace!("content hash: {:?}", parse_result.content_hash);
+        log::error!("content hash: {:?}", parse_result.content_hash);
 
         let extracted = parse_result.canonical_url.and_then(|s| Url::parse(&s).ok());
         let canonical_url = determine_canonical(url, extracted);
 
-        CrawlResult {
+        Some(CrawlResult {
             content_hash: Some(parse_result.content_hash),
             content: Some(parse_result.content),
             description: Some(parse_result.description),
@@ -276,7 +297,7 @@ impl Crawler {
             open_url: Some(canonical_url),
             links: parse_result.links,
             ..Default::default()
-        }
+        })
     }
 
     // TODO: Load web indexing as a plugin?
@@ -523,6 +544,10 @@ fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {
         .map(|x| x.to_string())
         .unwrap_or_default();
     extension.contains(ext)
+}
+
+fn is_html_content(content_type: &str) -> bool {
+    content_type.eq("text/html") || content_type.eq("application/xhtml+xml")
 }
 
 #[cfg(test)]
