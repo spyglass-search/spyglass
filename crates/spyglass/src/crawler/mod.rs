@@ -272,7 +272,7 @@ impl Crawler {
         raw_body: &str,
     ) -> Option<CrawlResult> {
         // Parse the html.
-        log::info!("Scraping page {:?}", url);
+        log::debug!("Scraping page {:?}", url);
         let content_type = headers
             .iter()
             .find(|(header, _value)| header.eq("content-type"));
@@ -283,7 +283,7 @@ impl Crawler {
             }
         }
         let parse_result = html_to_text(url.as_ref(), raw_body);
-        log::error!("content hash: {:?}", parse_result.content_hash);
+        log::debug!("content hash: {:?}", parse_result.content_hash);
 
         let extracted = parse_result.canonical_url.and_then(|s| Url::parse(&s).ok());
         let canonical_url = determine_canonical(url, extracted);
@@ -547,7 +547,7 @@ fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {
 }
 
 fn is_html_content(content_type: &str) -> bool {
-    content_type.eq("text/html") || content_type.eq("application/xhtml+xml")
+    content_type.contains("text/html") || content_type.contains("application/xhtml+xml")
 }
 
 #[cfg(test)]
