@@ -221,7 +221,7 @@ impl Component for LensManagerPage {
                         <div class="ml-2">{"Update"}</div>
                     </Btn>
                 </Header>
-                <div class="flex flex-col gap-4 p-4">{contents}</div>
+                <div class="flex flex-col gap-2 p-4">{contents}</div>
             </div>
         }
     }

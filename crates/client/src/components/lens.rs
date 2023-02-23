@@ -26,6 +26,13 @@ pub struct LensProps {
     pub in_progress: bool,
 }
 
+fn view_link(lens_name: &str) -> String {
+    format!(
+        "https://lenses.spyglass.fyi/lenses/{}",
+        lens_name.clone().to_lowercase().replace('_', "-")
+    )
+}
+
 #[function_component(LibraryLens)]
 pub fn lens_component(props: &LensProps) -> Html {
     let navigator = use_navigator().unwrap();
@@ -61,8 +68,8 @@ pub fn lens_component(props: &LensProps) -> Html {
                         }}
                         {"Install"}
                     </Btn>
-                    <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace('_', "-"))} size={BtnSize::Xs}>
-                        <icons::LinkIcon width="w-3.5" height="h-3.5" />
+                    <Btn href={view_link(&lens_name.clone())} size={BtnSize::Xs}>
+                        <icons::EyeIcon width="w-3.5" height="h-3.5" />
                         {"View Details"}
                     </Btn>
                 </div>
@@ -76,74 +83,64 @@ pub fn lens_component(props: &LensProps) -> Html {
             let mut buf = Buffer::default();
             buf.write_formatted(num_docs, &Locale::en);
 
-            match result.lens_type {
-                LensType::Lens => {
-                    html! {
-                        <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                            <Btn href={format!("https://lenses.spyglass.fyi/lenses/{}", lens_name.clone().to_lowercase().replace('_', "-"))} size={BtnSize::Xs}>
-                                <icons::LinkIcon width="w-3.5" height="h-3.5" />
-                                {"View Details"}
-                            </Btn>
-                            <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb} disabled={props.in_progress}>
-                                {if props.in_progress {
-                                    html! { <icons::RefreshIcon animate_spin={true} width="w-3.5" height="h-3.5" /> }
-                                } else {
-                                    html!{ <icons::TrashIcon width="w-3.5" height="h-3.5" /> }
-                                }}
-                                {"Uninstall"}
-                            </Btn>
-                            <div class="ml-auto text-neutral-200">{format!("{buf} docs")}</div>
-                        </div>
+            let view_btn = {
+                let label = html! {
+                    <>
+                        <icons::EyeIcon width="w-3.5" height="h-3.5" />
+                        {"Details"}
+                    </>
+                };
+                match result.lens_type {
+                    LensType::Lens => {
+                        html! { <Btn href={view_link(&lens_name.clone())} size={BtnSize::Xs}>{label}</Btn> }
+                    }
+                    LensType::Plugin => {
+                        let onclick = Callback::from(move |_| {
+                            navigator.push(&Route::SettingsPage {
+                                tab: pages::Tab::PluginsManager,
+                            })
+                        });
+                        html! { <Btn {onclick} size={BtnSize::Xs}>{label}</Btn> }
+                    }
+                    LensType::API => {
+                        let onclick = Callback::from(move |_| {
+                            navigator.push(&Route::SettingsPage {
+                                tab: pages::Tab::ConnectionsManager,
+                            })
+                        });
+                        html! { <Btn {onclick} size={BtnSize::Xs}>{label}</Btn> }
+                    }
+                    LensType::Internal => {
+                        let onclick = Callback::from(move |_| {
+                            navigator.push(&Route::SettingsPage {
+                                tab: pages::Tab::UserSettings,
+                            })
+                        });
+                        html! { <Btn {onclick} size={BtnSize::Xs}>{label}</Btn> }
                     }
                 }
-                LensType::Plugin => {
-                    let onclick = Callback::from(move |_| {
-                        navigator.push(&Route::SettingsPage {
-                            tab: pages::Tab::PluginsManager,
-                        })
-                    });
-                    html! {
-                        <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                            <Btn {onclick} size={BtnSize::Xs}>
-                                <icons::LinkIcon width="w-3.5" height="h-3.5" />
-                                {"View Details"}
-                            </Btn>
-                            <div class="ml-auto text-neutral-200">{format!("{buf} docs")}</div>
-                        </div>
-                    }
-                }
-                LensType::API => {
-                    let onclick = Callback::from(move |_| {
-                        navigator.push(&Route::SettingsPage {
-                            tab: pages::Tab::ConnectionsManager,
-                        })
-                    });
-                    html! {
-                        <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                            <Btn {onclick} size={BtnSize::Xs}>
-                                <icons::LinkIcon width="w-3.5" height="h-3.5" />
-                                {"View Details"}
-                            </Btn>
-                            <div class="ml-auto text-neutral-200">{format!("{buf} docs")}</div>
-                        </div>
-                    }
-                }
-                LensType::Internal => {
-                    let onclick = Callback::from(move |_| {
-                        navigator.push(&Route::SettingsPage {
-                            tab: pages::Tab::UserSettings,
-                        })
-                    });
-                    html! {
-                        <div class="mt-2 text-sm flex flex-row gap-2 items-center">
-                            <Btn {onclick} size={BtnSize::Xs}>
-                                <icons::LinkIcon width="w-3.5" height="h-3.5" />
-                                {"View Details"}
-                            </Btn>
-                            <div class="ml-auto text-neutral-200">{format!("{buf} docs")}</div>
-                        </div>
-                    }
-                }
+            };
+
+            let uninstall_btn = match result.lens_type {
+                LensType::Lens => html! {
+                    <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb} disabled={props.in_progress}>
+                        {if props.in_progress {
+                            html! { <icons::RefreshIcon animate_spin={true} width="w-3.5" height="h-3.5" /> }
+                        } else {
+                            html!{ <icons::TrashIcon width="w-3.5" height="h-3.5" /> }
+                        }}
+                    {"Uninstall"}
+                    </Btn>
+                },
+                _ => html! {},
+            };
+
+            html! {
+                <div class="mt-2 text-sm flex flex-row gap-2 items-center">
+                    {view_btn}
+                    {uninstall_btn}
+                    <div class="ml-auto text-neutral-200">{format!("{buf} docs")}</div>
+                </div>
             }
         }
         InstallStatus::Installing { percent, status } => match result.lens_type {
@@ -173,7 +170,7 @@ pub fn lens_component(props: &LensProps) -> Html {
     html! {
         <div class={component_styles}>
             <div class="mb-1">
-                <div class="text-lg font-semibold">{result.label.to_string()}</div>
+                <div class="text-base font-semibold">{result.label.to_string()}</div>
                 <div class="text-sm text-neutral-400">
                     {"Crafted By:"}
                     <a href={format!("https://github.com/{}", result.author)} target="_blank" class="text-cyan-400">
@@ -181,7 +178,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                     </a>
                 </div>
             </div>
-            <div class="text-sm text-neutral-200">{result.description.clone()}</div>
+            <div class="text-sm text-neutral-300">{result.description.clone()}</div>
             {detail_bar}
         </div>
     }
