@@ -5887,6 +5887,7 @@ dependencies = [
  "chrono",
  "directories",
  "log",
+ "num-format",
  "regex",
  "reqwest",
  "ron",
