@@ -18,7 +18,7 @@ pub enum LensEvent {
 }
 
 #[derive(Properties, PartialEq)]
-pub struct LensProps {
+struct LensActionBarProps {
     pub result: LensResult,
     #[prop_or_default]
     pub onclick: Callback<LensEvent>,
@@ -26,31 +26,17 @@ pub struct LensProps {
     pub in_progress: bool,
 }
 
-fn view_link(lens_name: &str) -> String {
-    format!(
-        "https://lenses.spyglass.fyi/lenses/{}",
-        lens_name.clone().to_lowercase().replace('_', "-")
-    )
-}
-
-#[function_component(LibraryLens)]
-pub fn lens_component(props: &LensProps) -> Html {
+#[function_component(LensActionBar)]
+fn lens_action_bar(props: &LensActionBarProps) -> Html {
     let navigator = use_navigator().unwrap();
-    let component_styles = classes!(
-        "rounded-md",
-        "bg-neutral-700",
-        "p-4",
-        "text-white",
-        "shadow-md",
-        "overflow-hidden"
-    );
-
     let result = &props.result;
-
     let lens_name = result.name.clone();
     let onclick = props.onclick.clone();
 
-    let detail_bar = match &result.progress {
+    let icon_h = "h-3.5";
+    let icon_w = "w-3.5";
+
+    match &result.progress {
         InstallStatus::NotInstalled => {
             let lens_display_name = lens_name.clone();
             let install_cb = Callback::from(move |_| {
@@ -60,17 +46,17 @@ pub fn lens_component(props: &LensProps) -> Html {
             });
             html! {
                 <div class="mt-2 text-sm flex flex-row gap-2 items-center">
+                    <Btn href={view_link(&lens_name.clone())} size={BtnSize::Xs}>
+                        <icons::EyeIcon width={icon_w} height={icon_h} />
+                        {"Details"}
+                    </Btn>
                     <Btn _type={BtnType::Success} size={BtnSize::Xs} onclick={install_cb} disabled={props.in_progress}>
                         {if props.in_progress {
-                            html! { <icons::RefreshIcon animate_spin={true} width="w-3.5" height="h-3.5" /> }
+                            html! { <icons::RefreshIcon animate_spin={true} width={icon_w} height={icon_h} /> }
                         } else {
-                            html!{ <icons::DocumentDownloadIcon width="w-3.5" height="h-3.5" /> }
+                            html!{ <icons::DocumentDownloadIcon width={icon_w} height={icon_h} /> }
                         }}
                         {"Install"}
-                    </Btn>
-                    <Btn href={view_link(&lens_name.clone())} size={BtnSize::Xs}>
-                        <icons::EyeIcon width="w-3.5" height="h-3.5" />
-                        {"View Details"}
                     </Btn>
                 </div>
             }
@@ -86,7 +72,7 @@ pub fn lens_component(props: &LensProps) -> Html {
             let view_btn = {
                 let label = html! {
                     <>
-                        <icons::EyeIcon width="w-3.5" height="h-3.5" />
+                        <icons::EyeIcon width={icon_w} height={icon_h} />
                         {"Details"}
                     </>
                 };
@@ -125,9 +111,9 @@ pub fn lens_component(props: &LensProps) -> Html {
                 LensType::Lens => html! {
                     <Btn _type={BtnType::Danger} size={BtnSize::Xs} onclick={uninstall_cb} disabled={props.in_progress}>
                         {if props.in_progress {
-                            html! { <icons::RefreshIcon animate_spin={true} width="w-3.5" height="h-3.5" /> }
+                            html! { <icons::RefreshIcon animate_spin={true} width={icon_w} height={icon_h} /> }
                         } else {
-                            html!{ <icons::TrashIcon width="w-3.5" height="h-3.5" /> }
+                            html!{ <icons::TrashIcon width={icon_w} height={icon_h} /> }
                         }}
                     {"Uninstall"}
                     </Btn>
@@ -165,7 +151,38 @@ pub fn lens_component(props: &LensProps) -> Html {
                 }
             }
         },
-    };
+    }
+}
+
+/// Create a view link to the lens directory HTML page.
+fn view_link(lens_name: &str) -> String {
+    format!(
+        "https://lenses.spyglass.fyi/lenses/{}",
+        lens_name.clone().to_lowercase().replace('_', "-")
+    )
+}
+
+#[derive(Properties, PartialEq)]
+pub struct LensProps {
+    pub result: LensResult,
+    #[prop_or_default]
+    pub onclick: Callback<LensEvent>,
+    #[prop_or_default]
+    pub in_progress: bool,
+}
+
+#[function_component(LibraryLens)]
+pub fn lens_component(props: &LensProps) -> Html {
+    let component_styles = classes!(
+        "rounded-md",
+        "bg-neutral-700",
+        "p-4",
+        "text-white",
+        "shadow-md",
+        "overflow-hidden"
+    );
+
+    let result = &props.result;
 
     html! {
         <div class={component_styles}>
@@ -179,7 +196,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                 </div>
             </div>
             <div class="text-sm text-neutral-300">{result.description.clone()}</div>
-            {detail_bar}
+            <LensActionBar result={props.result.clone()} onclick={props.onclick.clone()} in_progress={props.in_progress} />
         </div>
     }
 }
