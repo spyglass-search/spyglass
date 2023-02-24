@@ -66,6 +66,18 @@ impl Default for InstallStatus {
     }
 }
 
+impl InstallStatus {
+    pub fn is_installing(&self) -> bool {
+        matches!(
+            self,
+            Self::Installing {
+                percent: _,
+                status: _
+            }
+        )
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub enum LensType {
     #[default]

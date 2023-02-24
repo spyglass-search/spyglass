@@ -177,17 +177,55 @@ impl Component for LensManagerPage {
                     </div>
                 }
             } else {
-                self.user_installed
+                // Push currently syncing ones to the top
+                let syncing = self
+                    .user_installed
                     .iter()
-                    .map(|data| {
-                        html! {
-                            <LibraryLens onclick={link.callback(Msg::HandleLensEvent)}
-                                result={data.clone()}
-                                in_progress={self.uninstalling.contains(&data.name)}
-                            />
-                        }
-                    })
-                    .collect::<Html>()
+                    .filter(|x| x.progress.is_installing())
+                    .collect::<Vec<&LensResult>>();
+
+                let not_syncing = self
+                    .user_installed
+                    .iter()
+                    .filter(|x| !x.progress.is_installing())
+                    .collect::<Vec<&LensResult>>();
+
+                if !syncing.is_empty() {
+                    html! {
+                        <>
+                            <div>{"Currently Syncing"}</div>
+                            {syncing.iter().map(|data| {
+                                html! {
+                                    <LibraryLens onclick={link.callback(Msg::HandleLensEvent)}
+                                        result={data.to_owned().clone()}
+                                        in_progress={self.uninstalling.contains(&data.name)}
+                                    />
+                                }
+                            }).collect::<Html>()}
+                            <div class="pt-4">{"Library"}</div>
+                            {not_syncing.iter().map(|data| {
+                                html! {
+                                    <LibraryLens onclick={link.callback(Msg::HandleLensEvent)}
+                                        result={data.to_owned().clone()}
+                                        in_progress={self.uninstalling.contains(&data.name)}
+                                    />
+                                }
+                            }).collect::<Html>()}
+                        </>
+                    }
+                } else {
+                    not_syncing
+                        .iter()
+                        .map(|data| {
+                            html! {
+                                <LibraryLens onclick={link.callback(Msg::HandleLensEvent)}
+                                    result={data.to_owned().clone()}
+                                    in_progress={self.uninstalling.contains(&data.name)}
+                                />
+                            }
+                        })
+                        .collect::<Html>()
+                }
             }
         } else {
             html! {
