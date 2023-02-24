@@ -379,7 +379,7 @@ async fn build_filesystem_information(
             author: String::from("spyglass-search"),
             name: String::from("local-file-system"),
             label: String::from("Local File System"),
-            description: String::from("Provides indexing for local files. All content is processed locally and stored locally! Contents of supported file types will be indexed. All unsupported file types and directories will be indexed based on their path, name and extension."),
+            description: String::from("All files are processed locally. Contents of supported file types will be indexed. All unsupported files/folders will be indexed based on their path, name, and extension."),
             progress: status,
             lens_type: shared::response::LensType::Internal,
             ..Default::default()
