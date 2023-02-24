@@ -161,9 +161,9 @@ async fn main() -> Result<(), ()> {
     // Initialize/Load user preferences
     let state = AppState::new(&config).await;
     if !args.check {
-        let indexer_handle = start_backend(state.clone(), config.clone());
+        let indexer_handle = tokio::spawn(start_backend(state.clone(), config.clone()));
         // API server
-        let api_handle = api::start_api_server(state, config);
+        let api_handle = tokio::spawn(api::start_api_server(state, config));
         let _ = tokio::join!(indexer_handle, api_handle);
     }
 
