@@ -6061,6 +6061,7 @@ dependencies = [
  "nonzero_ext",
  "notify",
  "notify-debouncer-mini",
+ "num-format",
  "open",
  "percent-encoding",
  "regex",

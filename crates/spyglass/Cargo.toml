@@ -30,6 +30,7 @@ new_mime_guess = "4.0.1"
 nonzero_ext = "0.3.0"
 notify = { version = "5.1.0", default-features = false, features = ["serde", "macos_fsevent"] }
 notify-debouncer-mini = { version = "*", default-features = false }
+num-format = "0.4"
 open = "3.0"
 percent-encoding = "2.2"
 regex = "1"

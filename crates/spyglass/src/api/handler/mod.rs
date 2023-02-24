@@ -18,6 +18,7 @@ use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, ManagerCommand};
+use num_format::{Locale, ToFormattedString};
 use shared::config::{self, Config};
 use shared::metrics::Event;
 use shared::request::{RawDocType, RawDocumentRequest};
@@ -311,7 +312,10 @@ async fn add_connections_information(
                 let progress = if connection.is_syncing {
                     InstallStatus::Installing {
                         percent: 0,
-                        status: "Syncing...".into(),
+                        status: format!(
+                            "Syncing {} of many...",
+                            stats.indexed.to_formatted_string(&Locale::en)
+                        ),
                     }
                 } else {
                     InstallStatus::Finished {
@@ -356,7 +360,10 @@ async fn build_filesystem_information(
         let mut status = InstallStatus::Finished { num_docs: indexed };
         if total_finished < total_paths {
             let percent = (((indexed * 100) / total_paths) as i32).min(100);
-            let status_msg = format!("Processing {} of many", indexed);
+            let status_msg = format!(
+                "Processing {} of many",
+                indexed.to_formatted_string(&Locale::en)
+            );
             let status_msg = match path {
                 Some(path) => format!("{}. Walking {path}.", status_msg),
                 None => status_msg,
