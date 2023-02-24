@@ -479,9 +479,6 @@ pub async fn plugin_load(
             log::info!("<{}> plugin found", &plug.name);
         }
     }
-
-    // Startup filesystem watcher
-    tokio::spawn(crate::filesystem::configure_watcher(state.clone()));
 }
 
 pub async fn plugin_init(
