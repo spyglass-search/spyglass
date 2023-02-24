@@ -304,7 +304,9 @@ pub async fn worker_task(
                                     FetchResult::NotFound => {
                                         // URL no longer exists, delete from index.
                                         log::debug!("URI not found, deleting from index");
-                                        let _ = tokio::spawn(worker::handle_deletion(state.clone(), id)).await;
+                                        if let Err(err) = worker::handle_deletion(state.clone(), id).await {
+                                            log::error!("Unable to delete {id}: {err}");
+                                        }
                                     }
                                     FetchResult::Error(err) => {
                                         log::warn!("Unable to recrawl {} - {}", id, err);
