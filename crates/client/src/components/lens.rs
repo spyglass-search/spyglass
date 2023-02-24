@@ -201,19 +201,19 @@ pub fn lens_component(props: &LensProps) -> Html {
         <div class={component_styles}>
             <div class="flex flex-col flex-auto">
                 <div class="text-base font-semibold">{result.label.to_string()}</div>
-                <div class="text-xs text-neutral-300">
+                <div class="text-xs text-neutral-400">
                     {"Crafted By:"}
                     <a href={format!("https://github.com/{}", result.author)} target="_blank" class="text-cyan-400">
                         {format!(" @{}", result.author)}
                     </a>
                 </div>
-                <div class="text-sm text-neutral-300 mt-1">{result.description.clone()}</div>
+                <div class="text-sm text-neutral-400 mt-1">{result.description.clone()}</div>
                 {if !num_docs_buffer.is_empty() {
                     html! {
                         <div class="text-base mt-2 flex flex-row items-center gap-1">
-                            <icons::BookOpen width="w-4" height="h-4" />
+                            <icons::BookOpen width="w-4" height="h-4" classes="text-neutral-400" />
                             <span class="text-white">{num_docs_buffer}</span>
-                            <span class="text-neutral-300">{" docs"}</span>
+                            <span class="text-neutral-400">{" docs"}</span>
                         </div>
                     }
                 } else {
