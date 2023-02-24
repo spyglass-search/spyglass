@@ -494,17 +494,14 @@ impl Crawler {
 
 fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
     // Attempt to read file
-    let contents = match path.extension() {
-        Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
+    let ext = path.extension().unwrap_or_default();
+    let contents = if parser::supports_filetype(ext) {
+        match parser::parse_file(ext, path) {
             Err(err) => return Err(CrawlError::ParseError(err.to_string())),
             Ok(contents) => contents,
-        },
-        _ => match std::fs::read_to_string(path) {
-            Ok(x) => x,
-            Err(err) => {
-                return Err(CrawlError::FetchError(err.to_string()));
-            }
-        },
+        }
+    } else {
+        "".to_string()
     };
 
     let mut hasher = Sha256::new();
