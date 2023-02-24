@@ -6,7 +6,6 @@ use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
 
 use crate::connection::load_connection;
 use crate::crawler::bootstrap;
@@ -102,17 +101,7 @@ pub async fn manager_task(
     let mut commit_check_interval = tokio::time::interval(Duration::from_secs(10));
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
     // Startup filesystem watcher
-    let mut fs_watcher: Option<JoinHandle<_>> = if state
-        .user_settings
-        .filesystem_settings
-        .enable_filesystem_scanning
-    {
-        Some(tokio::spawn(crate::filesystem::configure_watcher(
-            state.clone(),
-        )))
-    } else {
-        None
-    };
+    filesystem::configure_watcher(state.clone()).await;
 
     loop {
         tokio::select! {
@@ -141,7 +130,7 @@ pub async fn manager_task(
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             } else {
-                                queue_check_interval = tokio::time::interval(Duration::from_millis(50));
+                                queue_check_interval = tokio::time::interval(Duration::from_millis(100));
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             }
@@ -153,11 +142,8 @@ pub async fn manager_task(
                                 let _ = Config::save_user_settings(&loaded_settings);
                                 state.user_settings = loaded_settings;
                             }
-                            // Clean up old watcher, if any.
-                            if let Some(watcher) = fs_watcher {
-                                watcher.abort();
-                            }
-                            fs_watcher = Some(tokio::spawn(filesystem::configure_watcher(state)));
+
+                            filesystem::configure_watcher(state).await;
                         }
                     }
                 }
@@ -175,9 +161,6 @@ pub async fn manager_task(
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 manager_cmd_rx.close();
-                if let Some(watcher) = fs_watcher {
-                    watcher.abort();
-                }
                 return;
             }
         };
@@ -330,6 +313,9 @@ pub async fn worker_task(
                 return;
             }
         };
+
+        // Add a little delay before we grab the next task.
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 }
 
