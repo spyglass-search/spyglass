@@ -136,7 +136,7 @@ pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LibraryStats {
     pub lens_name: String,
     pub crawled: i32,
