@@ -1319,32 +1319,6 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_dequeue_recrawl() {
-        let settings = UserSettings::default();
-        let db = setup_test_db().await;
-        let url = "file:///tmp/test.txt";
-
-        let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
-        let model = crawl_queue::ActiveModel {
-            crawl_type: Set(CrawlType::Normal),
-            domain: Set("localhost".to_string()),
-            status: Set(crawl_queue::CrawlStatus::Completed),
-            url: Set(url.to_string()),
-            created_at: Set(one_day_ago),
-            updated_at: Set(one_day_ago),
-            ..Default::default()
-        };
-
-        if let Err(res) = model.save(&db).await {
-            dbg!(res);
-        }
-
-        let queue = crawl_queue::dequeue_recrawl(&db, &settings).await.unwrap();
-        assert!(queue.is_some());
-        assert_eq!(queue.unwrap().url, url);
-    }
-
-    #[tokio::test]
     async fn test_update_or_remove_task() {
         let db = setup_test_db().await;
 

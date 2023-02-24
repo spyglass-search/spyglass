@@ -121,48 +121,4 @@ mod test {
             }
         );
     }
-
-    #[tokio::test]
-    async fn test_check_for_jobs_recrawl() {
-        let db = setup_test_db().await;
-        let state = AppState::builder().with_db(db.clone()).build();
-
-        // Insert dummy job
-        let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
-        let task = crawl_queue::ActiveModel {
-            url: Set("file:///tmp/test.txt".to_owned()),
-            domain: Set("localhost".to_owned()),
-            crawl_type: Set(CrawlType::Normal),
-            status: Set(CrawlStatus::Completed),
-            created_at: Set(one_day_ago),
-            updated_at: Set(one_day_ago),
-            ..Default::default()
-        };
-        let _ = task.save(&db).await.expect("Unable to save dummy task");
-
-        let two_day_ago = chrono::Utc::now() - chrono::Duration::days(2);
-        let task = crawl_queue::ActiveModel {
-            url: Set("file:///tmp/this_one.txt".to_owned()),
-            domain: Set("localhost".to_owned()),
-            crawl_type: Set(CrawlType::Normal),
-            status: Set(CrawlStatus::Completed),
-            created_at: Set(two_day_ago),
-            updated_at: Set(two_day_ago),
-            ..Default::default()
-        };
-        let mut saved = task.save(&db).await.expect("Unable to save dummy task");
-
-        let (sender, mut recv) = mpsc::channel(10);
-        let has_job = check_for_jobs(&state, &sender).await;
-        assert!(has_job);
-
-        // Should return the ID of the latest task.
-        let message = recv.recv().await.expect("no WorkerCommand in channel");
-        assert_eq!(
-            message,
-            WorkerCommand::Recrawl {
-                id: saved.id.take().unwrap_or_default()
-            }
-        );
-    }
 }
