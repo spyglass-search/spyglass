@@ -74,15 +74,20 @@ pub struct LensFilters {
 pub struct LensConfig {
     #[serde(default = "LensConfig::default_author")]
     pub author: String,
+    /// Unique identifier for the lens
     pub name: String,
+    /// Human readable title for the lens
     #[serde(default)]
     pub label: String,
+    /// Optional description of the lens and what it contains.
     pub description: Option<String>,
+    /// Whole domains we want to be part of the index.
     pub domains: Vec<String>,
+    /// Specific URLs or URL prefixes that will be crawled
     pub urls: Vec<String>,
+    /// Semantic version of this lens (will be used to check for updates in the future).
     pub version: String,
-    #[serde(default = "LensConfig::default_is_enabled")]
-    pub is_enabled: bool,
+    /// Rules to skip/constrain what URLs are indexed
     #[serde(default)]
     pub rules: Vec<LensRule>,
     #[serde(default)]
@@ -91,11 +96,14 @@ pub struct LensConfig {
     pub pipeline: Option<String>,
     #[serde(default)]
     pub lens_source: LensSource,
-    // Used internally & should not be serialized/deserialized
+
+    // Fields that are used internally & should not be serialized/deserialized
     #[serde(skip)]
     pub file_path: PathBuf,
     #[serde(skip)]
     pub hash: String,
+    #[serde(skip, default = "LensConfig::default_is_enabled")]
+    pub is_enabled: bool,
 }
 
 impl LensConfig {
