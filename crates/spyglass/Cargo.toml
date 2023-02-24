@@ -10,6 +10,7 @@ bytes = "1.2.1"
 calamine = "0.19.1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.0.32", features = ["derive"] }
+console-subscriber = { version = "0.1.8", optional = true }
 dashmap = "5.2"
 digest = "0.10"
 directories = "4.0"
@@ -69,6 +70,9 @@ shared = { path = "../shared", features = ["metrics"] }
 spyglass-netrunner = "0.2.9"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
+
+[features]
+tokio-console = ["tokio/tracing", "console-subscriber"]
 
 [lib]
 name = "libspyglass"

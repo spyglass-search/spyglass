@@ -3,7 +3,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
     sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
-    QueryOrder, QueryTrait, Set, Statement,
+    QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -360,51 +360,6 @@ pub async fn dequeue_files(
 
     // Grab new entity and immediately mark in-progress
     if let Some(task) = entity {
-        let mut update: ActiveModel = task.into();
-        update.status = Set(CrawlStatus::Processing);
-        return match update.update(db).await {
-            Ok(model) => Ok(Some(model)),
-            // Deleted while being processed?
-            Err(err) => {
-                log::error!("Unable to update crawl task: {}", err);
-                Ok(None)
-            }
-        };
-    }
-
-    Ok(None)
-}
-
-pub async fn dequeue_recrawl(
-    db: &DatabaseConnection,
-    user_settings: &UserSettings,
-) -> anyhow::Result<Option<Model>, DbErr> {
-    // Check for inflight limits
-    if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
-        // How many do we have in progress?
-        let num_in_progress = num_tasks_in_progress(db).await?;
-        // Nothing to do if we have too many crawls
-        if num_in_progress >= inflight_crawl_limit as u64 {
-            return Ok(None);
-        }
-    }
-
-    // TODO: Right now only recrawl local files.
-    let task = Entity::find()
-        .filter(Column::Status.eq(CrawlStatus::Completed))
-        .filter(Column::Url.starts_with("file://"))
-        .order_by_asc(Column::UpdatedAt)
-        .one(db)
-        .await?;
-
-    // Grab new entity and immediately mark in-progress
-    if let Some(task) = task {
-        let now = chrono::Utc::now();
-        let time_since = now - task.updated_at;
-        if time_since.num_days() < 1 {
-            return Ok(None);
-        }
-
         let mut update: ActiveModel = task.into();
         update.status = Set(CrawlStatus::Processing);
         return match update.update(db).await {
@@ -1361,32 +1316,6 @@ mod test {
             filtered.pop(),
             Some("https://bahai-library.com//shoghi-effendi_goals_crusade".into())
         );
-    }
-
-    #[tokio::test]
-    async fn test_dequeue_recrawl() {
-        let settings = UserSettings::default();
-        let db = setup_test_db().await;
-        let url = "file:///tmp/test.txt";
-
-        let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
-        let model = crawl_queue::ActiveModel {
-            crawl_type: Set(CrawlType::Normal),
-            domain: Set("localhost".to_string()),
-            status: Set(crawl_queue::CrawlStatus::Completed),
-            url: Set(url.to_string()),
-            created_at: Set(one_day_ago),
-            updated_at: Set(one_day_ago),
-            ..Default::default()
-        };
-
-        if let Err(res) = model.save(&db).await {
-            dbg!(res);
-        }
-
-        let queue = crawl_queue::dequeue_recrawl(&db, &settings).await.unwrap();
-        assert!(queue.is_some());
-        assert_eq!(queue.unwrap().url, url);
     }
 
     #[tokio::test]
