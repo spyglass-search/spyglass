@@ -180,7 +180,7 @@ impl Component for DiscoverPage {
         html! {
             <div>
                 <Header label="Discover" icon={header_icon}/>
-                <div class="flex flex-col gap-4 p-4">
+                <div class="flex flex-col gap-2 p-4">
                     <div>
                         <input type="text"
                             placeholder="filter lenses"

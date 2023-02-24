@@ -1,3 +1,4 @@
+use num_format::{Buffer, Locale};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -62,6 +63,18 @@ pub enum InstallStatus {
 impl Default for InstallStatus {
     fn default() -> Self {
         Self::NotInstalled
+    }
+}
+
+impl InstallStatus {
+    pub fn is_installing(&self) -> bool {
+        matches!(
+            self,
+            Self::Installing {
+                percent: _,
+                status: _
+            }
+        )
     }
 }
 
@@ -135,7 +148,7 @@ pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LibraryStats {
     pub lens_name: String,
     pub crawled: i32,
@@ -159,7 +172,7 @@ impl LibraryStats {
         if self.enqueued == 0 {
             self.indexed
         } else {
-            self.crawled + self.enqueued
+            self.crawled + self.enqueued + self.failed
         }
     }
 
@@ -168,7 +181,19 @@ impl LibraryStats {
     }
 
     pub fn status_string(&self) -> String {
-        format!("Crawled {} of {}", self.crawled, self.total_docs())
+        // For plugins/connections where we don't know exactly how many there are
+        if self.enqueued == 0 {
+            let mut indexed = Buffer::default();
+            indexed.write_formatted(&self.indexed, &Locale::en);
+            format!("Added {indexed} of many")
+        } else {
+            let mut indexed = Buffer::default();
+            let mut total = Buffer::default();
+
+            indexed.write_formatted(&self.indexed, &Locale::en);
+            total.write_formatted(&self.total_docs(), &Locale::en);
+            format!("Added {indexed} of {total}")
+        }
     }
 }
 
