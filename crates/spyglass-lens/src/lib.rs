@@ -142,4 +142,14 @@ mod test {
             .allowed
             .contains(&"^https://oldschool.runescape.wiki/w/.*".to_string()));
     }
+
+    #[test]
+    fn test_load_from_file() {
+        let lens_str = include_str!("../../../fixtures/lens/extra_fields.ron");
+        let config = ron::de::from_str::<LensConfig>(lens_str);
+        assert!(config.is_ok());
+
+        let config = config.expect("is err");
+        assert_eq!(config.name, "extra_fields");
+    }
 }

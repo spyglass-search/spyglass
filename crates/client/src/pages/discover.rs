@@ -1,5 +1,5 @@
 use shared::event::{ClientEvent, ClientInvoke, InstallLensParams};
-use shared::response::{InstallStatus, InstallableLens, LensResult};
+use shared::response::{InstallableLens, LensResult};
 use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -23,12 +23,12 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                         label: lens.label(),
                         description: lens.description.clone(),
                         hash: lens.sha.clone(),
-                        file_path: None,
                         html_url: Some(lens.html_url.clone()),
                         download_url: Some(lens.download_url.clone()),
-                        progress: InstallStatus::default(),
                         lens_type: shared::response::LensType::Lens,
+                        ..Default::default()
                     })
+
                     .collect();
 
                 Some(parsed)
