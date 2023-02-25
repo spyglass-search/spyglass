@@ -220,11 +220,10 @@ impl Component for DiscoverPage {
             }
         };
 
-        let header_icon = html! { <icons::GlobeIcon classes="mr-2" height="h-5" width="h-5" /> };
         html! {
-            <div>
-                <Header label="Discover" icon={header_icon}/>
-                <div class="flex flex-col gap-2 p-4">
+            <div class="px-4 pt-2">
+                <div class="pb-2 font-bold">{"Discover"}</div>
+                <div class="flex flex-col gap-2">
                     <div class="flex flex-row gap-2">
                         <select
                             class="text-black w-28"
@@ -237,7 +236,7 @@ impl Component for DiscoverPage {
                             }).collect::<Html>()}
                         </select>
                         <input type="text"
-                            placeholder="filter lenses"
+                            placeholder="search installable lenses"
                             class="w-full rounded p-2 text-black text-sm"
                             onkeyup={link.callback(|_| Msg::HandleFilter)}
                             ref={self.filter_input.clone()}
