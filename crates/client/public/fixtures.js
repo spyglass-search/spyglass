@@ -325,7 +325,7 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
-        categories: ['Test'],
+        categories: ['Test', 'Games'],
       },
       {
         author: "a5huynh",
@@ -347,7 +347,7 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
-        categories: ['Games'],
+        categories: ['Games', 'TTRPG'],
       }
     ];
   } else if (func_name == "plugin:lens-updater|install_lens") {

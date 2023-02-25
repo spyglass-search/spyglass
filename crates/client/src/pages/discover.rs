@@ -3,11 +3,11 @@ use shared::response::{InstallableLens, LensResult};
 use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
 use crate::components::lens::LensEvent;
-use crate::components::{icons, lens::LibraryLens, Header};
+use crate::components::{icons, lens::LibraryLens};
 use crate::invoke;
 use crate::utils::RequestState;
 
@@ -60,6 +60,7 @@ pub struct DiscoverPage {
 
 pub enum Msg {
     FetchAvailable,
+    HandleCategoryClick(MouseEvent),
     HandleCategoryFilter,
     HandleFilter,
     HandleLensEvent(LensEvent),
@@ -111,6 +112,20 @@ impl Component for DiscoverPage {
                 link.send_future(async { Msg::SetAvailable(fetch_available_lenses().await) });
 
                 false
+            }
+            Msg::HandleCategoryClick(event) => {
+                if let Some(target) = event.target_dyn_into::<HtmlElement>() {
+                    let value = target.inner_html();
+                    self.category_filter = Some(value.clone());
+
+                    if let Some(el) = self.category_input.cast::<HtmlInputElement>() {
+                        el.set_value(&value);
+                    }
+
+                    true
+                } else {
+                    false
+                }
             }
             Msg::HandleCategoryFilter => {
                 if let Some(el) = self.category_input.cast::<HtmlInputElement>() {
@@ -206,6 +221,7 @@ impl Component for DiscoverPage {
                     Some(html! { <LibraryLens
                         result={data.clone()}
                         onclick={link.callback(Msg::HandleLensEvent)}
+                        oncategoryclick={link.callback(Msg::HandleCategoryClick)}
                         in_progress={self.installing.contains(&data.name)}
                     /> })
                 })
@@ -232,7 +248,11 @@ impl Component for DiscoverPage {
                         >
                             <option value="ALL">{"All"}</option>
                             {self.category_list.iter().map(|(value, label)| {
-                                html!{ <option value={value.clone()}>{label.clone()}</option> }
+                                html!{
+                                    <option value={value.clone()}>
+                                        {label.clone()}
+                                    </option>
+                                }
                             }).collect::<Html>()}
                         </select>
                         <input type="text"
