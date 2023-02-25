@@ -1,6 +1,6 @@
 use shared::event::{ClientEvent, ClientInvoke, InstallLensParams};
 use shared::response::{InstallableLens, LensResult};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
@@ -26,9 +26,9 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
                         html_url: Some(lens.html_url.clone()),
                         download_url: Some(lens.download_url.clone()),
                         lens_type: shared::response::LensType::Lens,
+                        categories: lens.categories.clone(),
                         ..Default::default()
                     })
-
                     .collect();
 
                 Some(parsed)
@@ -46,15 +46,21 @@ async fn fetch_available_lenses() -> Option<Vec<LensResult>> {
 }
 
 pub struct DiscoverPage {
-    req_available: RequestState,
     installable: Vec<LensResult>,
-    filter_string: Option<String>,
-    filter_input: NodeRef,
     installing: HashSet<String>,
+    req_available: RequestState,
+    // Filte lenses by some keyword
+    filter_input: NodeRef,
+    filter_string: Option<String>,
+    // Filter lenses by category
+    category_filter: Option<String>,
+    category_input: NodeRef,
+    category_list: Vec<(String, String)>,
 }
 
 pub enum Msg {
     FetchAvailable,
+    HandleCategoryFilter,
     HandleFilter,
     HandleLensEvent(LensEvent),
     SetAvailable(Option<Vec<LensResult>>),
@@ -87,6 +93,9 @@ impl Component for DiscoverPage {
             filter_string: None,
             filter_input: NodeRef::default(),
             installing: HashSet::new(),
+            category_filter: None,
+            category_input: NodeRef::default(),
+            category_list: Vec::new(),
         }
     }
 
@@ -103,15 +112,27 @@ impl Component for DiscoverPage {
 
                 false
             }
+            Msg::HandleCategoryFilter => {
+                if let Some(el) = self.category_input.cast::<HtmlInputElement>() {
+                    let filter = el.value();
+                    self.category_filter = if filter.is_empty() || filter == "ALL" {
+                        None
+                    } else {
+                        Some(filter)
+                    };
+                    true
+                } else {
+                    false
+                }
+            }
             Msg::HandleFilter => {
                 if let Some(el) = self.filter_input.cast::<HtmlInputElement>() {
                     let filter = el.value();
-                    if filter.is_empty() {
-                        self.filter_string = None;
+                    self.filter_string = if filter.is_empty() {
+                        None
                     } else {
-                        self.filter_string = Some(filter.trim().to_string());
-                    }
-
+                        Some(filter)
+                    };
                     true
                 } else {
                     false
@@ -136,6 +157,23 @@ impl Component for DiscoverPage {
                     self.installing.clear();
                     self.req_available = RequestState::Finished;
                     self.installable = results;
+
+                    // Gather & sort the list of categories available.
+                    let mut cat_counts: HashMap<String, u32> = HashMap::new();
+                    for lens in self.installable.iter() {
+                        for cat in &lens.categories {
+                            let entry = cat_counts.entry(cat.to_string()).or_insert(0);
+                            *entry += 1;
+                        }
+                    }
+
+                    let mut categories: Vec<(String, String)> = cat_counts
+                        .iter()
+                        .map(|(cat, count)| (cat.to_owned(), format!("{cat} ({count})")))
+                        .collect::<Vec<(_, _)>>();
+                    categories.sort();
+                    self.category_list = categories;
+
                     true
                 } else {
                     self.req_available = RequestState::Error;
@@ -155,6 +193,12 @@ impl Component for DiscoverPage {
                         if !data.name.to_lowercase().contains(filter)
                             && !data.description.to_lowercase().contains(filter)
                         {
+                            return None;
+                        }
+                    }
+
+                    if let Some(cat) = &self.category_filter {
+                        if !data.categories.contains(cat) {
                             return None;
                         }
                     }
@@ -181,7 +225,17 @@ impl Component for DiscoverPage {
             <div>
                 <Header label="Discover" icon={header_icon}/>
                 <div class="flex flex-col gap-2 p-4">
-                    <div>
+                    <div class="flex flex-row gap-2">
+                        <select
+                            class="text-black w-28"
+                            ref={self.category_input.clone()}
+                            onchange={link.callback(|_| Msg::HandleCategoryFilter)}
+                        >
+                            <option value="ALL">{"All"}</option>
+                            {self.category_list.iter().map(|(value, label)| {
+                                html!{ <option value={value.clone()}>{label.clone()}</option> }
+                            }).collect::<Html>()}
+                        </select>
                         <input type="text"
                             placeholder="filter lenses"
                             class="w-full rounded p-2 text-black text-sm"

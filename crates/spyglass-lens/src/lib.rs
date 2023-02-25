@@ -4,8 +4,8 @@ use blake2::{Blake2s256, Digest};
 use serde::{Deserialize, Serialize};
 
 pub mod pipeline;
-mod utils;
 pub mod types;
+mod utils;
 use types::{LensFilters, LensRule, LensSource};
 
 pub use crate::pipeline::PipelineConfiguration;

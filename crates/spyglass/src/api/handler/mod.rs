@@ -274,9 +274,8 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                 hash: lens.hash.clone(),
                 file_path: Some(lens.file_path.clone()),
                 progress,
-                html_url: None,
-                download_url: None,
                 lens_type: shared::response::LensType::Lens,
+                ..Default::default()
             }
         })
         .collect();
