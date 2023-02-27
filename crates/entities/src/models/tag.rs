@@ -63,6 +63,10 @@ pub enum TagType {
     #[sea_orm(string_value = "fileext")]
     #[strum(serialize = "fileext")]
     FileExt,
+    /// Pull from the lens categorization
+    #[sea_orm(string_value = "category")]
+    #[strum(serialize = "category")]
+    Category,
 }
 
 #[derive(AsRefStr, Display, EnumString)]

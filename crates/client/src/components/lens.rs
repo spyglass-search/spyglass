@@ -160,6 +160,8 @@ pub struct LensProps {
     pub onclick: Callback<LensEvent>,
     #[prop_or_default]
     pub in_progress: bool,
+    #[prop_or_default]
+    pub oncategoryclick: Callback<MouseEvent>,
 }
 
 #[function_component(LibraryLens)]
@@ -197,6 +199,25 @@ pub fn lens_component(props: &LensProps) -> Html {
         }
     }
 
+    let categories = if matches!(result.progress, InstallStatus::NotInstalled) {
+        html! {
+            <div class="mt-2 flex flex-row gap-2 flex-wrap text-sm">
+                <span>{"Categories: "}</span>
+                {result.categories.iter().map(move |x| html! {
+                    <span
+                        class="text-cyan-500 cursor-pointer"
+                        onclick={props.oncategoryclick.clone()}
+                    >
+                        {x}
+                    </span>
+                })
+                .collect::<Html>()}
+            </div>
+        }
+    } else {
+        html! {}
+    };
+
     html! {
         <div class={component_styles}>
             <div class="flex flex-col flex-auto">
@@ -208,6 +229,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                     </a>
                 </div>
                 <div class="text-sm text-neutral-400 mt-1">{result.description.clone()}</div>
+                {categories}
                 {if !num_docs_buffer.is_empty() {
                     html! {
                         <div class="text-base mt-2 flex flex-row items-center gap-1">
@@ -216,9 +238,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                             <span class="text-neutral-400">{" docs"}</span>
                         </div>
                     }
-                } else {
-                    html! {}
-                }}
+                } else { html! {} }}
             </div>
             <div class={action_bar_styles}>
                 <LensActionBar result={props.result.clone()} onclick={props.onclick.clone()} in_progress={props.in_progress} />

@@ -171,6 +171,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Games'],
         progress: {
           Installing: {
             percent: 45,
@@ -188,6 +189,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Games', 'TTRPG'],
         progress: {
           Finished: {
             num_docs: 10000,
@@ -204,6 +206,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Games', 'MMORPG'],
         progress: {
           Installing: {
             percent: 45,
@@ -220,6 +223,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Productivity'],
         progress: {
           Installing: {
             percent: 100,
@@ -236,6 +240,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Productivity'],
         progress: {
           Finished: {
             num_docs: 10000
@@ -251,6 +256,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Productivity'],
         progress: {
           Finished: {
             num_docs: 10000
@@ -266,6 +272,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Productivity'],
         progress: {
           Finished: {
             num_docs: 10000
@@ -281,6 +288,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Productivity'],
         progress: {
           Finished: {
             num_docs: 10000
@@ -296,6 +304,7 @@ export let invoke = async (func_name, params) => {
         html_url: null,
         download_url: null,
         lens_type: 'Lens',
+        categories: ['Productivity'],
         progress: {
           Finished: {
             num_docs: 10000
@@ -316,6 +325,7 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
+        categories: ['Test', 'Games'],
       },
       {
         author: "a5huynh",
@@ -326,7 +336,19 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
+        categories: ['Funk'],
       },
+      {
+        author: "billybob",
+        description:
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+        name: "installable-three",
+        sha: "fake-sha-1",
+        html_url: "https://example.com",
+        download_url: "https://example.com",
+        progress: "NotInstalled",
+        categories: ['Games', 'TTRPG'],
+      }
     ];
   } else if (func_name == "plugin:lens-updater|install_lens") {
     window.setTimeout(() => {

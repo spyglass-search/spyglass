@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /// Fully provision a domain or domain prefix.
 /// 1. Make sure that we have a valid robots.txt for the domain
 /// 2. We'll grab a list of unique URLs that have been crawled by the web.archive.org
@@ -71,9 +73,21 @@ pub async fn bootstrap(
 
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
+    let tags = lens
+        .all_tags()
+        .iter()
+        .flat_map(|(label, value)| {
+            if let Ok(tag_type) = TagType::from_str(label.as_str()) {
+                Some((tag_type, value.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
     let overrides = crawl_queue::EnqueueSettings {
         crawl_type: crawl_queue::CrawlType::Normal,
-        tags: vec![(TagType::Lens, lens.name.to_string())],
+        tags,
         ..Default::default()
     };
 
