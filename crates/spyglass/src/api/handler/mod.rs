@@ -617,7 +617,7 @@ mod test {
                     domain: "example.com",
                     url: "https://example.com/test",
                     content: "test content",
-                    tags: &None,
+                    tags: &[],
                 },
             )
             .expect("Unable to add doc");

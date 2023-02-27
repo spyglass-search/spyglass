@@ -5,12 +5,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-pub use spyglass_lens::{LensConfig, LensRule, LensSource, PipelineConfiguration};
-
 use crate::{
     form::{FormType, SettingOpts},
     plugin::PluginConfig,
 };
+pub use spyglass_lens::types::{LensRule, LensSource};
+pub use spyglass_lens::{LensConfig, PipelineConfiguration};
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;

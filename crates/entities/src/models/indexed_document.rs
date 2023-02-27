@@ -136,18 +136,19 @@ pub async fn indexed_stats(
     Ok(res)
 }
 
-pub async fn insert_many(
-    db: &impl ConnectionTrait,
-    docs: Vec<ActiveModel>,
-) -> Result<InsertResult<ActiveModel>, DbErr> {
-    Entity::insert_many(docs)
-        .on_conflict(
-            OnConflict::columns(vec![Column::Url])
-                .update_column(Column::UpdatedAt)
-                .to_owned(),
-        )
-        .exec(db)
-        .await
+pub async fn insert_many(db: &impl ConnectionTrait, docs: &[ActiveModel]) -> Result<(), DbErr> {
+    for insert_chunk in docs.chunks(BATCH_SIZE) {
+        Entity::insert_many(insert_chunk.to_vec())
+            .on_conflict(
+                OnConflict::columns(vec![Column::Url])
+                    .update_column(Column::UpdatedAt)
+                    .to_owned(),
+            )
+            .exec(db)
+            .await?;
+    }
+
+    Ok(())
 }
 
 pub async fn insert_tags_for_docs<C: ConnectionTrait>(
