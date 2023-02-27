@@ -846,7 +846,7 @@ async fn _process_file_and_dir(
 /// Generates the tags for a file
 pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
     let mut tags = Vec::new();
-    tags.push((TagType::Lens, String::from("files")));
+    tags.push((TagType::Lens, String::from(FILES_LENS)));
     if path.is_dir() {
         tags.push((TagType::Type, TagValue::Directory.to_string()));
     } else if path.is_file() {
@@ -888,7 +888,7 @@ async fn _process_general_file(state: &AppState, file_uri: &[String]) {
     if let Err(err) = documents::process_crawl_results(
         state,
         &crawl_results,
-        &[(TagType::Lens, "files".to_string())],
+        &[(TagType::Lens, FILES_LENS.to_string())],
     )
     .await
     {
