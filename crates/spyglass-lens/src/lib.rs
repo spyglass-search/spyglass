@@ -117,6 +117,18 @@ impl LensConfig {
             Err(e) => Err(anyhow::Error::msg(e.to_string())),
         }
     }
+
+    pub fn all_tags(&self) -> Vec<(String, String)> {
+        let mut tags = Vec::new();
+
+        tags.push(("lens".into(), self.name.clone()));
+        for cat in self.categories.iter() {
+            tags.push(("category".into(), cat.clone()));
+        }
+        tags.extend(self.tags.clone().into_iter());
+
+        tags
+    }
 }
 
 #[cfg(test)]
@@ -151,5 +163,17 @@ mod test {
 
         let config = config.expect("is err");
         assert_eq!(config.name, "extra_fields");
+    }
+
+    #[test]
+    fn test_all_tags() {
+        let config = LensConfig {
+            name: "lens_name".into(),
+            categories: vec!["category_one".into(), "category_two".into()],
+            ..Default::default()
+        };
+
+        let tags = config.all_tags();
+        assert_eq!(tags.len(), 3);
     }
 }

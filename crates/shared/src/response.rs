@@ -104,6 +104,7 @@ pub struct LensResult {
     /// For installed lenses.
     pub file_path: Option<PathBuf>,
     // Only relevant for installable lenses
+    #[serde(default)]
     pub categories: Vec<String>,
     pub html_url: Option<String>,
     pub download_url: Option<String>,
