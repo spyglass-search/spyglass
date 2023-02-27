@@ -15,6 +15,11 @@ use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
 
+/// Max number of tokens we'll look at for matches before stopping.
+const MAX_HIGHLIGHT_SCAN: usize = 10_000;
+/// Max number of matches we need to generate a decent preview.
+const MAX_HIGHLIGHT_MATCHES: usize = 5;
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct WordRange {
     start: usize,
@@ -66,19 +71,28 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
-    let matched_indices = content
-        .split_whitespace()
-        .enumerate()
-        .filter(|(_, w)| {
-            let normalized = tokenizer
-                .token_stream(w)
-                .next()
-                .map(|t| t.text.clone())
-                .unwrap_or_else(|| w.to_string());
-            terms.contains(&normalized)
-        })
-        .map(|(idx, _)| idx)
-        .collect::<Vec<_>>();
+    let mut matched_indices = Vec::new();
+    let mut num_tokens_scanned = 0;
+    for (idx, w) in content.split_whitespace().enumerate() {
+        num_tokens_scanned += 1;
+
+        let normalized = tokenizer
+            .token_stream(w)
+            .next()
+            .map(|t| t.text.clone())
+            .unwrap_or_else(|| w.to_string());
+        if terms.contains(&normalized) {
+            matched_indices.push(idx);
+        }
+
+        if matched_indices.len() > MAX_HIGHLIGHT_MATCHES {
+            break;
+        }
+
+        if num_tokens_scanned > MAX_HIGHLIGHT_SCAN {
+            break;
+        }
+    }
 
     // Create word ranges from the indices
     let mut ranges: Vec<WordRange> = Vec::new();
