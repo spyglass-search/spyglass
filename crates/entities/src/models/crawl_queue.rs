@@ -509,49 +509,50 @@ pub async fn enqueue_local_files(
     overrides: &EnqueueSettings,
     pipeline: Option<String>,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
-    let model = urls
-        .iter()
-        .map(|url| ActiveModel {
-            domain: Set(String::from("localhost")),
-            crawl_type: Set(overrides.crawl_type.clone()),
-            status: Set(CrawlStatus::Initial),
-            url: Set(url.to_string()),
-            pipeline: Set(pipeline.clone()),
-            ..Default::default()
-        })
-        .collect::<Vec<ActiveModel>>();
+    for chunk in urls.chunks(BATCH_SIZE) {
+        let model = chunk
+            .iter()
+            .map(|url| ActiveModel {
+                domain: Set(String::from("localhost")),
+                crawl_type: Set(overrides.crawl_type.clone()),
+                status: Set(CrawlStatus::Initial),
+                url: Set(url.to_string()),
+                pipeline: Set(pipeline.clone()),
+                ..Default::default()
+            })
+            .collect::<Vec<ActiveModel>>();
 
-    let on_conflict = if overrides.is_recrawl {
-        OnConflict::column(Column::Url)
-            .update_column(Column::Status)
-            .to_owned()
-    } else {
-        OnConflict::column(Column::Url).do_nothing().to_owned()
-    };
+        let on_conflict = if overrides.is_recrawl {
+            OnConflict::column(Column::Url)
+                .update_column(Column::Status)
+                .to_owned()
+        } else {
+            OnConflict::column(Column::Url).do_nothing().to_owned()
+        };
 
-    let _insert = Entity::insert_many(model)
-        .on_conflict(on_conflict)
-        .exec(db)
-        .await?;
-    let inserted_rows = Entity::find()
-        .filter(Column::Url.is_in(urls.to_vec()))
-        .all(db)
-        .await?;
-
-    let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
-    let tag_rslt = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
-    if tag_rslt.is_ok() {
-        let query = Query::update()
-            .table(Entity.table_ref())
-            .values([(Column::Status, CrawlStatus::Queued.into())])
-            .and_where(Column::Id.is_in(ids))
-            .to_owned();
-
-        let query = query.to_string(SqliteQueryBuilder);
-        db.execute(Statement::from_string(db.get_database_backend(), query))
+        let _insert = Entity::insert_many(model)
+            .on_conflict(on_conflict)
+            .exec(db)
             .await?;
-    }
+        let inserted_rows = Entity::find()
+            .filter(Column::Url.is_in(chunk.to_vec()))
+            .all(db)
+            .await?;
 
+        let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
+        let tag_rslt = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
+        if tag_rslt.is_ok() {
+            let query = Query::update()
+                .table(Entity.table_ref())
+                .values([(Column::Status, CrawlStatus::Queued.into())])
+                .and_where(Column::Id.is_in(ids))
+                .to_owned();
+
+            let query = query.to_string(SqliteQueryBuilder);
+            db.execute(Statement::from_string(db.get_database_backend(), query))
+                .await?;
+        }
+    }
     Ok(())
 }
 
