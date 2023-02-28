@@ -50,6 +50,7 @@ jobs:
       run: |
         mkdir -p crates/tauri/binaries
         cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
+        cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}
     # Build front-end client
     - name: Build client
       env:

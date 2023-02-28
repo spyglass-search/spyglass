@@ -14,6 +14,7 @@ build-backend:
 	cargo build -p spyglass
 	mkdir -p crates/tauri/binaries
 	cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
+	cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-$(TARGET_ARCH)
 
 build-client:
 	cargo build -p spyglass-client -p spyglass-app

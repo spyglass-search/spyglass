@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use entities::models;
-use libspyglass::search::{self, IndexPath, Searcher};
+use libspyglass::search::{self, IndexPath, ReadonlySearcher};
 use ron::ser::PrettyConfig;
 use shared::config::Config;
 use spyglass_plugin::DocumentQuery;
@@ -99,10 +99,11 @@ async fn main() -> ExitCode {
                                     ron::ser::to_string_pretty(&tags, PrettyConfig::new())
                                         .unwrap_or_default()
                                 );
-                                let index =
-                                    Searcher::with_index(&IndexPath::LocalPath(config.index_dir()))
-                                        .expect("Unable to open index.");
-                                let docs = Searcher::search_by_query(
+                                let index = ReadonlySearcher::with_index(&IndexPath::LocalPath(
+                                    config.index_dir(),
+                                ))
+                                .expect("Unable to open index.");
+                                let docs = ReadonlySearcher::search_by_query(
                                     &db,
                                     &index,
                                     &DocumentQuery {

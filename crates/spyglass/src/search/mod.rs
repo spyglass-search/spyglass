@@ -45,6 +45,12 @@ pub struct Searcher {
 }
 
 #[derive(Clone)]
+pub struct ReadonlySearcher {
+    pub index: Index,
+    pub reader: IndexReader,
+}
+
+#[derive(Clone)]
 pub struct DocumentUpdate<'a> {
     pub doc_id: Option<String>,
     pub title: &'a str,
@@ -56,6 +62,14 @@ pub struct DocumentUpdate<'a> {
 }
 
 impl Debug for Searcher {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        f.debug_struct("Searcher")
+            .field("index", &self.index)
+            .finish()
+    }
+}
+
+impl Debug for ReadonlySearcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Searcher")
             .field("index", &self.index)
@@ -344,6 +358,108 @@ impl Searcher {
             // Filter out negative scores
             .filter(|(score, _)| *score > 0.0)
             .collect()
+    }
+}
+
+// Readonly Searcher implementation used for utilities that can run while
+// the spyglass system is running
+impl ReadonlySearcher {
+    /// Get document with `doc_id` from index.
+    pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
+        let fields = DocFields::as_fields();
+        let searcher = reader.searcher();
+
+        let query = TermQuery::new(
+            Term::from_field_text(fields.id, doc_id),
+            IndexRecordOption::Basic,
+        );
+
+        let res = searcher
+            .search(&query, &TopDocs::with_limit(1))
+            .map_or(Vec::new(), |x| x);
+
+        if res.is_empty() {
+            return None;
+        }
+
+        if let Some((_, doc_address)) = res.first() {
+            if let Ok(doc) = searcher.doc(*doc_address) {
+                return Some(doc);
+            }
+        }
+
+        None
+    }
+
+    /// Constructs a new Searcher object w/ the index @ `index_path`
+    pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
+        let schema = DocFields::as_schema();
+        let index = match index_path {
+            IndexPath::LocalPath(path) => {
+                let dir = MmapDirectory::open(path)?;
+                Index::open_or_create(dir, schema)?
+            }
+            IndexPath::Memory => Index::create_in_ram(schema),
+        };
+
+        // For a search server you will typically create on reader for the entire
+        // lifetime of your program.
+        let reader = index
+            .reader_builder()
+            .reload_policy(ReloadPolicy::OnCommit)
+            .try_into()
+            .expect("Unable to create reader");
+
+        Ok(ReadonlySearcher { index, reader })
+    }
+
+    /// Helper method to execute a search based on the provided document query
+    pub async fn search_by_query(
+        db: &DatabaseConnection,
+        searcher: &ReadonlySearcher,
+        query: &DocumentQuery,
+    ) -> Vec<SearchResult> {
+        let tag_ids = match &query.has_tags {
+            Some(include_tags) => {
+                let tags = tag::get_tags_by_value(db, include_tags)
+                    .await
+                    .unwrap_or_default();
+                tags.iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let exclude_tag_ids = match &query.exclude_tags {
+            Some(excludes) => {
+                let exclude_tags = tag::get_tags_by_value(db, excludes)
+                    .await
+                    .unwrap_or_default();
+                exclude_tags
+                    .iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let urls = query.urls.clone().unwrap_or_default();
+        let ids = query.ids.clone().unwrap_or_default();
+
+        let fields = DocFields::as_fields();
+        let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
+
+        let collector = tantivy::collector::DocSetCollector;
+
+        let reader = &searcher.reader;
+        let index_search = reader.searcher();
+
+        let docs = index_search
+            .search(&query, &collector)
+            .expect("Unable to execute query");
+
+        docs.into_iter().map(|addr| (1.0, addr)).collect()
     }
 }
 
