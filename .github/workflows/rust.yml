@@ -67,6 +67,9 @@ jobs:
         command: build
         args: -p spyglass
     # Run tests
+    - name: disk size
+      run: |
+            df -h
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
