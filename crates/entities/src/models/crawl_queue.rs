@@ -982,6 +982,24 @@ pub async fn process_urls_for_removed_exts(
     Ok(tasks)
 }
 
+/// Helper method used to get the details for the task. This method will return the associated task and any
+/// associated tags
+pub async fn get_task_details(
+    task_id: i64,
+    db: &DatabaseConnection,
+) -> Result<Option<(Model, Vec<tag::Model>)>, DbErr> {
+    if let Some(task) = Entity::find()
+        .filter(Column::Id.eq(task_id))
+        .one(db)
+        .await?
+    {
+        let tags = task.find_related(tag::Entity).all(db).await?;
+        return Ok(Some((task, tags)));
+    }
+
+    Ok(None)
+}
+
 #[cfg(test)]
 mod test {
     use sea_orm::prelude::*;

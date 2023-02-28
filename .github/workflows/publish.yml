@@ -12,6 +12,13 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
+    # Cleanup Disk
+    - name: Cleanup Disk
+      run: |
+            df -h
+            sudo rm -rf /usr/local/lib/android
+            sudo rm -rf /usr/share/dotnet
+            df -h
     - name: setup node
       uses: actions/setup-node@v1
       with:
@@ -65,6 +72,7 @@ jobs:
         cargo build -p spyglass --verbose --release
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
     - name: build sidecar (macos)
       if: matrix.platform == 'macos-latest'
       run: |
@@ -73,9 +81,13 @@ jobs:
         mkdir -p crates/tauri/binaries;
         cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
         cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+        cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
+        cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
         lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass \
-          target/aarch64-apple-darwin/release/spyglass;
+          target/aarch64-apple-darwin/release/spyglass \
+          target/x86_64-apple-darwin/release/spyglass-debug \
+          target/aarch64-apple-darwin/release/spyglass-debug;
     - name: build default plugins
       run: make build-plugins-release
     - name: import windows certificate
