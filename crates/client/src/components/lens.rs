@@ -199,17 +199,20 @@ pub fn lens_component(props: &LensProps) -> Html {
         }
     }
 
+    let mut cats = result.categories.clone();
+    cats.sort();
+
     let categories = if matches!(result.progress, InstallStatus::NotInstalled) {
         html! {
-            <div class="mt-2 flex flex-row gap-2 flex-wrap text-sm">
-                <span>{"Categories: "}</span>
-                {result.categories.iter().map(move |x| html! {
-                    <span
-                        class="text-cyan-500 cursor-pointer"
+            <div class="mt-2 flex flex-row gap-2 flex-wrap text-xs items-center">
+                <icons::TagIcon width="w-4" height="h-4" />
+                {cats.iter().map(move |x| html! {
+                    <div
+                        class="bg-cyan-500 cursor-pointer text-white rounded px-1 py-0.5 hover:bg-cyan-600"
                         onclick={props.oncategoryclick.clone()}
                     >
                         {x}
-                    </span>
+                    </div>
                 })
                 .collect::<Html>()}
             </div>
