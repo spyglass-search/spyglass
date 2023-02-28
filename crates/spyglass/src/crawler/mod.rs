@@ -492,8 +492,12 @@ impl Crawler {
     }
 }
 
-fn _process_file(state: &AppState, path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
-    
+fn _process_file(
+    state: &AppState,
+    path: &Path,
+    file_name: String,
+    url: &Url,
+) -> Result<CrawlResult, CrawlError> {
     let supported_ext = crate::filesystem::utils::get_supported_file_extensions(state);
     // Attempt to read file
     let contents = match path.extension() {
@@ -501,14 +505,19 @@ fn _process_file(state: &AppState, path: &Path, file_name: String, url: &Url) ->
             Err(err) => return Err(CrawlError::ParseError(err.to_string())),
             Ok(contents) => contents,
         },
-        Some(ext) if supported_ext.contains(ext.to_str().unwrap_or_default()) => match std::fs::read_to_string(path) {
-            Ok(x) => x,
-            Err(err) => {
-                return Err(CrawlError::FetchError(err.to_string()));
+        Some(ext) if supported_ext.contains(ext.to_str().unwrap_or_default()) => {
+            match std::fs::read_to_string(path) {
+                Ok(x) => x,
+                Err(err) => {
+                    return Err(CrawlError::FetchError(err.to_string()));
+                }
             }
         }
         _ => {
-            log::warn!("File type for path {:?} unsupported returning empty content", path);
+            log::warn!(
+                "File type for path {:?} unsupported returning empty content",
+                path
+            );
             "".to_string()
         }
     };
