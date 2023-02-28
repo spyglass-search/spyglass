@@ -100,6 +100,8 @@ pub async fn manager_task(
     let mut queue_check_interval = tokio::time::interval(Duration::from_millis(100));
     let mut commit_check_interval = tokio::time::interval(Duration::from_secs(10));
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
+    // Startup filesystem watcher
+    filesystem::configure_watcher(state.clone()).await;
 
     loop {
         tokio::select! {
@@ -128,7 +130,7 @@ pub async fn manager_task(
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             } else {
-                                queue_check_interval = tokio::time::interval(Duration::from_millis(50));
+                                queue_check_interval = tokio::time::interval(Duration::from_millis(100));
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             }
@@ -141,7 +143,7 @@ pub async fn manager_task(
                                 state.user_settings = loaded_settings;
                             }
 
-                            tokio::spawn(filesystem::configure_watcher(state));
+                            filesystem::configure_watcher(state).await;
                         }
                     }
                 }
@@ -285,7 +287,9 @@ pub async fn worker_task(
                                     FetchResult::NotFound => {
                                         // URL no longer exists, delete from index.
                                         log::debug!("URI not found, deleting from index");
-                                        let _ = tokio::spawn(worker::handle_deletion(state.clone(), id)).await;
+                                        if let Err(err) = worker::handle_deletion(state.clone(), id).await {
+                                            log::error!("Unable to delete {id}: {err}");
+                                        }
                                     }
                                     FetchResult::Error(err) => {
                                         log::warn!("Unable to recrawl {} - {}", id, err);
@@ -309,6 +313,9 @@ pub async fn worker_task(
                 return;
             }
         };
+
+        // Add a little delay before we grab the next task.
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 }
 

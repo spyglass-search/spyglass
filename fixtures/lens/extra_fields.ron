@@ -1,0 +1,16 @@
+(
+    version: "1",
+    name: "extra_fields",
+    label: "Extra Fields Test Lens",
+    author: "@test",
+    description: Some("test description"),
+    domains: [],
+    urls: [
+        "https://www.wikipedia.org$"
+    ],
+    rules: [],
+    // blam blam
+    extra: false,
+    this_is_ignored: ["blam", "boom"],
+    ignored_again: None
+)

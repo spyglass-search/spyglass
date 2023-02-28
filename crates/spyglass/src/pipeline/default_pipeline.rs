@@ -142,7 +142,7 @@ async fn start_crawl(
                                         domain: url_host,
                                         url: url.as_str(),
                                         content: &content,
-                                        tags: &None,
+                                        tags: &[],
                                     },
                                 ) {
                                     Ok(new_doc_id) => Some(new_doc_id),

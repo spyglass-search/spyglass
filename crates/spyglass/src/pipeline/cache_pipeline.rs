@@ -8,6 +8,7 @@ use crate::pipeline::PipelineContext;
 use crate::state::AppState;
 
 use libnetrunner::parser::ParseResult;
+use shared::config::LensConfig;
 use tokio::task::JoinHandle;
 
 use super::parser::DefaultParser;
@@ -78,7 +79,7 @@ pub async fn process_update_warc(state: AppState, cache_path: PathBuf) {
 
 /// processes the cache for a lens. The cache is streamed in from the provided path
 /// and processed. After the process is complete the cache is deleted
-pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) {
+pub async fn process_update(state: AppState, lens: &LensConfig, cache_path: PathBuf) {
     let now = Instant::now();
     let records = archive::read_parsed(&cache_path);
     if let Ok(mut record_iter) = records {
@@ -86,13 +87,17 @@ pub async fn process_update(state: AppState, lens: String, cache_path: PathBuf) 
         for record in record_iter.by_ref() {
             record_list.push(record);
             if record_list.len() >= 5000 {
-                documents::process_records(&state, &lens, &mut record_list).await;
+                if let Err(err) = documents::process_records(&state, lens, &mut record_list).await {
+                    log::warn!("Unable to process records: {err}");
+                }
                 record_list = Vec::new();
             }
         }
 
         if !record_list.is_empty() {
-            documents::process_records(&state, &lens, &mut record_list).await;
+            if let Err(err) = documents::process_records(&state, lens, &mut record_list).await {
+                log::warn!("Unable to process records: {err}");
+            }
         }
     }
 

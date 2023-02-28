@@ -42,6 +42,9 @@ pub enum TagType {
     /// For file based content this tag
     #[strum(serialize = "fileext")]
     FileExt,
+    /// Pull from the lens categorization
+    #[strum(serialize = "category")]
+    Category,
     /// Other custom generated TagTypes.
     #[strum(serialize = "Other(String)")]
     Other(String),
@@ -59,7 +62,8 @@ fn string_to_tag_type(v: &str) -> TagType {
         "shared" => TagType::SharedWith,
         "lens" => TagType::Lens,
         "repository" => TagType::Repository,
-        "fileext" => TagType::Repository,
+        "fileext" => TagType::FileExt,
+        "category" => TagType::Category,
         other => TagType::Other(String::from(other)),
     }
 }
@@ -77,6 +81,7 @@ impl ToString for TagType {
             Self::Lens => "lens",
             Self::Repository => "repository",
             Self::FileExt => "fileext",
+            Self::Category => "category",
             Self::Other(label) => label.as_str(),
         }
         .to_owned()

@@ -9,6 +9,7 @@ use ignore::gitignore::Gitignore;
 use ignore::WalkBuilder;
 
 use sha2::{Digest, Sha256};
+use tokio::task::JoinHandle;
 use url::Url;
 
 use crate::crawler::CrawlResult;
@@ -46,6 +47,7 @@ pub const FILES_LENS: &str = "files";
 pub struct SpyglassFileWatcher {
     // The director watcher services
     watcher: Arc<Mutex<Debouncer<RecommendedWatcher>>>,
+    pub watcher_handle: JoinHandle<()>,
     // The map of path being watched to the list of watchers
     path_map: DashMap<PathBuf, Vec<WatchPath>>,
     // Map of .gitignore file path to the ignore file processor
@@ -152,7 +154,6 @@ async fn watch_events(
             },
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down file watch loop");
-
                 file_events.close();
                 let mut watcher = state.file_watcher.lock().await;
                 if let Some(watcher) = watcher.as_mut() {
@@ -244,17 +245,14 @@ impl SpyglassFileWatcher {
             })
             .expect("Unable to watch lens directory");
 
-        let spy_watcher = SpyglassFileWatcher {
+        SpyglassFileWatcher {
             watcher: Arc::new(Mutex::new(watcher)),
+            watcher_handle: tokio::spawn(watch_events(state.clone(), file_events)),
             path_map: DashMap::new(),
             ignore_files: DashMap::new(),
             db: state.db.clone(),
             path_initializing: Arc::new(Mutex::new(None)),
-        };
-
-        tokio::spawn(watch_events(state.clone(), file_events));
-
-        spy_watcher
+        }
     }
 
     /// Helper method used to update the database with newly arrived changes
@@ -848,7 +846,7 @@ async fn _process_file_and_dir(
 /// Generates the tags for a file
 pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
     let mut tags = Vec::new();
-    tags.push((TagType::Lens, String::from("files")));
+    tags.push((TagType::Lens, String::from(FILES_LENS)));
     if path.is_dir() {
         tags.push((TagType::Type, TagValue::Directory.to_string()));
     } else if path.is_file() {
@@ -890,7 +888,7 @@ async fn _process_general_file(state: &AppState, file_uri: &[String]) {
     if let Err(err) = documents::process_crawl_results(
         state,
         &crawl_results,
-        &[(TagType::Lens, "files".to_string())],
+        &[(TagType::Lens, FILES_LENS.to_string())],
     )
     .await
     {

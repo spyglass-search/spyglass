@@ -51,7 +51,7 @@ pub struct DocumentUpdate<'a> {
     pub domain: &'a str,
     pub url: &'a str,
     pub content: &'a str,
-    pub tags: &'a Option<Vec<i64>>,
+    pub tags: &'a [i64],
 }
 
 impl Debug for Searcher {
@@ -230,10 +230,8 @@ impl Searcher {
         doc.add_text(fields.id, &doc_id);
         doc.add_text(fields.title, doc_update.title);
         doc.add_text(fields.url, doc_update.url);
-        if let Some(tag) = doc_update.tags {
-            for t in tag {
-                doc.add_u64(fields.tags, *t as u64);
-            }
+        for t in doc_update.tags {
+            doc.add_u64(fields.tags, *t as u64);
         }
         writer.add_document(doc)?;
 
@@ -439,7 +437,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![1_i64]),
+                tags: &vec![1_i64],
             },
         )
         .expect("Unable to add doc");
@@ -461,7 +459,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![2_i64]),
+                tags: &vec![2_i64],
             },
         )
         .expect("Unable to add doc");
@@ -481,7 +479,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-                tags: &Some(vec![2_i64]),
+                tags: &vec![2_i64],
             },
         )
         .expect("Unable to add doc");
@@ -498,7 +496,8 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-             tags: &Some(vec![1_i64]),}
+             tags: &vec![1_i64],
+        }
         )
         .expect("Unable to add doc");
 

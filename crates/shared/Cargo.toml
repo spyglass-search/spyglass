@@ -11,11 +11,12 @@ directories = "4.0"
 log = "0.4"
 regex = "1"
 ron = "0.8"
+num-format = { version = "0.4", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 strum = "0.24"
 strum_macros = "0.24"
-spyglass-lens = "0.1.5"
+spyglass-lens = "0.1.6"
 uuid = { version = "1.0.0", features = ["serde", "v4", "js"], default-features = false }
 url = "2.2"
 # Dependencies for metrics
