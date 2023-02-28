@@ -146,6 +146,9 @@ fn post_to_crawl(api_url: &Url, post: &Post) -> CrawlResult {
     let open_url = format!("https://www.reddit.com{}", post.permalink);
     let mut tags: Vec<TagPair> = Vec::new();
 
+    tags.push((TagType::Owner, post.author.clone()));
+    tags.push((TagType::Other("subreddit".into()), post.subreddit.clone()));
+
     // Comment
     let mut result =
         if let (Some(title), Some(body)) = (post.link_title.as_deref(), post.body.as_deref()) {
