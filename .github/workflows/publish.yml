@@ -48,11 +48,11 @@ jobs:
           librsvg2-dev \
           patchelf
     # Setup arch targets - linux
-    #- name: setup arch target - linux
-    #  if: ${{startsWith(matrix.platform, 'ubuntu')}}
-    #  run: |
-    #    echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
-    #    echo "target_ext=" >> $GITHUB_ENV
+    - name: setup arch target - linux
+      if: ${{startsWith(matrix.platform, 'ubuntu')}}
+      run: |
+        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
+        echo "target_ext=" >> $GITHUB_ENV
     - name: Setup arch target (windows only)
       if: ${{startsWith(matrix.platform, 'windows')}}
       run: |
@@ -66,21 +66,21 @@ jobs:
         mkdir -p crates/tauri/binaries
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
         cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
-    #- name: build sidecar (macos)
-    #  if: matrix.platform == 'macos-latest'
-    #  run: |
-    #    cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
-    #    cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
-    #    mkdir -p crates/tauri/binaries;
-    #    cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
-    #    cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
-    #    cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
-    #    cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
-    #    lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
-    #      target/x86_64-apple-darwin/release/spyglass \
-    #      target/aarch64-apple-darwin/release/spyglass \
-    #      target/x86_64-apple-darwin/release/spyglass-debug \
-    #      target/aarch64-apple-darwin/release/spyglass-debug;
+    - name: build sidecar (macos)
+      if: matrix.platform == 'macos-latest'
+      run: |
+        cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
+        cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
+        mkdir -p crates/tauri/binaries;
+        cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
+        cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+        cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
+        cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
+        lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
+          target/x86_64-apple-darwin/release/spyglass \
+          target/aarch64-apple-darwin/release/spyglass \
+          target/x86_64-apple-darwin/release/spyglass-debug \
+          target/aarch64-apple-darwin/release/spyglass-debug;
     - name: build default plugins
       run: make build-plugins-release
     - name: import windows certificate
@@ -115,4 +115,4 @@ jobs:
         releaseName: "Spyglass v20__VERSION__"
         releaseBody: "See the assets to download this version and install."
         releaseDraft: true
-        prerelease: true
+        prerelease: false
