@@ -1,23 +1,13 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
-use std::{collections::HashSet, path::PathBuf};
 
-use crate::{ListDirEntry, PluginCommandRequest, PluginSubscription};
-
+use crate::{DocumentQuery, PluginCommandRequest, TagModification};
 pub fn delete_doc(url: &str) {
     if object_to_stdout(&PluginCommandRequest::DeleteDoc {
         url: url.to_string(),
     })
     .is_ok()
     {
-        unsafe {
-            plugin_cmd();
-        }
-    }
-}
-
-pub fn subscribe(event: PluginSubscription) {
-    if object_to_stdout(&PluginCommandRequest::Subscribe(event)).is_ok() {
         unsafe {
             plugin_cmd();
         }
@@ -33,68 +23,11 @@ pub fn enqueue_all(urls: &[String]) {
     }
 }
 
-/// List contents of a directory.
-pub fn list_dir(path: &str) -> Result<Vec<ListDirEntry>, ron::error::SpannedError> {
-    if object_to_stdout(&PluginCommandRequest::ListDir {
-        path: path.to_string(),
-    })
-    .is_ok()
-    {
-        unsafe {
-            plugin_cmd();
-        }
-        return object_from_stdin::<Vec<ListDirEntry>>();
-    }
-
-    Ok(Vec::new())
-}
-
-/// Recursively walk & enqueue contents of a path.
-pub fn walk_and_enqueue_dir(
-    path: PathBuf,
-    extensions: &HashSet<String>,
-) -> Result<(), ron::error::SpannedError> {
-    if object_to_stdout(&PluginCommandRequest::WalkAndEnqueue {
-        path,
-        extensions: extensions.clone(),
-    })
-    .is_ok()
-    {
-        unsafe {
-            plugin_cmd();
-        }
-    }
-
-    Ok(())
-}
-
 /// Utility function to log to spyglass logs
 pub fn log(msg: String) {
     println!("{msg}");
     unsafe {
         plugin_log();
-    }
-}
-
-/// Hacky workaround until rusqlite can compile to wasm easily.
-/// Path is expected to be rooted in the plugins data directory.
-pub fn sqlite3_query(path: &str, query: &str) {
-    if object_to_stdout(&PluginCommandRequest::SqliteQuery {
-        path: path.to_string(),
-        query: query.to_string(),
-    })
-    .is_ok()
-    {
-        unsafe { plugin_cmd() };
-    }
-}
-
-/// Adds / updates a file in the plugin VFS from the host.
-pub fn sync_file(dst: String, src: String) {
-    if object_to_stdout(&PluginCommandRequest::SyncFile { dst, src }).is_ok() {
-        unsafe {
-            plugin_cmd();
-        }
     }
 }
 
@@ -114,5 +47,41 @@ pub fn object_from_stdin<T: DeserializeOwned>() -> Result<T, ron::error::Spanned
 #[doc(hidden)]
 pub fn object_to_stdout(obj: &impl Serialize) -> Result<(), ron::Error> {
     println!("{}", ron::ser::to_string(obj)?);
+    Ok(())
+}
+
+pub fn modify_tags(query: DocumentQuery, modification: TagModification) -> Result<(), ron::Error> {
+    object_to_stdout(&PluginCommandRequest::ModifyTags {
+        documents: query,
+        tag_modifications: modification,
+    })?;
+
+    unsafe {
+        plugin_cmd();
+    }
+    Ok(())
+}
+
+pub fn subscribe_for_documents(query: DocumentQuery) -> Result<(), ron::Error> {
+    object_to_stdout(&PluginCommandRequest::QueryDocuments {
+        query,
+        subscribe: true,
+    })?;
+
+    unsafe {
+        plugin_cmd();
+    }
+    Ok(())
+}
+
+pub fn query_documents(query: DocumentQuery) -> Result<(), ron::Error> {
+    object_to_stdout(&PluginCommandRequest::QueryDocuments {
+        query,
+        subscribe: false,
+    })?;
+
+    unsafe {
+        plugin_cmd();
+    }
     Ok(())
 }

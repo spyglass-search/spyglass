@@ -1,0 +1,14 @@
+[package]
+name = "rust"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "rust"
+path = "src/main.rs"
+
+[dependencies]
+cargo_toml = "0.15.2"
+spyglass-plugin = { path = "../../crates/spyglass-plugin" }
+url = "2.2"
