@@ -34,9 +34,13 @@ impl RelationTrait for Relation {
     }
 }
 
+#[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
         if insert {
             self.created_at = Set(chrono::Utc::now());
             self.updated_at = Set(chrono::Utc::now());

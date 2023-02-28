@@ -132,6 +132,7 @@ impl RelationTrait for Relation {
     }
 }
 
+#[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
@@ -144,7 +145,10 @@ impl ActiveModelBehavior for ActiveModel {
     }
 
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
         if !insert {
             self.updated_at = Set(chrono::Utc::now());
         }
@@ -556,8 +560,8 @@ pub async fn enqueue_local_files(
     Ok(())
 }
 
-pub async fn enqueue_all(
-    db: &DatabaseConnection,
+pub async fn enqueue_all<C: ConnectionTrait>(
+    db: &C,
     urls: &[String],
     lenses: &[LensConfig],
     settings: &UserSettings,
