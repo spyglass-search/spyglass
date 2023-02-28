@@ -237,12 +237,12 @@ impl Component for DiscoverPage {
         };
 
         html! {
-            <div class="px-4 pt-2">
-                <div class="pb-2 font-bold">{"Discover"}</div>
-                <div class="flex flex-col gap-2">
+            <div>
+                <div class="px-4 sticky top-0 bg-neutral-800 py-4">
+                    <div class="pb-2 font-bold">{"Discover"}</div>
                     <div class="flex flex-row gap-2">
                         <select
-                            class="text-black w-28"
+                            class="text-black text-sm w-40"
                             ref={self.category_input.clone()}
                             onchange={link.callback(|_| Msg::HandleCategoryFilter)}
                         >
@@ -262,6 +262,8 @@ impl Component for DiscoverPage {
                             ref={self.filter_input.clone()}
                         />
                     </div>
+                </div>
+                <div class="px-4 flex flex-col gap-2 pb-2">
                     {contents}
                 </div>
             </div>
