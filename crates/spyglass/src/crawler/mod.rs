@@ -492,16 +492,25 @@ impl Crawler {
     }
 }
 
-fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
+fn _process_file(state: &AppState, path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
+    
+    let supported_ext = crate::filesystem::utils::get_supported_file_extensions(state);
     // Attempt to read file
-    let ext = path.extension().unwrap_or_default();
-    let contents = if parser::supports_filetype(ext) {
-        match parser::parse_file(ext, path) {
+    let contents = match path.extension() {
+        Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
             Err(err) => return Err(CrawlError::ParseError(err.to_string())),
             Ok(contents) => contents,
+        },
+        Some(ext) if supported_ext.contains(ext.to_str().unwrap_or_default()) => match std::fs::read_to_string(path) {
+            Ok(x) => x,
+            Err(err) => {
+                return Err(CrawlError::FetchError(err.to_string()));
+            }
         }
-    } else {
-        "".to_string()
+        _ => {
+            log::warn!("File type for path {:?} unsupported returning empty content", path);
+            "".to_string()
+        }
     };
 
     let mut hasher = Sha256::new();
@@ -536,13 +545,13 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
 }
 
 async fn _process_path(
-    _state: &AppState,
+    state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
     if path.is_file() {
-        return _process_file(path, file_name, url);
+        return _process_file(state, path, file_name, url);
     }
     Err(CrawlError::NotFound)
 }
