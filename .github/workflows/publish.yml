@@ -12,6 +12,13 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
+    # Cleanup Disk
+    - name: Cleanup Disk
+      run: |
+            df -h
+            sudo rm -rf /usr/local/lib/android
+            sudo rm -rf /usr/share/dotnet
+            df -h
     - name: setup node
       uses: actions/setup-node@v1
       with:
