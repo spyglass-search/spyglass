@@ -138,7 +138,7 @@ pub async fn search_docs(
     let searcher = index.reader.searcher();
 
     let tags = tag::Entity::find()
-        .filter(tag::Column::Label.eq(tag::TagType::Lens))
+        .filter(tag::Column::Label.eq(tag::TagType::Lens.to_string()))
         .filter(tag::Column::Value.is_in(search_req.lenses))
         .all(&state.db)
         .await
@@ -172,7 +172,7 @@ pub async fn search_docs(
                         .await
                         .unwrap_or_default()
                         .iter()
-                        .map(|tag| (tag.label.as_ref().to_string(), tag.value.clone()))
+                        .map(|tag| (tag.label.to_string(), tag.value.clone()))
                         .collect::<Vec<(String, String)>>();
 
                     let description =
@@ -251,7 +251,7 @@ pub async fn search_lenses(
         .column_as(tag::Column::Value, "name")
         .column_as(lens::Column::Author, "author")
         .column_as(lens::Column::Description, "description")
-        .filter(tag::Column::Label.eq(TagType::Lens))
+        .filter(tag::Column::Label.eq(TagType::Lens.to_string()))
         .filter(tag::Column::Value.like(&format!("%{}%", &param.query)))
         // Pull in lens metadata
         .join_rev(

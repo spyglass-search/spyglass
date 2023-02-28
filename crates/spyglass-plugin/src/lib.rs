@@ -1,7 +1,3 @@
-use std::collections::HashSet;
-use std::fmt;
-use std::path::PathBuf;
-
 pub mod consts;
 mod shims;
 pub mod utils;
@@ -17,11 +13,29 @@ pub enum SearchFilter {
     URLRegexSkip(String),
 }
 
+/// Represents a Document in the system.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DocumentResult {
+    /// The unique id of the document
+    pub doc_id: String,
+    /// The domain associated with the document (can be blank)
+    pub domain: String,
+    /// The title associated with the document
+    pub title: String,
+    /// The description of the document
+    pub description: String,
+    /// The url for the document
+    pub url: String,
+    /// The tags associated with the document
+    pub tags: Vec<Tag>,
+}
+
 #[macro_export]
 macro_rules! register_plugin {
     ($t:ty) => {
         thread_local! {
             static STATE: std::cell::RefCell<$t> = std::cell::RefCell::new(Default::default());
+
         }
 
         fn main() {
@@ -39,67 +53,26 @@ macro_rules! register_plugin {
                 }
             })
         }
-
-        #[no_mangle]
-        pub fn search_filter() {
-            STATE.with(|state| {
-                let filters = state.borrow_mut().search_filter();
-                let _ = object_to_stdout(&filters);
-            })
-        }
     };
 }
 pub trait SpyglassPlugin {
     /// Initial plugin load, setup any configuration you need here as well as
     /// subscribe to specific events.
     fn load(&mut self);
-    /// Request plugin for updates
+    /// Asynchronous updates for plugin events
     fn update(&mut self, event: PluginEvent);
-    /// Optional function.
-    /// Only called for Lens plugins, request a set of filters to apply to a search.
-    /// If not implemented, no filter is applied to the search.
-    fn search_filter(&mut self) -> Vec<SearchFilter> {
-        vec![SearchFilter::None]
-    }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum PluginSubscription {
-    /// Check for updates at a fixed interval
-    CheckUpdateInterval,
-    WatchDirectory {
-        path: PathBuf,
-        recurse: bool,
-    },
-}
-
-impl fmt::Display for PluginSubscription {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            PluginSubscription::CheckUpdateInterval => {
-                write!(f, "<CheckUpdateInterval>")
-            }
-            PluginSubscription::WatchDirectory { path, recurse } => write!(
-                f,
-                "<WatchDirectory {} - {}>",
-                path.display(),
-                if *recurse {
-                    "recursive"
-                } else {
-                    "non-recursive"
-                }
-            ),
-        }
-    }
-}
-
+/// Event providing the plugin asynchronous data
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginEvent {
-    IntervalUpdate,
-    // File watcher updates
-    FileCreated(PathBuf),
-    FileUpdated(PathBuf),
-    FileDeleted(PathBuf),
+    /// A page of documents
+    DocumentResponse {
+        request_id: String,
+        page_count: u32,
+        page: u32,
+        documents: Vec<DocumentResult>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -111,27 +84,20 @@ pub enum PluginCommandRequest {
     Enqueue {
         urls: Vec<String>,
     },
-    // Ask host to list the contents of a directory
-    ListDir {
-        path: String,
+    // Requests a set of documents that match the
+    // provided query. If subscribe is set to false
+    // The query is a one time query. If set to true
+    // the query will be run once then every minute after
+    // that
+    QueryDocuments {
+        query: DocumentQuery,
+        subscribe: bool,
     },
-    // Subscribe to PluginEvents
-    Subscribe(PluginSubscription),
-    // Run a sqlite query on a db file. NOTE: This is a workaround due to the fact
-    // that sqlite can not be easily compiled to wasm... yet!
-    SqliteQuery {
-        path: String,
-        query: String,
-    },
-    // Request mounting a file & its contents to the plugin VFS
-    SyncFile {
-        dst: String,
-        src: String,
-    },
-    // Walk & enqueue the contents of a directory
-    WalkAndEnqueue {
-        path: PathBuf,
-        extensions: HashSet<String>,
+    // Request to modify the tags for all documents that
+    // match the associated document query.
+    ModifyTags {
+        documents: DocumentQuery,
+        tag_modifications: TagModification,
     },
 }
 
@@ -140,4 +106,30 @@ pub struct ListDirEntry {
     pub path: String,
     pub is_file: bool,
     pub is_dir: bool,
+}
+
+pub type Tag = (String, String);
+
+/// Defines a Tag modification request. Tags can be added or deleted
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct TagModification {
+    pub add: Option<Vec<Tag>>,
+    pub remove: Option<Vec<Tag>>,
+}
+
+/// Defines a document query.
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct DocumentQuery {
+    /// Will match against the urls. Since a single document can only
+    /// have one url these fields are or'd together
+    pub urls: Option<Vec<String>>,
+    /// With match against the document id. Since a single document can
+    /// only have one document id these fields are or'd together
+    pub ids: Option<Vec<String>>,
+    /// Matches only documents that have the specified tags. These entries
+    /// are and'd together
+    pub has_tags: Option<Vec<Tag>>,
+    /// Matches only documents that do not have the specified tags. These
+    /// entries are and'd together
+    pub exclude_tags: Option<Vec<Tag>>,
 }

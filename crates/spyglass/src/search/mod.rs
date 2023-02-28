@@ -1,3 +1,4 @@
+use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -14,7 +15,7 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use crate::search::query::build_query;
+use crate::search::query::{build_document_query, build_query};
 use crate::state::AppState;
 use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{DocFields, SearchDocument};
@@ -239,6 +240,55 @@ impl Searcher {
         Ok(doc_id)
     }
 
+    /// Helper method to execute a search based on the provided document query
+    pub async fn search_by_query(
+        db: &DatabaseConnection,
+        searcher: &Searcher,
+        query: &DocumentQuery,
+    ) -> Vec<SearchResult> {
+        let tag_ids = match &query.has_tags {
+            Some(include_tags) => {
+                let tags = tag::get_tags_by_value(db, include_tags)
+                    .await
+                    .unwrap_or_default();
+                tags.iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let exclude_tag_ids = match &query.exclude_tags {
+            Some(excludes) => {
+                let exclude_tags = tag::get_tags_by_value(db, excludes)
+                    .await
+                    .unwrap_or_default();
+                exclude_tags
+                    .iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let urls = query.urls.clone().unwrap_or_default();
+        let ids = query.ids.clone().unwrap_or_default();
+
+        let fields = DocFields::as_fields();
+        let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
+
+        let collector = tantivy::collector::DocSetCollector;
+
+        let reader = &searcher.reader;
+        let index_search = reader.searcher();
+
+        let docs = index_search
+            .search(&query, &collector)
+            .expect("Unable to execute query");
+
+        docs.into_iter().map(|addr| (1.0, addr)).collect()
+    }
+
     pub async fn search_with_lens(
         db: DatabaseConnection,
         applied_lenses: &Vec<u64>,
@@ -249,7 +299,7 @@ impl Searcher {
 
         let mut tag_boosts = HashSet::new();
         let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
-            .filter(tag::Column::Label.eq(tag::TagType::Favorited))
+            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
             .one(&db)
             .await
         {
@@ -322,8 +372,10 @@ pub struct RetrievedDocument {
     pub description: String,
     pub content: String,
     pub url: String,
+    pub tags: Vec<u64>,
 }
 
+// Helper method used to get the string value from a field
 fn field_to_string(doc: &Document, field: Field) -> String {
     doc.get_first(field)
         .map(|x| x.as_text().unwrap_or_default())
@@ -331,6 +383,12 @@ fn field_to_string(doc: &Document, field: Field) -> String {
         .unwrap_or_default()
 }
 
+// Helper method used to get the u64 vector from a field.
+fn field_to_u64vec(doc: &Document, field: Field) -> Vec<u64> {
+    doc.get_all(field).filter_map(|val| val.as_u64()).collect()
+}
+
+/// Helper method used to convert the provided document to a struct
 pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
     let fields = DocFields::as_fields();
     let doc_id = field_to_string(doc, fields.id);
@@ -343,6 +401,7 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
     let description = field_to_string(doc, fields.description);
     let url = field_to_string(doc, fields.url);
     let content = field_to_string(doc, fields.content);
+    let tags = field_to_u64vec(doc, fields.tags);
 
     Ok(RetrievedDocument {
         doc_id,
@@ -351,6 +410,7 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
         description,
         content,
         url,
+        tags,
     })
 }
 

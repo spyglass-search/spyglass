@@ -10,6 +10,7 @@ members = [
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",
+    "plugins/rust",
 ]
 
 [profile.release]

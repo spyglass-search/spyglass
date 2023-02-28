@@ -98,6 +98,56 @@ where
     BooleanQuery::new(combined)
 }
 
+/// Helper method used to build a document query based on urls, ids or tags.
+pub fn build_document_query(
+    fields: DocFields,
+    urls: &Vec<String>,
+    ids: &Vec<String>,
+    tags: &Vec<u64>,
+    exclude_tags: &Vec<u64>,
+) -> BooleanQuery {
+    let mut term_query: QueryVec = Vec::new();
+    let mut urls_query: QueryVec = Vec::new();
+    let mut ids_query: QueryVec = Vec::new();
+
+    for url in urls {
+        urls_query.push((
+            Occur::Should,
+            _boosted_term(Term::from_field_text(fields.url, url), 0.0),
+        ));
+    }
+
+    if !urls_query.is_empty() {
+        term_query.push((Occur::Must, Box::new(BooleanQuery::new(urls_query))));
+    }
+
+    for id in ids {
+        ids_query.push((
+            Occur::Should,
+            _boosted_term(Term::from_field_text(fields.id, id), 0.0),
+        ));
+    }
+
+    if !ids_query.is_empty() {
+        term_query.push((Occur::Must, Box::new(BooleanQuery::new(ids_query))));
+    }
+
+    for id in tags {
+        term_query.push((
+            Occur::Must,
+            _boosted_term(Term::from_field_u64(fields.tags, *id), 0.0),
+        ));
+    }
+
+    for id in exclude_tags {
+        term_query.push((
+            Occur::MustNot,
+            _boosted_term(Term::from_field_u64(fields.tags, *id), 0.0),
+        ));
+    }
+    BooleanQuery::new(term_query)
+}
+
 /**
  * Responsible for parsing the input query for a particular field. The tokenizer for the field
  * is used to ensure consistent tokens between indexing and queries.

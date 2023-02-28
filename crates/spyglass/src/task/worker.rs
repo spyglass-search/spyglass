@@ -505,7 +505,7 @@ mod test {
             .unwrap_or_default();
         assert_eq!(tags.len(), 1);
         let tag = tags.get(0).expect("tags.get(0)");
-        assert_eq!(tag.label, TagType::Source);
+        assert_eq!(tag.label, TagType::Source.to_string());
         assert_eq!(tag.value, "web".to_string());
     }
 

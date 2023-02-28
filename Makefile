@@ -3,9 +3,9 @@
 	setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
-PLUGINS :=
+PLUGINS := rust
 # Set this up if you're working on the plugins
-PLUGINS_DEV_FOLDER := ~/Library/Application\ Support/com.athlabs.spyglass-dev/
+PLUGINS_DEV_FOLDER := C:\\Users\\jbred\\AppData\\Roaming\\athlabs\\spyglass-dev\\data
 
 # By default just run fmt & clippy
 default: fmt clippy
