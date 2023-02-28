@@ -1,3 +1,4 @@
+use serde::Serialize;
 use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
@@ -363,6 +364,7 @@ async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64
     None
 }
 
+#[derive(Serialize)]
 pub struct RetrievedDocument {
     pub doc_id: String,
     pub domain: String,

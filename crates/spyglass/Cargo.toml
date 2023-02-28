@@ -82,3 +82,7 @@ crate-type = ["lib"]
 [[bin]]
 name = "spyglass"
 path = "src/main.rs"
+
+[[bin]]
+name = "spyglass-debug"
+path = "src/debug/main.rs"
