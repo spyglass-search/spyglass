@@ -30,8 +30,9 @@ pub struct Model {
     pub granted_at: DateTimeUtc,
     // Whether or not this connection is currently syncing.
     pub is_syncing: bool,
-    // When this connection was created/updated
+    /// When this connection was created
     pub created_at: DateTimeUtc,
+    /// When this connection was last synced
     pub updated_at: DateTimeUtc,
 }
 
@@ -155,6 +156,7 @@ pub async fn set_sync_status(
     if let Some(model) = get_by_id(db, id, account).await? {
         let mut update: ActiveModel = model.into();
         update.is_syncing = Set(is_syncing);
+        update.updated_at = Set(chrono::Utc::now());
         update.save(db).await?;
     }
 

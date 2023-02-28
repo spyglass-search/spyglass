@@ -6,6 +6,7 @@ use jsonrpsee::core::async_trait;
 use libauth::{AccessToken, ApiClient, Credentials, RefreshToken};
 use libgithub::GithubClient;
 use libgoog::{ClientType, GoogClient};
+use libreddit::RedditClient;
 use std::time::Duration;
 
 use crate::crawler::{CrawlError, CrawlResult};
@@ -18,6 +19,7 @@ pub mod credentials;
 pub mod gcal;
 pub mod gdrive;
 pub mod github;
+pub mod reddit;
 
 use auth_server::{create_auth_listener, AuthListener};
 use credentials::connection_secret;
@@ -135,20 +137,15 @@ pub async fn load_connection(
     account: &str,
 ) -> Result<Box<dyn Connection + Send>> {
     match api_id {
-        "calendar.google.com" => Ok(Box::new(
-            gcal::GCalConnection::new(state, account)
-                .await
-                .expect("Unable to create gcal connection"),
-        )),
+        "calendar.google.com" => Ok(Box::new(gcal::GCalConnection::new(state, account).await?)),
         "drive.google.com" => Ok(Box::new(
-            gdrive::DriveConnection::new(state, account)
-                .await
-                .expect("Unable to create gdrive connection"),
+            gdrive::DriveConnection::new(state, account).await?,
         )),
         "api.github.com" => Ok(Box::new(
-            github::GithubConnection::new(state, account)
-                .await
-                .expect("Unable to create github connection"),
+            github::GithubConnection::new(state, account).await?,
+        )),
+        "oauth.reddit.com" => Ok(Box::new(
+            reddit::RedditConnection::new(state, account).await?,
         )),
         _ => Err(anyhow::anyhow!("Not suppported connection")),
     }
@@ -211,7 +208,15 @@ pub async fn handle_authorize_connection(state: &AppState, api_id: &str) -> Resu
     let (client_id, client_secret, scopes) =
         connection_secret(api_id).expect("Unsupported connection");
 
-    let mut listener = create_auth_listener().await;
+    // FIX: Unfortunately reddit requires an explicit port.
+    // Remove this once we have deep linking support.
+    let port: Option<u16> = if api_id == "oauth.reddit.com" {
+        Some(53124)
+    } else {
+        None
+    };
+
+    let mut listener = create_auth_listener(port).await;
     let redirect_uri = format!("http://127.0.0.1:{}", listener.port());
 
     let res = match api_id {
@@ -237,6 +242,15 @@ pub async fn handle_authorize_connection(state: &AppState, api_id: &str) -> Resu
         "drive.google.com" => {
             let mut client = GoogClient::new(
                 ClientType::Drive,
+                &client_id,
+                &client_secret,
+                &redirect_uri,
+                Default::default(),
+            )?;
+            listen_for_token(state, &mut client, &mut listener, &scopes).await
+        }
+        "oauth.reddit.com" => {
+            let mut client = RedditClient::new(
                 &client_id,
                 &client_secret,
                 &redirect_uri,

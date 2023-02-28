@@ -72,7 +72,7 @@ pub fn with_channel(
 }
 
 /// Starts a basic HTTP server and listens for authentication requests
-pub async fn create_auth_listener() -> AuthListener {
+pub async fn create_auth_listener(port: Option<u16>) -> AuthListener {
     let (tx, _) = broadcast::channel::<()>(1);
 
     let (code_tx, code_rx) = mpsc::channel::<AuthCode>(1);
@@ -90,11 +90,13 @@ pub async fn create_auth_listener() -> AuthListener {
         });
 
     let tx_clone = tx.clone();
-    let (addr, server) =
-        warp::serve(capture).bind_with_graceful_shutdown(([127, 0, 0, 1], 0), async move {
+    let (addr, server) = warp::serve(capture).bind_with_graceful_shutdown(
+        ([127, 0, 0, 1], port.unwrap_or_default()),
+        async move {
             let mut rx = tx_clone.subscribe();
             let _ = rx.recv().await;
-        });
+        },
+    );
 
     tokio::task::spawn(server);
 
