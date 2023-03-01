@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use chrono::{DateTime, Utc};
 use entities::models::connection;
 use entities::models::tag::TagPair;
 use entities::sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
@@ -38,7 +39,7 @@ pub trait Connection {
 
     /// Add URIs to crawl queue that are new/updated & remove ones that have
     /// been deleted.
-    async fn sync(&mut self, state: &AppState);
+    async fn sync(&mut self, state: &AppState, last_synced_at: Option<DateTime<Utc>>);
 
     /// Get raw data for a URI
     async fn get(&mut self, uri: &Url) -> anyhow::Result<CrawlResult, CrawlError>;
@@ -197,6 +198,7 @@ async fn listen_for_token(
         .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
             api_id,
             account: account_id,
+            is_first_sync: true,
         }))
         .await;
 

@@ -74,8 +74,9 @@ pub struct CrawlResult {
     /// Text content from page after stripping HTML tags & any semantically
     /// unimportant sections (header/footer/etc.)
     pub content: Option<String>,
-    /// A short description of the page provided by the <meta> tag or summarized
-    /// from the content.
+    /// Historically used as a short description of the page provided by the <meta>
+    /// tag or summarized from the content. We generate previews now based on search
+    /// terms + content.
     pub description: Option<String>,
     pub title: Option<String>,
     /// Uniquely identifying URL for this document. Used by the crawler to determine
@@ -101,12 +102,6 @@ impl CrawlResult {
         hasher.update(content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
-        // Use a portion of the content
-        let desc = if let Some(desc) = desc {
-            Some(desc)
-        } else {
-            Some(content.to_string())
-        };
 
         Self {
             content_hash,

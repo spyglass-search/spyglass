@@ -83,6 +83,7 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
             .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
                 api_id: task.api_id,
                 account: task.account,
+                is_first_sync: false,
             }))
             .await;
         started_task = Some(true);
