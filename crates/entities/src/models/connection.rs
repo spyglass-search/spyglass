@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{QuerySelect, Set};
+use sea_orm::{QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 
 use super::{crawl_queue, indexed_document};
@@ -89,6 +89,28 @@ pub async fn get_all_connections(db: &DatabaseConnection) -> Vec<Model> {
     Entity::find().all(db).await.unwrap_or_default()
 }
 
+/// Finds the oldest connection that hasn't been synced & sync it!
+pub async fn dequeue_sync(db: &DatabaseConnection) -> Option<Model> {
+    let model = Entity::find().order_by_asc(Column::UpdatedAt).one(db).await;
+
+    if let Ok(Some(task)) = model {
+        let now = chrono::Utc::now();
+        let last_synced = now - task.updated_at;
+        if last_synced.num_hours() < 24 {
+            return None;
+        }
+
+        // Set to synicng & update the updated at timestamp.
+        let mut update: ActiveModel = task.clone().into();
+        update.is_syncing = Set(true);
+        update.updated_at = Set(now);
+        let _ = update.save(db).await;
+        Some(task)
+    } else {
+        None
+    }
+}
+
 /// Helper method used to get the entry for the specified id and account
 pub async fn get_by_id(
     db: &DatabaseConnection,
@@ -161,4 +183,41 @@ pub async fn set_sync_status(
     }
 
     Ok(())
+}
+
+
+#[cfg(test)]
+mod test {
+    use chrono::{TimeZone, Utc};
+    use sea_orm::{ActiveModelTrait, Set};
+    use crate::test::setup_test_db;
+    use super::ActiveModel;
+
+    /// Should always dequeue the oldest one first.
+    #[tokio::test]
+    async fn test_dequeue_sync() {
+        let db = setup_test_db().await;
+
+        let newer = Utc.with_ymd_and_hms(2023, 2, 2, 0, 0, 0).unwrap();
+        let older = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
+
+        let one = ActiveModel {
+            api_id: Set("test_one".into()),
+            updated_at: Set(newer),
+            ..Default::default()
+        };
+        let _ = one.insert(&db).await.expect("Unable to insert");
+
+        let two = ActiveModel {
+            api_id: Set("test_two".into()),
+            updated_at: Set(older),
+            ..Default::default()
+        };
+        let two = two.insert(&db).await.expect("Unable to insert");
+
+        let result = super::dequeue_sync(&db).await
+            .expect("Should be a result");
+
+        assert_eq!(result.api_id, two.api_id);
+    }
 }
