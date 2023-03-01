@@ -202,6 +202,7 @@ mod test {
 
         let one = ActiveModel {
             api_id: Set("test_one".into()),
+            account: Set("test_account".into()),
             updated_at: Set(newer),
             ..Default::default()
         };
@@ -209,6 +210,7 @@ mod test {
 
         let two = ActiveModel {
             api_id: Set("test_two".into()),
+            account: Set("test_account".into()),
             updated_at: Set(older),
             ..Default::default()
         };
