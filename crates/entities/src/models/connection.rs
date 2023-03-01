@@ -62,7 +62,7 @@ impl ActiveModelBehavior for ActiveModel {
 
 impl ActiveModel {
     pub fn new(
-        id: String,
+        api_id: String,
         account: String,
         access_token: String,
         refresh_token: Option<String>,
@@ -70,7 +70,7 @@ impl ActiveModel {
         scopes: Vec<String>,
     ) -> Self {
         Self {
-            api_id: Set(id),
+            api_id: Set(api_id),
             account: Set(account),
             access_token: Set(access_token),
             refresh_token: Set(refresh_token),
@@ -79,6 +79,7 @@ impl ActiveModel {
             granted_at: Set(chrono::Utc::now()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
+            is_syncing: Set(false),
             ..Default::default()
         }
     }
@@ -200,20 +201,26 @@ mod test {
         let newer = Utc.with_ymd_and_hms(2023, 2, 2, 0, 0, 0).unwrap();
         let older = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
 
-        let one = ActiveModel {
-            api_id: Set("test_one".into()),
-            account: Set("test_account".into()),
-            updated_at: Set(newer),
-            ..Default::default()
-        };
+        let mut one = ActiveModel::new(
+            "test_one".into(),
+            "test_account".into(),
+            "fake-token".into(),
+            None,
+            None,
+            vec!["identity".into()],
+        );
+        one.updated_at = Set(newer);
         let _ = one.insert(&db).await.expect("Unable to insert");
 
-        let two = ActiveModel {
-            api_id: Set("test_two".into()),
-            account: Set("test_account".into()),
-            updated_at: Set(older),
-            ..Default::default()
-        };
+        let mut two = ActiveModel::new(
+            "test_two".into(),
+            "test_account".into(),
+            "fake-token".into(),
+            None,
+            None,
+            vec!["identity".into()],
+        );
+        two.updated_at = Set(older);
         let two = two.insert(&db).await.expect("Unable to insert");
 
         let result = super::dequeue_sync(&db).await.expect("Should be a result");
