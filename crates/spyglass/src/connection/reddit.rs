@@ -1,10 +1,14 @@
 use anyhow::Result;
 use entities::models::{
     connection,
-    tag::{TagPair, TagType, TagValue},
+    tag::{TagPair, TagType},
 };
 use jsonrpsee::core::async_trait;
-use libreddit::{types::Post, RedditClient};
+use libreddit::{
+    types::{ApiResponse, Post},
+    RedditClient,
+};
+use strum_macros::{Display, EnumString};
 use url::Url;
 
 use crate::{
@@ -24,6 +28,14 @@ pub struct RedditConnection {
 }
 
 const BUFFER_SYNC_SIZE: usize = 500;
+
+#[derive(Display, EnumString)]
+enum FavoriteType {
+    #[strum(serialize = "saved")]
+    Saved,
+    #[strum(serialize = "upvoted")]
+    Upvoted,
+}
 
 /// API id for Reddit connections
 pub const API_ID: &str = "oauth.reddit.com";
@@ -59,52 +71,81 @@ impl RedditConnection {
         Ok(url_base)
     }
 
-    async fn sync_saved(&mut self, state: &AppState) -> Result<()> {
+    async fn process_list(
+        &mut self,
+        state: &AppState,
+        buffer: &mut Vec<Post>,
+        resp: &ApiResponse<Vec<Post>>,
+        tags: &[TagPair],
+    ) -> Option<String> {
+        let page = resp.after.clone();
+        buffer.extend(resp.data.clone());
+
+        if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
+            // Add to database
+            let mut posts = Vec::new();
+            for post in buffer.iter() {
+                let api_url = self.to_url(&post.name).expect("unable to create url");
+                log::debug!("post: {}", api_url);
+                posts.push(post_to_crawl(&api_url, post));
+            }
+
+            if !posts.is_empty() {
+                if let Err(err) = process_crawl_results(state, &posts, tags).await {
+                    log::warn!("Unable to add posts: {}", err);
+                }
+
+                if let Err(err) = Searcher::save(state).await {
+                    log::warn!("Unable to save posts: {}", err);
+                }
+            }
+
+            buffer.clear();
+        }
+
+        page
+    }
+
+    async fn sync_saved(&mut self, state: &AppState) -> Result<usize> {
         let mut page = None;
         let mut total_synced = 0;
         let mut buffer = Vec::new();
 
         let mut tags = self.default_tags().clone();
-        tags.push((TagType::Favorited, TagValue::Favorited.to_string()));
+        tags.push((TagType::Favorited, FavoriteType::Saved.to_string()));
 
         loop {
             let resp = self.client.list_saved(page, 100).await?;
-            page = resp.after;
             total_synced += resp.data.len();
-            buffer.extend(resp.data);
-
-            if buffer.len() > BUFFER_SYNC_SIZE || page.is_none() {
-                // Add to database
-                let mut posts = Vec::new();
-                for post in &buffer {
-                    let api_url = self.to_url(&post.name).expect("unable to create url");
-                    log::debug!("post: {}", api_url);
-                    posts.push(post_to_crawl(&api_url, post));
-                }
-
-                if !posts.is_empty() {
-                    if let Err(err) = process_crawl_results(state, &posts, &tags).await {
-                        log::warn!("Unable to add posts: {}", err);
-                    }
-
-                    if let Err(err) = Searcher::save(state).await {
-                        log::warn!("Unable to save posts: {}", err);
-                    }
-                }
-                buffer.clear();
-            }
+            page = self.process_list(state, &mut buffer, &resp, &tags).await;
 
             if page.is_none() {
                 break;
             }
         }
 
-        log::debug!("synced {} posts", total_synced);
-        Ok(())
+        Ok(total_synced)
     }
 
-    async fn sync_upvoted(&mut self, _state: &AppState) -> Result<()> {
-        Ok(())
+    async fn sync_upvoted(&mut self, state: &AppState) -> Result<usize> {
+        let mut page = None;
+        let mut total_synced = 0;
+        let mut buffer = Vec::new();
+
+        let mut tags = self.default_tags().clone();
+        tags.push((TagType::Favorited, FavoriteType::Upvoted.to_string()));
+
+        loop {
+            let resp = self.client.list_upvoted(page, 100).await?;
+            total_synced += resp.data.len();
+            page = self.process_list(state, &mut buffer, &resp, &tags).await;
+
+            if page.is_none() {
+                break;
+            }
+        }
+
+        Ok(total_synced)
     }
 }
 
@@ -126,12 +167,14 @@ impl Connection for RedditConnection {
         log::debug!("syncing w/ connection: {}", &Self::id());
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
 
-        if let Err(err) = self.sync_saved(state).await {
-            log::warn!("Unable to sync saved posts: {}", err);
+        match self.sync_saved(state).await {
+            Ok(num_synced) => log::info!("synced {num_synced} saved posts"),
+            Err(err) => log::warn!("Unable to sync saved posts: {err}"),
         }
 
-        if let Err(err) = self.sync_upvoted(state).await {
-            log::warn!("Unable to sync upvoted posts: {}", err);
+        match self.sync_upvoted(state).await {
+            Ok(num_synced) => log::info!("synced {num_synced} upvoted posts"),
+            Err(err) => log::warn!("Unable to sync upvoted posts: {}", err),
         }
 
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, false).await;
