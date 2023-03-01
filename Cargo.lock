@@ -257,21 +257,17 @@ dependencies = [
 [[package]]
 name = "auth_core"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
 dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
  "chrono",
- "dotenv",
- "dotenv_codegen",
  "log",
  "oauth2",
  "reqwest",
  "serde",
  "serde_json",
- "strum 0.24.1",
- "strum_macros 0.24.3",
  "thiserror",
  "tokio",
  "url",
@@ -1484,35 +1480,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
-name = "dotenv_codegen"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56966279c10e4f8ee8c22123a15ed74e7c8150b658b26c619c53f4a56eb4a8aa"
-dependencies = [
- "dotenv_codegen_implementation",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "dotenv_codegen_implementation"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e737a3522cd45f6adc19b644ce43ef53e1e9045f2d2de425c1f468abd4cf33"
-dependencies = [
- "dotenv",
- "proc-macro-hack",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "dotenvy"
 version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2155,15 +2122,12 @@ dependencies = [
 [[package]]
 name = "github"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
 dependencies = [
  "anyhow",
  "async-trait",
  "auth_core",
- "bytes",
  "chrono",
- "dotenv",
- "dotenv_codegen",
  "log",
  "markdown",
  "oauth2",
@@ -2174,7 +2138,6 @@ dependencies = [
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -2423,15 +2386,13 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
 dependencies = [
  "anyhow",
  "async-trait",
  "auth_core",
  "bytes",
  "chrono",
- "dotenv",
- "dotenv_codegen",
  "log",
  "oauth2",
  "reqwest",
@@ -2440,7 +2401,6 @@ dependencies = [
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -4927,6 +4887,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "reddit"
+version = "0.1.0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "auth_core",
+ "chrono",
+ "log",
+ "oauth2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "tokio",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6203,6 +6182,7 @@ dependencies = [
  "num-format",
  "open",
  "percent-encoding",
+ "reddit",
  "regex",
  "reqwest",
  "ron",
