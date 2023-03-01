@@ -655,19 +655,16 @@ pub async fn enqueue_all<C: ConnectionTrait>(
         let statement = Statement::from_sql_and_values(DbBackend::Sqlite, &sql, values);
         if let Err(err) = db.execute(statement).await {
             log::warn!("insert_many error: {err}");
-        } else {
-            if !overrides.tags.is_empty() {
-                let inserted_rows = Entity::find()
-                    .filter(Column::Url.is_in(urls))
-                    .all(db)
-                    .await
-                    .unwrap_or_default();
+        } else if !overrides.tags.is_empty() {
+            let inserted_rows = Entity::find()
+                .filter(Column::Url.is_in(urls))
+                .all(db)
+                .await
+                .unwrap_or_default();
 
-                if !inserted_rows.is_empty() {
-                    if let Err(error) = insert_tags_many(db, &inserted_rows, &overrides.tags).await
-                    {
-                        log::warn!("Error inserting tags for crawl - {:?}", error);
-                    }
+            if !inserted_rows.is_empty() {
+                if let Err(error) = insert_tags_many(db, &inserted_rows, &overrides.tags).await {
+                    log::warn!("Error inserting tags for crawl - {:?}", error);
                 }
             }
         }
