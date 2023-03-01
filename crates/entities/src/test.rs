@@ -2,8 +2,8 @@ use sea_orm::{sea_query::Index, ConnectionTrait, DatabaseConnection, Schema};
 use shared::config::Config;
 
 use crate::models::{
-    bootstrap_queue, crawl_queue, crawl_tag, create_connection, connection, document_tag, fetch_history,
-    indexed_document, lens, link, resource_rule, tag,
+    bootstrap_queue, connection, crawl_queue, crawl_tag, create_connection, document_tag,
+    fetch_history, indexed_document, lens, link, resource_rule, tag,
 };
 
 #[allow(dead_code)]

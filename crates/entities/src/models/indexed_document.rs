@@ -432,15 +432,22 @@ pub async fn get_tag_ids_by_doc_id(
     .await
 }
 
+pub enum DocumentIdentifier<'a> {
+    DocId(&'a str),
+    Url(&'a str),
+}
+
 pub async fn get_document_details(
     db: &DatabaseConnection,
-    doc_url: &str,
+    identifier: DocumentIdentifier<'_>,
 ) -> Result<Option<(Model, Vec<tag::Model>)>, DbErr> {
-    if let Some(doc) = Entity::find()
-        .filter(Column::Url.eq(doc_url))
-        .one(db)
-        .await?
-    {
+    let query = Entity::find();
+    let query = match identifier {
+        DocumentIdentifier::DocId(doc_id) => query.filter(Column::DocId.eq(doc_id)),
+        DocumentIdentifier::Url(url) => query.filter(Column::Url.eq(url)),
+    };
+
+    if let Some(doc) = query.one(db).await? {
         let tags = doc
             .find_related(tag::Entity)
             .all(db)

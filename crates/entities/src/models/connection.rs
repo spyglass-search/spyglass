@@ -185,13 +185,12 @@ pub async fn set_sync_status(
     Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
+    use super::ActiveModel;
+    use crate::test::setup_test_db;
     use chrono::{TimeZone, Utc};
     use sea_orm::{ActiveModelTrait, Set};
-    use crate::test::setup_test_db;
-    use super::ActiveModel;
 
     /// Should always dequeue the oldest one first.
     #[tokio::test]
@@ -215,8 +214,7 @@ mod test {
         };
         let two = two.insert(&db).await.expect("Unable to insert");
 
-        let result = super::dequeue_sync(&db).await
-            .expect("Should be a result");
+        let result = super::dequeue_sync(&db).await.expect("Should be a result");
 
         assert_eq!(result.api_id, two.api_id);
     }
