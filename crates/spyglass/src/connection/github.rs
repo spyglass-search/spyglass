@@ -263,7 +263,7 @@ impl Connection for GithubConnection {
         vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
-    async fn sync(&mut self, state: &AppState) {
+    async fn sync(&mut self, state: &AppState, _last_synced_at: Option<DateTime<Utc>>) {
         log::debug!("syncing w/ connection: {}", &Self::id());
         let sync_time = Utc::now();
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;

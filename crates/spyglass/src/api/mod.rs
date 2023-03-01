@@ -127,6 +127,7 @@ impl RpcServer for SpyglassRpc {
             .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
                 api_id,
                 account,
+                is_first_sync: false,
             }))
             .await;
 

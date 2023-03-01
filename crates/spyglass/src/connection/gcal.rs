@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use entities::models::connection;
 use entities::models::tag::{TagPair, TagType};
 use jsonrpsee::core::async_trait;
@@ -72,7 +73,7 @@ impl Connection for GCalConnection {
         vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
-    async fn sync(&mut self, state: &AppState) {
+    async fn sync(&mut self, state: &AppState, _last_synced_at: Option<DateTime<Utc>>) {
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
         log::debug!("syncing w/ connection: {}", &Self::id());
 
