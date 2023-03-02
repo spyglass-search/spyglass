@@ -1,7 +1,9 @@
+pub mod accelerator;
 pub mod config;
 pub mod constants;
 pub mod event;
 pub mod form;
+pub mod keyboard;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod plugin;

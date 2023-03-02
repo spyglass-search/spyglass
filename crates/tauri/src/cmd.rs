@@ -4,14 +4,14 @@ use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
-use tauri::Manager;
 use tauri::State;
+use tauri::{ClipboardManager, Manager};
 
 use crate::window::show_discover_window;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::Config;
-use shared::{event::ClientEvent, request, response};
+use shared::{event::ClientEvent, request, response, url_to_file_path};
 use spyglass_rpc::RpcClient;
 
 mod settings;
@@ -74,7 +74,11 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
+pub async fn open_result(
+    _: tauri::Window,
+    url: &str,
+    application: Option<String>,
+) -> Result<(), String> {
     match url::Url::parse(url) {
         Ok(mut url) => {
             // treat open files as a local action.
@@ -82,27 +86,31 @@ pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
                 let _ = url.set_host(None);
 
                 #[cfg(target_os = "windows")]
-                {
-                    use shared::url_to_file_path;
-                    let path = url_to_file_path(url.path(), true);
-                    if let Err(err) = open::that(format!("file://{path}")) {
-                        log::warn!("Unable to open file://{path} due to: {err}");
-                        return Err(err.to_string());
-                    }
+                let path = url_to_file_path(url.path(), true);
 
-                    return Ok(());
-                }
+                #[cfg(not(target_os = "windows"))]
+                let path = url_to_file_path(url.path(), false);
+
+                return open_application(path, application);
             }
 
-            if let Err(err) = open::that(url.to_string()) {
-                log::warn!("Unable to open {} due to: {}", url.to_string(), err);
-                return Err(err.to_string());
-            }
-
-            Ok(())
+            open_application(url.to_string(), application)
         }
         Err(err) => Err(err.to_string()),
     }
+}
+
+#[tauri::command]
+pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), String> {
+    if let Err(error) = win
+        .app_handle()
+        .clipboard_manager()
+        .write_text(String::from(txt))
+    {
+        log::error!("Error copying content to clipboard {:?}", error);
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -381,4 +389,26 @@ pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, Strin
         file_paths: Vec::new(),
         extensions: Vec::new(),
     })
+}
+
+// Helper method used to open the specified url with either the default application or the
+// specified application
+fn open_application(url: String, application: Option<String>) -> Result<(), String> {
+    match application {
+        Some(application) => {
+            log::info!("Open url {:?} with application {:?}", url, application);
+            if let Err(err) = open::with(url.clone(), application) {
+                log::warn!("Unable to open {} due to: {}", url, err);
+                return Err(err.to_string());
+            }
+        }
+        None => {
+            log::info!("Open url with default application {:?}", url);
+            if let Err(err) = open::that(url.clone()) {
+                log::warn!("Unable to open {} due to: {}", url, err);
+                return Err(err.to_string());
+            }
+        }
+    }
+    Ok(())
 }

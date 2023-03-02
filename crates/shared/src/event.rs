@@ -53,6 +53,8 @@ pub enum ClientInvoke {
     ListPlugins,
     #[strum(serialize = "load_user_settings")]
     LoadUserSettings,
+    #[strum(serialize = "load_action_settings")]
+    LoadUserActions,
     #[strum(serialize = "resync_connection")]
     ResyncConnection,
     #[strum(serialize = "revoke_connection")]
@@ -67,6 +69,8 @@ pub enum ClientInvoke {
     OpenLensFolder,
     #[strum(serialize = "open_result")]
     OpenResult,
+    #[strum(serialize = "copy_to_clipboard")]
+    CopyToClipboard,
     #[strum(serialize = "open_settings_folder")]
     OpenSettingsFolder,
     #[strum(serialize = "plugin:lens-updater|uninstall_lens")]
@@ -96,6 +100,12 @@ pub struct InstallLensParams {
 #[derive(Deserialize, Serialize)]
 pub struct OpenResultParams {
     pub url: String,
+    pub application: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct CopyContext {
+    pub txt: String,
 }
 
 #[derive(Deserialize, Serialize)]

@@ -1,6 +1,11 @@
 use gloo::timers::callback::Timeout;
 use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
+use shared::config::{KeyCode, ModifiersState};
+use shared::config::{UserAction, UserActionDefinition, UserActionSettings};
+use shared::event::CopyContext;
+use shared::response::SearchResultTemplate;
+use std::str::FromStr;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlElement, HtmlInputElement};
@@ -42,6 +47,7 @@ pub enum Msg {
     Focus,
     KeyboardEvent(KeyboardEvent),
     HandleError(String),
+    SetCurrentActions(UserActionSettings),
     OpenResult(SearchResult),
     SearchDocs,
     SearchLenses,
@@ -62,9 +68,76 @@ pub struct SearchPage {
     query_debounce: Option<JsValue>,
     blur_timeout: Option<JsValue>,
     is_searching: bool,
+    pressed_key: Option<KeyCode>,
+    executed_key: Option<KeyCode>,
+    modifier: ModifiersState,
+    action_settings: Option<UserActionSettings>,
 }
 
 impl SearchPage {
+    // Helper to access the currently configured user actions
+    async fn fetch_user_actions() -> UserActionSettings {
+        match invoke(ClientInvoke::LoadUserActions.as_ref(), JsValue::NULL).await {
+            Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    log::error!("Unable to deserialize results: {}", e.to_string());
+                    UserActionSettings::default()
+                }
+            },
+            Err(e) => {
+                log::error!("Error fetching user settings: {:?}", e);
+                UserActionSettings::default()
+            }
+        }
+    }
+
+    // Helper used to execute the specified user action
+    async fn execute_action(action: UserActionDefinition, selected: SearchResult) {
+        let template_input = SearchResultTemplate::from(selected);
+        match action.action {
+            UserAction::OpenApplication(app_path, argument) => {
+                let reg = handlebars::Handlebars::new();
+                let url = match reg.render_template(argument.as_str(), &template_input) {
+                    Ok(val) => val,
+                    Err(_) => template_input.url.clone(),
+                };
+                spawn_local(async move {
+                    if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
+                        ClientInvoke::OpenResult,
+                        OpenResultParams {
+                            url,
+                            application: Some(app_path.clone()),
+                        },
+                    )
+                    .await
+                    {
+                        let window = window();
+                        let _ = window.alert_with_message(&err);
+                    }
+                });
+            }
+            UserAction::CopyToClipboard(copy_template) => {
+                let reg = handlebars::Handlebars::new();
+                let copy_txt = match reg.render_template(copy_template.as_str(), &template_input) {
+                    Ok(val) => val,
+                    Err(_) => template_input.url.clone(),
+                };
+                spawn_local(async move {
+                    if let Err(err) = tauri_invoke::<CopyContext, ()>(
+                        ClientInvoke::CopyToClipboard,
+                        CopyContext { txt: copy_txt },
+                    )
+                    .await
+                    {
+                        let window = window();
+                        let _ = window.alert_with_message(&err);
+                    }
+                });
+            }
+        }
+    }
+
     fn handle_selection(&mut self, link: &Scope<Self>) {
         // Grab the currently selected item
         if !self.docs_results.is_empty() {
@@ -74,7 +147,7 @@ impl SearchPage {
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
             self.lens.push(selected.label.to_string());
-            // Clear query string
+            // Clear query string,
             link.send_message(Msg::ClearQuery);
         }
     }
@@ -85,7 +158,10 @@ impl SearchPage {
         spawn_local(async move {
             if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
                 ClientInvoke::OpenResult,
-                OpenResultParams { url },
+                OpenResultParams {
+                    url,
+                    application: None,
+                },
             )
             .await
             {
@@ -104,11 +180,14 @@ impl SearchPage {
 
         self.selected_idx = (self.selected_idx + 1).min(max_len);
         self.scroll_to_result(self.selected_idx);
+
+        //fire event to update available actions
     }
 
     fn move_selection_up(&mut self) {
         self.selected_idx = self.selected_idx.max(1) - 1;
         self.scroll_to_result(self.selected_idx);
+        //fire event to update available actions
     }
 
     fn scroll_to_result(&self, idx: usize) {
@@ -135,6 +214,13 @@ impl Component for SearchPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
+
+        // Setup user actions
+        {
+            link.send_future(async {
+                Msg::SetCurrentActions(SearchPage::fetch_user_actions().await)
+            });
+        }
 
         // Listen to onblur events so we can hide the search bar
         {
@@ -207,6 +293,10 @@ impl Component for SearchPage {
             query_debounce: None,
             blur_timeout: None,
             is_searching: false,
+            action_settings: None,
+            pressed_key: None,
+            executed_key: None,
+            modifier: ModifiersState::empty(),
         }
     }
 
@@ -238,6 +328,10 @@ impl Component for SearchPage {
 
                 self.request_resize();
                 true
+            }
+            Msg::SetCurrentActions(actions) => {
+                self.action_settings = Some(actions);
+                false
             }
             Msg::Blur => {
                 let link = link.clone();
@@ -283,6 +377,60 @@ impl Component for SearchPage {
                             _ => (),
                         }
 
+                        let mut new_key: bool = false;
+                        match KeyCode::from_str(key.to_uppercase().as_str()) {
+                            Ok(key_code) => match key_code {
+                                KeyCode::Unidentified(_) => (),
+                                _ => match self.pressed_key {
+                                    Some(key) => {
+                                        if !key.eq(&key_code) {
+                                            new_key = true;
+                                            self.pressed_key = Some(key_code);
+                                        }
+                                    }
+                                    None => {
+                                        new_key = true;
+                                        self.pressed_key = Some(key_code);
+                                    }
+                                },
+                            },
+                            Err(error) => log::error!("Error processing key {:?}", error),
+                        }
+
+                        self.modifier.set(ModifiersState::ALT, e.alt_key());
+                        self.modifier.set(ModifiersState::CONTROL, e.ctrl_key());
+                        self.modifier.set(ModifiersState::SHIFT, e.shift_key());
+                        self.modifier.set(ModifiersState::SUPER, e.meta_key());
+
+                        if new_key {
+                            if let Some(actions) = &self.action_settings {
+                                if !self.docs_results.is_empty()
+                                    && !self.modifier.is_empty()
+                                    && self.pressed_key.is_some()
+                                {
+                                    let context = self.docs_results.get(self.selected_idx);
+                                    if let Some(action) = actions.get_triggered_action(
+                                        &self.modifier,
+                                        &self.pressed_key.unwrap(),
+                                        context,
+                                    ) {
+                                        let exec_context = context.cloned();
+
+                                        spawn_local(async move {
+                                            SearchPage::execute_action(
+                                                action,
+                                                exec_context.unwrap(),
+                                            )
+                                            .await;
+                                        });
+
+                                        self.executed_key = self.pressed_key;
+                                        e.prevent_default();
+                                    }
+                                }
+                            }
+                        }
+
                         match key.as_str() {
                             // Search result navigation
                             "ArrowDown" => {
@@ -304,9 +452,37 @@ impl Component for SearchPage {
                             _ => {}
                         }
 
+                        self.modifier.set(ModifiersState::ALT, e.alt_key());
+                        self.modifier.set(ModifiersState::CONTROL, e.ctrl_key());
+                        self.modifier.set(ModifiersState::SHIFT, e.shift_key());
+                        self.modifier.set(ModifiersState::SUPER, e.meta_key());
+
+                        match KeyCode::from_str(key.to_uppercase().as_str()) {
+                            Ok(key_code) => match key_code {
+                                KeyCode::Unidentified(_) => (),
+                                _ => {
+                                    if let Some(key) = self.pressed_key {
+                                        if key.eq(&key_code) {
+                                            self.pressed_key = None;
+                                        }
+                                    }
+                                }
+                            },
+
+                            Err(error) => log::error!("Error processing key {:?}", error),
+                        }
+
                         match key.as_str() {
                             "ArrowDown" | "ArrowUp" => {}
-                            "Enter" => self.handle_selection(link),
+                            "Enter" => {
+                                if self.executed_key.is_some()
+                                    && self.executed_key.unwrap().eq(&KeyCode::Enter)
+                                {
+                                    self.executed_key = None;
+                                } else {
+                                    self.handle_selection(link)
+                                }
+                            }
                             "Escape" => {
                                 link.send_future(async move {
                                     let _ =

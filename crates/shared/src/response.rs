@@ -1,6 +1,7 @@
 use num_format::{Buffer, Locale};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use url::Url;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
@@ -139,6 +140,73 @@ pub struct SearchResult {
     pub url: String,
     pub tags: Vec<(String, String)>,
     pub score: f32,
+}
+
+// The search result template is used to provide extra
+// fields for action template expansion. This provides
+// additional power for template expansion without the need
+// for complicated template logic
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct SearchResultTemplate {
+    /// Document ID
+    pub doc_id: String,
+    /// URI used to crawl this result
+    pub crawl_uri: String,
+    pub domain: String,
+    pub title: String,
+    pub description: String,
+    pub url: String,
+    pub tags: Vec<(String, String)>,
+    pub score: f32,
+    pub url_schema: String,
+    pub url_userinfo: String,
+    pub url_port: u16,
+    pub url_path: Vec<String>,
+    pub url_path_length: u32,
+    pub url_query: String,
+}
+
+impl From<SearchResult> for SearchResultTemplate {
+    fn from(value: SearchResult) -> Self {
+        let mut result = Self {
+            doc_id: value.doc_id,
+            crawl_uri: value.crawl_uri,
+            domain: value.domain,
+            title: value.title,
+            description: value.description,
+            url: value.url.clone(),
+            tags: value.tags,
+            score: value.score,
+            url_schema: String::from(""),
+            url_userinfo: String::from(""),
+            url_port: 0,
+            url_path: Vec::new(),
+            url_path_length: 0,
+            url_query: String::from(""),
+        };
+
+        if let Ok(url) = Url::parse(&value.url) {
+            result.url_schema = url.scheme().to_owned();
+            result.url_userinfo = url.username().to_owned();
+            result.url_port = url.port().unwrap_or(0);
+            if let Some(segments) = url.path_segments().map(|c| c.collect::<Vec<_>>()) {
+                result.url_path = segments
+                    .iter()
+                    .filter_map(|s| {
+                        if !s.is_empty() {
+                            Some(s.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<String>>();
+                result.url_path_length = segments.len() as u32;
+            }
+
+            result.url_query = String::from(url.query().unwrap_or(""));
+        }
+        result
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
