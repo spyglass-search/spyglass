@@ -106,6 +106,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
+    // Fixes path issues on macOS & Linux
+    let _ = fix_path_env::fix();
     let app = tauri::Builder::default()
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
