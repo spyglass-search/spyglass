@@ -257,7 +257,7 @@ dependencies = [
 [[package]]
 name = "auth_core"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -703,6 +703,28 @@ dependencies = [
  "time 0.1.45",
  "wasm-bindgen",
  "winapi",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29c39203181991a7dd4343b8005bd804e7a9a37afb8ac070e43771e8c820bbde"
+dependencies = [
+ "chrono",
+ "chrono-tz-build",
+ "phf 0.11.1",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f509c3a87b33437b05e2458750a0700e5bdd6956176773e6c7d6dd15a283a0c"
+dependencies = [
+ "parse-zoneinfo",
+ "phf 0.11.1",
+ "phf_codegen 0.11.1",
 ]
 
 [[package]]
@@ -2122,7 +2144,7 @@ dependencies = [
 [[package]]
 name = "github"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2386,7 +2408,7 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2396,6 +2418,7 @@ dependencies = [
  "log",
  "oauth2",
  "reqwest",
+ "rrule",
  "serde",
  "serde_json",
  "strum 0.24.1",
@@ -4296,6 +4319,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "parse-zoneinfo"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "password-hash"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4369,6 +4401,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
+dependencies = [
+ "phf_shared 0.11.1",
+]
+
+[[package]]
 name = "phf_codegen"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4389,6 +4430,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf_codegen"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a56ac890c5e3ca598bbdeaa99964edb5b0258a583a9eb6ef4e89fc85d9224770"
+dependencies = [
+ "phf_generator 0.11.1",
+ "phf_shared 0.11.1",
+]
+
+[[package]]
 name = "phf_generator"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4405,6 +4456,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
 dependencies = [
  "phf_shared 0.10.0",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1181c94580fa345f50f19d738aaa39c0ed30a600d95cb2d3e23f94266f14fbf"
+dependencies = [
+ "phf_shared 0.11.1",
  "rand 0.8.5",
 ]
 
@@ -4452,6 +4513,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
  "siphasher",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
+dependencies = [
+ "siphasher",
+ "uncased",
 ]
 
 [[package]]
@@ -4889,7 +4960,7 @@ dependencies = [
 [[package]]
 name = "reddit"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=9e35189755e26240a8f9b5dad3983fdc63c104eb#9e35189755e26240a8f9b5dad3983fdc63c104eb"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5119,6 +5190,20 @@ name = "route-recognizer"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
+
+[[package]]
+name = "rrule"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "822efdcd86c668b92c5ddc4c08906b731d184feb3e595575924737495ae928a7"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "lazy_static",
+ "log",
+ "regex",
+ "thiserror",
+]
 
 [[package]]
 name = "rss"
@@ -7564,6 +7649,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b72f89f0ca32e4db1c04e2a72f5345d59796d4866a1ee0609084569f73683dc8"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "uncased"
+version = "0.9.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09b01702b0fd0b3fadcf98e098780badda8742d4f4a7676615cad90e8ac73622"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]

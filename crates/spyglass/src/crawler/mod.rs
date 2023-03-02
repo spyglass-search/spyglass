@@ -103,9 +103,16 @@ impl CrawlResult {
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
 
+        let content = content.trim();
+        let content = if content.is_empty() {
+            None
+        } else {
+            Some(content.to_string())
+        };
+
         Self {
             content_hash,
-            content: Some(content.to_string()),
+            content,
             description: desc,
             title: Some(title.to_string()),
             url: url.to_string(),
