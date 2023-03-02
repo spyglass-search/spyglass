@@ -63,10 +63,10 @@ wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
 
 # Spyglass libs
-auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "9e35189755e26240a8f9b5dad3983fdc63c104eb" }
-github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "9e35189755e26240a8f9b5dad3983fdc63c104eb" }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "9e35189755e26240a8f9b5dad3983fdc63c104eb" }
-reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "9e35189755e26240a8f9b5dad3983fdc63c104eb" }
+auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
 
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
