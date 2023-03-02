@@ -457,65 +457,92 @@ impl Component for SearchPage {
                         self.modifier.set(ModifiersState::SHIFT, e.shift_key());
                         self.modifier.set(ModifiersState::SUPER, e.meta_key());
 
+                        let mut executed_key_released = false;
+
                         match KeyCode::from_str(key.to_uppercase().as_str()) {
-                            Ok(key_code) => match key_code {
-                                KeyCode::Unidentified(_) => (),
-                                _ => {
-                                    if let Some(key) = self.pressed_key {
-                                        if key.eq(&key_code) {
-                                            self.pressed_key = None;
+                            Ok(key_code) => {
+                                if self.executed_key.is_some()
+                                    && self.executed_key.unwrap().eq(&key_code)
+                                {
+                                    executed_key_released = true;
+                                    self.executed_key = None;
+                                }
+                                if let Some(key) = self.pressed_key {
+                                    if key.eq(&key_code) {
+                                        self.pressed_key = None;
+                                    }
+                                }
+
+                                match key_code {
+                                    KeyCode::ArrowUp
+                                    | KeyCode::ArrowDown
+                                    | KeyCode::CapsLock
+                                    | KeyCode::Unidentified(_)
+                                    | KeyCode::ControlLeft
+                                    | KeyCode::ControlRight
+                                    | KeyCode::AltLeft
+                                    | KeyCode::AltRight
+                                    | KeyCode::ShiftLeft
+                                    | KeyCode::ShiftRight
+                                    | KeyCode::Abort
+                                    | KeyCode::End
+                                    | KeyCode::Home
+                                    | KeyCode::PageDown
+                                    | KeyCode::PageUp
+                                    | KeyCode::AudioVolumeDown
+                                    | KeyCode::AudioVolumeMute
+                                    | KeyCode::AudioVolumeUp
+                                    | KeyCode::MediaPlayPause
+                                    | KeyCode::MediaSelect
+                                    | KeyCode::MediaStop
+                                    | KeyCode::MediaTrackNext
+                                    | KeyCode::MediaTrackPrevious => {}
+                                    KeyCode::Enter => {
+                                        if !executed_key_released {
+                                            self.handle_selection(link)
+                                        }
+                                    }
+                                    KeyCode::Escape => {
+                                        link.send_future(async move {
+                                            let _ = invoke(
+                                                ClientInvoke::Escape.as_ref(),
+                                                JsValue::NULL,
+                                            )
+                                            .await;
+                                            Msg::ClearQuery
+                                        });
+                                    }
+                                    KeyCode::Backspace => {
+                                        let input: HtmlInputElement = e.target_unchecked_into();
+
+                                        if self.query.is_empty() && !self.lens.is_empty() {
+                                            log::info!("updating lenses");
+                                            self.lens.pop();
+                                        }
+
+                                        link.send_message(Msg::UpdateQuery(input.value()));
+                                        if input.value().len() < crate::constants::MIN_CHARS {
+                                            link.send_message(Msg::ClearResults);
+                                        }
+
+                                        return true;
+                                    }
+                                    KeyCode::Tab => {
+                                        // Tab completion for len results only
+                                        if self.result_display == ResultDisplay::Lens {
+                                            self.handle_selection(link);
+                                        }
+                                    }
+                                    // everything else
+                                    _ => {
+                                        if !executed_key_released {
+                                            let input: HtmlInputElement = e.target_unchecked_into();
+                                            link.send_message(Msg::UpdateQuery(input.value()));
                                         }
                                     }
                                 }
-                            },
-
+                            }
                             Err(error) => log::error!("Error processing key {:?}", error),
-                        }
-
-                        match key.as_str() {
-                            "ArrowDown" | "ArrowUp" => {}
-                            "Enter" => {
-                                if self.executed_key.is_some()
-                                    && self.executed_key.unwrap().eq(&KeyCode::Enter)
-                                {
-                                    self.executed_key = None;
-                                } else {
-                                    self.handle_selection(link)
-                                }
-                            }
-                            "Escape" => {
-                                link.send_future(async move {
-                                    let _ =
-                                        invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
-                                    Msg::ClearQuery
-                                });
-                            }
-                            "Backspace" => {
-                                let input: HtmlInputElement = e.target_unchecked_into();
-
-                                if self.query.is_empty() && !self.lens.is_empty() {
-                                    log::info!("updating lenses");
-                                    self.lens.pop();
-                                }
-
-                                link.send_message(Msg::UpdateQuery(input.value()));
-                                if input.value().len() < crate::constants::MIN_CHARS {
-                                    link.send_message(Msg::ClearResults);
-                                }
-
-                                return true;
-                            }
-                            "Tab" => {
-                                // Tab completion for len results only
-                                if self.result_display == ResultDisplay::Lens {
-                                    self.handle_selection(link);
-                                }
-                            }
-                            // everything else
-                            _ => {
-                                let input: HtmlInputElement = e.target_unchecked_into();
-                                link.send_message(Msg::UpdateQuery(input.value()));
-                            }
                         }
                     }
                     _ => {}

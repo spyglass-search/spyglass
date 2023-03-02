@@ -169,7 +169,9 @@ impl UserActionSettings {
         if let Some(context) = context {
             for action in &self.context_actions {
                 if action.is_applicable(context) {
-                    return action.get_triggered_action(modifiers, key);
+                    if let Some(context_action) = action.get_triggered_action(modifiers, key) {
+                        return Some(context_action);
+                    }
                 }
             }
         }
