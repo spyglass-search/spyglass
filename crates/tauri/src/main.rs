@@ -13,8 +13,9 @@ use std::sync::Arc;
 use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
 use tauri::{
-    AppHandle, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
+    AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
 };
+use tauri::api::process::{current_binary};
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing_log::LogTracer;
@@ -67,12 +68,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Check and register this app to run on boot
-    let path = std::env::current_exe().map(|path| path.to_str().map(|s| s.to_owned()));
-    if let Ok(Some(path)) = path {
+    let binary = current_binary(&Env::default());
+    if let Ok(path) = binary {
         // NOTE: See how this works: https://github.com/Teamwork/node-auto-launch#how-does-it-work
         if let Ok(auto) = AutoLaunchBuilder::new()
             .set_app_name("Spyglass Search")
-            .set_app_path(&path)
+            .set_app_path(&path.display().to_string())
             .set_use_launch_agent(true)
             .build()
         {
