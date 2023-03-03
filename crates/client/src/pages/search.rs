@@ -49,6 +49,7 @@ pub enum Msg {
     HandleError(String),
     SetCurrentActions(UserActionSettings),
     OpenResult(SearchResult),
+    UserActionComplete(String),
     SearchDocs,
     SearchLenses,
     UpdateLensResults(Vec<response::LensResult>),
@@ -70,6 +71,7 @@ pub struct SearchPage {
     is_searching: bool,
     pressed_key: Option<KeyCode>,
     executed_key: Option<KeyCode>,
+    executed_action: Option<String>,
     modifier: ModifiersState,
     action_settings: Option<UserActionSettings>,
 }
@@ -92,8 +94,26 @@ impl SearchPage {
         }
     }
 
+    fn has_context_action(&self, settings: &UserActionSettings) -> bool {
+        if !self.docs_results.is_empty() {
+            if let Some(selected) = self.docs_results.get(self.selected_idx) {
+                for ctx_action in &settings.context_actions {
+                    if ctx_action.is_applicable(selected) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     // Helper used to execute the specified user action
-    async fn execute_action(action: UserActionDefinition, selected: SearchResult) {
+    async fn execute_action(
+        action: UserActionDefinition,
+        selected: SearchResult,
+        link: Scope<Self>,
+    ) {
         let template_input = SearchResultTemplate::from(selected);
         match action.action {
             UserAction::OpenApplication(app_path, argument) => {
@@ -102,6 +122,12 @@ impl SearchPage {
                     Ok(val) => val,
                     Err(_) => template_input.url.clone(),
                 };
+                Timeout::new(500, move || {
+                    spawn_local(async move {
+                        link.send_message(Msg::UserActionComplete(action.label.clone()));
+                    });
+                })
+                .forget();
                 spawn_local(async move {
                     if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
                         ClientInvoke::OpenResult,
@@ -123,6 +149,13 @@ impl SearchPage {
                     Ok(val) => val,
                     Err(_) => template_input.url.clone(),
                 };
+                Timeout::new(500, move || {
+                    spawn_local(async move {
+                        link.send_message(Msg::UserActionComplete(action.label.clone()));
+                    });
+                })
+                .forget();
+
                 spawn_local(async move {
                     if let Err(err) = tauri_invoke::<CopyContext, ()>(
                         ClientInvoke::CopyToClipboard,
@@ -296,6 +329,7 @@ impl Component for SearchPage {
             action_settings: None,
             pressed_key: None,
             executed_key: None,
+            executed_action: None,
             modifier: ModifiersState::empty(),
         }
     }
@@ -366,6 +400,10 @@ impl Component for SearchPage {
                 let _ = window.alert_with_message(&msg);
                 false
             }
+            Msg::UserActionComplete(_) => {
+                self.executed_action = None;
+                true
+            }
             Msg::KeyboardEvent(e) => {
                 match e.type_().as_str() {
                     "keydown" => {
@@ -415,17 +453,28 @@ impl Component for SearchPage {
                                         context,
                                     ) {
                                         let exec_context = context.cloned();
-
+                                        match &action.status_msg {
+                                            Some(status) => {
+                                                self.executed_action = Some(status.clone());
+                                            }
+                                            None => {
+                                                self.executed_action =
+                                                    Some(format!("Executing {}", action.label));
+                                            }
+                                        }
+                                        let link = link.clone();
                                         spawn_local(async move {
                                             SearchPage::execute_action(
                                                 action,
                                                 exec_context.unwrap(),
+                                                link,
                                             )
                                             .await;
                                         });
 
                                         self.executed_key = self.pressed_key;
                                         e.prevent_default();
+                                        return true;
                                     }
                                 }
                             }
@@ -688,15 +737,28 @@ impl Component for SearchPage {
             let mut wall_time = Buffer::default();
             wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
 
-            html! {
-                <>
+            let running_action = if let Some(action) = &self.executed_action {
+                html! {
+                    <div class="flex flex-row gap-1 items-center">
+                        <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                        <span class="text-cyan-600">{action}</span>
+                    </div>
+                }
+            } else {
+                html! {
                     <div>
                         {"Searched "}
                         <span class="text-cyan-600">{num_docs}</span>
                         {" documents in "}
                         <span class="text-cyan-600">{wall_time}{" ms."}</span>
                     </div>
-                    <div class="ml-auto flex flex-row align-middle items-center">
+                }
+            };
+
+            html! {
+                <div class="flex flex-row justify-between w-full items-center align-middle">
+                    {running_action}
+                    <div class="flex flex-row align-middle items-center">
                         {"Use"}
                         <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
@@ -715,7 +777,7 @@ impl Component for SearchPage {
                         </div>
                         {"to open."}
                     </div>
-                </>
+                </div>
             }
         } else {
             let is_searching_indicator = if self.is_searching {
@@ -739,7 +801,7 @@ impl Component for SearchPage {
                     </div>
                     {"to select a lens."}
                     <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
-                        {"Enter"}
+                        {"Type"}
                     </div>
                     {"to search."}
                     </div>
@@ -747,6 +809,27 @@ impl Component for SearchPage {
             }
         };
 
+        let noop = html! {};
+
+        let _custom_actions = if let Some(settings) = &self.action_settings {
+            if !self.docs_results.is_empty()
+                && (!settings.actions.is_empty() || self.has_context_action(settings))
+            {
+                html! {
+                    <div class="border-l border-neutral-500 px-0 py-1.5 hover:bg-stone-700 hover:border-stone-500 flex-none w-6">
+                      <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                      </div>
+                    </div>
+                }
+            } else {
+                noop
+            }
+        } else {
+            noop
+        };
         html! {
             <div ref={self.search_wrapper_ref.clone()}
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
@@ -770,8 +853,10 @@ impl Component for SearchPage {
                 <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px]">
                     {results}
                 </div>
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
-                    {search_meta}
+                <div  class="flex flex-row w-full items-center bg-neutral-900">
+                  <div class="bg-neutral-900 grow text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
+                      {search_meta}
+                  </div>
                 </div>
             </div>
         }

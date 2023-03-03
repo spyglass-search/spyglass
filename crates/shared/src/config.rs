@@ -323,6 +323,7 @@ pub struct ContextFilter {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UserActionDefinition {
     pub label: String,
+    pub status_msg: Option<String>,
     pub action: UserAction,
     pub key_binding: String,
 }
