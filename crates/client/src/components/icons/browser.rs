@@ -1,6 +1,6 @@
+use super::IconProps;
 use yew::function_component;
 use yew::prelude::*;
-use super::IconProps;
 
 #[function_component(ChromeBrowserIcon)]
 pub fn chrome_browser_icon(props: &IconProps) -> Html {

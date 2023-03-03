@@ -87,7 +87,6 @@ impl Default for BtnAlign {
     }
 }
 
-
 #[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
     Default,
@@ -221,15 +220,10 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         props.children.clone()
     };
 
-    let mut label_styles = classes!(
-        "flex",
-        "flex-row",
-        "gap-1",
-        "items-center",
-    );
+    let mut label_styles = classes!("flex", "flex-row", "gap-1", "items-center",);
 
     match &props.align {
-        BtnAlign::Left => {},
+        BtnAlign::Left => {}
         BtnAlign::Right => label_styles.push("ml-auto"),
         BtnAlign::Center => label_styles.push("mx-auto"),
     }

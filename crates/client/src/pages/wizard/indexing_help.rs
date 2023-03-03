@@ -1,3 +1,10 @@
+use super::btn;
+use crate::components::{
+    btn::{BtnAlign, BtnSize},
+    forms::SettingChangeEvent,
+};
+use crate::components::{forms, icons};
+use crate::tauri_invoke;
 use shared::{
     constants::{CHROME_EXT_LINK, FIREFOX_EXT_LINK},
     event::ClientInvoke,
@@ -7,10 +14,6 @@ use shared::{
 use yew::platform::spawn_local;
 use yew::prelude::*;
 use yew::virtual_dom::VNode;
-use crate::components::{forms::SettingChangeEvent, btn::{BtnSize, BtnAlign}};
-use crate::components::{forms, icons};
-use crate::tauri_invoke;
-use super::btn;
 
 #[derive(Properties, PartialEq)]
 pub struct IndexFilesHelpProps {
