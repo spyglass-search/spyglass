@@ -29,8 +29,9 @@ pub fn os_open(url: &Url) -> anyhow::Result<()> {
     match tauri::api::process::Command::new("xdg-open")
         .args(vec![url.to_string()])
         .current_dir(parent)
-        .output() {
+        .output()
+    {
         Ok(_) => Ok(()),
-        Err(err) => Err(anyhow::anyhow!(err.to_string()))
+        Err(err) => Err(anyhow::anyhow!(err.to_string())),
     }
 }
