@@ -1,0 +1,5 @@
+# Set this up if you're working on the plugins
+PLUGINS_DEV_FOLDER := /Users/example/Library/Application Support/com.athlabs.spyglass-dev
+
+# Or for windows
+# PLUGINS_DEV_FOLDER := C:\\Users\\example\\AppData\\Roaming\\athlabs\\spyglass-dev\\data

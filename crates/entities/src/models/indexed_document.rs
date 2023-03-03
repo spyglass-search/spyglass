@@ -9,10 +9,11 @@ use sea_orm::{
     ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set,
     Statement,
 };
+use serde::Serialize;
 
 use super::tag::{get_or_create, TagPair};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "indexed_document")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -429,6 +430,32 @@ pub async fn get_tag_ids_by_doc_id(
     ))
     .all(db)
     .await
+}
+
+pub enum DocumentIdentifier<'a> {
+    DocId(&'a str),
+    Url(&'a str),
+}
+
+pub async fn get_document_details(
+    db: &DatabaseConnection,
+    identifier: DocumentIdentifier<'_>,
+) -> Result<Option<(Model, Vec<tag::Model>)>, DbErr> {
+    let query = Entity::find();
+    let query = match identifier {
+        DocumentIdentifier::DocId(doc_id) => query.filter(Column::DocId.eq(doc_id)),
+        DocumentIdentifier::Url(url) => query.filter(Column::Url.eq(url)),
+    };
+
+    if let Some(doc) = query.one(db).await? {
+        let tags = doc
+            .find_related(tag::Entity)
+            .all(db)
+            .await
+            .unwrap_or_default();
+        return Ok(Some((doc, tags)));
+    }
+    Ok(None)
 }
 
 #[cfg(test)]

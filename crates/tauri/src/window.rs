@@ -3,7 +3,8 @@ use crate::{constants, platform};
 use shared::event::ClientEvent;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{
-    AppHandle, LogicalSize, Manager, Menu, Monitor, Size, Window, WindowBuilder, WindowUrl,
+    AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
+    WindowUrl,
 };
 
 /// Try and detect which monitor the window is on so that we can determine the
@@ -25,16 +26,24 @@ fn find_monitor(window: &Window) -> Option<Monitor> {
 }
 
 pub fn center_search_bar(window: &Window) {
+    let window_size = match window.inner_size() {
+        Ok(size) => size,
+        // Nothing to do if the window is not created yet.
+        Err(_) => return,
+    };
+
     if let Some(monitor) = find_monitor(window) {
-        let size = monitor.size();
-        let scale = monitor.scale_factor();
+        let screen_position = monitor.position();
+        let screen_size = monitor.size();
 
-        let middle = (size.width as f64 / (scale * 2.0)) - (constants::INPUT_WIDTH / 2.0);
+        let y = (constants::INPUT_Y * monitor.scale_factor()) as i32;
+        let new_position = PhysicalPosition {
+            x: screen_position.x
+                + ((screen_size.width as i32 / 2) - (window_size.width as i32 / 2)),
+            y,
+        };
 
-        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-            x: middle,
-            y: constants::INPUT_Y,
-        }));
+        let _ = window.set_position(tauri::Position::Physical(new_position));
     } else {
         log::warn!("Unable to detect any monitors.");
     }
@@ -96,28 +105,27 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
-    let monitor_height = {
-        if let Some(monitor) = find_monitor(window) {
-            let size = monitor.size();
-            let scale = monitor.scale_factor();
-            Some((size.height as f64) / scale - (constants::INPUT_Y * 1.5))
-        } else {
-            None
-        }
-    };
+    if let Some(monitor) = find_monitor(window) {
+        let size = monitor.size();
+        let scale = monitor.scale_factor();
+        let monitor_height = size.height as f64 - (constants::INPUT_Y * scale);
 
-    // If the requested height is greater than the monitor size, use the monitor
-    // height so we don't go offscreen.
-    let height = if let Some(monitor_height) = monitor_height {
-        monitor_height.min(height)
+        // If the requested height is greater than the monitor size, use the monitor
+        // height so we don't go offscreen.
+        let height = monitor_height.min(height);
+
+        let _ = window.set_size(Size::Physical(PhysicalSize {
+            width: (constants::INPUT_WIDTH * scale) as u32,
+            height: (height * scale) as u32,
+        }));
     } else {
-        height
-    };
-
-    let _ = window.set_size(Size::Logical(LogicalSize {
-        width: constants::INPUT_WIDTH,
-        height,
-    }));
+        log::warn!("Unable to detect monitor size, resizing using defaults");
+        // No monitor info available so just set!
+        let _ = window.set_size(Size::Physical(PhysicalSize {
+            width: constants::INPUT_WIDTH as u32,
+            height: height as u32,
+        }));
+    }
 }
 
 fn show_window(window: &Window) {

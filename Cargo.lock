@@ -257,21 +257,17 @@ dependencies = [
 [[package]]
 name = "auth_core"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
  "chrono",
- "dotenv",
- "dotenv_codegen",
  "log",
  "oauth2",
  "reqwest",
  "serde",
  "serde_json",
- "strum 0.24.1",
- "strum_macros 0.24.3",
  "thiserror",
  "tokio",
  "url",
@@ -707,6 +703,28 @@ dependencies = [
  "time 0.1.45",
  "wasm-bindgen",
  "winapi",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29c39203181991a7dd4343b8005bd804e7a9a37afb8ac070e43771e8c820bbde"
+dependencies = [
+ "chrono",
+ "chrono-tz-build",
+ "phf 0.11.1",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f509c3a87b33437b05e2458750a0700e5bdd6956176773e6c7d6dd15a283a0c"
+dependencies = [
+ "parse-zoneinfo",
+ "phf 0.11.1",
+ "phf_codegen 0.11.1",
 ]
 
 [[package]]
@@ -1484,35 +1502,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
-name = "dotenv_codegen"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56966279c10e4f8ee8c22123a15ed74e7c8150b658b26c619c53f4a56eb4a8aa"
-dependencies = [
- "dotenv_codegen_implementation",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "dotenv_codegen_implementation"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e737a3522cd45f6adc19b644ce43ef53e1e9045f2d2de425c1f468abd4cf33"
-dependencies = [
- "dotenv",
- "proc-macro-hack",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "dotenvy"
 version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1751,6 +1740,15 @@ dependencies = [
  "lazy_static",
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "fix-path-env"
+version = "0.0.0"
+source = "git+https://github.com/tauri-apps/fix-path-env-rs?rev=6c63c49e29e670343b71fee455e1a6c9145f4a8e#6c63c49e29e670343b71fee455e1a6c9145f4a8e"
+dependencies = [
+ "strip-ansi-escapes",
+ "thiserror",
 ]
 
 [[package]]
@@ -2155,15 +2153,12 @@ dependencies = [
 [[package]]
 name = "github"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
  "auth_core",
- "bytes",
  "chrono",
- "dotenv",
- "dotenv_codegen",
  "log",
  "markdown",
  "oauth2",
@@ -2174,7 +2169,6 @@ dependencies = [
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -2423,24 +2417,22 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=dc4355a2b2ca12c7e1640a3f39c275f5428157d0#dc4355a2b2ca12c7e1640a3f39c275f5428157d0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
 dependencies = [
  "anyhow",
  "async-trait",
  "auth_core",
  "bytes",
  "chrono",
- "dotenv",
- "dotenv_codegen",
  "log",
  "oauth2",
  "reqwest",
+ "rrule",
  "serde",
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -4350,6 +4342,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "parse-zoneinfo"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "password-hash"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4457,6 +4458,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
+dependencies = [
+ "phf_shared 0.11.1",
+]
+
+[[package]]
 name = "phf_codegen"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4477,6 +4487,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf_codegen"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a56ac890c5e3ca598bbdeaa99964edb5b0258a583a9eb6ef4e89fc85d9224770"
+dependencies = [
+ "phf_generator 0.11.1",
+ "phf_shared 0.11.1",
+]
+
+[[package]]
 name = "phf_generator"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4493,6 +4513,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
 dependencies = [
  "phf_shared 0.10.0",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1181c94580fa345f50f19d738aaa39c0ed30a600d95cb2d3e23f94266f14fbf"
+dependencies = [
+ "phf_shared 0.11.1",
  "rand 0.8.5",
 ]
 
@@ -4540,6 +4570,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
  "siphasher",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
+dependencies = [
+ "siphasher",
+ "uncased",
 ]
 
 [[package]]
@@ -4975,6 +5015,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "reddit"
+version = "0.1.0"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "auth_core",
+ "chrono",
+ "log",
+ "oauth2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "tokio",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5188,6 +5247,20 @@ name = "route-recognizer"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
+
+[[package]]
+name = "rrule"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "822efdcd86c668b92c5ddc4c08906b731d184feb3e595575924737495ae928a7"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "lazy_static",
+ "log",
+ "regex",
+ "thiserror",
+]
 
 [[package]]
 name = "rss"
@@ -6252,6 +6325,7 @@ dependencies = [
  "num-format",
  "open",
  "percent-encoding",
+ "reddit",
  "regex",
  "reqwest",
  "ron",
@@ -6291,6 +6365,7 @@ dependencies = [
  "anyhow",
  "auto-launch",
  "cocoa",
+ "fix-path-env",
  "jsonrpsee",
  "log",
  "migration",
@@ -6642,6 +6717,15 @@ checksum = "8ee348cb74b87454fff4b551cbf727025810a004f88aeacae7f85b87f4e9a1c1"
 dependencies = [
  "unicode-bidi",
  "unicode-normalization",
+]
+
+[[package]]
+name = "strip-ansi-escapes"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "011cbb39cf7c1f62871aea3cc46e5817b0937b49e9447370c93cacbe93a766d8"
+dependencies = [
+ "vte",
 ]
 
 [[package]]
@@ -7637,6 +7721,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "uncased"
+version = "0.9.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09b01702b0fd0b3fadcf98e098780badda8742d4f4a7676615cad90e8ac73622"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "unicase"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7734,6 +7827,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcfc827f90e53a02eaef5e535ee14266c1d569214c6aa70133a624d8a3164ba"
 
 [[package]]
+name = "utf8parse"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
+
+[[package]]
 name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7783,6 +7882,27 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "vte"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
+dependencies = [
+ "arrayvec 0.5.2",
+ "utf8parse",
+ "vte_generate_state_changes",
+]
+
+[[package]]
+name = "vte_generate_state_changes"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d257817081c7dffcdbab24b9e62d2def62e2ff7d00b1c20062551e6cccc145ff"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
 
 [[package]]
 name = "waker-fn"

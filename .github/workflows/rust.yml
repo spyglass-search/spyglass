@@ -17,6 +17,13 @@ jobs:
     steps:
     # Checkout source code
     - uses: actions/checkout@v3
+    # Cleanup Disk
+    - name: Cleanup Disk
+      run: |
+            df -h
+            sudo rm -rf /usr/local/lib/android
+            sudo rm -rf /usr/share/dotnet
+            df -h
     # Setup arch target for sidecar build
     - name: Setup arch target
       run: echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
@@ -50,6 +57,7 @@ jobs:
       run: |
         mkdir -p crates/tauri/binaries
         cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
+        cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}
     # Build front-end client
     - name: Build client
       env:

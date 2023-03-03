@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use entities::models::connection;
 use entities::models::tag::{TagPair, TagType};
 use jsonrpsee::core::async_trait;
@@ -20,6 +21,9 @@ pub const LENS: &str = "Calendar";
 pub const TITLE: &str = "Google Calendar";
 /// The description for google calendar connections
 pub const DESCRIPTION: &str = "Adds indexing support for Google calendar events.";
+
+const MONTH_DAYS: i64 = 30;
+const YEAR_DAYS: i64 = 365;
 
 const BUFFER_SYNC_SIZE: usize = 500;
 pub struct GCalConnection {
@@ -72,7 +76,7 @@ impl Connection for GCalConnection {
         vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
-    async fn sync(&mut self, state: &AppState) {
+    async fn sync(&mut self, state: &AppState, last_synced_at: Option<DateTime<Utc>>) {
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
         log::debug!("syncing w/ connection: {}", &Self::id());
 
@@ -82,8 +86,20 @@ impl Connection for GCalConnection {
 
         let mut buffer = Vec::new();
 
+        // Timebox list of events. 1 year in the past & 3 months into the future.
+        let after = if let Some(last_synced_at) = last_synced_at {
+            last_synced_at
+        } else {
+            Utc::now() - chrono::Duration::days(YEAR_DAYS)
+        };
+        let before = Utc::now() + chrono::Duration::days(MONTH_DAYS * 3);
+
         // Grab the next page of files
-        while let Ok(events) = self.client.list_calendar_events("primary", next_page).await {
+        while let Ok(events) = self
+            .client
+            .list_calendar_events("primary", Some(after), Some(before), next_page)
+            .await
+        {
             next_page = events.next_page_token;
             num_events += events.items.len();
             buffer.extend(events.items);
@@ -93,7 +109,9 @@ impl Connection for GCalConnection {
                 for event in &buffer {
                     let api_uri = self.to_url("primary", &event.id);
                     log::debug!("gcal event: {}", event.summary);
-                    events.push(event_to_crawl(&api_uri, event));
+                    if let Some(event) = event_to_crawl(&api_uri, event) {
+                        events.push(event);
+                    }
                 }
 
                 if let Err(err) = process_crawl_results(state, &events, &self.default_tags()).await
@@ -128,9 +146,12 @@ impl Connection for GCalConnection {
                 .await
             {
                 Ok(event) => {
-                    let mut event = event_to_crawl(uri, &event);
-                    event.tags.extend(self.default_tags());
-                    Ok(event)
+                    if let Some(mut event) = event_to_crawl(uri, &event) {
+                        event.tags.extend(self.default_tags());
+                        Ok(event)
+                    } else {
+                        Err(CrawlError::NotFound)
+                    }
                 }
                 Err(err) => Err(CrawlError::FetchError(err.to_string())),
             };
@@ -140,7 +161,7 @@ impl Connection for GCalConnection {
     }
 }
 
-fn event_to_crawl(api_url: &Url, event: &CalendarEvent) -> CrawlResult {
+fn event_to_crawl(api_url: &Url, event: &CalendarEvent) -> Option<CrawlResult> {
     let mut tags: Vec<TagPair> = Vec::new();
     for attendee in &event.attendees {
         if attendee.is_organizer {
@@ -150,16 +171,30 @@ fn event_to_crawl(api_url: &Url, event: &CalendarEvent) -> CrawlResult {
         }
     }
 
-    let content = event.description.clone().unwrap_or_default();
-    let title = format!("{} ({})", &event.summary, event.start.date);
-    let mut crawl_result = CrawlResult::new(
-        api_url,
-        Some(event.html_link.clone()),
-        &content,
-        &title,
-        None,
-    );
-    crawl_result.tags = tags;
+    // Skip recurring events that aren't coming up after today.
+    let date = if event.is_recurring() {
+        event
+            .next_recurrence()
+            .map(|x| x.with_timezone(&chrono::Local).format("%F %r").to_string())
+    } else {
+        Some(event.start.date_time.map_or(event.start.date.clone(), |d| {
+            d.with_timezone(&chrono::Local).format("%F %r").to_string()
+        }))
+    };
 
-    crawl_result
+    if let Some(date) = date {
+        let content = event.description.clone().unwrap_or_default();
+        let title = format!("{} ({})", &event.summary, date);
+        let mut crawl_result = CrawlResult::new(
+            api_url,
+            Some(event.html_link.clone()),
+            &content,
+            &title,
+            None,
+        );
+        crawl_result.tags = tags;
+        Some(crawl_result)
+    } else {
+        None
+    }
 }

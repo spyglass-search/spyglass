@@ -21,6 +21,8 @@ pub enum WizardStage {
     IndexCloud,
     #[strum(serialize = "index-files")]
     IndexFiles,
+    #[strum(serialize = "index-bookmarks")]
+    IndexBookmarks,
     #[strum(serialize = "index-web")]
     IndexWeb,
     #[strum(serialize = "done")]
@@ -45,7 +47,8 @@ pub fn wizard_page(props: &WizardProps) -> Html {
             WizardStage::MenubarHelp => WizardStage::DisplaySearchbarHelp,
             WizardStage::DisplaySearchbarHelp => WizardStage::IndexFiles,
             WizardStage::IndexFiles => WizardStage::IndexCloud,
-            WizardStage::IndexCloud => WizardStage::IndexWeb,
+            WizardStage::IndexCloud => WizardStage::IndexBookmarks,
+            WizardStage::IndexBookmarks => WizardStage::IndexWeb,
             WizardStage::IndexWeb => WizardStage::Done,
             _ => WizardStage::Done,
         };
@@ -77,6 +80,9 @@ pub fn wizard_page(props: &WizardProps) -> Html {
         }
         WizardStage::DisplaySearchbarHelp => {
             html! { <display_searchbar::DisplaySearchbarPage /> }
+        }
+        WizardStage::IndexBookmarks => {
+            html! { <indexing_help::IndexBookmarks /> }
         }
         WizardStage::IndexFiles => {
             html! { <indexing_help::IndexFilesHelp toggle_file_indexer={*toggle_file_indexer} onchange={handle_onchange} /> }

@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use entities::models::connection;
 use entities::models::crawl_queue::{self, CrawlType, EnqueueSettings};
 use entities::models::tag::{TagPair, TagType, TagValue};
@@ -87,12 +88,20 @@ impl Connection for DriveConnection {
         vec![(TagType::Source, Self::id()), (TagType::Lens, LENS.into())]
     }
 
-    async fn sync(&mut self, state: &AppState) {
+    async fn sync(&mut self, state: &AppState, last_synced_at: Option<DateTime<Utc>>) {
         log::debug!("syncing w/ connection");
         let _ = connection::set_sync_status(&state.db, &Self::id(), &self.user, true).await;
 
         // Ignore shortcuts
-        let ignore_query = "mimeType != 'application/vnd.google-apps.shortcut'".to_string();
+        let mut query = "mimeType != 'application/vnd.google-apps.shortcut'".to_string();
+        // If this is not the first sync, only look at files that have been modified since the
+        // last sync.
+        if let Some(last_synced_at) = last_synced_at {
+            query = format!(
+                "{query} and modifiedTime > '{}'",
+                last_synced_at.to_rfc3339()
+            );
+        }
 
         // stream pages of files from the integration & add them to the crawl queue
         let mut next_page = None;
@@ -102,7 +111,7 @@ impl Connection for DriveConnection {
         // Grab the next page of files
         while let Ok(resp) = self
             .client
-            .list_files(next_page.clone(), Some(ignore_query.clone()))
+            .list_files(next_page.clone(), Some(query.clone()))
             .await
         {
             next_page = resp.next_page_token;

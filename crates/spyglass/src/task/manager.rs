@@ -1,7 +1,7 @@
-use entities::models::crawl_queue;
+use entities::models::{connection, crawl_queue};
 use tokio::sync::mpsc;
 
-use super::{CrawlTask, WorkerCommand};
+use super::{CollectTask, CrawlTask, ManagerCommand, WorkerCommand};
 use crate::pipeline::PipelineCommand;
 use crate::state::AppState;
 
@@ -37,7 +37,7 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
             }
         }
         Err(err) => {
-            log::error!("Unable to dequeue jobs: {}", err.to_string());
+            log::warn!("Unable to dequeue jobs: {}", err.to_string());
             started_task = Some(false);
         }
         _ => {}
@@ -71,10 +71,22 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
             }
         }
         Err(err) => {
-            log::error!("Unable to dequeue jobs: {}", err.to_string());
+            log::warn!("Unable to dequeue jobs: {}", err.to_string());
             started_task = Some(false);
         }
         _ => {}
+    }
+
+    // Do we have any connections we should be syncing
+    if let Some(task) = connection::dequeue_sync(&state.db).await {
+        let _ = state
+            .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
+                api_id: task.api_id,
+                account: task.account,
+                is_first_sync: false,
+            }))
+            .await;
+        started_task = Some(true);
     }
 
     if let Some(ret) = started_task {

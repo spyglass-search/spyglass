@@ -14,6 +14,13 @@ use shared::config::Config;
 use shared::{event::ClientEvent, request, response, url_to_file_path};
 use spyglass_rpc::RpcClient;
 
+#[cfg(target_os = "linux")]
+use super::platform::linux::os_open;
+#[cfg(target_os = "macos")]
+use super::platform::mac::os_open;
+#[cfg(target_os = "windows")]
+use super::platform::windows::os_open;
+
 mod settings;
 pub use settings::*;
 
@@ -81,17 +88,13 @@ pub async fn open_result(
 ) -> Result<(), String> {
     match url::Url::parse(url) {
         Ok(mut url) => {
-            // treat open files as a local action.
             if url.scheme() == "file" {
                 let _ = url.set_host(None);
+            }
 
-                #[cfg(target_os = "windows")]
-                let path = url_to_file_path(url.path(), true);
-
-                #[cfg(not(target_os = "windows"))]
-                let path = url_to_file_path(url.path(), false);
-
-                return open_application(path, application);
+            if let Err(err) = os_open(&url, application) {
+                log::warn!("Unable to open {} due to: {}", url.to_string(), err);
+                return Err(err.to_string());
             }
 
             open_application(url.to_string(), application)

@@ -1,4 +1,4 @@
-use entities::models::bootstrap_queue;
+use entities::models::{bootstrap_queue, connection};
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use shared::config::{Config, LensConfig};
@@ -37,6 +37,7 @@ pub enum CollectTask {
     ConnectionSync {
         api_id: String,
         account: String,
+        is_first_sync: bool,
     },
 }
 
@@ -233,19 +234,22 @@ pub async fn worker_task(
                                     }
                                 });
                             }
-                            CollectTask::ConnectionSync { api_id, account } => {
+                            CollectTask::ConnectionSync { api_id, account, is_first_sync } => {
                                 log::debug!("handling ConnectionSync for {}", api_id);
                                 let state = state.clone();
                                 tokio::spawn(async move {
-                                    match load_connection(&state, &api_id, &account).await {
-                                        Ok(mut conn) => {
-                                            conn.as_mut().sync(&state).await;
-                                        }
-                                        Err(err) => log::error!(
-                                            "Unable to sync w/ connection: {} - {}",
-                                            api_id,
-                                            err.to_string()
-                                        ),
+                                    match connection::get_by_id(&state.db, &api_id, &account).await {
+                                        Ok(Some(connection)) => {
+                                            match load_connection(&state, &api_id, &account).await {
+                                                Ok(mut conn) => {
+                                                    let last_sync = if is_first_sync { None } else { Some(connection.updated_at) };
+                                                    conn.as_mut().sync(&state, last_sync).await;
+                                                }
+                                                Err(err) => log::warn!("Unable to sync w/ connection: {account}@{api_id} - {err}"),
+                                            }
+                                        },
+                                        Ok(None) => log::warn!("No connection {account}@{api_id}"),
+                                        Err(err) => log::warn!("Unable to find connection {account}@{api_id} - {err}"),
                                     }
                                 });
                             }

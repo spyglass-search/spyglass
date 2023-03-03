@@ -544,7 +544,7 @@ pub async fn enqueue_local_files(
             .await?;
 
         let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
-        let tag_rslt = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
+        let tag_rslt = insert_tags_many(db, &inserted_rows, &overrides.tags).await;
         if tag_rslt.is_ok() {
             let query = Query::update()
                 .table(Entity.table_ref())
@@ -620,9 +620,9 @@ pub async fn enqueue_all<C: ConnectionTrait>(
             .unwrap_or_default();
 
         if !to_update.is_empty() {
-            let result = insert_tags_many(&to_update, db, &overrides.tags).await;
+            let result = insert_tags_many(db, &to_update, &overrides.tags).await;
             if let Err(error) = result {
-                log::error!("Error inserting tags for crawl {:?}", error);
+                log::error!("Error updating tags for crawl: {:?}", error);
             }
         }
     }
@@ -652,30 +652,21 @@ pub async fn enqueue_all<C: ConnectionTrait>(
             .build(SqliteQueryBuilder);
 
         let values: Vec<Value> = values.iter().map(|x| x.to_owned()).collect();
-        match db
-            .execute(Statement::from_sql_and_values(
-                DbBackend::Sqlite,
-                &sql,
-                values,
-            ))
-            .await
-        {
-            Ok(_) => {
-                if !overrides.tags.is_empty() {
-                    let inserted_rows = Entity::find()
-                        .filter(Column::Url.is_in(urls))
-                        .all(db)
-                        .await
-                        .unwrap_or_default();
-                    if !inserted_rows.is_empty() {
-                        let result = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
-                        if let Err(error) = result {
-                            log::error!("Error inserting tags for crawl {:?}", error);
-                        }
-                    }
+        let statement = Statement::from_sql_and_values(DbBackend::Sqlite, &sql, values);
+        if let Err(err) = db.execute(statement).await {
+            log::warn!("insert_many error: {err}");
+        } else if !overrides.tags.is_empty() {
+            let inserted_rows = Entity::find()
+                .filter(Column::Url.is_in(urls))
+                .all(db)
+                .await
+                .unwrap_or_default();
+
+            if !inserted_rows.is_empty() {
+                if let Err(error) = insert_tags_many(db, &inserted_rows, &overrides.tags).await {
+                    log::warn!("Error inserting tags for crawl - {:?}", error);
                 }
             }
-            Err(e) => log::error!("insert_many error: {:?}", e),
         }
     }
 
@@ -755,18 +746,23 @@ pub async fn insert_tags_by_id<C: ConnectionTrait>(
 /// Inserts an entry into the tag table for each crawl and
 /// tag pair provided
 pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &[Model],
     db: &C,
+    docs: &[Model],
     tags: &[TagPair],
-) -> Result<InsertResult<crawl_tag::ActiveModel>, DbErr> {
+) -> Result<(), DbErr> {
     let mut tag_ids: Vec<i64> = Vec::new();
     for (label, value) in tags.iter() {
         match get_or_create(db, label.to_owned(), value).await {
             Ok(tag) => tag_ids.push(tag.id),
-            Err(err) => log::error!("{}", err),
+            Err(err) => log::warn!("Unable to get/create tag: {err}"),
         }
     }
-    insert_tags_by_id(db, docs, &tag_ids).await
+
+    let res = insert_tags_by_id(db, docs, &tag_ids).await;
+    match res {
+        Ok(_) | Err(DbErr::RecordNotInserted) => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected
@@ -980,6 +976,24 @@ pub async fn process_urls_for_removed_exts(
         }
     }
     Ok(tasks)
+}
+
+/// Helper method used to get the details for the task. This method will return the associated task and any
+/// associated tags
+pub async fn get_task_details(
+    task_id: i64,
+    db: &DatabaseConnection,
+) -> Result<Option<(Model, Vec<tag::Model>)>, DbErr> {
+    if let Some(task) = Entity::find()
+        .filter(Column::Id.eq(task_id))
+        .one(db)
+        .await?
+    {
+        let tags = task.find_related(tag::Entity).all(db).await?;
+        return Ok(Some((task, tags)));
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]
