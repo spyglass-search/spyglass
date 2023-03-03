@@ -12,10 +12,11 @@ use std::sync::Arc;
 
 use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
+use tauri::api::process::current_binary;
 use tauri::{
-    AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
+    AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray,
+    SystemTrayEvent,
 };
-use tauri::api::process::{current_binary};
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing_log::LogTracer;

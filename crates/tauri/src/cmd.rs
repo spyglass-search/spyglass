@@ -7,7 +7,7 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::Manager;
 use tauri::State;
 
-use crate::window::{alert, show_discover_window};
+use crate::window::show_discover_window;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::Config;
@@ -74,7 +74,7 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_result(win: tauri::Window, url: &str) -> Result<(), String> {
+pub async fn open_result(_win: tauri::Window, url: &str) -> Result<(), String> {
     match url::Url::parse(url) {
         Ok(mut url) => {
             // treat open files as a local action.
@@ -96,7 +96,6 @@ pub async fn open_result(win: tauri::Window, url: &str) -> Result<(), String> {
 
             if let Err(err) = open::that(url.to_string()) {
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
-                alert(&win, "cant oepn", &err.to_string());
                 return Err(err.to_string());
             }
 
