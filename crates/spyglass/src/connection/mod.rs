@@ -159,6 +159,12 @@ async fn listen_for_token(
     scopes: &[String],
 ) -> Result<()> {
     let request = client.authorize(scopes);
+
+    // Linux requires special checks if we're running inside an AppImage
+    #[cfg(target_os = "linux")]
+    let _ = crate::platform::linux_open(request.url.as_str());
+
+    #[cfg(not(target_os = "linux"))]
     let _ = open::that(request.url.to_string());
 
     log::debug!("listening for auth code");
