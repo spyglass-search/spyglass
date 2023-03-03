@@ -1,15 +1,16 @@
-use crate::components::forms::SettingChangeEvent;
-use crate::components::{forms, icons};
-use crate::tauri_invoke;
-use yew::platform::spawn_local;
-use yew::prelude::*;
-
 use shared::{
+    constants::{CHROME_EXT_LINK, FIREFOX_EXT_LINK},
     event::ClientInvoke,
     form::{FormType, SettingOpts},
     response::DefaultIndices,
 };
+use yew::platform::spawn_local;
+use yew::prelude::*;
 use yew::virtual_dom::VNode;
+use crate::components::{forms::SettingChangeEvent, btn::{BtnSize, BtnAlign}};
+use crate::components::{forms, icons};
+use crate::tauri_invoke;
+use super::btn;
 
 #[derive(Properties, PartialEq)]
 pub struct IndexFilesHelpProps {
@@ -124,6 +125,31 @@ pub fn index_web_help() -> Html {
             <div>
                 <img src="/discover-tab.png"  class="w-[300px] mx-auto rounded shadow-md shadow-cyan-500/50"/>
             </div>
+        </div>
+    }
+}
+
+#[function_component(IndexBookmarks)]
+pub fn index_bookmarks_help() -> Html {
+    html! {
+        <div class="p-4 bg-neutral-800 h-screen text-left text-neutral-400 flex flex-col gap-4 h-">
+            <h1 class="text-2xl flex flex-row items-center gap-2 text-white">
+                <icons::BookmarkIcon width="w-8" height="h-8" />
+                <div>{"Search your bookmarks"}</div>
+            </h1>
+            <div class="text-sm">
+                {"Easily "}<span class="font-bold text-cyan-500">{"add URLs to your library"}</span>{" & "}
+                <span class="font-bold text-cyan-500">{"sync your bookmarks"}</span>{" with our extensions."}
+            </div>
+            <btn::Btn href={CHROME_EXT_LINK} classes={classes!("w-full")} size={BtnSize::Xl} align={BtnAlign::Left}>
+                <icons::ChromeBrowserIcon height="h-9" width="w-9" />
+                <div class="ml-2">{"Install for Chrome"}</div>
+            </btn::Btn>
+            <btn::Btn href={FIREFOX_EXT_LINK} classes={classes!("w-full")} size={BtnSize::Xl} align={BtnAlign::Left}>
+                <icons::FirefoxBrowserIcon height="h-9" width="w-9" />
+                <div class="ml-2">{"Install for Firefox"}</div>
+            </btn::Btn>
+
         </div>
     }
 }

@@ -73,6 +73,21 @@ pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Clone, PartialEq, Eq)]
+pub enum BtnAlign {
+    Left,
+    Right,
+    Center,
+}
+
+impl Default for BtnAlign {
+    fn default() -> Self {
+        Self::Center
+    }
+}
+
+
 #[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
     Default,
@@ -93,6 +108,7 @@ pub enum BtnSize {
     Sm,
     Base,
     Lg,
+    Xl,
 }
 
 impl Default for BtnSize {
@@ -107,6 +123,8 @@ pub struct DefaultBtnProps {
     pub _type: BtnType,
     #[prop_or_default]
     pub size: BtnSize,
+    #[prop_or_default]
+    pub align: BtnAlign,
     #[prop_or_default]
     pub onclick: Callback<MouseEvent>,
     #[prop_or_default]
@@ -148,6 +166,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         BtnSize::Sm => classes!("text-sm", "px-2", "py-1"),
         BtnSize::Base => classes!("text-base", "px-3", "py-2"),
         BtnSize::Lg => classes!("text-lg", "px-3", "py-2"),
+        BtnSize::Xl => classes!("text-xl", "px-4", "py-4"),
     };
 
     let styles = classes!(
@@ -202,10 +221,23 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         props.children.clone()
     };
 
+    let mut label_styles = classes!(
+        "flex",
+        "flex-row",
+        "gap-1",
+        "items-center",
+    );
+
+    match &props.align {
+        BtnAlign::Left => {},
+        BtnAlign::Right => label_styles.push("ml-auto"),
+        BtnAlign::Center => label_styles.push("mx-auto"),
+    }
+
     if props.href.is_none() {
         html! {
             <button onclick={handle_onclick} class={styles} disabled={props.disabled}>
-                <div class="flex flex-row gap-1 items-center mx-auto">
+                <div class={label_styles}>
                     {label}
                 </div>
             </button>
@@ -213,7 +245,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     } else {
         html! {
             <a onclick={handle_onclick} class={styles}>
-                <div class="flex flex-row gap-1 items-center mx-auto">
+                <div class={label_styles}>
                     {label}
                 </div>
             </a>

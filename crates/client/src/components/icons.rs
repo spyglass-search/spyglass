@@ -1,6 +1,9 @@
 use yew::function_component;
 use yew::prelude::*;
 
+mod browser;
+pub use browser::*;
+
 #[derive(Properties, PartialEq)]
 pub struct IconProps {
     #[prop_or_default]
