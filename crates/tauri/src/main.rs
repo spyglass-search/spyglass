@@ -26,6 +26,13 @@ use shared::config::Config;
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
 
+#[cfg(target_os = "linux")]
+use platform::linux::os_open;
+#[cfg(target_os = "macos")]
+use platform::mac::os_open;
+#[cfg(target_os = "windows")]
+use platform::windows::os_open;
+
 mod cmd;
 mod constants;
 mod menu;
@@ -248,7 +255,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 window.open_devtools();
                             }
                             MenuID::JOIN_DISCORD => {
-                                let _ = open::that(shared::constants::DISCORD_JOIN_URL);
+                                let _ = os_open(
+                                    &url::Url::parse(shared::constants::DISCORD_JOIN_URL)
+                                        .expect("Invalid Discord URL"),
+                                );
                             }
                             // Just metainfo
                             MenuID::VERSION => {}

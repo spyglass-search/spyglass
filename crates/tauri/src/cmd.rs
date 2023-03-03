@@ -83,7 +83,7 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_result(_win: tauri::Window, url: &str) -> Result<(), String> {
+pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     match url::Url::parse(url) {
         Ok(mut url) => {
             if url.scheme() == "file" {
