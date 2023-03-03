@@ -14,6 +14,13 @@ use shared::config::Config;
 use shared::{event::ClientEvent, request, response};
 use spyglass_rpc::RpcClient;
 
+#[cfg(target_os = "linux")]
+use super::platform::linux::os_open;
+#[cfg(target_os = "macos")]
+use super::platform::mac::os_open;
+#[cfg(target_os = "windows")]
+use super::platform::windows::os_open;
+
 mod settings;
 pub use settings::*;
 
@@ -77,24 +84,11 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
     match url::Url::parse(url) {
         Ok(mut url) => {
-            // treat open files as a local action.
             if url.scheme() == "file" {
                 let _ = url.set_host(None);
-
-                #[cfg(target_os = "windows")]
-                {
-                    use shared::url_to_file_path;
-                    let path = url_to_file_path(url.path(), true);
-                    if let Err(err) = open::that(format!("file://{path}")) {
-                        log::warn!("Unable to open file://{path} due to: {err}");
-                        return Err(err.to_string());
-                    }
-
-                    return Ok(());
-                }
             }
 
-            if let Err(err) = open::that(url.to_string()) {
+            if let Err(err) = os_open(&url) {
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
                 return Err(err.to_string());
             }

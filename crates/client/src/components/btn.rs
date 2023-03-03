@@ -1,7 +1,11 @@
+use shared::event::OpenResultParams;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::{icons, tooltip::Tooltip};
+use crate::{
+    components::{icons, tooltip::Tooltip},
+    tauri_invoke,
+};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct DeleteButtonProps {
@@ -110,7 +114,7 @@ pub struct DefaultBtnProps {
     #[prop_or_default]
     pub children: Children,
     #[prop_or_default]
-    pub href: String,
+    pub href: Option<AttrValue>,
     #[prop_or_default]
     pub classes: Classes,
 }
@@ -165,6 +169,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     let prop_onclick = props.onclick.clone();
     let btn_type = props._type.clone();
 
+    let href_prop = props.href.clone();
     let handle_onclick = Callback::from(move |evt| {
         // Handle confirmation for danger buttons
         if btn_type == BtnType::Danger {
@@ -174,6 +179,19 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
                 confirmed_state.set(true);
             }
         } else {
+            if let Some(href) = &href_prop {
+                let href = href.clone();
+                spawn_local(async move {
+                    let _ = tauri_invoke::<OpenResultParams, ()>(
+                        shared::event::ClientInvoke::OpenResult,
+                        OpenResultParams {
+                            url: href.to_string(),
+                        },
+                    )
+                    .await;
+                });
+            }
+
             prop_onclick.emit(evt);
         }
     });
@@ -184,7 +202,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         props.children.clone()
     };
 
-    if props.href.is_empty() {
+    if props.href.is_none() {
         html! {
             <button onclick={handle_onclick} class={styles} disabled={props.disabled}>
                 <div class="flex flex-row gap-1 items-center mx-auto">
@@ -194,7 +212,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         }
     } else {
         html! {
-            <a onclick={handle_onclick} href={props.href.clone()} class={styles} target="_blank">
+            <a onclick={handle_onclick} class={styles}>
                 <div class="flex flex-row gap-1 items-center mx-auto">
                     {label}
                 </div>
