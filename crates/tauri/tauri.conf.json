@@ -27,7 +27,7 @@
         "../../assets/*"
       ],
       "externalBin": ["binaries/spyglass-server", "binaries/spyglass-debug"],
-      "copyright": "(C) 2022 Andrew Huynh",
+      "copyright": "(C) 2023 Spyglass Search, Inc.",
       "category": "DeveloperTool",
       "shortDescription": "",
       "longDescription": "",
@@ -65,7 +65,7 @@
     },
     "windows": [],
     "security": {
-      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self'; script-src 'unsafe-eval'"
+      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'self';"
     },
     "systemTray": {
       "iconPath": "icons/tray-icon.png",
