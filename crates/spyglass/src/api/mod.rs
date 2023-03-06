@@ -24,7 +24,7 @@ pub struct SpyglassRpc {
 #[async_trait]
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
-        Ok("0.1.0".into())
+        Ok("0.1.1".into())
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
