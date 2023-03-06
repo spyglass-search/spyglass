@@ -11,7 +11,7 @@ use crate::window::show_discover_window;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::Config;
-use shared::{event::ClientEvent, request, response, url_to_file_path};
+use shared::{event::ClientEvent, request, response};
 use spyglass_rpc::RpcClient;
 
 #[cfg(target_os = "linux")]
@@ -96,8 +96,7 @@ pub async fn open_result(
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
                 return Err(err.to_string());
             }
-
-            open_application(url.to_string(), application)
+            Ok(())
         }
         Err(err) => Err(err.to_string()),
     }
@@ -392,26 +391,4 @@ pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, Strin
         file_paths: Vec::new(),
         extensions: Vec::new(),
     })
-}
-
-// Helper method used to open the specified url with either the default application or the
-// specified application
-fn open_application(url: String, application: Option<String>) -> Result<(), String> {
-    match application {
-        Some(application) => {
-            log::info!("Open url {:?} with application {:?}", url, application);
-            if let Err(err) = open::with(url.clone(), application) {
-                log::warn!("Unable to open {} due to: {}", url, err);
-                return Err(err.to_string());
-            }
-        }
-        None => {
-            log::info!("Open url with default application {:?}", url);
-            if let Err(err) = open::that(url.clone()) {
-                log::warn!("Unable to open {} due to: {}", url, err);
-                return Err(err.to_string());
-            }
-        }
-    }
-    Ok(())
 }
