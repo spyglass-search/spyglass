@@ -21,7 +21,7 @@ use libspyglass::task::{AppPause, ManagerCommand};
 use num_format::{Locale, ToFormattedString};
 use shared::config::{self, Config};
 use shared::metrics::Event;
-use shared::request::{RawDocType, RawDocumentRequest};
+use shared::request::{BatchDocumentRequest, RawDocType, RawDocumentRequest};
 use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
@@ -36,8 +36,53 @@ use super::response;
 
 pub mod search;
 
+pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) -> Result<(), Error> {
+    // Validate tags and consolidate tags
+    let mut tags = Vec::new();
+    tags.push((TagType::Source, req.source.to_string()));
+    for (tag_type, tag_value) in req.tags.iter() {
+        if let Ok(ttype) = TagType::from_str(tag_type) {
+            if !tag_value.is_empty() {
+                tags.push((ttype, tag_value.to_owned()));
+            } else {
+                log::warn!("Invalid tag value `{tag_value}` for tag type: {tag_type}");
+            }
+        } else {
+            log::warn!("Invalid tag type: {tag_type}");
+        }
+    }
+
+    // No need to process anything, simply add to the crawl queue for processing
+    log::debug!(
+        "Enqueueing {} URLs from webext w/ tags: {:?}",
+        req.urls.len(),
+        &tags
+    );
+    let overrides = EnqueueSettings {
+        force_allow: true,
+        is_recrawl: true,
+        tags,
+        ..Default::default()
+    };
+
+    if let Err(err) = crawl_queue::enqueue_all(
+        &state.db,
+        &req.urls,
+        &[],
+        &state.user_settings,
+        &overrides,
+        None,
+    )
+    .await
+    {
+        return Err(Error::Custom(format!("Unable to queue URL: {err}")));
+    }
+
+    Ok(())
+}
+
 /// Adds a raw document to the user's index.
-pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Result<(), Error> {
+pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Result<(), Error> {
     // Validate tags and consolidate tags
     let mut tags = Vec::new();
     tags.push((TagType::Source, req.source.to_string()));
@@ -83,7 +128,7 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
 
             // Add to index
             log::debug!("adding to index: {} - {:?}", crawl.url, crawl.tags);
-            if let Err(err) = process_crawl_results(&state, &[crawl], &Vec::new()).await {
+            if let Err(err) = process_crawl_results(state, &[crawl], &Vec::new()).await {
                 log::error!("Unable to add from webext: {}", err);
             }
         }
@@ -93,7 +138,7 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
         }
         // No need to process anything, simply add to the crawl queue for processing
         RawDocType::Url => {
-            log::debug!("Enqueueing URL fro webext: {} - {:?}", req.url, &tags);
+            log::debug!("Enqueueing URL from webext: {} - {:?}", req.url, &tags);
             let overrides = EnqueueSettings {
                 force_allow: true,
                 is_recrawl: true,

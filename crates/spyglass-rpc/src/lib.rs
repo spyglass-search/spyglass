@@ -2,7 +2,7 @@ use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
 use std::collections::HashMap;
 
-use shared::request::{RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
     SearchLensesResp, SearchResults,
@@ -18,6 +18,10 @@ pub trait Rpc {
     /// Adds an unparsed document to the spyglass index.
     #[method(name = "index.add_raw_document")]
     async fn add_raw_document(&self, doc: RawDocumentRequest) -> Result<(), Error>;
+
+    /// Adds a whole bunch of documents at once to the spyglass index.
+    #[method(name = "index.add_document_batch")]
+    async fn add_document_batch(&self, req: BatchDocumentRequest) -> Result<(), Error>;
 
     /// Checks whether a URL has been indexed
     #[method(name = "index.is_document_indexed")]

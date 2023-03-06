@@ -93,9 +93,21 @@ fn render_metadata(result: &SearchResult) -> Html {
     // Generate the icons/labels required for tags
     let mut priority_tags = Vec::new();
     let mut normal_tags = Vec::new();
+
+    let result_type = result
+        .tags
+        .iter()
+        .find(|(label, _)| label.to_lowercase() == "type")
+        .map(|(_, val)| val.as_str())
+        .unwrap_or_default();
+
     for (tag, value) in result.tags.iter() {
         let tag = tag.to_lowercase();
         if tag == "source" || tag == "mimetype" {
+            continue;
+        }
+
+        if result_type == "repository" && tag == "repository" {
             continue;
         }
 
