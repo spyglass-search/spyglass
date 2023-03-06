@@ -7,7 +7,7 @@ use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::Config;
-use shared::request::{RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::RpcServer;
 use std::collections::HashMap;
@@ -28,7 +28,11 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
-        handler::add_raw_document(self.state.clone(), &req).await
+        handler::add_raw_document(&self.state, &req).await
+    }
+
+    async fn add_document_batch(&self, req: BatchDocumentRequest) -> Result<(), Error> {
+        handler::add_document_batch(&self.state, &req).await
     }
 
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {
