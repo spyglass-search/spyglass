@@ -94,7 +94,9 @@ fn render_metadata(result: &SearchResult) -> Html {
     let mut priority_tags = Vec::new();
     let mut normal_tags = Vec::new();
 
-    let result_type = result.tags.iter()
+    let result_type = result
+        .tags
+        .iter()
         .find(|(label, _)| label.to_lowercase() == "type")
         .map(|(_, val)| val.as_str())
         .unwrap_or_default();
