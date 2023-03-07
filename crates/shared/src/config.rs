@@ -188,17 +188,14 @@ impl UserActionSettings {
     // List of default actions when no other actions are configured
     pub fn default_actions() -> UserActionSettings {
         UserActionSettings {
-            actions: vec![
-                UserActionDefinition {
-                    action: UserAction::CopyToClipboard(String::from("{{ url }}")),
-                    key_binding: String::from("CmdOrCtrl+C"),
-                    label: String::from("Copy URL to Clipboard"),
-                    status_msg: Some(String::from("Copying...")),
-                }
-            ],
+            actions: vec![UserActionDefinition {
+                action: UserAction::CopyToClipboard(String::from("{{ url }}")),
+                key_binding: String::from("CmdOrCtrl+C"),
+                label: String::from("Copy URL to Clipboard"),
+                status_msg: Some(String::from("Copying...")),
+            }],
             context_actions: vec![],
         }
-        
     }
 }
 
