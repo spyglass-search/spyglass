@@ -2,48 +2,6 @@
 // Copyright 2021-2023 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 
-//! Accelerators describe keyboard shortcuts defined by the application.
-//!
-//! [`Accelerator`s](crate::accelerator::Accelerator) are used to define a keyboard shortcut consisting
-//! of an optional combination of modifier keys (provided by [`SysMods`](crate::accelerator::SysMods),
-//! [`RawMods`](crate::accelerator::RawMods) or [`ModifiersState`](crate::keyboard::ModifiersState)) and
-//! one key ([`KeyCode`](crate::keyboard::KeyCode)).
-//!
-//! # Examples
-//! They can be created directly
-//! ```
-//! # use tao::accelerator::{Accelerator, AcceleratorId, SysMods, RawMods};
-//! # use tao::keyboard::{ModifiersState, KeyCode};
-//! #
-//! let accelerator = Accelerator::new(SysMods::Shift, KeyCode::KeyQ);
-//! let accelerator_with_raw_mods = Accelerator::new(RawMods::Shift, KeyCode::KeyQ);
-//! let accelerator_without_mods = Accelerator::new(None, KeyCode::KeyQ);
-//! # assert_eq!(accelerator, accelerator_with_raw_mods);
-//! # assert_eq!(
-//! #     accelerator.with_id(AcceleratorId::new("shift+q")),
-//! #     "shift+q".parse().unwrap()
-//! # );
-//! ```
-//! or from `&str`, note that all modifiers
-//! have to be listed before the non-modifier key, `shift+alt+q` is legal,
-//! whereas `shift+q+alt` is not.
-//! ```
-//! # use tao::accelerator::{Accelerator, AcceleratorId, RawMods};
-//! # use tao::keyboard::{ModifiersState, KeyCode};
-//! #
-//! let accelerator: Accelerator = "shift+alt+q".parse().unwrap();
-//! # assert_eq!(
-//! #     accelerator,
-//! #     Accelerator::new(RawMods::AltShift, KeyCode::KeyQ)
-//! #         .with_id(AcceleratorId::new("shift+alt+q"))
-//! # );
-//! #
-//! # // This assert exists to ensure a test breaks once the
-//! # // statement above about ordering is no longer valid.
-//! # assert!("shift+q+alt".parse::<Accelerator>().is_err());
-//! ```
-//!
-
 use crate::keyboard::{KeyCode, ModifiersState, NativeKeyCode};
 use std::{
     borrow::Borrow,
