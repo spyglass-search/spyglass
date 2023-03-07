@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-pub use crate::accelerator::Accelerator;
+pub use crate::accelerator::{self, Accelerator};
 use crate::response::SearchResult;
 use crate::{
     form::{FormType, SettingOpts},
@@ -14,7 +14,6 @@ use crate::{
 };
 pub use spyglass_lens::types::{LensRule, LensSource};
 pub use spyglass_lens::{LensConfig, PipelineConfiguration};
-use std::str::FromStr;
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
@@ -138,16 +137,17 @@ impl UserActionSettings {
         modifiers: &ModifiersState,
         key: &KeyCode,
         context: Option<&SearchResult>,
+        os: &str,
     ) -> bool {
         for action in &self.actions {
-            if action.is_triggered(modifiers, key) {
+            if action.is_triggered(modifiers, key, os) {
                 return true;
             }
         }
 
         if let Some(context) = context {
             for action in &self.context_actions {
-                if action.is_applicable(context) && action.contains_trigger(modifiers, key) {
+                if action.is_applicable(context) && action.contains_trigger(modifiers, key, os) {
                     return true;
                 }
             }
@@ -164,12 +164,13 @@ impl UserActionSettings {
         &self,
         modifiers: &ModifiersState,
         key: &KeyCode,
+        os: &str,
         context: Option<&SearchResult>,
     ) -> Option<UserActionDefinition> {
         if let Some(context) = context {
             for action in &self.context_actions {
                 if action.is_applicable(context) {
-                    if let Some(context_action) = action.get_triggered_action(modifiers, key) {
+                    if let Some(context_action) = action.get_triggered_action(modifiers, key, os) {
                         return Some(context_action);
                     }
                 }
@@ -177,7 +178,7 @@ impl UserActionSettings {
         }
 
         for action in &self.actions {
-            if action.is_triggered(modifiers, key) {
+            if action.is_triggered(modifiers, key, os) {
                 return Some(action.clone());
             }
         }
@@ -214,9 +215,9 @@ impl ContextActions {
     // Helper method used to identify if the context contains an actions that should
     // be triggered by the passed in keyboard combination. Note this method does not
     // check to see if the context is valid, just if the key combination matches.
-    pub fn contains_trigger(&self, modifiers: &ModifiersState, key: &KeyCode) -> bool {
+    pub fn contains_trigger(&self, modifiers: &ModifiersState, key: &KeyCode, os: &str) -> bool {
         for action in &self.actions {
-            if action.is_triggered(modifiers, key) {
+            if action.is_triggered(modifiers, key, os) {
                 return true;
             }
         }
@@ -229,9 +230,10 @@ impl ContextActions {
         &self,
         modifiers: &ModifiersState,
         key: &KeyCode,
+        os: &str,
     ) -> Option<UserActionDefinition> {
         for action in &self.actions {
-            if action.is_triggered(modifiers, key) {
+            if action.is_triggered(modifiers, key, os) {
                 return Some(action.clone());
             }
         }
@@ -344,9 +346,9 @@ pub struct UserActionDefinition {
 impl UserActionDefinition {
     // Helper used to identify if the key binding specified in the action definition
     // matches the passed in key code and modifiers
-    pub fn is_triggered(&self, modifiers: &ModifiersState, key: &KeyCode) -> bool {
+    pub fn is_triggered(&self, modifiers: &ModifiersState, key: &KeyCode, os: &str) -> bool {
         //todo preprocess accelerator like a normal person
-        if let Ok(accelerator) = Accelerator::from_str(&self.key_binding) {
+        if let Ok(accelerator) = accelerator::parse_accelerator(&self.key_binding, os) {
             return accelerator.matches(modifiers, key);
         }
         false

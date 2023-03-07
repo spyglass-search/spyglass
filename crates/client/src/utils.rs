@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter, Result};
+
 use gloo::utils::window;
 
 pub enum OsName {
@@ -13,6 +15,17 @@ pub enum RequestState {
     InProgress,
     Finished,
     Error,
+}
+
+impl Display for OsName {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        match self {
+            OsName::MacOS => write!(f, "mac"),
+            OsName::Windows => write!(f, "windows"),
+            OsName::Linux => write!(f, "linux"),
+            OsName::Unknown => write!(f, "Unknown"),
+        }
+    }
 }
 
 impl Default for RequestState {

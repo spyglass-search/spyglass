@@ -2,11 +2,12 @@ use crate::components::icons::BookOpen;
 use crate::components::icons::{
     ArrowTopRightOnSquare, ClipboardDocumentIcon, DownArrowInBubble, UpArrowInBubble, WinKeyIcon,
 };
+use crate::utils;
+use shared::accelerator;
 use shared::{
-    config::{self, Accelerator, UserAction, UserActionDefinition},
+    config::{self, UserAction, UserActionDefinition},
     keyboard::ModifiersState,
 };
-use std::str::FromStr;
 use yew::function_component;
 use yew::prelude::*;
 
@@ -135,7 +136,10 @@ fn user_action(props: &UserActionProps) -> Html {
     );
     let txt = props.action.label.clone();
 
-    if let Ok(accelerator) = Accelerator::from_str(props.action.key_binding.as_str()) {
+    if let Ok(accelerator) = accelerator::parse_accelerator(
+        props.action.key_binding.as_str(),
+        utils::get_os().to_string().as_str(),
+    ) {
         let key_binding = accelerator.key.to_str();
         let click_action = props.onclick.clone();
         let action = props.action.clone();

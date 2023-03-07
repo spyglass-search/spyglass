@@ -22,7 +22,7 @@ use crate::components::{
     result::{LensResultItem, SearchResultItem},
     SelectedLens,
 };
-use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke};
+use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
 
 #[wasm_bindgen]
 extern "C" {
@@ -552,6 +552,7 @@ impl Component for SearchPage {
                                     if let Some(action) = actions.get_triggered_action(
                                         &self.modifier,
                                         &self.pressed_key.unwrap(),
+                                        utils::get_os().to_string().as_str(),
                                         context,
                                     ) {
                                         self.handle_selected_action(&action, link);
