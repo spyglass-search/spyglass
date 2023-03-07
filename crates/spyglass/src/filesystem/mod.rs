@@ -636,7 +636,7 @@ pub async fn configure_watcher(state: AppState) {
             log::error!("Watcher is missing");
         }
 
-        match processed_files::remove_unmatched_paths(&state.db, path_names).await {
+        match processed_files::remove_unmatched_paths(&state.db, &path_names, false).await {
             Ok(removed) => {
                 let uri_list = removed
                     .iter()
@@ -644,7 +644,7 @@ pub async fn configure_watcher(state: AppState) {
                     .collect::<Vec<String>>();
                 documents::delete_documents_by_uri(&state, uri_list).await;
             }
-            Err(error) => log::error!(
+            Err(error) => log::warn!(
                 "Error removing paths that are no longer being watched. {:?}",
                 error
             ),
@@ -657,7 +657,7 @@ pub async fn configure_watcher(state: AppState) {
             watcher.close().await;
         }
 
-        match processed_files::remove_unmatched_paths(&state.db, Vec::new()).await {
+        match processed_files::remove_unmatched_paths(&state.db, &[], true).await {
             Ok(removed) => {
                 let uri_list = removed
                     .iter()
@@ -665,7 +665,7 @@ pub async fn configure_watcher(state: AppState) {
                     .collect::<Vec<String>>();
                 documents::delete_documents_by_uri(&state, uri_list).await;
             }
-            Err(error) => log::error!(
+            Err(error) => log::warn!(
                 "Error removing paths that are no longer being watched. {:?}",
                 error
             ),

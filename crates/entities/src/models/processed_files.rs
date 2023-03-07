@@ -50,9 +50,10 @@ impl ActiveModelBehavior for ActiveModel {
 /// is used to remove documents for folders that are no longer configured
 pub async fn remove_unmatched_paths(
     db: &DatabaseConnection,
-    paths: Vec<String>,
+    paths: &[String],
+    remove_all: bool,
 ) -> anyhow::Result<Vec<Model>> {
-    if !paths.is_empty() {
+    if !paths.is_empty() || remove_all {
         log::debug!("removing files not matching {:?}", paths);
         let mut find = Entity::find();
         for path in paths {
