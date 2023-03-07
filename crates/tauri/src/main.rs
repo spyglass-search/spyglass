@@ -46,6 +46,8 @@ use window::{
     show_update_window, show_user_settings, show_wizard_window,
 };
 
+use crate::window::get_searchbar;
+
 const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
 #[cfg(not(debug_assertions))]
 const SPYGLASS_LEVEL: &str = "spyglass_app=INFO";
@@ -171,6 +173,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 current_version,
                 app_handle.clone(),
             ));
+
+            let _ = get_searchbar(&app_handle);
 
             app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
