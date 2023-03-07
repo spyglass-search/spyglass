@@ -58,6 +58,9 @@ pub fn show_search_bar(window: &Window) {
 
     #[cfg(target_os = "windows")]
     platform::windows::show_search_bar(window);
+
+    let window = window.clone();
+    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
 }
 
 pub fn hide_search_bar(window: &Window) {
@@ -83,11 +86,11 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
                 .title("Spyglass")
                 .decorations(false)
                 .transparent(true)
+                .visible(false)
                 .disable_file_drop_handler()
                 .inner_size(640.0, default_height)
                 .build()
                 .expect("Unable to create searchbar window");
-        center_search_bar(&window);
 
         // macOS: Handle multiple spaces correctly
         #[cfg(target_os = "macos")]

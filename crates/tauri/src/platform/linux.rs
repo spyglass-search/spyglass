@@ -5,12 +5,14 @@ use tauri::{Env, Window};
 use url::Url;
 
 pub fn show_search_bar(window: &Window) {
+    if let Ok(false) = window.is_visible() {
+        let _ = window.show();
+    }
+
     let _ = window.unminimize();
     window::center_search_bar(window);
     let _ = window.set_focus();
     let _ = window.set_always_on_top(true);
-
-    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
 }
 
 pub fn hide_search_bar(window: &Window) {
