@@ -4,8 +4,8 @@ use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
-use tauri::Manager;
 use tauri::State;
+use tauri::{ClipboardManager, Manager};
 
 use crate::window::show_discover_window;
 use crate::PauseState;
@@ -81,22 +81,38 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_result(_: tauri::Window, url: &str) -> Result<(), String> {
+pub async fn open_result(
+    _: tauri::Window,
+    url: &str,
+    application: Option<String>,
+) -> Result<(), String> {
     match url::Url::parse(url) {
         Ok(mut url) => {
             if url.scheme() == "file" {
                 let _ = url.set_host(None);
             }
 
-            if let Err(err) = os_open(&url) {
+            if let Err(err) = os_open(&url, application) {
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
                 return Err(err.to_string());
             }
-
             Ok(())
         }
         Err(err) => Err(err.to_string()),
     }
+}
+
+#[tauri::command]
+pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), String> {
+    if let Err(error) = win
+        .app_handle()
+        .clipboard_manager()
+        .write_text(String::from(txt))
+    {
+        log::error!("Error copying content to clipboard {:?}", error);
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 #[tauri::command]

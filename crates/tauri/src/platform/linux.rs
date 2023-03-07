@@ -20,7 +20,7 @@ pub fn hide_search_bar(window: &Window) {
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
 
-pub fn os_open(url: &Url) -> anyhow::Result<()> {
+pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
     let binary_path = current_binary(&Env::default())?;
     let parent = if let Some(parent) = binary_path.parent() {
         parent.to_path_buf()
@@ -28,8 +28,20 @@ pub fn os_open(url: &Url) -> anyhow::Result<()> {
         binary_path
     };
 
-    match tauri::api::process::Command::new("xdg-open")
-        .args(vec![url.to_string()])
+    let open_url = if url.scheme() == "file" {
+        use shared::url_to_file_path;
+        url_to_file_path(url.path(), false)
+    } else {
+        url.to_string()
+    };
+
+    let app = match &application {
+        Some(app) => app.clone(),
+        None => String::from("xdg-open"),
+    };
+
+    match tauri::api::process::Command::new(app)
+        .args(vec![open_url])
         .current_dir(parent)
         .output()
     {

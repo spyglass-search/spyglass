@@ -133,11 +133,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
+            cmd::load_action_settings,
             cmd::network_change,
             cmd::open_folder_path,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,
+            cmd::copy_to_clipboard,
             cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
@@ -262,18 +264,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = os_open(
                                     &url::Url::parse(shared::constants::DISCORD_JOIN_URL)
                                         .expect("Invalid Discord URL"),
+                                    None,
                                 );
                             }
                             MenuID::INSTALL_CHROME_EXT => {
                                 let _ = os_open(
                                     &url::Url::parse(shared::constants::CHROME_EXT_LINK)
                                         .expect("Invalid Chrome extension URL"),
+                                    None,
                                 );
                             }
                             MenuID::INSTALL_FIREFOX_EXT => {
                                 let _ = os_open(
                                     &url::Url::parse(shared::constants::FIREFOX_EXT_LINK)
                                         .expect("Invalid Firefox extension URL"),
+                                    None,
                                 );
                             }
                             // Just metainfo

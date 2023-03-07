@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use shared::config::FileSystemSettings;
+use shared::config::UserActionSettings;
 use tauri::Manager;
 use tauri::State;
 
@@ -127,6 +128,16 @@ pub async fn save_user_settings(
     } else {
         Err(errors)
     }
+}
+
+#[tauri::command]
+pub async fn load_action_settings(
+    _: tauri::Window,
+    _config: State<'_, Config>,
+) -> Result<UserActionSettings, String> {
+    let settings = Config::load_user_settings().expect("unable to read user settings");
+    let user_action_settings = settings.user_action_settings;
+    Ok(user_action_settings)
 }
 
 #[tauri::command]

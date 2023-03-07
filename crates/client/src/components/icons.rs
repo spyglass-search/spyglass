@@ -317,6 +317,62 @@ pub fn x_circle(props: &IconProps) -> Html {
     }
 }
 
+#[function_component(ClipboardDocumentIcon)]
+pub fn clipboard_document_icon(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z" />
+        </svg>
+    }
+}
+
+#[function_component(ArrowTopRightOnSquare)]
+pub fn arrow_top_right_on_square(props: &IconProps) -> Html {
+    html! {
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+        </svg>
+    }
+}
+
+#[function_component(CmdIcon)]
+pub fn cmd_icon(props: &IconProps) -> Html {
+    html! {
+        <img src="/icons/cmd.svg" class={props.class()} />
+    }
+}
+
+#[function_component(WinKeyIcon)]
+pub fn windows_icon(props: &IconProps) -> Html {
+    html! {
+        <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class={props.class()}>
+            <path d="M0,0H11.377V11.372H0ZM12.623,0H24V11.372H12.623ZM0,12.623H11.377V24H0Zm12.623,0H24V24H12.623"/>
+        </svg>
+    }
+}
+
+#[function_component(UpArrowInBubble)]
+pub fn up_arrow_in_bubble(props: &IconProps) -> Html {
+    html! {
+      <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+        </svg>
+      </div>
+    }
+}
+
+#[function_component(DownArrowInBubble)]
+pub fn down_arrow_in_bubble(props: &IconProps) -> Html {
+    html! {
+      <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+        </svg>
+      </div>
+    }
+}
+
 #[derive(Properties, PartialEq)]
 pub struct FileExtIconProps {
     pub ext: String,

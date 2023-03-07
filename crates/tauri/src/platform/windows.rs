@@ -18,17 +18,23 @@ pub fn hide_search_bar(window: &Window) {
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
 
-pub fn os_open(url: &Url) -> anyhow::Result<()> {
+pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
     let open_url = if url.scheme() == "file" {
         use shared::url_to_file_path;
-        let path = url_to_file_path(url.path(), true);
-        format!("file://{path}")
+        url_to_file_path(url.path(), true)
     } else {
         url.to_string()
     };
 
-    match open::that(open_url) {
-        Ok(_) => Ok(()),
-        Err(err) => Err(anyhow::anyhow!(err.to_string())),
+    if let Some(application) = application {
+        match open::with(open_url, application) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(err.to_string())),
+        }
+    } else {
+        match open::that(open_url) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(err.to_string())),
+        }
     }
 }
