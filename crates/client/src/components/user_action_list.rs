@@ -2,7 +2,7 @@ use crate::components::icons;
 use crate::components::icons::{
     ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon, DownArrowInBubble, UpArrowInBubble,
 };
-use crate::utils;
+use crate::utils::{self, OsName};
 use shared::accelerator;
 use shared::{
     config::{self, UserAction, UserActionDefinition},
@@ -69,18 +69,21 @@ fn modifier_icon(props: &ModifierProps) -> Html {
     };
 
     let meta_icon = if props.modifier.super_key() {
-        #[cfg(target_os = "macos")]
-        html! {
-            <div class={component_styles.clone()}>
-              <icons::CmdIcon height="h-4" width="w-4" />
-            </div>
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        html! {
-            <div class={component_styles.clone()}>
-              <icons::WinKeyIcon height="h-4" width="w-4" />
-            </div>
+        match utils::get_os() {
+            OsName::MacOS => {
+                html! {
+                  <div class={component_styles.clone()}>
+                    <icons::CmdIcon height="h-4" width="w-4" />
+                  </div>
+                }
+            }
+            _ => {
+                html! {
+                  <div class={component_styles.clone()}>
+                    <icons::WinKeyIcon height="h-4" width="w-4" />
+                  </div>
+                }
+            }
         }
     } else {
         html! {}
