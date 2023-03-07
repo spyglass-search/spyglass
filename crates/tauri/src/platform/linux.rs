@@ -33,12 +33,12 @@ pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
         url.to_string()
     };
 
-    let app = match application {
-        Some(app) => app.as_str(),
-        None => "xdg-open",
+    let app = match &application {
+        Some(app) => app.clone(),
+        None => String::from("xdg-open"),
     };
 
-    match tauri::api::process::Command::new(app)
+    match tauri::api::process::Command::new(&app)
         .args(vec![open_url])
         .current_dir(parent)
         .output()
