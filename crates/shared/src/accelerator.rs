@@ -56,8 +56,8 @@ use std::{
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Accelerator {
     id: Option<AcceleratorId>,
-    pub(crate) mods: ModifiersState,
-    pub(crate) key: KeyCode,
+    pub mods: ModifiersState,
+    pub key: KeyCode,
 }
 
 impl Accelerator {

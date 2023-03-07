@@ -16,6 +16,7 @@ use shared::{
     response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
+use crate::components::user_action_list::{self, ActionsList, TextBubble, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
     result::{LensResultItem, SearchResultItem},
@@ -30,6 +31,7 @@ extern "C" {
 }
 
 const QUERY_DEBOUNCE_MS: u32 = 256;
+const RESULT_PREFIX: &str = "result-";
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum ResultDisplay {
@@ -50,6 +52,8 @@ pub enum Msg {
     SetCurrentActions(UserActionSettings),
     OpenResult(SearchResult),
     UserActionComplete(String),
+    UserActionSelected(UserActionDefinition),
+    ToggleShowActions,
     SearchDocs,
     SearchLenses,
     UpdateLensResults(Vec<response::LensResult>),
@@ -74,6 +78,9 @@ pub struct SearchPage {
     executed_action: Option<String>,
     modifier: ModifiersState,
     action_settings: Option<UserActionSettings>,
+    show_actions: bool,
+    selected_action_idx: usize,
+    action_menu_button_selected: bool,
 }
 
 impl SearchPage {
@@ -94,18 +101,26 @@ impl SearchPage {
         }
     }
 
-    fn has_context_action(&self, settings: &UserActionSettings) -> bool {
-        if !self.docs_results.is_empty() {
-            if let Some(selected) = self.docs_results.get(self.selected_idx) {
-                for ctx_action in &settings.context_actions {
-                    if ctx_action.is_applicable(selected) {
-                        return true;
+    fn get_action_list(&self) -> Vec<UserActionDefinition> {
+        let mut actions = Vec::new();
+        if let Some(settings) = &self.action_settings {
+            if !self.docs_results.is_empty() {
+                if let Some(context) = self.docs_results.get(self.selected_idx) {
+                    for ctx_action in &settings.context_actions {
+                        if ctx_action.is_applicable(context) {
+                            for act in &ctx_action.actions {
+                                actions.push(act.clone());
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        false
+            for action in &settings.actions {
+                actions.push(action.clone());
+            }
+        }
+        actions
     }
 
     // Helper used to execute the specified user action
@@ -122,7 +137,7 @@ impl SearchPage {
                     Ok(val) => val,
                     Err(_) => template_input.url.clone(),
                 };
-                Timeout::new(500, move || {
+                Timeout::new(350, move || {
                     spawn_local(async move {
                         link.send_message(Msg::UserActionComplete(action.label.clone()));
                     });
@@ -149,7 +164,7 @@ impl SearchPage {
                     Ok(val) => val,
                     Err(_) => template_input.url.clone(),
                 };
-                Timeout::new(500, move || {
+                Timeout::new(350, move || {
                     spawn_local(async move {
                         link.send_message(Msg::UserActionComplete(action.label.clone()));
                     });
@@ -171,7 +186,46 @@ impl SearchPage {
         }
     }
 
-    fn handle_selection(&mut self, link: &Scope<Self>) {
+    fn handle_selection(&mut self, link: &Scope<Self>) -> bool {
+        if self.show_actions {
+            if self.selected_action_idx == 0 {
+                self.handle_default_selected(link);
+            } else {
+                let actions = self.get_action_list();
+                if let Some(action) = actions.get(self.selected_action_idx.max(1) - 1) {
+                    self.handle_selected_action(action, link);
+                    return true;
+                } else {
+                    self.handle_default_selected(link);
+                }
+            }
+        } else {
+            self.handle_default_selected(link);
+        }
+        false
+    }
+
+    fn handle_selected_action(&mut self, action: &UserActionDefinition, link: &Scope<Self>) {
+        let context = self.docs_results.get(self.selected_idx);
+        let exec_context = context.cloned();
+        match &action.status_msg {
+            Some(status) => {
+                self.executed_action = Some(status.clone());
+            }
+            None => {
+                self.executed_action = Some(format!("Executing {}", action.label));
+            }
+        }
+        let action_def = action.clone();
+        let link = link.clone();
+        spawn_local(async move {
+            SearchPage::execute_action(action_def, exec_context.unwrap(), link).await;
+        });
+        self.show_actions = false;
+        self.selected_action_idx = 0;
+    }
+
+    fn handle_default_selected(&mut self, link: &Scope<Self>) {
         // Grab the currently selected item
         if !self.docs_results.is_empty() {
             if let Some(selected) = self.docs_results.get(self.selected_idx) {
@@ -205,29 +259,48 @@ impl SearchPage {
     }
 
     fn move_selection_down(&mut self) {
-        let max_len = match self.result_display {
-            ResultDisplay::Docs => (self.docs_results.len() - 1).max(0),
-            ResultDisplay::Lens => (self.lens_results.len() - 1).max(0),
-            _ => 0,
-        };
+        if self.show_actions {
+            // Total number for action + 1 for the default action
+            let max = self.get_action_list().len();
+            self.selected_action_idx = (self.selected_action_idx + 1).min(max);
+            self.scroll_to_result(
+                user_action_list::USER_ACTION_PREFIX,
+                false,
+                self.selected_action_idx,
+            );
+        } else {
+            let max_len = match self.result_display {
+                ResultDisplay::Docs => (self.docs_results.len() - 1).max(0),
+                ResultDisplay::Lens => (self.lens_results.len() - 1).max(0),
+                _ => 0,
+            };
 
-        self.selected_idx = (self.selected_idx + 1).min(max_len);
-        self.scroll_to_result(self.selected_idx);
-
+            self.selected_idx = (self.selected_idx + 1).min(max_len);
+            self.scroll_to_result(RESULT_PREFIX, true, self.selected_idx);
+        }
         //fire event to update available actions
     }
 
     fn move_selection_up(&mut self) {
-        self.selected_idx = self.selected_idx.max(1) - 1;
-        self.scroll_to_result(self.selected_idx);
-        //fire event to update available actions
+        if self.show_actions {
+            self.selected_action_idx = self.selected_action_idx.max(1) - 1;
+            self.scroll_to_result(
+                user_action_list::USER_ACTION_PREFIX,
+                false,
+                self.selected_action_idx,
+            );
+        } else {
+            self.selected_idx = self.selected_idx.max(1) - 1;
+            self.scroll_to_result(RESULT_PREFIX, true, self.selected_idx);
+            //fire event to update available actions
+        }
     }
 
-    fn scroll_to_result(&self, idx: usize) {
+    fn scroll_to_result(&self, prefix: &str, align_top: bool, idx: usize) {
         let document = gloo::utils::document();
-        if let Some(el) = document.get_element_by_id(&format!("result-{idx}")) {
+        if let Some(el) = document.get_element_by_id(&format!("{prefix}{idx}")) {
             if let Ok(el) = el.dyn_into::<HtmlElement>() {
-                el.scroll_into_view();
+                el.scroll_into_view_with_bool(align_top);
             }
         }
     }
@@ -331,6 +404,9 @@ impl Component for SearchPage {
             executed_key: None,
             executed_action: None,
             modifier: ModifiersState::empty(),
+            show_actions: false,
+            selected_action_idx: 0,
+            action_menu_button_selected: false,
         }
     }
 
@@ -345,6 +421,8 @@ impl Component for SearchPage {
                 self.selected_idx = 0;
                 self.docs_results.clear();
                 self.lens_results.clear();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
                 self.request_resize();
@@ -354,6 +432,8 @@ impl Component for SearchPage {
                 self.selected_idx = 0;
                 self.docs_results.clear();
                 self.lens_results.clear();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
                 self.search_meta = None;
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
@@ -369,6 +449,8 @@ impl Component for SearchPage {
             }
             Msg::Blur => {
                 let link = link.clone();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
                 // Handle the hide as a timeout since there's a brief moment when
                 // alt-tabbing / clicking on the task will yield a blur event & then a
                 // focus event.
@@ -399,6 +481,26 @@ impl Component for SearchPage {
                 let window = window();
                 let _ = window.alert_with_message(&msg);
                 false
+            }
+            Msg::ToggleShowActions => {
+                self.show_actions = !self.show_actions;
+                self.action_menu_button_selected = false;
+                if !self.show_actions {
+                    self.selected_action_idx = 0;
+                }
+                true
+            }
+            Msg::UserActionSelected(action) => {
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                self.action_menu_button_selected = false;
+                if action.label.eq(DEFAULT_ACTION_LABEL) {
+                    self.handle_default_selected(link);
+                    false
+                } else {
+                    self.handle_selected_action(&action, link);
+                    true
+                }
             }
             Msg::UserActionComplete(_) => {
                 self.executed_action = None;
@@ -452,25 +554,7 @@ impl Component for SearchPage {
                                         &self.pressed_key.unwrap(),
                                         context,
                                     ) {
-                                        let exec_context = context.cloned();
-                                        match &action.status_msg {
-                                            Some(status) => {
-                                                self.executed_action = Some(status.clone());
-                                            }
-                                            None => {
-                                                self.executed_action =
-                                                    Some(format!("Executing {}", action.label));
-                                            }
-                                        }
-                                        let link = link.clone();
-                                        spawn_local(async move {
-                                            SearchPage::execute_action(
-                                                action,
-                                                exec_context.unwrap(),
-                                                link,
-                                            )
-                                            .await;
-                                        });
+                                        self.handle_selected_action(&action, link);
 
                                         self.executed_key = self.pressed_key;
                                         e.prevent_default();
@@ -548,18 +632,26 @@ impl Component for SearchPage {
                                     | KeyCode::MediaTrackPrevious => {}
                                     KeyCode::Enter => {
                                         if !executed_key_released {
-                                            self.handle_selection(link)
+                                            if self.action_menu_button_selected {
+                                                link.send_message(Msg::ToggleShowActions);
+                                            } else {
+                                                return self.handle_selection(link);
+                                            }
                                         }
                                     }
                                     KeyCode::Escape => {
-                                        link.send_future(async move {
-                                            let _ = invoke(
-                                                ClientInvoke::Escape.as_ref(),
-                                                JsValue::NULL,
-                                            )
-                                            .await;
-                                            Msg::ClearQuery
-                                        });
+                                        if self.show_actions {
+                                            link.send_message(Msg::ToggleShowActions);
+                                        } else {
+                                            link.send_future(async move {
+                                                let _ = invoke(
+                                                    ClientInvoke::Escape.as_ref(),
+                                                    JsValue::NULL,
+                                                )
+                                                .await;
+                                                Msg::ClearQuery
+                                            });
+                                        }
                                     }
                                     KeyCode::Backspace => {
                                         let input: HtmlInputElement = e.target_unchecked_into();
@@ -580,6 +672,10 @@ impl Component for SearchPage {
                                         // Tab completion for len results only
                                         if self.result_display == ResultDisplay::Lens {
                                             self.handle_selection(link);
+                                        } else if !executed_key_released {
+                                            self.action_menu_button_selected =
+                                                !self.action_menu_button_selected;
+                                            return true;
                                         }
                                     }
                                     // everything else
@@ -649,6 +745,9 @@ impl Component for SearchPage {
                 false
             }
             Msg::UpdateLensResults(results) => {
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                self.action_menu_button_selected = false;
                 self.lens_results = results;
                 self.docs_results.clear();
                 self.result_display = ResultDisplay::Lens;
@@ -657,6 +756,9 @@ impl Component for SearchPage {
                 true
             }
             Msg::UpdateDocsResults(results) => {
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                self.action_menu_button_selected = false;
                 if self.query == results.meta.query {
                     self.docs_results = results.results;
                     self.search_meta = Some(results.meta);
@@ -703,11 +805,11 @@ impl Component for SearchPage {
                     .iter()
                     .enumerate()
                     .map(|(idx, res)| {
-                        let is_selected = idx == self.selected_idx;
+                        let is_selected = idx == self.selected_idx && !self.action_menu_button_selected;
                         let open_msg = Msg::OpenResult(res.to_owned());
                         html! {
                             <SearchResultItem
-                                 id={format!("result-{idx}")}
+                                 id={format!("{RESULT_PREFIX}{idx}")}
                                  onclick={link.callback(move |_| open_msg.clone())}
                                  result={res.clone()}
                                  {is_selected}
@@ -723,7 +825,7 @@ impl Component for SearchPage {
                     .map(|(idx, res)| {
                         let is_selected = idx == self.selected_idx;
                         html! {
-                            <LensResultItem id={format!("result-{idx}")} result={res.clone()} {is_selected} />
+                            <LensResultItem id={format!("{RESULT_PREFIX}{idx}")} result={res.clone()} {is_selected} />
                         }
                     })
                     .collect::<Html>()
@@ -757,26 +859,15 @@ impl Component for SearchPage {
 
             html! {
                 <div class="flex flex-row justify-between w-full items-center align-middle">
-                    {running_action}
-                    <div class="flex flex-row align-middle items-center">
-                        {"Use"}
-                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-                            </svg>
-                        </div>
-                        {"and"}
-                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
-                            </svg>
-                        </div>
-                        {"to select."}
-                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 mx-1 text-[8px]">
-                            {"Enter"}
-                        </div>
-                        {"to open."}
-                    </div>
+                  {running_action}
+                  <div class="flex flex-row align-middle items-center">
+                    {"Use"}
+                    <icons::UpArrowInBubble height="h-2" width="w-2"></icons::UpArrowInBubble>
+                    {"and"}
+                    <icons::DownArrowInBubble height="h-2" width="w-2"></icons::DownArrowInBubble>
+                    {"to select."}
+
+                  </div>
                 </div>
             }
         } else {
@@ -795,41 +886,62 @@ impl Component for SearchPage {
                 <>
                     {is_searching_indicator}
                     <div class="ml-auto flex flex-row items-center align-middle">
-                    {"Use"}
-                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-1 text-black text-[8px]">
-                        {"/"}
-                    </div>
-                    {"to select a lens."}
-                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
-                        {"Type"}
-                    </div>
-                    {"to search."}
+                      {"Use"}
+                      <TextBubble txt="/"></TextBubble>
+                      {"to select a lens."}
+                      <TextBubble txt="Type"></TextBubble>
+                      {"to search."}
                     </div>
                 </>
             }
         };
 
-        let noop = html! {};
-
-        let _custom_actions = if let Some(settings) = &self.action_settings {
-            if !self.docs_results.is_empty()
-                && (!settings.actions.is_empty() || self.has_context_action(settings))
-            {
-                html! {
-                    <div class="border-l border-neutral-500 px-0 py-1.5 hover:bg-stone-700 hover:border-stone-500 flex-none w-6">
-                      <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                        </svg>
-                      </div>
-                    </div>
+        let action_button = if self.search_meta.is_some() {
+            let classes = classes!(
+                "flex",
+                "flex-row",
+                "align-middle",
+                "items-center",
+                "border-l",
+                "text-xs",
+                "text-neutral-500",
+                "border-neutral-500",
+                "pr-3",
+                "py-1.5",
+                "hover:bg-stone-700",
+                "hover:border-stone-500",
+                "ml-1",
+                if self.action_menu_button_selected {
+                    "bg-stone-700"
+                } else {
+                    "bg-neutral-900"
                 }
-            } else {
-                noop
+            );
+
+            html! {
+                <button class={classes}
+                  onclick={link.callback(|_| Msg::ToggleShowActions)}>
+                  <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 mx-1 text-[8px]">
+                    {"Enter"}
+                  </div>
+                  {"to open."}
+                </button>
             }
         } else {
-            noop
+            html! {}
         };
+
+        let action_details = if self.show_actions {
+            let action_list = self.get_action_list();
+            html! {
+               <ActionsList actions={action_list}
+                selected_action={self.selected_action_idx}
+                onclick={link.callback(Msg::UserActionSelected)} />
+            }
+        } else {
+            html! {}
+        };
+
         html! {
             <div ref={self.search_wrapper_ref.clone()}
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
@@ -854,10 +966,12 @@ impl Component for SearchPage {
                     {results}
                 </div>
                 <div  class="flex flex-row w-full items-center bg-neutral-900">
-                  <div class="bg-neutral-900 grow text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
+                  <div class="bg-neutral-900 grow text-neutral-500 text-xs pl-3 py-1.5 flex flex-row items-center gap-2">
                       {search_meta}
                   </div>
+                  {action_button}
                 </div>
+               {action_details}
             </div>
         }
     }

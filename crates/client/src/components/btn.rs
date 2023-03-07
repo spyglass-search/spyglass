@@ -204,7 +204,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
                         shared::event::ClientInvoke::OpenResult,
                         OpenResultParams {
                             url: href.to_string(),
-                            application: None
+                            application: None,
                         },
                     )
                     .await;

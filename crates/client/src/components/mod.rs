@@ -5,6 +5,7 @@ pub mod lens;
 pub mod result;
 pub mod tag;
 pub mod tooltip;
+pub mod user_action_list;
 use yew::{prelude::*, virtual_dom::AttrValue};
 
 #[derive(Properties, PartialEq, Eq)]

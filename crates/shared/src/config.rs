@@ -115,7 +115,7 @@ impl Default for FileSystemSettings {
 }
 
 // Enum of actions the user can take when a document is selected
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum UserAction {
     OpenApplication(String, String),
     CopyToClipboard(String),
@@ -123,7 +123,7 @@ pub enum UserAction {
 
 // The user action settings configuration provides the ability
 // for the user to define custom behavior for a document.
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq)]
 pub struct UserActionSettings {
     pub actions: Vec<UserActionDefinition>,
     pub context_actions: Vec<ContextActions>,
@@ -189,7 +189,7 @@ impl UserActionSettings {
 // Defines context specific actions. A context specific action
 // is a list of actions that are only valid when the document selected
 // matches the defined context.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ContextActions {
     // Defines what context must be matched for the actions to be valid
     pub context: ContextFilter,
@@ -303,7 +303,7 @@ impl ContextActions {
 
 // Filter definition used to define what documents should match
 // against the context.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ContextFilter {
     // Includes documents that match any of the defined tags
     pub has_tag: Option<Vec<Tag>>,
@@ -320,7 +320,7 @@ pub struct ContextFilter {
 }
 
 // The definition for an action
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct UserActionDefinition {
     pub label: String,
     pub status_msg: Option<String>,

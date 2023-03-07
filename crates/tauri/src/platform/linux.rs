@@ -35,7 +35,7 @@ pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
 
     let app = match application {
         Some(app) => app.as_str(),
-        None => "xdg-open"
+        None => "xdg-open",
     };
 
     match tauri::api::process::Command::new(app)

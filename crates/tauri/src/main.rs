@@ -260,21 +260,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let _ = os_open(
                                     &url::Url::parse(shared::constants::DISCORD_JOIN_URL)
                                         .expect("Invalid Discord URL"),
-                                    None
+                                    None,
                                 );
                             }
                             MenuID::INSTALL_CHROME_EXT => {
                                 let _ = os_open(
                                     &url::Url::parse(shared::constants::CHROME_EXT_LINK)
                                         .expect("Invalid Chrome extension URL"),
-                                        None
+                                    None,
                                 );
                             }
                             MenuID::INSTALL_FIREFOX_EXT => {
                                 let _ = os_open(
                                     &url::Url::parse(shared::constants::FIREFOX_EXT_LINK)
                                         .expect("Invalid Firefox extension URL"),
-                                    None
+                                    None,
                                 );
                             }
                             // Just metainfo
