@@ -99,17 +99,7 @@ pub fn get_shortcut_destination(path: &Path) -> Option<PathBuf> {
 pub fn last_modified_time_for_path(path: &Path) -> DateTime<Utc> {
     if let Ok(metadata) = path.metadata() {
         if let Ok(modified) = metadata.modified() {
-            let since_the_epoch = modified
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards");
-
-            if let Some(time) =
-                NaiveDateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
-            {
-                DateTime::<Utc>::from_utc(time, Utc)
-            } else {
-                Utc::now()
-            }
+            modified.into()
         } else {
             Utc::now()
         }

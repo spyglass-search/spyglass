@@ -2,6 +2,8 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{DatabaseBackend, FromQueryResult, Set, Statement};
 use serde::Serialize;
 
+use crate::BATCH_SIZE;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
 #[sea_orm(table_name = "processed_files")]
 pub struct Model {
@@ -48,32 +50,33 @@ impl ActiveModelBehavior for ActiveModel {
 /// is used to remove documents for folders that are no longer configured
 pub async fn remove_unmatched_paths(
     db: &DatabaseConnection,
-    paths: Vec<String>,
+    paths: &[String],
+    remove_all: bool,
 ) -> anyhow::Result<Vec<Model>> {
-    let mut find = Entity::find();
-    if !paths.is_empty() {
+    if !paths.is_empty() || remove_all {
+        log::debug!("removing files not matching {:?}", paths);
+        let mut find = Entity::find();
         for path in paths {
             find = find.filter(Column::FilePath.not_like(format!("{path}%").as_str()));
         }
-    } else {
-        log::debug!("No paths being watched removing all.");
-    }
 
-    match find.all(db).await {
-        Ok(items) => {
-            log::debug!("Removing {:?} unused files from the database.", items.len());
-            let ids = items.iter().map(|model| model.id).collect::<Vec<i64>>();
+        let items = find.all(db).await?;
+        log::debug!("Removing {:?} unused files from the database.", items.len());
+        let ids = items.iter().map(|model| model.id).collect::<Vec<i64>>();
+        for chunk in ids.chunks(BATCH_SIZE) {
             if let Err(error) = Entity::delete_many()
-                .filter(Column::Id.is_in(ids))
+                .filter(Column::Id.is_in(chunk.to_vec()))
                 .exec(db)
                 .await
             {
-                log::error!("Error deleting unused paths {:?}", error);
-                return Err(anyhow::Error::from(error));
+                log::warn!("Error deleting unused paths {:?}", error);
             }
-            Ok(items)
         }
-        Err(error) => Err(anyhow::Error::from(error)),
+
+        Ok(items)
+    } else {
+        log::debug!("No paths being watched removing all.");
+        Ok(Vec::new())
     }
 }
 
@@ -91,12 +94,12 @@ pub async fn get_files_to_recrawl(
         DatabaseBackend::Sqlite,
         r#"
         with possible as (
-            select url 
+            select url
             from crawl_queue
              where url like $1
         )
         select file_path as url
-        from processed_files 
+        from processed_files
             where file_path like $1 and file_path not in possible;"#,
         vec![ext_filter.into()],
     ))
