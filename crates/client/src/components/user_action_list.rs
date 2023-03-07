@@ -1,6 +1,6 @@
-use crate::components::icons::BookOpen;
+use crate::components::icons;
 use crate::components::icons::{
-    ArrowTopRightOnSquare, ClipboardDocumentIcon, DownArrowInBubble, UpArrowInBubble, WinKeyIcon,
+    ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon, DownArrowInBubble, UpArrowInBubble,
 };
 use shared::{
     config::{self, Accelerator, UserAction, UserActionDefinition},
@@ -71,14 +71,14 @@ fn modifier_icon(props: &ModifierProps) -> Html {
         #[cfg(target_os = "macos")]
         html! {
             <div class={component_styles.clone()}>
-              <CmdIcon height="h-4" width="w-4" />
+              <icons::CmdIcon height="h-4" width="w-4" />
             </div>
         }
 
         #[cfg(not(target_os = "macos"))]
         html! {
             <div class={component_styles.clone()}>
-              <WinKeyIcon height="h-4" width="w-4" />
+              <icons::WinKeyIcon height="h-4" width="w-4" />
             </div>
         }
     } else {
