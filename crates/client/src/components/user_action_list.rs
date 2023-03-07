@@ -2,11 +2,12 @@ use crate::components::icons;
 use crate::components::icons::{
     ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon, DownArrowInBubble, UpArrowInBubble,
 };
+use crate::utils::{self, OsName};
+use shared::accelerator;
 use shared::{
-    config::{self, Accelerator, UserAction, UserActionDefinition},
+    config::{self, UserAction, UserActionDefinition},
     keyboard::ModifiersState,
 };
-use std::str::FromStr;
 use yew::function_component;
 use yew::prelude::*;
 
@@ -68,18 +69,21 @@ fn modifier_icon(props: &ModifierProps) -> Html {
     };
 
     let meta_icon = if props.modifier.super_key() {
-        #[cfg(target_os = "macos")]
-        html! {
-            <div class={component_styles.clone()}>
-              <icons::CmdIcon height="h-4" width="w-4" />
-            </div>
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        html! {
-            <div class={component_styles.clone()}>
-              <icons::WinKeyIcon height="h-4" width="w-4" />
-            </div>
+        match utils::get_os() {
+            OsName::MacOS => {
+                html! {
+                  <div class={component_styles.clone()}>
+                    <icons::CmdIcon height="h-4" width="w-4" />
+                  </div>
+                }
+            }
+            _ => {
+                html! {
+                  <div class={component_styles.clone()}>
+                    <icons::WinKeyIcon height="h-4" width="w-4" />
+                  </div>
+                }
+            }
         }
     } else {
         html! {}
@@ -135,7 +139,10 @@ fn user_action(props: &UserActionProps) -> Html {
     );
     let txt = props.action.label.clone();
 
-    if let Ok(accelerator) = Accelerator::from_str(props.action.key_binding.as_str()) {
+    if let Ok(accelerator) = accelerator::parse_accelerator(
+        props.action.key_binding.as_str(),
+        utils::get_os().to_string().as_str(),
+    ) {
         let key_binding = accelerator.key.to_str();
         let click_action = props.onclick.clone();
         let action = props.action.clone();

@@ -2,7 +2,10 @@
 // Copyright 2021-2023 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::keyboard::{KeyCode, ModifiersState, NativeKeyCode};
+use crate::{
+    keyboard::{KeyCode, ModifiersState, NativeKeyCode},
+    MAC_OS,
+};
 use std::{
     borrow::Borrow,
     collections::hash_map::DefaultHasher,
@@ -60,16 +63,6 @@ impl Accelerator {
         let modifiers = modifiers.borrow();
         let key = key.borrow();
         self.mods == *modifiers & base_mods && self.key == *key
-    }
-}
-
-// Accelerator::from_str is available to be backward
-// compatible with tauri and it also open the option
-// to generate accelerator from string
-impl FromStr for Accelerator {
-    type Err = AcceleratorParseError;
-    fn from_str(accelerator_string: &str) -> Result<Self, Self::Err> {
-        parse_accelerator(accelerator_string)
     }
 }
 
@@ -270,7 +263,10 @@ impl std::fmt::Display for AcceleratorParseError {
     }
 }
 
-fn parse_accelerator(accelerator_string: &str) -> Result<Accelerator, AcceleratorParseError> {
+pub fn parse_accelerator(
+    accelerator_string: &str,
+    os: &str,
+) -> Result<Accelerator, AcceleratorParseError> {
     let mut mods = ModifiersState::empty();
     let mut key = KeyCode::Unidentified(NativeKeyCode::Unidentified);
 
@@ -307,12 +303,10 @@ fn parse_accelerator(accelerator_string: &str) -> Result<Accelerator, Accelerato
             "SHIFT" => {
                 mods.set(ModifiersState::SHIFT, true);
             }
-            "COMMANDORCONTROL" | "COMMANDORCTRL" | "CMDORCTRL" | "CMDORCONTROL" => {
-                #[cfg(target_os = "macos")]
-                mods.set(ModifiersState::SUPER, true);
-                #[cfg(not(target_os = "macos"))]
-                mods.set(ModifiersState::CONTROL, true);
-            }
+            "COMMANDORCONTROL" | "COMMANDORCTRL" | "CMDORCTRL" | "CMDORCONTROL" => match os {
+                MAC_OS => mods.set(ModifiersState::SUPER, true),
+                _ => mods.set(ModifiersState::CONTROL, true),
+            },
             _ => {
                 if let Ok(keycode) = KeyCode::from_str(&token) {
                     match keycode {
@@ -354,8 +348,9 @@ fn hash_accelerator_to_u16(hotkey: Accelerator) -> u16 {
 
 #[test]
 fn test_parse_accelerator() {
+    use crate::{LINUX_OS, WINDOWS_OS};
     assert_eq!(
-        parse_accelerator("CTRL+X").unwrap(),
+        parse_accelerator("CTRL+X", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("CTRL+X")),
             mods: ModifiersState::CONTROL,
@@ -363,7 +358,7 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("SHIFT+C").unwrap(),
+        parse_accelerator("SHIFT+C", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("SHIFT+C")),
             mods: ModifiersState::SHIFT,
@@ -371,7 +366,7 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("CTRL+Z").unwrap(),
+        parse_accelerator("CTRL+Z", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("CTRL+Z")),
             mods: ModifiersState::CONTROL,
@@ -379,7 +374,7 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("super+ctrl+SHIFT+alt+Up").unwrap(),
+        parse_accelerator("super+ctrl+SHIFT+alt+Up", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("super+ctrl+SHIFT+alt+Up")),
             mods: ModifiersState::SUPER
@@ -390,7 +385,7 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("5").unwrap(),
+        parse_accelerator("5", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("5")),
             mods: ModifiersState::empty(),
@@ -398,7 +393,7 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("G").unwrap(),
+        parse_accelerator("G", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("G")),
             mods: ModifiersState::empty(),
@@ -406,7 +401,7 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("G").unwrap(),
+        parse_accelerator("G", MAC_OS).unwrap(),
         Accelerator {
             // id not with same uppercase should work
             id: Some(AcceleratorId::new("g")),
@@ -415,14 +410,14 @@ fn test_parse_accelerator() {
         }
     );
 
-    let acc = parse_accelerator("+G");
+    let acc = parse_accelerator("+G", MAC_OS);
     assert!(acc.is_err());
 
-    let acc = parse_accelerator("SHGSH+G");
+    let acc = parse_accelerator("SHGSH+G", MAC_OS);
     assert!(acc.is_err());
 
     assert_eq!(
-        parse_accelerator("SHiFT+F12").unwrap(),
+        parse_accelerator("SHiFT+F12", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("SHIFT+F12")),
             mods: ModifiersState::SHIFT,
@@ -430,17 +425,32 @@ fn test_parse_accelerator() {
         }
     );
     assert_eq!(
-        parse_accelerator("CmdOrCtrl+Space").unwrap(),
+        parse_accelerator("CmdOrCtrl+Space", MAC_OS).unwrap(),
         Accelerator {
             id: Some(AcceleratorId::new("CmdOrCtrl+Space")),
-            #[cfg(target_os = "macos")]
             mods: ModifiersState::SUPER,
-            #[cfg(not(target_os = "macos"))]
+            key: KeyCode::Space,
+        }
+    );
+
+    assert_eq!(
+        parse_accelerator("CmdOrCtrl+Space", WINDOWS_OS).unwrap(),
+        Accelerator {
+            id: Some(AcceleratorId::new("CmdOrCtrl+Space")),
             mods: ModifiersState::CONTROL,
             key: KeyCode::Space,
         }
     );
 
-    let acc = parse_accelerator("CTRL+");
+    assert_eq!(
+        parse_accelerator("CmdOrCtrl+Space", LINUX_OS).unwrap(),
+        Accelerator {
+            id: Some(AcceleratorId::new("CmdOrCtrl+Space")),
+            mods: ModifiersState::CONTROL,
+            key: KeyCode::Space,
+        }
+    );
+
+    let acc = parse_accelerator("CTRL+", MAC_OS);
     assert!(acc.is_err());
 }
