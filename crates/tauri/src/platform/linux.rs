@@ -38,7 +38,7 @@ pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
         None => String::from("xdg-open"),
     };
 
-    match tauri::api::process::Command::new(&app)
+    match tauri::api::process::Command::new(app)
         .args(vec![open_url])
         .current_dir(parent)
         .output()

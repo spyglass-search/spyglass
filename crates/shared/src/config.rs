@@ -184,6 +184,22 @@ impl UserActionSettings {
 
         None
     }
+
+    // List of default actions when no other actions are configured
+    pub fn default_actions() -> UserActionSettings {
+        UserActionSettings {
+            actions: vec![
+                UserActionDefinition {
+                    action: UserAction::CopyToClipboard(String::from("{{ url }}")),
+                    key_binding: String::from("CmdOrCtrl+C"),
+                    label: String::from("Copy URL to Clipboard"),
+                    status_msg: Some(String::from("Copying...")),
+                }
+            ],
+            context_actions: vec![],
+        }
+        
+    }
 }
 
 // Defines context specific actions. A context specific action
@@ -376,7 +392,7 @@ pub struct UserSettings {
     pub disable_autolaunch: bool,
     #[serde(default = "UserSettings::default_port")]
     pub port: u16,
-    #[serde(default)]
+    #[serde(default = "UserActionSettings::default_actions")]
     pub user_action_settings: UserActionSettings,
     // /// Hide the app icon from the dock/taskbar while running. Will still show up
     // /// in the menubar/systemtray.
