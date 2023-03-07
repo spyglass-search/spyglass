@@ -489,7 +489,7 @@ impl SpyglassFileWatcher {
                                 Err(err) => {
                                     // delete any invalid paths from db
                                     to_delete.push(item.id);
-                                    log::error!(
+                                    log::warn!(
                                         "uri_to_path failed on {} due to {}",
                                         file_path,
                                         err
@@ -509,7 +509,7 @@ impl SpyglassFileWatcher {
                         Err(err) => {
                             // delete any invalid paths from db
                             to_delete.push(item.id);
-                            log::error!("uri_to_path failed on {} due to {}", item.file_path, err);
+                            log::warn!("uri_to_path failed on {} due to {}", item.file_path, err);
                         }
                     },
                 }
