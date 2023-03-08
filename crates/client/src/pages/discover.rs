@@ -242,7 +242,7 @@ impl Component for DiscoverPage {
                     <div class="pb-2 font-bold">{"Discover"}</div>
                     <div class="flex flex-row gap-2">
                         <select
-                            class="text-black text-sm w-40"
+                            class="w-40 rounded p-2 text-sm form-input placeholder-neutral-400 bg-neutral-700 border-neutral-800"
                             ref={self.category_input.clone()}
                             onchange={link.callback(|_| Msg::HandleCategoryFilter)}
                         >
@@ -257,7 +257,7 @@ impl Component for DiscoverPage {
                         </select>
                         <input type="text"
                             placeholder="search installable lenses"
-                            class="w-full rounded p-2 text-black text-sm"
+                            class="w-full rounded p-2 text-sm form-input placeholder-neutral-400 bg-neutral-700 border-neutral-800"
                             onkeyup={link.callback(|_| Msg::HandleFilter)}
                             ref={self.filter_input.clone()}
                         />
