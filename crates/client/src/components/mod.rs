@@ -133,3 +133,17 @@ pub fn tabs(props: &TabsProps) -> Html {
         </ul>
     }
 }
+
+#[derive(Properties, PartialEq)]
+pub struct KeyCodeProps {
+    pub children: Children,
+}
+
+#[function_component(KeyComponent)]
+pub fn txt_bubble(props: &KeyCodeProps) -> Html {
+    html! {
+      <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-1 text-[8px] h-5 min-w-5 flex items-center font-semibold justify-center">
+        {props.children.clone()}
+      </div>
+    }
+}

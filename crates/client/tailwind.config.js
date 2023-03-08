@@ -1,6 +1,10 @@
 module.exports = {
     content: ["./src/**/*.{html,js,rs}", "./*.html"],
     theme: {
+        minWidth: {
+            "4": "1rem",
+            "5": "1.25rem"
+        },
         extend: {
             keyframes: {
                 "fade-in": {

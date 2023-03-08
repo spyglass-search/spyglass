@@ -351,25 +351,21 @@ pub fn windows_icon(props: &IconProps) -> Html {
     }
 }
 
-#[function_component(UpArrowInBubble)]
-pub fn up_arrow_in_bubble(props: &IconProps) -> Html {
+#[function_component(UpArrow)]
+pub fn up_arrow(props: &IconProps) -> Html {
     html! {
-      <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
         </svg>
-      </div>
     }
 }
 
-#[function_component(DownArrowInBubble)]
-pub fn down_arrow_in_bubble(props: &IconProps) -> Html {
+#[function_component(DownArrow)]
+pub fn down_arrow(props: &IconProps) -> Html {
     html! {
-      <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class={props.class()}>
           <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
         </svg>
-      </div>
     }
 }
 
