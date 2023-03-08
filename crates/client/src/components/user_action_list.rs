@@ -44,7 +44,7 @@ fn modifier_icon(props: &ModifierProps) -> Html {
     let mut nodes: Vec<Html> = Vec::new();
 
     if props.modifier.control_key() {
-        nodes.push(html! { <KeyComponent>{"Ctrl"}</KeyComponent> });
+        nodes.push(html! { <KeyComponent>{"CTRL"}</KeyComponent> });
     }
 
     if props.modifier.super_key() {
@@ -58,11 +58,11 @@ fn modifier_icon(props: &ModifierProps) -> Html {
     }
 
     if props.modifier.alt_key() {
-        nodes.push(html! { <KeyComponent>{"Alt"}</KeyComponent> });
+        nodes.push(html! { <KeyComponent>{"ALT"}</KeyComponent> });
     }
 
     if props.modifier.shift_key() {
-        nodes.push(html! { <KeyComponent>{"Shift"}</KeyComponent> });
+        nodes.push(html! { <KeyComponent>{"SHIFT"}</KeyComponent> });
     }
 
     html! { <>{nodes}</> }
