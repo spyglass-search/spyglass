@@ -144,6 +144,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "text-white",
         "cursor-pointer",
         "active:bg-cyan-900",
+        "scroll-mt-2",
         if is_selected {
             "bg-cyan-900"
         } else {
