@@ -886,12 +886,12 @@ impl Component for SearchPage {
             html! {
                 <>
                     {is_searching_indicator}
-                    <div class="ml-auto flex flex-row items-center align-middle">
-                      {"Use"}
-                      <TextBubble txt="/"></TextBubble>
-                      {"to select a lens."}
-                      <TextBubble txt="Type"></TextBubble>
-                      {"to search."}
+                    <div class="ml-auto flex flex-row items-center align-middle pr-2 gap-1">
+                      <span>{"Use"}</span>
+                      <TextBubble>{"/"}</TextBubble>
+                      <span>{"to select a lens."}</span>
+                      <TextBubble>{"Type"}</TextBubble>
+                      <span>{"to search."}</span>
                     </div>
                 </>
             }
@@ -901,38 +901,36 @@ impl Component for SearchPage {
             let classes = classes!(
                 "flex",
                 "flex-row",
-                "align-middle",
                 "items-center",
                 "border-l",
-                "text-xs",
+                "text-sm",
                 "text-neutral-500",
-                "border-neutral-500",
-                "pr-3",
-                "py-1.5",
-                "hover:bg-stone-700",
-                "hover:border-stone-500",
-                "ml-1",
-                if self.action_menu_button_selected {
-                    "bg-stone-700"
+                "border-neutral-700",
+                "px-3",
+                "ml-3",
+                "h-8",
+                if self.action_menu_button_selected || self.show_actions {
+                    "bg-neutral-700"
                 } else {
                     "bg-neutral-900"
-                }
+                },
+                "hover:bg-neutral-700",
             );
 
             html! {
                 <button class={classes}
                   onclick={link.callback(|_| Msg::ToggleShowActions)}>
-                  <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 mx-1 text-[8px]">
-                    {"Enter"}
-                  </div>
-                  {"to open."}
+                  <TextBubble>{"Enter"}</TextBubble>
+                  <span class="ml-1">{"to open."}</span>
                 </button>
             }
         } else {
             html! {}
         };
 
-        let action_details = if self.show_actions {
+        let action_details = if self.show_actions
+            && (!self.docs_results.is_empty() || !self.lens_results.is_empty())
+        {
             let action_list = self.get_action_list();
             html! {
                <ActionsList actions={action_list}
@@ -963,11 +961,15 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px]">
-                    {results}
-                </div>
-                <div  class="flex flex-row w-full items-center bg-neutral-900">
-                  <div class="bg-neutral-900 grow text-neutral-500 text-xs pl-3 py-1.5 flex flex-row items-center gap-2">
+                { if !self.docs_results.is_empty() || !self.lens_results.is_empty() {
+                    html! {
+                        <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 pb-2 border-t border-neutral-600">
+                            <div class="w-full flex flex-col">{results}</div>
+                        </div>
+                    }
+                } else { html!{} }}
+                <div class="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
+                  <div class="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
                       {search_meta}
                   </div>
                   {action_button}
