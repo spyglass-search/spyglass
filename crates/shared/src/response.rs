@@ -1,3 +1,4 @@
+use crate::url_to_file_path;
 use num_format::{Buffer, Locale};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -156,6 +157,7 @@ pub struct SearchResultTemplate {
     pub title: String,
     pub description: String,
     pub url: String,
+    pub open_url: String,
     pub tags: Vec<(String, String)>,
     pub score: f32,
     pub url_schema: String,
@@ -175,6 +177,7 @@ impl From<SearchResult> for SearchResultTemplate {
             title: value.title,
             description: value.description,
             url: value.url.clone(),
+            open_url: String::from(""),
             tags: value.tags,
             score: value.score,
             url_schema: String::from(""),
@@ -185,7 +188,7 @@ impl From<SearchResult> for SearchResultTemplate {
             url_query: String::from(""),
         };
 
-        if let Ok(url) = Url::parse(&value.url) {
+        if let Ok(mut url) = Url::parse(&value.url) {
             result.url_schema = url.scheme().to_owned();
             result.url_userinfo = url.username().to_owned();
             result.url_port = url.port().unwrap_or(0);
@@ -204,6 +207,13 @@ impl From<SearchResult> for SearchResultTemplate {
             }
 
             result.url_query = String::from(url.query().unwrap_or(""));
+
+            if url.scheme() == "file" {
+                let _ = url.set_host(None);
+                result.open_url = url_to_file_path(url.path(), true);
+            } else {
+                result.open_url = result.url.clone();
+            }
         }
         result
     }
