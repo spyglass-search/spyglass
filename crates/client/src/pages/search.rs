@@ -910,11 +910,11 @@ impl Component for SearchPage {
                 "ml-3",
                 "h-8",
                 if self.action_menu_button_selected || self.show_actions {
-                    "bg-neutral-700"
+                    "bg-stone-800"
                 } else {
                     "bg-neutral-900"
                 },
-                "hover:bg-neutral-700",
+                "hover:bg-stone-800",
             );
 
             html! {

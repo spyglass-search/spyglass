@@ -83,7 +83,7 @@ fn user_action(props: &UserActionProps) -> Html {
         if props.is_selected {
             "bg-cyan-900"
         } else {
-            "bg-neutral-700"
+            "bg-stone-800"
         }
     );
     let txt = props.action.label.clone();
@@ -161,7 +161,7 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
 
     let action_id = format!("{USER_ACTION_PREFIX}-0");
     html! {
-        <div class="absolute bottom-8 h-32 max-h-screen w-1/2 right-0 z-20 flex flex-col overflow-hidden rounded-tl-lg bg-neutral-700 border-t-2 border-l-2 border-neutral-900 p-1">
+        <div class="absolute bottom-8 h-32 max-h-screen w-1/2 right-0 z-20 flex flex-col overflow-hidden rounded-tl-lg bg-stone-800 border-t-2 border-l-2 border-neutral-900 p-1">
           <div class="overflow-y-auto">
             <UserActionComponent
               action_id={action_id}
