@@ -1,5 +1,5 @@
-use crate::components::icons;
 use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
+use crate::components::{icons, KeyComponent};
 use crate::utils::{self, OsName};
 use shared::accelerator;
 use shared::{
@@ -44,26 +44,25 @@ fn modifier_icon(props: &ModifierProps) -> Html {
     let mut nodes: Vec<Html> = Vec::new();
 
     if props.modifier.control_key() {
-        nodes.push(html! { <TextBubble>{"Ctrl"}</TextBubble> });
+        nodes.push(html! { <KeyComponent>{"CTRL"}</KeyComponent> });
     }
 
     if props.modifier.super_key() {
         match utils::get_os() {
-            OsName::MacOS => nodes.push(
-                html! { <TextBubble><icons::CmdIcon height="h-3" width="w-3" /></TextBubble> },
-            ),
-            _ => nodes.push(
-                html! { <TextBubble><icons::WinKeyIcon height="h-3" width="w-3" /></TextBubble> },
-            ),
+            OsName::MacOS => {
+                nodes.push(html! { <KeyComponent><icons::CmdIcon height="h-3" width="w-3" /></KeyComponent> })
+            }
+            _ => nodes
+                .push(html! { <KeyComponent><icons::WinKeyIcon height="h-3" width="w-3" /></KeyComponent> }),
         }
     }
 
     if props.modifier.alt_key() {
-        nodes.push(html! { <TextBubble>{"Alt"}</TextBubble> });
+        nodes.push(html! { <KeyComponent>{"ALT"}</KeyComponent> });
     }
 
     if props.modifier.shift_key() {
-        nodes.push(html! { <TextBubble>{"Shift"}</TextBubble> });
+        nodes.push(html! { <KeyComponent>{"SHIFT"}</KeyComponent> });
     }
 
     html! { <>{nodes}</> }
@@ -78,7 +77,7 @@ fn user_action(props: &UserActionProps) -> Html {
         "text-sm",
         "text-white",
         "cursor-pointer",
-        "hover:bg-cyan-900",
+        "active:bg-cyan-900",
         "rounded",
         if props.is_selected {
             "bg-cyan-900"
@@ -103,7 +102,7 @@ fn user_action(props: &UserActionProps) -> Html {
                 <ActionIcon actiontype={user_action.clone()}></ActionIcon>
                 <span class="grow">{txt}</span>
                 <ModifierIcon modifier={accelerator.mods}></ModifierIcon>
-                <TextBubble>{key_binding}</TextBubble>
+                <KeyComponent>{key_binding}</KeyComponent>
               </div>
             </div>
         }
@@ -172,19 +171,5 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
             {html}
           </div>
         </div>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct TextBubbleProps {
-    pub children: Children,
-}
-
-#[function_component(TextBubble)]
-pub fn txt_bubble(props: &TextBubbleProps) -> Html {
-    html! {
-      <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 text-[8px]">
-        {props.children.clone()}
-      </div>
     }
 }

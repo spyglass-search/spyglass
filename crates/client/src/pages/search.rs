@@ -16,11 +16,11 @@ use shared::{
     response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
-use crate::components::user_action_list::{self, ActionsList, TextBubble, DEFAULT_ACTION_LABEL};
+use crate::components::user_action_list::{self, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
     result::{LensResultItem, SearchResultItem},
-    SelectedLens,
+    KeyComponent, SelectedLens,
 };
 use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
 
@@ -861,11 +861,11 @@ impl Component for SearchPage {
             html! {
                 <div class="flex flex-row justify-between w-full items-center align-middle">
                   {running_action}
-                  <div class="flex flex-row align-middle items-center">
+                  <div class="flex flex-row align-middle items-center gap-1">
                     {"Use"}
-                    <icons::UpArrowInBubble height="h-2" width="w-2"></icons::UpArrowInBubble>
+                    <KeyComponent><icons::UpArrow height="h-2" width="w-2" /></KeyComponent>
                     {"and"}
-                    <icons::DownArrowInBubble height="h-2" width="w-2"></icons::DownArrowInBubble>
+                    <KeyComponent><icons::DownArrow height="h-2" width="w-2" /></KeyComponent>
                     {"to select."}
 
                   </div>
@@ -888,10 +888,8 @@ impl Component for SearchPage {
                     {is_searching_indicator}
                     <div class="ml-auto flex flex-row items-center align-middle pr-2 gap-1">
                       <span>{"Use"}</span>
-                      <TextBubble>{"/"}</TextBubble>
-                      <span>{"to select a lens."}</span>
-                      <TextBubble>{"Type"}</TextBubble>
-                      <span>{"to search."}</span>
+                      <KeyComponent>{"/"}</KeyComponent>
+                      <span>{"to select a lens. Type to search"}</span>
                     </div>
                 </>
             }
@@ -920,7 +918,7 @@ impl Component for SearchPage {
             html! {
                 <button class={classes}
                   onclick={link.callback(|_| Msg::ToggleShowActions)}>
-                  <TextBubble>{"Enter"}</TextBubble>
+                  <KeyComponent>{"ENTER"}</KeyComponent>
                   <span class="ml-1">{"to open."}</span>
                 </button>
             }
