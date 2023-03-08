@@ -187,7 +187,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             </div>
             <div class="grow">
                 <div class="text-xs text-cyan-500">{domain}</div>
-                <h2 class="text-lg truncate font-bold w-[30rem]">
+                <h2 class="text-lg truncate font-semibold w-[30rem]">
                     {title}
                 </h2>
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-14 overflow-hidden">

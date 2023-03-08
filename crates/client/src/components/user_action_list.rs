@@ -1,7 +1,5 @@
 use crate::components::icons;
-use crate::components::icons::{
-    ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon, DownArrowInBubble, UpArrowInBubble,
-};
+use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
 use crate::utils::{self, OsName};
 use shared::accelerator;
 use shared::{
@@ -12,7 +10,7 @@ use yew::function_component;
 use yew::prelude::*;
 
 // Label used for the default action
-pub const DEFAULT_ACTION_LABEL: &str = "Open with default application...";
+pub const DEFAULT_ACTION_LABEL: &str = "Open with default app";
 pub const USER_ACTION_PREFIX: &str = "user-action-";
 
 /// Properties for the action list component
@@ -43,80 +41,32 @@ pub struct ModifierProps {
 
 #[function_component(ModifierIcon)]
 fn modifier_icon(props: &ModifierProps) -> Html {
-    let component_styles = classes!(
-        "flex",
-        "justify-center",
-        "items-center",
-        "ml-1",
-        "min-w-[24px]",
-        "rounded",
-        "border",
-        "border-neutral-500",
-        "bg-neutral-400",
-        "px-0.5",
-        "text-[10px]",
-        "text-black"
-    );
+    let mut nodes: Vec<Html> = Vec::new();
 
-    let ctrl_icon = if props.modifier.control_key() {
-        html! {
-            <div class={component_styles.clone()}>
-              <span>{"Ctrl"}</span>
-            </div>
-        }
-    } else {
-        html! {}
-    };
-
-    let meta_icon = if props.modifier.super_key() {
-        match utils::get_os() {
-            OsName::MacOS => {
-                html! {
-                  <div class={component_styles.clone()}>
-                    <icons::CmdIcon height="h-4" width="w-4" />
-                  </div>
-                }
-            }
-            _ => {
-                html! {
-                  <div class={component_styles.clone()}>
-                    <icons::WinKeyIcon height="h-4" width="w-4" />
-                  </div>
-                }
-            }
-        }
-    } else {
-        html! {}
-    };
-
-    let alt_icon = if props.modifier.alt_key() {
-        html! {
-            <div class={component_styles.clone()}>
-               <span>{"Alt"}</span>
-            </div>
-        }
-    } else {
-        html! {}
-    };
-
-    let shift_icon = if props.modifier.shift_key() {
-        html! {
-            <div class={component_styles}>
-              <span>{"Shift"}</span>
-            </div>
-        }
-    } else {
-        html! {}
-    };
-
-    html! {
-        <>
-          {ctrl_icon}
-          {meta_icon}
-          {alt_icon}
-          {shift_icon}
-        </>
+    if props.modifier.control_key() {
+        nodes.push(html! { <TextBubble>{"Ctrl"}</TextBubble> });
     }
+
+    if props.modifier.super_key() {
+        match utils::get_os() {
+            OsName::MacOS => nodes.push(
+                html! { <TextBubble><icons::CmdIcon height="h-3" width="w-3" /></TextBubble> },
+            ),
+            _ => nodes.push(
+                html! { <TextBubble><icons::WinKeyIcon height="h-3" width="w-3" /></TextBubble> },
+            ),
+        }
+    }
+
+    if props.modifier.alt_key() {
+        nodes.push(html! { <TextBubble>{"Alt"}</TextBubble> });
+    }
+
+    if props.modifier.shift_key() {
+        nodes.push(html! { <TextBubble>{"Shift"}</TextBubble> });
+    }
+
+    html! { <>{nodes}</> }
 }
 
 #[function_component(UserActionComponent)]
@@ -124,17 +74,15 @@ fn user_action(props: &UserActionProps) -> Html {
     let component_styles = classes!(
         "flex",
         "flex-col",
-        "border-t",
-        "border-neutral-600",
-        "px-8",
-        "py-4",
+        "py-2",
+        "text-sm",
         "text-white",
         "cursor-pointer",
         "hover:bg-cyan-900",
         if props.is_selected {
             "bg-cyan-900"
         } else {
-            "bg-neutral-800"
+            "bg-neutral-700"
         }
     );
     let txt = props.action.label.clone();
@@ -143,26 +91,18 @@ fn user_action(props: &UserActionProps) -> Html {
         props.action.key_binding.as_str(),
         utils::get_os().to_string().as_str(),
     ) {
-        let key_binding = accelerator.key.to_str();
+        let key_binding = accelerator.key.to_str().to_string();
         let click_action = props.onclick.clone();
         let action = props.action.clone();
 
         let user_action = action.action.clone();
         html! {
             <div id={props.action_id.clone()} class={component_styles} onclick={Callback::from(move |_| click_action.emit(action.clone()))}>
-              <div class="flex flex-row justify-center px-2">
-                <div class="flex justify-center items-center">
-                  <ActionIcon actiontype={user_action.clone()}></ActionIcon>
-                </div>
-                <span class="grow pl-2">
-                  {txt}
-                </span>
-                <div class="flex flex-row pl-1 align-middle">
-                  <ModifierIcon modifier={accelerator.mods}></ModifierIcon>
-                  <div class="flex justify-center items-center ml-1 min-w-[24px] rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[10px] text-black">
-                    <span>{key_binding}</span>
-                  </div>
-                </div>
+              <div class="flex flex-row px-2 items-center gap-1">
+                <ActionIcon actiontype={user_action.clone()}></ActionIcon>
+                <span class="grow">{txt}</span>
+                <ModifierIcon modifier={accelerator.mods}></ModifierIcon>
+                <TextBubble>{key_binding}</TextBubble>
               </div>
             </div>
         }
@@ -171,9 +111,7 @@ fn user_action(props: &UserActionProps) -> Html {
             <div class={component_styles}>
               <div class="flex flex-row px-2">
                 <BookOpen/>
-                <span class="grow">
-                  {txt}
-                </span>
+                <span class="grow">{txt}</span>
               </div>
             </div>
         }
@@ -209,7 +147,7 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
             let id_str = format!("{USER_ACTION_PREFIX}{index}");
             index += 1;
             html! {
-                <UserActionComponent action_id={id_str} action={act.clone()} is_selected={is_selected} onclick={props.onclick.clone()}></UserActionComponent>
+                <UserActionComponent action_id={id_str} action={act.clone()} is_selected={is_selected} onclick={props.onclick.clone()} />
             }
         }).collect::<Html>();
 
@@ -222,25 +160,15 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
 
     let action_id = format!("{USER_ACTION_PREFIX}-0");
     html! {
-        <div class="absolute bottom-0 right-0 bg-neutral-800 z-20 flex flex-col rounded-xl border-neutral-600 border content-start px-0 py-0 h-1/2 w-3/4 overflow-hidden">
-          <div class="grow overflow-y-auto">
-            <UserActionComponent action_id={action_id} action={default_action} is_selected={props.selected_action == 0} onclick={props.onclick.clone()}></UserActionComponent>
+        <div class="absolute bottom-8 h-32 max-h-screen w-1/2 right-0 z-20 flex flex-col overflow-hidden rounded-tl-lg bg-neutral-700 border-t-2 border-l-2 border-neutral-900">
+          <div class="overflow-y-auto">
+            <UserActionComponent
+              action_id={action_id}
+              action={default_action}
+              is_selected={props.selected_action == 0}
+              onclick={props.onclick.clone()}
+            />
             {html}
-          </div>
-          <div  class="flex flex-row w-full items-center bg-neutral-900">
-            <div class="bg-neutral-900 grow text-neutral-500 text-xs px-3 py-1.5 flex flex-row justify-end items-center gap-2">
-              <div class="flex flex-row align-middle items-center">
-                {"Use"}
-                <UpArrowInBubble height="h-2" width="w-2"></UpArrowInBubble>
-                {"and"}
-                <DownArrowInBubble height="h-2" width="w-2"></DownArrowInBubble>
-                {"to select."}
-                <TextBubble txt="Enter"></TextBubble>
-                {"to execute action."}
-                <TextBubble txt="Esc"></TextBubble>
-                {"to close window."}
-              </div>
-            </div>
           </div>
         </div>
     }
@@ -248,14 +176,14 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct TextBubbleProps {
-    pub txt: String,
+    pub children: Children,
 }
 
 #[function_component(TextBubble)]
 pub fn txt_bubble(props: &TextBubbleProps) -> Html {
     html! {
-      <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
-        {props.txt.clone()}
+      <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 text-[8px]">
+        {props.children.clone()}
       </div>
     }
 }
