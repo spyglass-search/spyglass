@@ -18,7 +18,7 @@ export let invoke = async (func_name, params) => {
           domain: "google.com",
           title: "This is an example title",
           description:
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            "<div>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.</div>",
           crawl_uri: "https://google.com/this/is/a/path",
           url: "https://google.com/this/is/a/path",
           tags: [
@@ -48,7 +48,7 @@ export let invoke = async (func_name, params) => {
           title:
             "This is an example super long title to demonstrate very long titles that go on for a very long time and then some.",
           description:
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            "<div>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.</div>",
           crawl_uri: "api://account@drive.google.com/1540812340985",
           url: "https://example.com",
           tags: [
@@ -65,7 +65,7 @@ export let invoke = async (func_name, params) => {
           domain: "localhost",
           title: "README.md",
           description:
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            "<div>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.</div>",
           crawl_uri:
             "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
           url: "file://localhost/User/alice/Documents/Projects/personal/test-project/github-repos/blog/src/blah-blah/README.md",
@@ -81,7 +81,7 @@ export let invoke = async (func_name, params) => {
           domain: "drive.google.com",
           title: "API Example Doc",
           description:
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+            "<div>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.</div>",
           crawl_uri: "api://drive.google.com/24938aslkdj-313-19384",
           url: "https://example.com/this/is/a/path",
           tags: [
@@ -98,7 +98,7 @@ export let invoke = async (func_name, params) => {
       {
         author: "a5huynh",
         description:
-          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+          "<div>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.</div>",
         name: "fake_lense",
         label: "Fake Lense",
         hash: "",
@@ -109,7 +109,7 @@ export let invoke = async (func_name, params) => {
       {
         author: "a5huynh",
         description:
-          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
+          "<div>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.</div>",
         name: "fake_lense_2_boogaloo",
         label: "Fake Lense 2: Boogaloo",
         hash: "",
@@ -170,8 +170,8 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Games'],
+        lens_type: "Lens",
+        categories: ["Games"],
         progress: {
           Installing: {
             percent: 45,
@@ -188,8 +188,8 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Games', 'TTRPG'],
+        lens_type: "Lens",
+        categories: ["Games", "TTRPG"],
         progress: {
           Finished: {
             num_docs: 10000,
@@ -205,8 +205,8 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Games', 'MMORPG'],
+        lens_type: "Lens",
+        categories: ["Games", "MMORPG"],
         progress: {
           Installing: {
             percent: 45,
@@ -222,8 +222,8 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Productivity'],
+        lens_type: "Lens",
+        categories: ["Productivity"],
         progress: {
           Installing: {
             percent: 100,
@@ -239,13 +239,13 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Productivity'],
+        lens_type: "Lens",
+        categories: ["Productivity"],
         progress: {
           Finished: {
-            num_docs: 10000
-          }
-        }
+            num_docs: 10000,
+          },
+        },
       },
       {
         author: "Spyglass",
@@ -255,13 +255,13 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Productivity'],
+        lens_type: "Lens",
+        categories: ["Productivity"],
         progress: {
           Finished: {
-            num_docs: 10000
-          }
-        }
+            num_docs: 10000,
+          },
+        },
       },
       {
         author: "Spyglass",
@@ -271,13 +271,13 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Productivity'],
+        lens_type: "Lens",
+        categories: ["Productivity"],
         progress: {
           Finished: {
-            num_docs: 10000
-          }
-        }
+            num_docs: 10000,
+          },
+        },
       },
       {
         author: "Spyglass",
@@ -287,13 +287,13 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Productivity'],
+        lens_type: "Lens",
+        categories: ["Productivity"],
         progress: {
           Finished: {
-            num_docs: 10000
-          }
-        }
+            num_docs: 10000,
+          },
+        },
       },
       {
         author: "Spyglass",
@@ -303,13 +303,13 @@ export let invoke = async (func_name, params) => {
         hash: "",
         html_url: null,
         download_url: null,
-        lens_type: 'Lens',
-        categories: ['Productivity'],
+        lens_type: "Lens",
+        categories: ["Productivity"],
         progress: {
           Finished: {
-            num_docs: 10000
-          }
-        }
+            num_docs: 10000,
+          },
+        },
       },
     ];
     list.sort((a, b) => a.label.localeCompare(b.label));
@@ -325,7 +325,7 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
-        categories: ['Test', 'Games'],
+        categories: ["Test", "Games"],
       },
       {
         author: "a5huynh",
@@ -336,7 +336,7 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
-        categories: ['Funk'],
+        categories: ["Funk"],
       },
       {
         author: "billybob",
@@ -347,8 +347,8 @@ export let invoke = async (func_name, params) => {
         html_url: "https://example.com",
         download_url: "https://example.com",
         progress: "NotInstalled",
-        categories: ['Games', 'TTRPG'],
-      }
+        categories: ["Games", "TTRPG"],
+      },
     ];
   } else if (func_name == "plugin:lens-updater|install_lens") {
     window.setTimeout(() => {

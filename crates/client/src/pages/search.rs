@@ -905,16 +905,16 @@ impl Component for SearchPage {
                 "border-l",
                 "text-sm",
                 "text-neutral-500",
-                "border-neutral-500",
+                "border-neutral-700",
                 "px-3",
-                "hover:bg-neutral-700",
                 "ml-3",
                 "h-8",
                 if self.action_menu_button_selected || self.show_actions {
                     "bg-neutral-700"
                 } else {
                     "bg-neutral-900"
-                }
+                },
+                "hover:bg-neutral-700",
             );
 
             html! {
@@ -961,10 +961,14 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px]">
-                    {results}
-                </div>
-                <div  class="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
+                { if !self.docs_results.is_empty() || !self.lens_results.is_empty() {
+                    html! {
+                        <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 pb-2 border-t border-neutral-600">
+                            <div class="w-full flex flex-col">{results}</div>
+                        </div>
+                    }
+                } else { html!{} }}
+                <div class="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
                   <div class="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
                       {search_meta}
                   </div>
