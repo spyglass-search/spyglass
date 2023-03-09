@@ -7,7 +7,7 @@
 	setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
-PLUGINS := rust
+PLUGINS :=
 
 # By default just run fmt & clippy
 default: fmt clippy
