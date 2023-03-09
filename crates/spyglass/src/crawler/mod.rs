@@ -532,7 +532,6 @@ fn _process_file(
     let description = if !contents.is_empty() {
         let desc = contents
             .split(' ')
-            .into_iter()
             .take(DEFAULT_DESC_LENGTH)
             .collect::<Vec<&str>>()
             .join(" ");
