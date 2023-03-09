@@ -12,8 +12,10 @@ use std::sync::Arc;
 
 use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
+use tauri::api::process::current_binary;
 use tauri::{
-    AppHandle, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray, SystemTrayEvent,
+    AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray,
+    SystemTrayEvent,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -23,6 +25,13 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use shared::config::Config;
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
+
+#[cfg(target_os = "linux")]
+use platform::linux::os_open;
+#[cfg(target_os = "macos")]
+use platform::mac::os_open;
+#[cfg(target_os = "windows")]
+use platform::windows::os_open;
 
 mod cmd;
 mod constants;
@@ -36,6 +45,8 @@ use window::{
     show_connection_manager_window, show_lens_manager_window, show_plugin_manager, show_search_bar,
     show_update_window, show_user_settings, show_wizard_window,
 };
+
+use crate::window::get_searchbar;
 
 const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
 #[cfg(not(debug_assertions))]
@@ -67,12 +78,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Check and register this app to run on boot
-    let path = std::env::current_exe().map(|path| path.to_str().map(|s| s.to_owned()));
-    if let Ok(Some(path)) = path {
+    let binary = current_binary(&Env::default());
+    if let Ok(path) = binary {
         // NOTE: See how this works: https://github.com/Teamwork/node-auto-launch#how-does-it-work
         if let Ok(auto) = AutoLaunchBuilder::new()
             .set_app_name("Spyglass Search")
-            .set_app_path(&path)
+            .set_app_path(&path.display().to_string())
             .set_use_launch_agent(true)
             .build()
         {
@@ -106,6 +117,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;
 
+    // Fixes path issues on macOS & Linux
+    let _ = fix_path_env::fix();
     let app = tauri::Builder::default()
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::startup::init())
@@ -120,11 +133,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::list_connections,
             cmd::list_plugins,
             cmd::load_user_settings,
+            cmd::load_action_settings,
             cmd::network_change,
             cmd::open_folder_path,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,
+            cmd::copy_to_clipboard,
             cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
@@ -160,6 +175,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 current_version,
                 app_handle.clone(),
             ));
+
+            let _ = get_searchbar(&app_handle);
 
             app.manage(config.clone());
             app.manage(Arc::new(PauseState::new(false)));
@@ -244,7 +261,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 window.open_devtools();
                             }
                             MenuID::JOIN_DISCORD => {
-                                let _ = open::that(shared::constants::DISCORD_JOIN_URL);
+                                let _ = os_open(
+                                    &url::Url::parse(shared::constants::DISCORD_JOIN_URL)
+                                        .expect("Invalid Discord URL"),
+                                    None,
+                                );
+                            }
+                            MenuID::INSTALL_CHROME_EXT => {
+                                let _ = os_open(
+                                    &url::Url::parse(shared::constants::CHROME_EXT_LINK)
+                                        .expect("Invalid Chrome extension URL"),
+                                    None,
+                                );
+                            }
+                            MenuID::INSTALL_FIREFOX_EXT => {
+                                let _ = os_open(
+                                    &url::Url::parse(shared::constants::FIREFOX_EXT_LINK)
+                                        .expect("Invalid Firefox extension URL"),
+                                    None,
+                                );
                             }
                             // Just metainfo
                             MenuID::VERSION => {}

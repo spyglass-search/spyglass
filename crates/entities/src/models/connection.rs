@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{QuerySelect, Set};
+use sea_orm::{QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 
 use super::{crawl_queue, indexed_document};
@@ -30,8 +30,9 @@ pub struct Model {
     pub granted_at: DateTimeUtc,
     // Whether or not this connection is currently syncing.
     pub is_syncing: bool,
-    // When this connection was created/updated
+    /// When this connection was created
     pub created_at: DateTimeUtc,
+    /// When this connection was last synced
     pub updated_at: DateTimeUtc,
 }
 
@@ -44,9 +45,13 @@ impl RelationTrait for Relation {
     }
 }
 
+#[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
         if !insert {
             self.updated_at = Set(chrono::Utc::now());
         }
@@ -57,7 +62,7 @@ impl ActiveModelBehavior for ActiveModel {
 
 impl ActiveModel {
     pub fn new(
-        id: String,
+        api_id: String,
         account: String,
         access_token: String,
         refresh_token: Option<String>,
@@ -65,7 +70,7 @@ impl ActiveModel {
         scopes: Vec<String>,
     ) -> Self {
         Self {
-            api_id: Set(id),
+            api_id: Set(api_id),
             account: Set(account),
             access_token: Set(access_token),
             refresh_token: Set(refresh_token),
@@ -74,6 +79,7 @@ impl ActiveModel {
             granted_at: Set(chrono::Utc::now()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
+            is_syncing: Set(false),
             ..Default::default()
         }
     }
@@ -82,6 +88,28 @@ impl ActiveModel {
 /// Helper method used to access all configured connections
 pub async fn get_all_connections(db: &DatabaseConnection) -> Vec<Model> {
     Entity::find().all(db).await.unwrap_or_default()
+}
+
+/// Finds the oldest connection that hasn't been synced & sync it!
+pub async fn dequeue_sync(db: &DatabaseConnection) -> Option<Model> {
+    let model = Entity::find().order_by_asc(Column::UpdatedAt).one(db).await;
+
+    if let Ok(Some(task)) = model {
+        let now = chrono::Utc::now();
+        let last_synced = now - task.updated_at;
+        if last_synced.num_hours() < 24 {
+            return None;
+        }
+
+        // Set to synicng & update the updated at timestamp.
+        let mut update: ActiveModel = task.clone().into();
+        update.is_syncing = Set(true);
+        update.updated_at = Set(now);
+        let _ = update.save(db).await;
+        Some(task)
+    } else {
+        None
+    }
 }
 
 /// Helper method used to get the entry for the specified id and account
@@ -151,8 +179,52 @@ pub async fn set_sync_status(
     if let Some(model) = get_by_id(db, id, account).await? {
         let mut update: ActiveModel = model.into();
         update.is_syncing = Set(is_syncing);
+        update.updated_at = Set(chrono::Utc::now());
         update.save(db).await?;
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::ActiveModel;
+    use crate::test::setup_test_db;
+    use chrono::{TimeZone, Utc};
+    use sea_orm::{ActiveModelTrait, Set};
+
+    /// Should always dequeue the oldest one first.
+    #[tokio::test]
+    async fn test_dequeue_sync() {
+        let db = setup_test_db().await;
+
+        let newer = Utc.with_ymd_and_hms(2023, 2, 2, 0, 0, 0).unwrap();
+        let older = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
+
+        let mut one = ActiveModel::new(
+            "test_one".into(),
+            "test_account".into(),
+            "fake-token".into(),
+            None,
+            None,
+            vec!["identity".into()],
+        );
+        one.updated_at = Set(newer);
+        let _ = one.insert(&db).await.expect("Unable to insert");
+
+        let mut two = ActiveModel::new(
+            "test_two".into(),
+            "test_account".into(),
+            "fake-token".into(),
+            None,
+            None,
+            vec!["identity".into()],
+        );
+        two.updated_at = Set(older);
+        let two = two.insert(&db).await.expect("Unable to insert");
+
+        let result = super::dequeue_sync(&db).await.expect("Should be a result");
+
+        assert_eq!(result.api_id, two.api_id);
+    }
 }

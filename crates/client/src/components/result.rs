@@ -2,7 +2,6 @@ use js_sys::decode_uri_component;
 use url::Url;
 use yew::prelude::*;
 
-use super::btn::DeleteButton;
 use super::{
     icons,
     tag::{Tag, TagIcon},
@@ -93,9 +92,21 @@ fn render_metadata(result: &SearchResult) -> Html {
     // Generate the icons/labels required for tags
     let mut priority_tags = Vec::new();
     let mut normal_tags = Vec::new();
+
+    let result_type = result
+        .tags
+        .iter()
+        .find(|(label, _)| label.to_lowercase() == "type")
+        .map(|(_, val)| val.as_str())
+        .unwrap_or_default();
+
     for (tag, value) in result.tags.iter() {
         let tag = tag.to_lowercase();
         if tag == "source" || tag == "mimetype" {
+            continue;
+        }
+
+        if result_type == "repository" && tag == "repository" {
             continue;
         }
 
@@ -126,13 +137,14 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         "flex",
         "flex-row",
         "gap-4",
-        "border-t",
-        "border-neutral-600",
-        "py-4",
+        "rounded",
+        "py-2",
+        "pr-2",
+        "mt-2",
         "text-white",
-        "w-screen",
         "cursor-pointer",
-        "hover:bg-cyan-900",
+        "active:bg-cyan-900",
+        "scroll-mt-2",
         if is_selected {
             "bg-cyan-900"
         } else {
@@ -175,16 +187,13 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
             </div>
             <div class="grow">
                 <div class="text-xs text-cyan-500">{domain}</div>
-                <h2 class="text-lg truncate font-bold w-[30rem]">
+                <h2 class="text-base truncate font-semibold w-[30rem]">
                     {title}
                 </h2>
-                <div class="text-sm leading-relaxed text-neutral-400 max-h-14 overflow-hidden">
+                <div class="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
                     {Html::from_html_unchecked(result.description.clone().into())}
                 </div>
                 {metadata}
-            </div>
-            <div class="flex-none flex flex-col justify-self-end self-start pl-4 pr-4">
-                <DeleteButton doc_id={result.doc_id.clone()} />
             </div>
         </a>
     }

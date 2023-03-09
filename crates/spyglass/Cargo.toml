@@ -1,15 +1,17 @@
 [package]
 name = "spyglass"
-version = "23.2.4"
+version = "23.3.1"
 edition = "2021"
+default-run = "spyglass"
 
 [dependencies]
 addr = "0.15.3"
 anyhow = "1.0"
 bytes = "1.2.1"
 calamine = "0.19.1"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.23", features = ["serde"] }
 clap = { version = "4.0.32", features = ["derive"] }
+console-subscriber = { version = "0.1.8", optional = true }
 dashmap = "5.2"
 digest = "0.10"
 directories = "4.0"
@@ -30,6 +32,7 @@ new_mime_guess = "4.0.1"
 nonzero_ext = "0.3.0"
 notify = { version = "5.1.0", default-features = false, features = ["serde", "macos_fsevent"] }
 notify-debouncer-mini = { version = "*", default-features = false }
+num-format = "0.4"
 open = "3.0"
 percent-encoding = "2.2"
 regex = "1"
@@ -60,14 +63,19 @@ wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
 
 # Spyglass libs
-auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
-github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dc4355a2b2ca12c7e1640a3f39c275f5428157d0" }
+auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
-spyglass-netrunner = "0.2.9"
+spyglass-netrunner = "0.2.10"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
+
+[features]
+tokio-console = ["tokio/tracing", "console-subscriber"]
 
 [lib]
 name = "libspyglass"
@@ -77,3 +85,7 @@ crate-type = ["lib"]
 [[bin]]
 name = "spyglass"
 path = "src/main.rs"
+
+[[bin]]
+name = "spyglass-debug"
+path = "src/debug/main.rs"

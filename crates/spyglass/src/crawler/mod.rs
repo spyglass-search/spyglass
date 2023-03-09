@@ -41,7 +41,7 @@ type RateLimit = RateLimiter<String, DashMapStateStore<String>, QuantaClock>;
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 pub enum CrawlError {
     #[error("crawl denied by rule {0}")]
     Denied(String),
@@ -49,9 +49,13 @@ pub enum CrawlError {
     FetchError(String),
     #[error("unable to parse document due to {0}")]
     ParseError(String),
+    #[error("unable to read document due to {0}")]
+    ReadError(#[from] std::io::Error),
     /// Document was not found.
     #[error("document not found")]
     NotFound,
+    #[error("document was not modified since last check")]
+    NotModified,
     #[error("document was recently fetched")]
     RecentlyFetched,
     /// Request timeout, crawler will try again later.
@@ -70,8 +74,9 @@ pub struct CrawlResult {
     /// Text content from page after stripping HTML tags & any semantically
     /// unimportant sections (header/footer/etc.)
     pub content: Option<String>,
-    /// A short description of the page provided by the <meta> tag or summarized
-    /// from the content.
+    /// Historically used as a short description of the page provided by the <meta>
+    /// tag or summarized from the content. We generate previews now based on search
+    /// terms + content.
     pub description: Option<String>,
     pub title: Option<String>,
     /// Uniquely identifying URL for this document. Used by the crawler to determine
@@ -97,16 +102,17 @@ impl CrawlResult {
         hasher.update(content.as_bytes());
         let content_hash = Some(hex::encode(&hasher.finalize()[..]));
         log::trace!("content hash: {:?}", content_hash);
-        // Use a portion of the content
-        let desc = if let Some(desc) = desc {
-            Some(desc)
+
+        let content = content.trim();
+        let content = if content.is_empty() {
+            None
         } else {
             Some(content.to_string())
         };
 
         Self {
             content_hash,
-            content: Some(content.to_string()),
+            content,
             description: desc,
             title: Some(title.to_string()),
             url: url.to_string(),
@@ -246,7 +252,13 @@ impl Crawler {
         match handle_crawl(&self.client, None, self.limiter.clone(), url).await {
             Ok(crawl) => {
                 if parse_results {
-                    Ok(self.scrape_page(url, &crawl.content).await)
+                    let result = self.scrape_page(url, &crawl.headers, &crawl.content).await;
+                    match result {
+                        Some(crawl) => Ok(crawl),
+                        None => Err(CrawlError::Unsupported(format!(
+                            "Content Type unsupported {url:?}"
+                        ))),
+                    }
                 } else {
                     Ok(CrawlResult {
                         url: crawl.url.clone(),
@@ -259,15 +271,30 @@ impl Crawler {
         }
     }
 
-    pub async fn scrape_page(&self, url: &Url, raw_body: &str) -> CrawlResult {
+    pub async fn scrape_page(
+        &self,
+        url: &Url,
+        headers: &[(String, String)],
+        raw_body: &str,
+    ) -> Option<CrawlResult> {
         // Parse the html.
+        log::debug!("Scraping page {:?}", url);
+        let content_type = headers
+            .iter()
+            .find(|(header, _value)| header.eq("content-type"));
+        if let Some((_header, value)) = content_type {
+            if !is_html_content(value) {
+                log::info!("Skipping content type {:?}", value);
+                return None;
+            }
+        }
         let parse_result = html_to_text(url.as_ref(), raw_body);
-        log::trace!("content hash: {:?}", parse_result.content_hash);
+        log::debug!("content hash: {:?}", parse_result.content_hash);
 
         let extracted = parse_result.canonical_url.and_then(|s| Url::parse(&s).ok());
         let canonical_url = determine_canonical(url, extracted);
 
-        CrawlResult {
+        Some(CrawlResult {
             content_hash: Some(parse_result.content_hash),
             content: Some(parse_result.content),
             description: Some(parse_result.description),
@@ -276,7 +303,7 @@ impl Crawler {
             open_url: Some(canonical_url),
             links: parse_result.links,
             ..Default::default()
-        }
+        })
     }
 
     // TODO: Load web indexing as a plugin?
@@ -355,7 +382,7 @@ impl Crawler {
     async fn handle_file_fetch(
         &self,
         state: &AppState,
-        _: &crawl_queue::Model,
+        task: &crawl_queue::Model,
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
         // Attempt to convert from the URL to a file path
@@ -368,6 +395,15 @@ impl Crawler {
         // Is this a file and does this exist?
         if !path.exists() {
             return Err(CrawlError::NotFound);
+        }
+
+        // Check when this was last modified against our last updated field
+        let metadata = path.metadata()?;
+        if let Ok(last_mod) = metadata.modified() {
+            let last_modified: chrono::DateTime<Utc> = last_mod.into();
+            if last_modified > task.updated_at {
+                return Err(CrawlError::NotModified);
+            }
         }
 
         let file_name = path
@@ -458,19 +494,34 @@ impl Crawler {
     }
 }
 
-fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
+fn _process_file(
+    state: &AppState,
+    path: &Path,
+    file_name: String,
+    url: &Url,
+) -> Result<CrawlResult, CrawlError> {
+    let supported_ext = crate::filesystem::utils::get_supported_file_extensions(state);
     // Attempt to read file
     let contents = match path.extension() {
         Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
             Err(err) => return Err(CrawlError::ParseError(err.to_string())),
             Ok(contents) => contents,
         },
-        _ => match std::fs::read_to_string(path) {
-            Ok(x) => x,
-            Err(err) => {
-                return Err(CrawlError::FetchError(err.to_string()));
+        Some(ext) if supported_ext.contains(ext.to_str().unwrap_or_default()) => {
+            match std::fs::read_to_string(path) {
+                Ok(x) => x,
+                Err(err) => {
+                    return Err(CrawlError::FetchError(err.to_string()));
+                }
             }
-        },
+        }
+        _ => {
+            log::warn!(
+                "File type for path {:?} unsupported returning empty content",
+                path
+            );
+            "".to_string()
+        }
     };
 
     let mut hasher = Sha256::new();
@@ -505,13 +556,13 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
 }
 
 async fn _process_path(
-    _state: &AppState,
+    state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
     if path.is_file() {
-        return _process_file(path, file_name, url);
+        return _process_file(state, path, file_name, url);
     }
     Err(CrawlError::NotFound)
 }
@@ -523,6 +574,10 @@ fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {
         .map(|x| x.to_string())
         .unwrap_or_default();
     extension.contains(ext)
+}
+
+fn is_html_content(content_type: &str) -> bool {
+    content_type.contains("text/html") || content_type.contains("application/xhtml+xml")
 }
 
 #[cfg(test)]

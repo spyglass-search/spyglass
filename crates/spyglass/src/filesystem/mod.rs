@@ -9,6 +9,7 @@ use ignore::gitignore::Gitignore;
 use ignore::WalkBuilder;
 
 use sha2::{Digest, Sha256};
+use tokio::task::JoinHandle;
 use url::Url;
 
 use crate::crawler::CrawlResult;
@@ -46,6 +47,7 @@ pub const FILES_LENS: &str = "files";
 pub struct SpyglassFileWatcher {
     // The director watcher services
     watcher: Arc<Mutex<Debouncer<RecommendedWatcher>>>,
+    pub watcher_handle: JoinHandle<()>,
     // The map of path being watched to the list of watchers
     path_map: DashMap<PathBuf, Vec<WatchPath>>,
     // Map of .gitignore file path to the ignore file processor
@@ -152,7 +154,6 @@ async fn watch_events(
             },
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down file watch loop");
-
                 file_events.close();
                 let mut watcher = state.file_watcher.lock().await;
                 if let Some(watcher) = watcher.as_mut() {
@@ -244,17 +245,14 @@ impl SpyglassFileWatcher {
             })
             .expect("Unable to watch lens directory");
 
-        let spy_watcher = SpyglassFileWatcher {
+        SpyglassFileWatcher {
             watcher: Arc::new(Mutex::new(watcher)),
+            watcher_handle: tokio::spawn(watch_events(state.clone(), file_events)),
             path_map: DashMap::new(),
             ignore_files: DashMap::new(),
             db: state.db.clone(),
             path_initializing: Arc::new(Mutex::new(None)),
-        };
-
-        tokio::spawn(watch_events(state.clone(), file_events));
-
-        spy_watcher
+        }
     }
 
     /// Helper method used to update the database with newly arrived changes
@@ -491,7 +489,7 @@ impl SpyglassFileWatcher {
                                 Err(err) => {
                                     // delete any invalid paths from db
                                     to_delete.push(item.id);
-                                    log::error!(
+                                    log::warn!(
                                         "uri_to_path failed on {} due to {}",
                                         file_path,
                                         err
@@ -511,7 +509,7 @@ impl SpyglassFileWatcher {
                         Err(err) => {
                             // delete any invalid paths from db
                             to_delete.push(item.id);
-                            log::error!("uri_to_path failed on {} due to {}", item.file_path, err);
+                            log::warn!("uri_to_path failed on {} due to {}", item.file_path, err);
                         }
                     },
                 }
@@ -638,7 +636,7 @@ pub async fn configure_watcher(state: AppState) {
             log::error!("Watcher is missing");
         }
 
-        match processed_files::remove_unmatched_paths(&state.db, path_names).await {
+        match processed_files::remove_unmatched_paths(&state.db, &path_names, false).await {
             Ok(removed) => {
                 let uri_list = removed
                     .iter()
@@ -646,7 +644,7 @@ pub async fn configure_watcher(state: AppState) {
                     .collect::<Vec<String>>();
                 documents::delete_documents_by_uri(&state, uri_list).await;
             }
-            Err(error) => log::error!(
+            Err(error) => log::warn!(
                 "Error removing paths that are no longer being watched. {:?}",
                 error
             ),
@@ -659,7 +657,7 @@ pub async fn configure_watcher(state: AppState) {
             watcher.close().await;
         }
 
-        match processed_files::remove_unmatched_paths(&state.db, Vec::new()).await {
+        match processed_files::remove_unmatched_paths(&state.db, &[], true).await {
             Ok(removed) => {
                 let uri_list = removed
                     .iter()
@@ -667,7 +665,7 @@ pub async fn configure_watcher(state: AppState) {
                     .collect::<Vec<String>>();
                 documents::delete_documents_by_uri(&state, uri_list).await;
             }
-            Err(error) => log::error!(
+            Err(error) => log::warn!(
                 "Error removing paths that are no longer being watched. {:?}",
                 error
             ),
@@ -848,7 +846,7 @@ async fn _process_file_and_dir(
 /// Generates the tags for a file
 pub fn build_file_tags(path: &Path) -> Vec<TagPair> {
     let mut tags = Vec::new();
-    tags.push((TagType::Lens, String::from("files")));
+    tags.push((TagType::Lens, String::from(FILES_LENS)));
     if path.is_dir() {
         tags.push((TagType::Type, TagValue::Directory.to_string()));
     } else if path.is_file() {
@@ -890,7 +888,7 @@ async fn _process_general_file(state: &AppState, file_uri: &[String]) {
     if let Err(err) = documents::process_crawl_results(
         state,
         &crawl_results,
-        &[(TagType::Lens, "files".to_string())],
+        &[(TagType::Lens, FILES_LENS.to_string())],
     )
     .await
     {

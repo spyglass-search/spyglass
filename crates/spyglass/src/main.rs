@@ -1,19 +1,19 @@
 extern crate notify;
 use clap::Parser;
-use std::io;
-use tokio::signal;
-use tokio::sync::{broadcast, mpsc};
-use tracing_log::LogTracer;
-use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
-
 use entities::models::{self, crawl_queue, lens};
 use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
+use migration::DbErr;
 #[allow(unused_imports)]
 use migration::Migrator;
 use shared::config::{self, Config};
+use std::io;
+use tokio::signal;
+use tokio::sync::{broadcast, mpsc};
+use tracing_log::LogTracer;
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 mod api;
 
@@ -36,10 +36,24 @@ struct CliArgs {
     check: bool,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut config = Config::new();
-    let args = CliArgs::parse();
+#[cfg(feature = "tokio-console")]
+pub fn setup_logging(_config: &Config) {
+    let subscriber = tracing_subscriber::registry()
+        .with(
+            EnvFilter::from_default_env()
+                .add_directive("tokio=TRACE".parse().expect("invalid EnvFilter"))
+                .add_directive("runtime=TRACE".parse().expect("invalid EnvFilter")),
+        )
+        .with(
+            console_subscriber::ConsoleLayer::builder()
+                .with_default_env()
+                .spawn(),
+        );
+    tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
+}
 
+#[cfg(not(feature = "tokio-console"))]
+pub fn setup_logging(config: &Config) {
     #[cfg(not(debug_assertions))]
     let _guard = if config.user_settings.disable_telemetry {
         None
@@ -78,17 +92,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(fmt::Layer::new().with_writer(io::stdout))
         .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
         .with(sentry_tracing::layer());
-
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
-    LogTracer::init()?;
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), ()> {
+    let mut config = Config::new();
+    let args = CliArgs::parse();
+
+    setup_logging(&config);
+    LogTracer::init().expect("Unable to initialize LogTracer");
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());
-    let backend_rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name("spyglass-backend")
-        .build()
-        .expect("Unable to create tokio runtime");
-
     // In case we need to split the runtimes for some reason:
     // let num_cores = usize::from(std::thread::available_parallelism().expect("Unable to get number of cores"));
     // let api_rt = tokio::runtime::Builder::new_multi_thread()
@@ -101,23 +116,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run any migrations, only on headless mode.
     #[cfg(debug_assertions)]
     {
-        let migration_status = backend_rt.block_on(async {
-            match Migrator::run_migrations().await {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let msg = e.to_string();
-                    // This is ok, just the migrator being funky
-                    if !msg.contains("been applied but its file is missing") {
-                        // Ruh-oh something went wrong
-                        log::error!("Unable to migrate database - {}", e.to_string());
-                        // Exit from app
-                        return Err(());
-                    }
-
-                    Ok(())
+        let migration_status: Result<(), DbErr> = match Migrator::run_migrations().await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let msg = e.to_string();
+                // This is ok, just the migrator being funky
+                if !msg.contains("been applied but its file is missing") {
+                    // Ruh-oh something went wrong
+                    log::error!("Unable to migrate database - {}", e.to_string());
+                    // Exit from app
+                    return Err(());
                 }
+
+                Ok(())
             }
-        });
+        };
 
         if migration_status.is_err() {
             return Ok(());
@@ -125,39 +138,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        backend_rt.block_on(async {
-            // migrate plugin settings
-            let db = models::create_connection(&config, false)
-                .await
-                .expect("Unable to connect to db");
+        // migrate plugin settings
+        let db = models::create_connection(&config, false)
+            .await
+            .expect("Unable to connect to db");
 
-            // state.user_settings
-            if let Ok(Some(model)) = lens::find_by_name(config::LEGACY_FILESYSTEM_PLUGIN, &db).await
-            {
-                let mut new_settings = config.user_settings.clone();
-                new_settings.filesystem_settings.enable_filesystem_scanning = model.is_enabled;
-                let _ = Config::save_user_settings(&new_settings);
-                if let Ok(settings) = Config::load_user_settings() {
-                    config.user_settings = settings;
-                }
-
-                if let Err(err) = lens::delete_by_id(model.id, &db).await {
-                    log::error!("Error deleting filesystem plugin lens {:?}", err);
-                }
+        // state.user_settings
+        if let Ok(Some(model)) = lens::find_by_name(config::LEGACY_FILESYSTEM_PLUGIN, &db).await {
+            let mut new_settings = config.user_settings.clone();
+            new_settings.filesystem_settings.enable_filesystem_scanning = model.is_enabled;
+            let _ = Config::save_user_settings(&new_settings);
+            if let Ok(settings) = Config::load_user_settings() {
+                config.user_settings = settings;
             }
-        });
+
+            if let Err(err) = lens::delete_by_id(model.id, &db).await {
+                log::error!("Error deleting filesystem plugin lens {:?}", err);
+            }
+        }
     }
 
     // Initialize/Load user preferences
-    let state = backend_rt.block_on(AppState::new(&config));
+    let state = AppState::new(&config).await;
     if !args.check {
-        let indexer_handle = backend_rt.spawn(start_backend(state.clone(), config.clone()));
+        let indexer_handle = start_backend(state.clone(), config.clone());
         // API server
-        let api_handle = backend_rt.spawn(api::start_api_server(state, config));
-
-        backend_rt.block_on(async move {
-            let _ = tokio::join!(indexer_handle, api_handle);
-        });
+        let api_handle = api::start_api_server(state, config);
+        let _ = tokio::join!(indexer_handle, api_handle);
     }
 
     Ok(())
@@ -266,6 +273,10 @@ async fn start_backend(state: AppState, config: Config) {
     match signal::ctrl_c().await {
         Ok(()) => {
             log::warn!("Shutdown request received");
+            if let Some(fs) = state.file_watcher.lock().await.as_ref() {
+                fs.watcher_handle.abort();
+            }
+
             state
                 .shutdown_cmd_tx
                 .lock()

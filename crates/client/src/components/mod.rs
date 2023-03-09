@@ -5,6 +5,7 @@ pub mod lens;
 pub mod result;
 pub mod tag;
 pub mod tooltip;
+pub mod user_action_list;
 use yew::{prelude::*, virtual_dom::AttrValue};
 
 #[derive(Properties, PartialEq, Eq)]
@@ -130,5 +131,19 @@ pub fn tabs(props: &TabsProps) -> Html {
             .collect::<Html>()
         }
         </ul>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct KeyCodeProps {
+    pub children: Children,
+}
+
+#[function_component(KeyComponent)]
+pub fn txt_bubble(props: &KeyCodeProps) -> Html {
+    html! {
+      <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-1 text-[8px] h-5 min-w-5 flex items-center font-semibold justify-center">
+        {props.children.clone()}
+      </div>
     }
 }

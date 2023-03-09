@@ -1,13 +1,26 @@
+pub mod accelerator;
 pub mod config;
 pub mod constants;
 pub mod event;
 pub mod form;
+pub mod keyboard;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod plugin;
 pub mod regex;
 pub mod request;
 pub mod response;
+
+#[cfg(target_os = "macos")]
+pub const OS_STR: &str = "mac";
+#[cfg(target_os = "windows")]
+pub const OS_STR: &str = "windows";
+#[cfg(target_os = "linux")]
+pub const OS_STR: &str = "linux";
+
+pub const MAC_OS: &str = "mac";
+pub const WINDOWS_OS: &str = "windows";
+pub const LINUX_OS: &str = "linux";
 
 /// A platform-agnostic way to turn a URL file path into something that can
 /// be opened & crawled.

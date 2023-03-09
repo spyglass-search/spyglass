@@ -49,3 +49,10 @@ pub struct RawDocumentRequest {
     pub source: RawDocSource,
     pub tags: Vec<(String, String)>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BatchDocumentRequest {
+    pub urls: Vec<String>,
+    pub source: RawDocSource,
+    pub tags: Vec<(String, String)>,
+}

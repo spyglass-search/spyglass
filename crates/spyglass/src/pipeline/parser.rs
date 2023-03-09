@@ -20,10 +20,11 @@ impl DefaultParser {
     ) -> Result<ParseResult, String> {
         if let Some(raw_content) = &crawl_result.content {
             let url = Url::parse(&crawl_result.url).expect("Invalid fetch URL");
-            let scrape_result = self.crawler.scrape_page(&url, raw_content).await;
-            return Result::Ok(ParseResult {
-                content: scrape_result,
-            });
+            if let Some(scrape_result) = self.crawler.scrape_page(&url, &[], raw_content).await {
+                return Result::Ok(ParseResult {
+                    content: scrape_result,
+                });
+            }
         }
         Result::Err(String::from("Nope no parsing today"))
     }

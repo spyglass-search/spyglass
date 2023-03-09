@@ -13,7 +13,7 @@ chrono = { version = "0.4", features = ["serde"] }
 entities = { path = "../entities" }
 log = "0.4"
 rayon = "1.5"
-sea-orm-migration = { version = "0.10" }
+sea-orm-migration = { version = "0.11" }
 shared = { path = "../shared" }
 tantivy = "0.18"
 tar = "0.4"

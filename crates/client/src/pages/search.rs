@@ -1,6 +1,11 @@
 use gloo::timers::callback::Timeout;
 use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
+use shared::config::{KeyCode, ModifiersState};
+use shared::config::{UserAction, UserActionDefinition, UserActionSettings};
+use shared::event::CopyContext;
+use shared::response::SearchResultTemplate;
+use std::str::FromStr;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlElement, HtmlInputElement};
@@ -11,12 +16,13 @@ use shared::{
     response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
+use crate::components::user_action_list::{self, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
     result::{LensResultItem, SearchResultItem},
-    SelectedLens,
+    KeyComponent, SelectedLens,
 };
-use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke};
+use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
 
 #[wasm_bindgen]
 extern "C" {
@@ -25,6 +31,7 @@ extern "C" {
 }
 
 const QUERY_DEBOUNCE_MS: u32 = 256;
+const RESULT_PREFIX: &str = "result-";
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum ResultDisplay {
@@ -42,7 +49,11 @@ pub enum Msg {
     Focus,
     KeyboardEvent(KeyboardEvent),
     HandleError(String),
+    SetCurrentActions(UserActionSettings),
     OpenResult(SearchResult),
+    UserActionComplete(String),
+    UserActionSelected(UserActionDefinition),
+    ToggleShowActions,
     SearchDocs,
     SearchLenses,
     UpdateLensResults(Vec<response::LensResult>),
@@ -62,10 +73,159 @@ pub struct SearchPage {
     query_debounce: Option<JsValue>,
     blur_timeout: Option<JsValue>,
     is_searching: bool,
+    pressed_key: Option<KeyCode>,
+    executed_key: Option<KeyCode>,
+    executed_action: Option<String>,
+    modifier: ModifiersState,
+    action_settings: Option<UserActionSettings>,
+    show_actions: bool,
+    selected_action_idx: usize,
+    action_menu_button_selected: bool,
 }
 
 impl SearchPage {
-    fn handle_selection(&mut self, link: &Scope<Self>) {
+    // Helper to access the currently configured user actions
+    async fn fetch_user_actions() -> UserActionSettings {
+        match invoke(ClientInvoke::LoadUserActions.as_ref(), JsValue::NULL).await {
+            Ok(results) => match serde_wasm_bindgen::from_value(results) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    log::error!("Unable to deserialize results: {}", e.to_string());
+                    UserActionSettings::default()
+                }
+            },
+            Err(e) => {
+                log::error!("Error fetching user settings: {:?}", e);
+                UserActionSettings::default()
+            }
+        }
+    }
+
+    fn get_action_list(&self) -> Vec<UserActionDefinition> {
+        let mut actions = Vec::new();
+        if let Some(settings) = &self.action_settings {
+            if !self.docs_results.is_empty() {
+                if let Some(context) = self.docs_results.get(self.selected_idx) {
+                    for ctx_action in &settings.context_actions {
+                        if ctx_action.is_applicable(context) {
+                            for act in &ctx_action.actions {
+                                actions.push(act.clone());
+                            }
+                        }
+                    }
+                }
+            }
+
+            for action in &settings.actions {
+                actions.push(action.clone());
+            }
+        }
+        actions
+    }
+
+    // Helper used to execute the specified user action
+    async fn execute_action(
+        action: UserActionDefinition,
+        selected: SearchResult,
+        link: Scope<Self>,
+    ) {
+        let template_input = SearchResultTemplate::from(selected);
+        match action.action {
+            UserAction::OpenApplication(app_path, argument) => {
+                let reg = handlebars::Handlebars::new();
+                let url = match reg.render_template(argument.as_str(), &template_input) {
+                    Ok(val) => val,
+                    Err(_) => template_input.url.clone(),
+                };
+                Timeout::new(350, move || {
+                    spawn_local(async move {
+                        link.send_message(Msg::UserActionComplete(action.label.clone()));
+                    });
+                })
+                .forget();
+                spawn_local(async move {
+                    if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
+                        ClientInvoke::OpenResult,
+                        OpenResultParams {
+                            url,
+                            application: Some(app_path.clone()),
+                        },
+                    )
+                    .await
+                    {
+                        let window = window();
+                        let _ = window.alert_with_message(&err);
+                    }
+                });
+            }
+            UserAction::CopyToClipboard(copy_template) => {
+                let reg = handlebars::Handlebars::new();
+                let copy_txt = match reg.render_template(copy_template.as_str(), &template_input) {
+                    Ok(val) => val,
+                    Err(_) => template_input.url.clone(),
+                };
+                Timeout::new(350, move || {
+                    spawn_local(async move {
+                        link.send_message(Msg::UserActionComplete(action.label.clone()));
+                    });
+                })
+                .forget();
+
+                spawn_local(async move {
+                    if let Err(err) = tauri_invoke::<CopyContext, ()>(
+                        ClientInvoke::CopyToClipboard,
+                        CopyContext { txt: copy_txt },
+                    )
+                    .await
+                    {
+                        let window = window();
+                        let _ = window.alert_with_message(&err);
+                    }
+                });
+            }
+        }
+    }
+
+    fn handle_selection(&mut self, link: &Scope<Self>) -> bool {
+        if self.show_actions {
+            if self.selected_action_idx == 0 {
+                self.handle_default_selected(link);
+            } else {
+                let actions = self.get_action_list();
+                if let Some(action) = actions.get(self.selected_action_idx.max(1) - 1) {
+                    self.handle_selected_action(action, link);
+                    return true;
+                } else {
+                    self.handle_default_selected(link);
+                }
+            }
+        } else {
+            self.handle_default_selected(link);
+        }
+        false
+    }
+
+    fn handle_selected_action(&mut self, action: &UserActionDefinition, link: &Scope<Self>) {
+        let context = self.docs_results.get(self.selected_idx);
+        let exec_context = context.cloned();
+        match &action.status_msg {
+            Some(status) => {
+                self.executed_action = Some(status.clone());
+            }
+            None => {
+                self.executed_action = Some(format!("Executing {}", action.label));
+            }
+        }
+        let action_def = action.clone();
+        let link = link.clone();
+        spawn_local(async move {
+            SearchPage::execute_action(action_def, exec_context.unwrap(), link).await;
+        });
+        self.show_actions = false;
+        self.selected_action_idx = 0;
+    }
+
+    fn handle_default_selected(&mut self, link: &Scope<Self>) {
         // Grab the currently selected item
         if !self.docs_results.is_empty() {
             if let Some(selected) = self.docs_results.get(self.selected_idx) {
@@ -74,7 +234,7 @@ impl SearchPage {
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
             self.lens.push(selected.label.to_string());
-            // Clear query string
+            // Clear query string,
             link.send_message(Msg::ClearQuery);
         }
     }
@@ -85,7 +245,10 @@ impl SearchPage {
         spawn_local(async move {
             if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
                 ClientInvoke::OpenResult,
-                OpenResultParams { url },
+                OpenResultParams {
+                    url,
+                    application: None,
+                },
             )
             .await
             {
@@ -96,26 +259,48 @@ impl SearchPage {
     }
 
     fn move_selection_down(&mut self) {
-        let max_len = match self.result_display {
-            ResultDisplay::Docs => (self.docs_results.len() - 1).max(0),
-            ResultDisplay::Lens => (self.lens_results.len() - 1).max(0),
-            _ => 0,
-        };
+        if self.show_actions {
+            // Total number for action + 1 for the default action
+            let max = self.get_action_list().len();
+            self.selected_action_idx = (self.selected_action_idx + 1).min(max);
+            self.scroll_to_result(
+                user_action_list::USER_ACTION_PREFIX,
+                false,
+                self.selected_action_idx,
+            );
+        } else {
+            let max_len = match self.result_display {
+                ResultDisplay::Docs => (self.docs_results.len() - 1).max(0),
+                ResultDisplay::Lens => (self.lens_results.len() - 1).max(0),
+                _ => 0,
+            };
 
-        self.selected_idx = (self.selected_idx + 1).min(max_len);
-        self.scroll_to_result(self.selected_idx);
+            self.selected_idx = (self.selected_idx + 1).min(max_len);
+            self.scroll_to_result(RESULT_PREFIX, true, self.selected_idx);
+        }
+        //fire event to update available actions
     }
 
     fn move_selection_up(&mut self) {
-        self.selected_idx = self.selected_idx.max(1) - 1;
-        self.scroll_to_result(self.selected_idx);
+        if self.show_actions {
+            self.selected_action_idx = self.selected_action_idx.max(1) - 1;
+            self.scroll_to_result(
+                user_action_list::USER_ACTION_PREFIX,
+                false,
+                self.selected_action_idx,
+            );
+        } else {
+            self.selected_idx = self.selected_idx.max(1) - 1;
+            self.scroll_to_result(RESULT_PREFIX, true, self.selected_idx);
+            //fire event to update available actions
+        }
     }
 
-    fn scroll_to_result(&self, idx: usize) {
+    fn scroll_to_result(&self, prefix: &str, align_top: bool, idx: usize) {
         let document = gloo::utils::document();
-        if let Some(el) = document.get_element_by_id(&format!("result-{idx}")) {
+        if let Some(el) = document.get_element_by_id(&format!("{prefix}{idx}")) {
             if let Ok(el) = el.dyn_into::<HtmlElement>() {
-                el.scroll_into_view();
+                el.scroll_into_view_with_bool(align_top);
             }
         }
     }
@@ -135,6 +320,13 @@ impl Component for SearchPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
+
+        // Setup user actions
+        {
+            link.send_future(async {
+                Msg::SetCurrentActions(SearchPage::fetch_user_actions().await)
+            });
+        }
 
         // Listen to onblur events so we can hide the search bar
         {
@@ -207,6 +399,14 @@ impl Component for SearchPage {
             query_debounce: None,
             blur_timeout: None,
             is_searching: false,
+            action_settings: None,
+            pressed_key: None,
+            executed_key: None,
+            executed_action: None,
+            modifier: ModifiersState::empty(),
+            show_actions: false,
+            selected_action_idx: 0,
+            action_menu_button_selected: false,
         }
     }
 
@@ -221,6 +421,8 @@ impl Component for SearchPage {
                 self.selected_idx = 0;
                 self.docs_results.clear();
                 self.lens_results.clear();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
                 self.search_meta = None;
                 self.result_display = ResultDisplay::None;
                 self.request_resize();
@@ -230,6 +432,8 @@ impl Component for SearchPage {
                 self.selected_idx = 0;
                 self.docs_results.clear();
                 self.lens_results.clear();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
                 self.search_meta = None;
                 self.query = "".to_string();
                 if let Some(el) = self.search_input_ref.cast::<HtmlInputElement>() {
@@ -239,8 +443,14 @@ impl Component for SearchPage {
                 self.request_resize();
                 true
             }
+            Msg::SetCurrentActions(actions) => {
+                self.action_settings = Some(actions);
+                false
+            }
             Msg::Blur => {
                 let link = link.clone();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
                 // Handle the hide as a timeout since there's a brief moment when
                 // alt-tabbing / clicking on the task will yield a blur event & then a
                 // focus event.
@@ -272,6 +482,30 @@ impl Component for SearchPage {
                 let _ = window.alert_with_message(&msg);
                 false
             }
+            Msg::ToggleShowActions => {
+                self.show_actions = !self.show_actions;
+                self.action_menu_button_selected = false;
+                if !self.show_actions {
+                    self.selected_action_idx = 0;
+                }
+                true
+            }
+            Msg::UserActionSelected(action) => {
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                self.action_menu_button_selected = false;
+                if action.label.eq(DEFAULT_ACTION_LABEL) {
+                    self.handle_default_selected(link);
+                    false
+                } else {
+                    self.handle_selected_action(&action, link);
+                    true
+                }
+            }
+            Msg::UserActionComplete(_) => {
+                self.executed_action = None;
+                true
+            }
             Msg::KeyboardEvent(e) => {
                 match e.type_().as_str() {
                     "keydown" => {
@@ -281,6 +515,54 @@ impl Component for SearchPage {
                             // Tab: Prevent search box from losing focus
                             "ArrowUp" | "ArrowDown" | "Tab" => e.prevent_default(),
                             _ => (),
+                        }
+
+                        let mut new_key: bool = false;
+                        match KeyCode::from_str(key.to_uppercase().as_str()) {
+                            Ok(key_code) => match key_code {
+                                KeyCode::Unidentified(_) => (),
+                                _ => match self.pressed_key {
+                                    Some(key) => {
+                                        if !key.eq(&key_code) {
+                                            new_key = true;
+                                            self.pressed_key = Some(key_code);
+                                        }
+                                    }
+                                    None => {
+                                        new_key = true;
+                                        self.pressed_key = Some(key_code);
+                                    }
+                                },
+                            },
+                            Err(error) => log::error!("Error processing key {:?}", error),
+                        }
+
+                        self.modifier.set(ModifiersState::ALT, e.alt_key());
+                        self.modifier.set(ModifiersState::CONTROL, e.ctrl_key());
+                        self.modifier.set(ModifiersState::SHIFT, e.shift_key());
+                        self.modifier.set(ModifiersState::SUPER, e.meta_key());
+
+                        if new_key {
+                            if let Some(actions) = &self.action_settings {
+                                if !self.docs_results.is_empty()
+                                    && !self.modifier.is_empty()
+                                    && self.pressed_key.is_some()
+                                {
+                                    let context = self.docs_results.get(self.selected_idx);
+                                    if let Some(action) = actions.get_triggered_action(
+                                        &self.modifier,
+                                        &self.pressed_key.unwrap(),
+                                        utils::get_os().to_string().as_str(),
+                                        context,
+                                    ) {
+                                        self.handle_selected_action(&action, link);
+
+                                        self.executed_key = self.pressed_key;
+                                        e.prevent_default();
+                                        return true;
+                                    }
+                                }
+                            }
                         }
 
                         match key.as_str() {
@@ -304,42 +586,109 @@ impl Component for SearchPage {
                             _ => {}
                         }
 
-                        match key.as_str() {
-                            "ArrowDown" | "ArrowUp" => {}
-                            "Enter" => self.handle_selection(link),
-                            "Escape" => {
-                                link.send_future(async move {
-                                    let _ =
-                                        invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
-                                    Msg::ClearQuery
-                                });
-                            }
-                            "Backspace" => {
-                                let input: HtmlInputElement = e.target_unchecked_into();
+                        self.modifier.set(ModifiersState::ALT, e.alt_key());
+                        self.modifier.set(ModifiersState::CONTROL, e.ctrl_key());
+                        self.modifier.set(ModifiersState::SHIFT, e.shift_key());
+                        self.modifier.set(ModifiersState::SUPER, e.meta_key());
 
-                                if self.query.is_empty() && !self.lens.is_empty() {
-                                    log::info!("updating lenses");
-                                    self.lens.pop();
+                        let mut executed_key_released = false;
+
+                        match KeyCode::from_str(key.to_uppercase().as_str()) {
+                            Ok(key_code) => {
+                                if self.executed_key.is_some()
+                                    && self.executed_key.unwrap().eq(&key_code)
+                                {
+                                    executed_key_released = true;
+                                    self.executed_key = None;
+                                }
+                                if let Some(key) = self.pressed_key {
+                                    if key.eq(&key_code) {
+                                        self.pressed_key = None;
+                                    }
                                 }
 
-                                link.send_message(Msg::UpdateQuery(input.value()));
-                                if input.value().len() < crate::constants::MIN_CHARS {
-                                    link.send_message(Msg::ClearResults);
-                                }
+                                match key_code {
+                                    KeyCode::ArrowUp
+                                    | KeyCode::ArrowDown
+                                    | KeyCode::CapsLock
+                                    | KeyCode::Unidentified(_)
+                                    | KeyCode::ControlLeft
+                                    | KeyCode::ControlRight
+                                    | KeyCode::AltLeft
+                                    | KeyCode::AltRight
+                                    | KeyCode::ShiftLeft
+                                    | KeyCode::ShiftRight
+                                    | KeyCode::Abort
+                                    | KeyCode::End
+                                    | KeyCode::Home
+                                    | KeyCode::PageDown
+                                    | KeyCode::PageUp
+                                    | KeyCode::AudioVolumeDown
+                                    | KeyCode::AudioVolumeMute
+                                    | KeyCode::AudioVolumeUp
+                                    | KeyCode::MediaPlayPause
+                                    | KeyCode::MediaSelect
+                                    | KeyCode::MediaStop
+                                    | KeyCode::MediaTrackNext
+                                    | KeyCode::MediaTrackPrevious => {}
+                                    KeyCode::Enter => {
+                                        if !executed_key_released {
+                                            if self.action_menu_button_selected {
+                                                link.send_message(Msg::ToggleShowActions);
+                                            } else {
+                                                return self.handle_selection(link);
+                                            }
+                                        }
+                                    }
+                                    KeyCode::Escape => {
+                                        if self.show_actions {
+                                            link.send_message(Msg::ToggleShowActions);
+                                        } else {
+                                            link.send_future(async move {
+                                                let _ = invoke(
+                                                    ClientInvoke::Escape.as_ref(),
+                                                    JsValue::NULL,
+                                                )
+                                                .await;
+                                                Msg::ClearQuery
+                                            });
+                                        }
+                                    }
+                                    KeyCode::Backspace => {
+                                        let input: HtmlInputElement = e.target_unchecked_into();
 
-                                return true;
-                            }
-                            "Tab" => {
-                                // Tab completion for len results only
-                                if self.result_display == ResultDisplay::Lens {
-                                    self.handle_selection(link);
+                                        if self.query.is_empty() && !self.lens.is_empty() {
+                                            log::info!("updating lenses");
+                                            self.lens.pop();
+                                        }
+
+                                        link.send_message(Msg::UpdateQuery(input.value()));
+                                        if input.value().len() < crate::constants::MIN_CHARS {
+                                            link.send_message(Msg::ClearResults);
+                                        }
+
+                                        return true;
+                                    }
+                                    KeyCode::Tab => {
+                                        // Tab completion for len results only
+                                        if self.result_display == ResultDisplay::Lens {
+                                            self.handle_selection(link);
+                                        } else if !executed_key_released {
+                                            self.action_menu_button_selected =
+                                                !self.action_menu_button_selected;
+                                            return true;
+                                        }
+                                    }
+                                    // everything else
+                                    _ => {
+                                        if !executed_key_released {
+                                            let input: HtmlInputElement = e.target_unchecked_into();
+                                            link.send_message(Msg::UpdateQuery(input.value()));
+                                        }
+                                    }
                                 }
                             }
-                            // everything else
-                            _ => {
-                                let input: HtmlInputElement = e.target_unchecked_into();
-                                link.send_message(Msg::UpdateQuery(input.value()));
-                            }
+                            Err(error) => log::error!("Error processing key {:?}", error),
                         }
                     }
                     _ => {}
@@ -397,6 +746,9 @@ impl Component for SearchPage {
                 false
             }
             Msg::UpdateLensResults(results) => {
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                self.action_menu_button_selected = false;
                 self.lens_results = results;
                 self.docs_results.clear();
                 self.result_display = ResultDisplay::Lens;
@@ -405,6 +757,9 @@ impl Component for SearchPage {
                 true
             }
             Msg::UpdateDocsResults(results) => {
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                self.action_menu_button_selected = false;
                 if self.query == results.meta.query {
                     self.docs_results = results.results;
                     self.search_meta = Some(results.meta);
@@ -451,11 +806,11 @@ impl Component for SearchPage {
                     .iter()
                     .enumerate()
                     .map(|(idx, res)| {
-                        let is_selected = idx == self.selected_idx;
+                        let is_selected = idx == self.selected_idx && !self.action_menu_button_selected;
                         let open_msg = Msg::OpenResult(res.to_owned());
                         html! {
                             <SearchResultItem
-                                 id={format!("result-{idx}")}
+                                 id={format!("{RESULT_PREFIX}{idx}")}
                                  onclick={link.callback(move |_| open_msg.clone())}
                                  result={res.clone()}
                                  {is_selected}
@@ -471,7 +826,7 @@ impl Component for SearchPage {
                     .map(|(idx, res)| {
                         let is_selected = idx == self.selected_idx;
                         html! {
-                            <LensResultItem id={format!("result-{idx}")} result={res.clone()} {is_selected} />
+                            <LensResultItem id={format!("{RESULT_PREFIX}{idx}")} result={res.clone()} {is_selected} />
                         }
                     })
                     .collect::<Html>()
@@ -485,34 +840,36 @@ impl Component for SearchPage {
             let mut wall_time = Buffer::default();
             wall_time.write_formatted(&meta.wall_time_ms, &Locale::en);
 
-            html! {
-                <>
+            let running_action = if let Some(action) = &self.executed_action {
+                html! {
+                    <div class="flex flex-row gap-1 items-center">
+                        <icons::RefreshIcon width="w-3" height="h-3" animate_spin={true} />
+                        <span class="text-cyan-600">{action}</span>
+                    </div>
+                }
+            } else {
+                html! {
                     <div>
                         {"Searched "}
                         <span class="text-cyan-600">{num_docs}</span>
                         {" documents in "}
                         <span class="text-cyan-600">{wall_time}{" ms."}</span>
                     </div>
-                    <div class="ml-auto flex flex-row align-middle items-center">
-                        {"Use"}
-                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-                            </svg>
-                        </div>
-                        {"and"}
-                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black p-0.5 mx-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-2 h-2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
-                            </svg>
-                        </div>
-                        {"to select."}
-                        <div class="border border-neutral-500 rounded bg-neutral-400 text-black px-0.5 mx-1 text-[8px]">
-                            {"Enter"}
-                        </div>
-                        {"to open."}
-                    </div>
-                </>
+                }
+            };
+
+            html! {
+                <div class="flex flex-row justify-between w-full items-center align-middle">
+                  {running_action}
+                  <div class="flex flex-row align-middle items-center gap-1">
+                    {"Use"}
+                    <KeyComponent><icons::UpArrow height="h-2" width="w-2" /></KeyComponent>
+                    {"and"}
+                    <KeyComponent><icons::DownArrow height="h-2" width="w-2" /></KeyComponent>
+                    {"to select."}
+
+                  </div>
+                </div>
             }
         } else {
             let is_searching_indicator = if self.is_searching {
@@ -529,19 +886,57 @@ impl Component for SearchPage {
             html! {
                 <>
                     {is_searching_indicator}
-                    <div class="ml-auto flex flex-row items-center align-middle">
-                    {"Use"}
-                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-1 text-black text-[8px]">
-                        {"/"}
-                    </div>
-                    {"to select a lens."}
-                    <div class="mx-1 rounded border border-neutral-500 bg-neutral-400 px-0.5 text-[8px] text-black">
-                        {"Enter"}
-                    </div>
-                    {"to search."}
+                    <div class="ml-auto flex flex-row items-center align-middle pr-2 gap-1">
+                      <span>{"Use"}</span>
+                      <KeyComponent>{"/"}</KeyComponent>
+                      <span>{"to select a lens. Type to search"}</span>
                     </div>
                 </>
             }
+        };
+
+        let action_button = if self.search_meta.is_some() {
+            let classes = classes!(
+                "flex",
+                "flex-row",
+                "items-center",
+                "border-l",
+                "text-sm",
+                "text-neutral-500",
+                "border-neutral-700",
+                "px-3",
+                "ml-3",
+                "h-8",
+                if self.action_menu_button_selected || self.show_actions {
+                    "bg-stone-800"
+                } else {
+                    "bg-neutral-900"
+                },
+                "hover:bg-stone-800",
+            );
+
+            html! {
+                <button class={classes}
+                  onclick={link.callback(|_| Msg::ToggleShowActions)}>
+                  <KeyComponent>{"ENTER"}</KeyComponent>
+                  <span class="ml-1">{"to open."}</span>
+                </button>
+            }
+        } else {
+            html! {}
+        };
+
+        let action_details = if self.show_actions
+            && (!self.docs_results.is_empty() || !self.lens_results.is_empty())
+        {
+            let action_list = self.get_action_list();
+            html! {
+               <ActionsList actions={action_list}
+                selected_action={self.selected_action_idx}
+                onclick={link.callback(Msg::UserActionSelected)} />
+            }
+        } else {
+            html! {}
         };
 
         html! {
@@ -564,12 +959,20 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px]">
-                    {results}
+                { if !self.docs_results.is_empty() || !self.lens_results.is_empty() {
+                    html! {
+                        <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 pb-2 border-t border-neutral-600">
+                            <div class="w-full flex flex-col">{results}</div>
+                        </div>
+                    }
+                } else { html!{} }}
+                <div class="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
+                  <div class="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
+                      {search_meta}
+                  </div>
+                  {action_button}
                 </div>
-                <div class="bg-neutral-900 text-neutral-500 text-xs px-3 py-1.5 flex flex-row items-center gap-2">
-                    {search_meta}
-                </div>
+               {action_details}
             </div>
         }
     }

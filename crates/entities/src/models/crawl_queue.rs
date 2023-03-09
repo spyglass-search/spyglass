@@ -3,7 +3,7 @@ use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
     sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
-    QueryOrder, QueryTrait, Set, Statement,
+    QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -132,6 +132,7 @@ impl RelationTrait for Relation {
     }
 }
 
+#[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
@@ -144,7 +145,10 @@ impl ActiveModelBehavior for ActiveModel {
     }
 
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
         if !insert {
             self.updated_at = Set(chrono::Utc::now());
         }
@@ -375,51 +379,6 @@ pub async fn dequeue_files(
     Ok(None)
 }
 
-pub async fn dequeue_recrawl(
-    db: &DatabaseConnection,
-    user_settings: &UserSettings,
-) -> anyhow::Result<Option<Model>, DbErr> {
-    // Check for inflight limits
-    if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
-        // How many do we have in progress?
-        let num_in_progress = num_tasks_in_progress(db).await?;
-        // Nothing to do if we have too many crawls
-        if num_in_progress >= inflight_crawl_limit as u64 {
-            return Ok(None);
-        }
-    }
-
-    // TODO: Right now only recrawl local files.
-    let task = Entity::find()
-        .filter(Column::Status.eq(CrawlStatus::Completed))
-        .filter(Column::Url.starts_with("file://"))
-        .order_by_asc(Column::UpdatedAt)
-        .one(db)
-        .await?;
-
-    // Grab new entity and immediately mark in-progress
-    if let Some(task) = task {
-        let now = chrono::Utc::now();
-        let time_since = now - task.updated_at;
-        if time_since.num_days() < 1 {
-            return Ok(None);
-        }
-
-        let mut update: ActiveModel = task.into();
-        update.status = Set(CrawlStatus::Processing);
-        return match update.update(db).await {
-            Ok(model) => Ok(Some(model)),
-            // Deleted while being processed?
-            Err(err) => {
-                log::error!("Unable to update crawl task: {}", err);
-                Ok(None)
-            }
-        };
-    }
-
-    Ok(None)
-}
-
 /// Add url to the crawl queue
 #[derive(PartialEq, Eq)]
 pub enum SkipReason {
@@ -554,54 +513,55 @@ pub async fn enqueue_local_files(
     overrides: &EnqueueSettings,
     pipeline: Option<String>,
 ) -> anyhow::Result<(), sea_orm::DbErr> {
-    let model = urls
-        .iter()
-        .map(|url| ActiveModel {
-            domain: Set(String::from("localhost")),
-            crawl_type: Set(overrides.crawl_type.clone()),
-            status: Set(CrawlStatus::Initial),
-            url: Set(url.to_string()),
-            pipeline: Set(pipeline.clone()),
-            ..Default::default()
-        })
-        .collect::<Vec<ActiveModel>>();
+    for chunk in urls.chunks(BATCH_SIZE) {
+        let model = chunk
+            .iter()
+            .map(|url| ActiveModel {
+                domain: Set(String::from("localhost")),
+                crawl_type: Set(overrides.crawl_type.clone()),
+                status: Set(CrawlStatus::Initial),
+                url: Set(url.to_string()),
+                pipeline: Set(pipeline.clone()),
+                ..Default::default()
+            })
+            .collect::<Vec<ActiveModel>>();
 
-    let on_conflict = if overrides.is_recrawl {
-        OnConflict::column(Column::Url)
-            .update_column(Column::Status)
-            .to_owned()
-    } else {
-        OnConflict::column(Column::Url).do_nothing().to_owned()
-    };
+        let on_conflict = if overrides.is_recrawl {
+            OnConflict::column(Column::Url)
+                .update_column(Column::Status)
+                .to_owned()
+        } else {
+            OnConflict::column(Column::Url).do_nothing().to_owned()
+        };
 
-    let _insert = Entity::insert_many(model)
-        .on_conflict(on_conflict)
-        .exec(db)
-        .await?;
-    let inserted_rows = Entity::find()
-        .filter(Column::Url.is_in(urls.to_vec()))
-        .all(db)
-        .await?;
-
-    let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
-    let tag_rslt = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
-    if tag_rslt.is_ok() {
-        let query = Query::update()
-            .table(Entity.table_ref())
-            .values([(Column::Status, CrawlStatus::Queued.into())])
-            .and_where(Column::Id.is_in(ids))
-            .to_owned();
-
-        let query = query.to_string(SqliteQueryBuilder);
-        db.execute(Statement::from_string(db.get_database_backend(), query))
+        let _insert = Entity::insert_many(model)
+            .on_conflict(on_conflict)
+            .exec(db)
             .await?;
-    }
+        let inserted_rows = Entity::find()
+            .filter(Column::Url.is_in(chunk.to_vec()))
+            .all(db)
+            .await?;
 
+        let ids = inserted_rows.iter().map(|row| row.id).collect::<Vec<i64>>();
+        let tag_rslt = insert_tags_many(db, &inserted_rows, &overrides.tags).await;
+        if tag_rslt.is_ok() {
+            let query = Query::update()
+                .table(Entity.table_ref())
+                .values([(Column::Status, CrawlStatus::Queued.into())])
+                .and_where(Column::Id.is_in(ids))
+                .to_owned();
+
+            let query = query.to_string(SqliteQueryBuilder);
+            db.execute(Statement::from_string(db.get_database_backend(), query))
+                .await?;
+        }
+    }
     Ok(())
 }
 
-pub async fn enqueue_all(
-    db: &DatabaseConnection,
+pub async fn enqueue_all<C: ConnectionTrait>(
+    db: &C,
     urls: &[String],
     lenses: &[LensConfig],
     settings: &UserSettings,
@@ -660,9 +620,9 @@ pub async fn enqueue_all(
             .unwrap_or_default();
 
         if !to_update.is_empty() {
-            let result = insert_tags_many(&to_update, db, &overrides.tags).await;
+            let result = insert_tags_many(db, &to_update, &overrides.tags).await;
             if let Err(error) = result {
-                log::error!("Error inserting tags for crawl {:?}", error);
+                log::error!("Error updating tags for crawl: {:?}", error);
             }
         }
     }
@@ -692,30 +652,21 @@ pub async fn enqueue_all(
             .build(SqliteQueryBuilder);
 
         let values: Vec<Value> = values.iter().map(|x| x.to_owned()).collect();
-        match db
-            .execute(Statement::from_sql_and_values(
-                DbBackend::Sqlite,
-                &sql,
-                values,
-            ))
-            .await
-        {
-            Ok(_) => {
-                if !overrides.tags.is_empty() {
-                    let inserted_rows = Entity::find()
-                        .filter(Column::Url.is_in(urls))
-                        .all(db)
-                        .await
-                        .unwrap_or_default();
-                    if !inserted_rows.is_empty() {
-                        let result = insert_tags_many(&inserted_rows, db, &overrides.tags).await;
-                        if let Err(error) = result {
-                            log::error!("Error inserting tags for crawl {:?}", error);
-                        }
-                    }
+        let statement = Statement::from_sql_and_values(DbBackend::Sqlite, &sql, values);
+        if let Err(err) = db.execute(statement).await {
+            log::warn!("insert_many error: {err}");
+        } else if !overrides.tags.is_empty() {
+            let inserted_rows = Entity::find()
+                .filter(Column::Url.is_in(urls))
+                .all(db)
+                .await
+                .unwrap_or_default();
+
+            if !inserted_rows.is_empty() {
+                if let Err(error) = insert_tags_many(db, &inserted_rows, &overrides.tags).await {
+                    log::warn!("Error inserting tags for crawl - {:?}", error);
                 }
             }
-            Err(e) => log::error!("insert_many error: {:?}", e),
         }
     }
 
@@ -736,6 +687,7 @@ pub async fn mark_done(
 
         let mut updated: ActiveModel = crawl.into();
         updated.status = Set(CrawlStatus::Completed);
+        updated.updated_at = Set(chrono::Utc::now());
         updated.update(db).await.ok()
     } else {
         None
@@ -794,18 +746,23 @@ pub async fn insert_tags_by_id<C: ConnectionTrait>(
 /// Inserts an entry into the tag table for each crawl and
 /// tag pair provided
 pub async fn insert_tags_many<C: ConnectionTrait>(
-    docs: &[Model],
     db: &C,
+    docs: &[Model],
     tags: &[TagPair],
-) -> Result<InsertResult<crawl_tag::ActiveModel>, DbErr> {
+) -> Result<(), DbErr> {
     let mut tag_ids: Vec<i64> = Vec::new();
     for (label, value) in tags.iter() {
         match get_or_create(db, label.to_owned(), value).await {
             Ok(tag) => tag_ids.push(tag.id),
-            Err(err) => log::error!("{}", err),
+            Err(err) => log::warn!("Unable to get/create tag: {err}"),
         }
     }
-    insert_tags_by_id(db, docs, &tag_ids).await
+
+    let res = insert_tags_by_id(db, docs, &tag_ids).await;
+    match res {
+        Ok(_) | Err(DbErr::RecordNotInserted) => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 /// Remove tasks from the crawl queue that match `rule`. Rule is expected
@@ -1019,6 +976,24 @@ pub async fn process_urls_for_removed_exts(
         }
     }
     Ok(tasks)
+}
+
+/// Helper method used to get the details for the task. This method will return the associated task and any
+/// associated tags
+pub async fn get_task_details(
+    task_id: i64,
+    db: &DatabaseConnection,
+) -> Result<Option<(Model, Vec<tag::Model>)>, DbErr> {
+    if let Some(task) = Entity::find()
+        .filter(Column::Id.eq(task_id))
+        .one(db)
+        .await?
+    {
+        let tags = task.find_related(tag::Entity).all(db).await?;
+        return Ok(Some((task, tags)));
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -1360,32 +1335,6 @@ mod test {
             filtered.pop(),
             Some("https://bahai-library.com//shoghi-effendi_goals_crusade".into())
         );
-    }
-
-    #[tokio::test]
-    async fn test_dequeue_recrawl() {
-        let settings = UserSettings::default();
-        let db = setup_test_db().await;
-        let url = "file:///tmp/test.txt";
-
-        let one_day_ago = chrono::Utc::now() - chrono::Duration::days(1);
-        let model = crawl_queue::ActiveModel {
-            crawl_type: Set(CrawlType::Normal),
-            domain: Set("localhost".to_string()),
-            status: Set(crawl_queue::CrawlStatus::Completed),
-            url: Set(url.to_string()),
-            created_at: Set(one_day_ago),
-            updated_at: Set(one_day_ago),
-            ..Default::default()
-        };
-
-        if let Err(res) = model.save(&db).await {
-            dbg!(res);
-        }
-
-        let queue = crawl_queue::dequeue_recrawl(&db, &settings).await.unwrap();
-        assert!(queue.is_some());
-        assert_eq!(queue.unwrap().url, url);
     }
 
     #[tokio::test]

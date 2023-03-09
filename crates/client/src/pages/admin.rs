@@ -35,7 +35,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
     let link_styles = classes!(
         "flex-row",
         "flex",
-        "hover:bg-stone-700",
+        "hover:bg-neutral-700",
         "items-center",
         "p-2",
         "rounded",
@@ -46,7 +46,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
         <Link<Route>
             classes={
                 classes!(
-                    (props.current == props.tab).then_some(Some("bg-stone-700")),
+                    (props.current == props.tab).then_some(Some("bg-neutral-700")),
                     link_styles
                 )
             }

@@ -1,5 +1,8 @@
+use crate::url_to_file_path;
+use num_format::{Buffer, Locale};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use url::Url;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppStatus {
@@ -36,6 +39,8 @@ pub struct InstallableLens {
     pub sha: String,
     pub download_url: String,
     pub html_url: String,
+    #[serde(default)]
+    pub categories: Vec<String>,
 }
 
 impl InstallableLens {
@@ -65,6 +70,18 @@ impl Default for InstallStatus {
     }
 }
 
+impl InstallStatus {
+    pub fn is_installing(&self) -> bool {
+        matches!(
+            self,
+            Self::Installing {
+                percent: _,
+                status: _
+            }
+        )
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub enum LensType {
     #[default]
@@ -89,6 +106,8 @@ pub struct LensResult {
     /// For installed lenses.
     pub file_path: Option<PathBuf>,
     // Only relevant for installable lenses
+    #[serde(default)]
+    pub categories: Vec<String>,
     pub html_url: Option<String>,
     pub download_url: Option<String>,
     pub progress: InstallStatus,
@@ -124,6 +143,82 @@ pub struct SearchResult {
     pub score: f32,
 }
 
+// The search result template is used to provide extra
+// fields for action template expansion. This provides
+// additional power for template expansion without the need
+// for complicated template logic
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct SearchResultTemplate {
+    /// Document ID
+    pub doc_id: String,
+    /// URI used to crawl this result
+    pub crawl_uri: String,
+    pub domain: String,
+    pub title: String,
+    pub description: String,
+    pub url: String,
+    pub open_url: String,
+    pub tags: Vec<(String, String)>,
+    pub score: f32,
+    pub url_schema: String,
+    pub url_userinfo: String,
+    pub url_port: u16,
+    pub url_path: Vec<String>,
+    pub url_path_length: u32,
+    pub url_query: String,
+}
+
+impl From<SearchResult> for SearchResultTemplate {
+    fn from(value: SearchResult) -> Self {
+        let mut result = Self {
+            doc_id: value.doc_id,
+            crawl_uri: value.crawl_uri,
+            domain: value.domain,
+            title: value.title,
+            description: value.description,
+            url: value.url.clone(),
+            open_url: String::from(""),
+            tags: value.tags,
+            score: value.score,
+            url_schema: String::from(""),
+            url_userinfo: String::from(""),
+            url_port: 0,
+            url_path: Vec::new(),
+            url_path_length: 0,
+            url_query: String::from(""),
+        };
+
+        if let Ok(mut url) = Url::parse(&value.url) {
+            result.url_schema = url.scheme().to_owned();
+            result.url_userinfo = url.username().to_owned();
+            result.url_port = url.port().unwrap_or(0);
+            if let Some(segments) = url.path_segments().map(|c| c.collect::<Vec<_>>()) {
+                result.url_path = segments
+                    .iter()
+                    .filter_map(|s| {
+                        if !s.is_empty() {
+                            Some(s.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<String>>();
+                result.url_path_length = segments.len() as u32;
+            }
+
+            result.url_query = String::from(url.query().unwrap_or(""));
+
+            if url.scheme() == "file" {
+                let _ = url.set_host(None);
+                result.open_url = url_to_file_path(url.path(), true);
+            } else {
+                result.open_url = result.url.clone();
+            }
+        }
+        result
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchResults {
     pub results: Vec<SearchResult>,
@@ -135,7 +230,7 @@ pub struct SearchLensesResp {
     pub results: Vec<LensResult>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LibraryStats {
     pub lens_name: String,
     pub crawled: i32,
@@ -159,7 +254,7 @@ impl LibraryStats {
         if self.enqueued == 0 {
             self.indexed
         } else {
-            self.crawled + self.enqueued
+            self.crawled + self.enqueued + self.failed
         }
     }
 
@@ -168,7 +263,19 @@ impl LibraryStats {
     }
 
     pub fn status_string(&self) -> String {
-        format!("Crawled {} of {}", self.crawled, self.total_docs())
+        // For plugins/connections where we don't know exactly how many there are
+        if self.enqueued == 0 {
+            let mut indexed = Buffer::default();
+            indexed.write_formatted(&self.indexed, &Locale::en);
+            format!("Added {indexed} of many")
+        } else {
+            let mut indexed = Buffer::default();
+            let mut total = Buffer::default();
+
+            indexed.write_formatted(&self.indexed, &Locale::en);
+            total.write_formatted(&self.total_docs(), &Locale::en);
+            format!("Added {indexed} of {total}")
+        }
     }
 }
 

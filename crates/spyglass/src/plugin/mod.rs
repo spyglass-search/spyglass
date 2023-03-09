@@ -1,13 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use dashmap::DashMap;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use ignore::WalkBuilder;
-use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use spyglass_plugin::SearchFilter;
@@ -19,9 +16,8 @@ use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 use entities::models::lens;
 use shared::config::{Config, LensConfig};
 use shared::plugin::{PluginConfig, PluginType};
-use spyglass_plugin::{consts::env, PluginEvent, PluginSubscription};
+use spyglass_plugin::{consts::env, PluginEvent};
 
-use crate::filesystem;
 use crate::state::AppState;
 
 mod exports;
@@ -37,11 +33,6 @@ pub enum PluginCommand {
         plugin_id: PluginId,
         event: PluginEvent,
     },
-    Subscribe(PluginId, PluginSubscription),
-    // Queue up interval checks for subs
-    QueueIntervalCheck,
-    // Queue up file change notifications for subs
-    QueueFileNotify(notify::Event),
 }
 
 /// Plugin context whenever we get a call from the one of the plugins
@@ -54,7 +45,7 @@ pub(crate) struct PluginEnv {
     /// Current application state
     app_state: AppState,
     /// Where the plugin stores data
-    data_dir: PathBuf,
+    _data_dir: PathBuf,
     /// wasi connection for communications
     wasi_env: WasiEnv,
     /// host specific requests
@@ -157,6 +148,23 @@ impl PluginManager {
 
         None
     }
+
+    /// Returns an indication if the specified plugin is enabled or not
+    pub fn is_enabled(&self, id: PluginId) -> bool {
+        if let Some(plugin) = self.plugins.get(&id) {
+            return plugin.config.is_enabled;
+        }
+        false
+    }
+
+    /// Returns an indication if the specified plugin is enabled or not.
+    /// This method utilizes the plugin name to identify the plugin.
+    pub fn is_enabled_by_name(&self, name: String) -> bool {
+        if let Some(plugin) = self.find_by_name(name) {
+            return plugin.config.is_enabled;
+        }
+        false
+    }
 }
 
 /// Manages plugin events
@@ -172,22 +180,6 @@ pub async fn plugin_event_loop(
     let mut config = config.clone();
     plugin_load(&state, &mut config, &cmd_writer).await;
 
-    // For file watching subscribers
-    let (tx, mut file_events) = tokio::sync::mpsc::channel(1);
-    let mut watcher = notify::recommended_watcher(move |res| {
-        futures::executor::block_on(async {
-            if !tx.is_closed() {
-                if let Err(err) = tx.send(res).await {
-                    log::error!("fseventwatcher error: {}", err.to_string());
-                }
-            }
-        })
-    })
-    .expect("Unable to watch lens directory");
-    let mut file_watch_subs: HashMap<PluginId, PathBuf> = HashMap::new();
-
-    // Subscribe plugins check for updates every 10 minutes
-    let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
@@ -195,20 +187,8 @@ pub async fn plugin_event_loop(
         let next_cmd = tokio::select! {
             // Listen for plugin requests
             res = cmd_queue.recv() => res,
-            // Listen for file change notifications
-            file_event = file_events.recv() => {
-                if let Some(Ok(file_event)) = file_event {
-                    Some(PluginCommand::QueueFileNotify(file_event))
-                } else {
-                    None
-                }
-            },
-            // Handle interval checks
-            _ = interval.tick() => Some(PluginCommand::QueueIntervalCheck),
-            // SHUT IT DOWN
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down plugin manager");
-                file_events.close();
                 cmd_queue.close();
                 return;
             }
@@ -230,10 +210,6 @@ pub async fn plugin_event_loop(
                 disabled.iter().for_each(|pid| {
                     manager.check_update_subs.remove(pid);
                 });
-
-                if plugin_name.eq("local-file-importer") {
-                    tokio::spawn(filesystem::configure_watcher(state.clone()));
-                }
             }
             Some(PluginCommand::EnablePlugin(plugin_name)) => {
                 log::info!("enabling plugin <{}>", plugin_name);
@@ -252,12 +228,6 @@ pub async fn plugin_event_loop(
                             .send(PluginCommand::Initialize(instance.config.clone()))
                             .await;
                     }
-                }
-
-                if plugin_name.eq("local-file-importer") {
-                    let mut state = state.clone();
-                    state.reload_config();
-                    tokio::spawn(filesystem::configure_watcher(state));
                 }
             }
             Some(PluginCommand::HandleUpdate { plugin_id, event }) => {
@@ -284,108 +254,6 @@ pub async fn plugin_event_loop(
                         );
                     }
                     Err(e) => log::error!("Unable to init plugin <{}>: {}", plugin.name, e),
-                }
-            }
-            Some(PluginCommand::Subscribe(plugin_id, event)) => match event {
-                PluginSubscription::CheckUpdateInterval => {
-                    let mut manager = state.plugin_manager.lock().await;
-                    manager.check_update_subs.insert(plugin_id);
-                    let _ = cmd_writer
-                        .send(PluginCommand::HandleUpdate {
-                            plugin_id,
-                            event: PluginEvent::IntervalUpdate,
-                        })
-                        .await;
-                }
-                PluginSubscription::WatchDirectory { path, recurse } => {
-                    // Ignore invalid directory paths
-                    if !path.exists() || !path.is_dir() {
-                        log::warn!("Ignoring invalid path: {}", path.display());
-                    } else {
-                        let _ = watcher.watch(
-                            &path,
-                            if recurse {
-                                RecursiveMode::Recursive
-                            } else {
-                                RecursiveMode::NonRecursive
-                            },
-                        );
-
-                        file_watch_subs.insert(plugin_id, path);
-                    }
-                }
-            },
-            // Queue update checks for subscribed plugins
-            Some(PluginCommand::QueueIntervalCheck) => {
-                let manager = state.plugin_manager.lock().await;
-                for plugin_id in &manager.check_update_subs {
-                    let _ = cmd_writer
-                        .send(PluginCommand::HandleUpdate {
-                            plugin_id: *plugin_id,
-                            event: PluginEvent::IntervalUpdate,
-                        })
-                        .await;
-                }
-            }
-            // Notify subscribers of a new file event
-            Some(PluginCommand::QueueFileNotify(file_event)) => {
-                let paths = file_event
-                    .paths
-                    .iter()
-                    .filter_map(|path| {
-                        log::trace!(
-                            "notifying plugins of file_event: {:?} for <{}>",
-                            file_event.kind,
-                            path.display()
-                        );
-
-                        match &file_event.kind {
-                            EventKind::Create(_) => {
-                                Some((path.clone(), PluginEvent::FileCreated(path.clone())))
-                            }
-                            EventKind::Modify(modify_kind) => match modify_kind {
-                                ModifyKind::Any
-                                | ModifyKind::Data(_)
-                                | ModifyKind::Name(_)
-                                | ModifyKind::Other => {
-                                    Some((path.clone(), PluginEvent::FileUpdated(path.clone())))
-                                }
-                                ModifyKind::Metadata(_) => None,
-                            },
-                            EventKind::Remove(_) => {
-                                Some((path.clone(), PluginEvent::FileDeleted(path.clone())))
-                            }
-                            _ => None,
-                        }
-                    })
-                    .collect::<Vec<(PathBuf, PluginEvent)>>();
-
-                for (path, event) in paths {
-                    for (plugin_id, watched_path) in file_watch_subs.iter() {
-                        if path.starts_with(watched_path) {
-                            // Use ignore crate to check whether this path would've
-                            // been ignored based on the standard filters.
-                            let walker = WalkBuilder::new(watched_path)
-                                .standard_filters(true)
-                                .build();
-
-                            let valid_paths = walker
-                                .flat_map(|entry| match entry {
-                                    Ok(entry) => Some(entry.into_path()),
-                                    _ => None,
-                                })
-                                .collect::<HashSet<PathBuf>>();
-
-                            if valid_paths.contains(&path) {
-                                let _ = cmd_writer
-                                    .send(PluginCommand::HandleUpdate {
-                                        plugin_id: *plugin_id,
-                                        event: event.clone(),
-                                    })
-                                    .await;
-                            }
-                        }
-                    }
                 }
             }
             None => {}
@@ -479,9 +347,6 @@ pub async fn plugin_load(
             log::info!("<{}> plugin found", &plug.name);
         }
     }
-
-    // Startup filesystem watcher
-    tokio::spawn(crate::filesystem::configure_watcher(state.clone()));
 }
 
 pub async fn plugin_init(

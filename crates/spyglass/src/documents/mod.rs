@@ -1,19 +1,23 @@
 use chrono::Utc;
 use entities::{
     models::{
-        crawl_queue, indexed_document,
+        crawl_queue,
+        indexed_document::{self, find_by_doc_ids},
         tag::{self, TagPair},
     },
     sea_orm::{ActiveModelTrait, DatabaseConnection},
 };
-use std::{collections::HashMap, time::Instant};
+use shared::config::LensConfig;
+use spyglass_plugin::TagModification;
+use std::{collections::HashMap, str::FromStr, time::Instant};
+use tantivy::DocAddress;
 
 use libnetrunner::parser::ParseResult;
 use url::Url;
 
 use crate::{
     crawler::CrawlResult,
-    search::{DocumentUpdate, Searcher},
+    search::{self, DocumentUpdate, RetrievedDocument, Searcher},
     state::AppState,
 };
 use entities::models::tag::TagType;
@@ -141,7 +145,7 @@ pub async fn process_crawl_results(
                     domain: url_host,
                     url: url.as_str(),
                     content: &crawl_result.content.clone().unwrap_or_default(),
-                    tags: &Some(tags_for_crawl.clone()),
+                    tags: &tags_for_crawl.clone(),
                 },
             )?;
 
@@ -165,7 +169,7 @@ pub async fn process_crawl_results(
     }
 
     // Insert docs & save everything.
-    indexed_document::insert_many(&tx, inserts).await?;
+    indexed_document::insert_many(&tx, &inserts).await?;
     for update in updates {
         let _ = update.save(&tx).await;
     }
@@ -209,7 +213,11 @@ pub async fn process_crawl_results(
 // 2. Remove any documents that already exist from the index
 // 3. Add all new results to the index
 // 4. Insert all new documents to the indexed document database
-pub async fn process_records(state: &AppState, lens: &str, results: &mut Vec<ParseResult>) {
+pub async fn process_records(
+    state: &AppState,
+    lens: &LensConfig,
+    results: &mut Vec<ParseResult>,
+) -> anyhow::Result<()> {
     // get a list of all urls
     let parsed_urls = results
         .iter()
@@ -239,132 +247,266 @@ pub async fn process_records(state: &AppState, lens: &str, results: &mut Vec<Par
     let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
     let _ = Searcher::save(state).await;
 
-    // Access tag for this lens and build id list
-    let tag = tag::get_or_create(&state.db, TagType::Lens, lens).await;
-    let tag_list = match tag {
-        Ok(model) => Some(vec![model.id]),
-        Err(error) => {
-            log::error!("Error accessing tag for lens {:?}", error);
-            None
+    // Grab tags from the lens.
+    let tags = lens
+        .all_tags()
+        .iter()
+        .flat_map(|(label, value)| {
+            if let Ok(tag_type) = TagType::from_str(label.as_str()) {
+                Some((tag_type, value.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Create/grab tags from db.
+    let tag_list = tag::get_or_create_many(&state.db, &tags)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|x| x.id)
+        .collect::<Vec<_>>();
+
+    let transaction = state.db.begin().await?;
+    let mut updates = Vec::new();
+    let mut added_docs = Vec::new();
+    for crawl_result in results {
+        if let Some(canonical_url_str) = &crawl_result.canonical_url {
+            match Url::parse(canonical_url_str) {
+                Ok(url) => {
+                    let url_host = url.host_str().unwrap_or("");
+                    // Add document to index
+                    let doc_id: Option<String> = {
+                        if let Ok(mut index_writer) = state.index.writer.lock() {
+                            match Searcher::upsert_document(
+                                &mut index_writer,
+                                DocumentUpdate {
+                                    doc_id: id_map.get(&canonical_url_str.clone()).cloned(),
+                                    title: &crawl_result.title.clone().unwrap_or_default(),
+                                    description: &crawl_result.description.clone(),
+                                    domain: url_host,
+                                    url: url.as_str(),
+                                    content: &crawl_result.content,
+                                    tags: &tag_list,
+                                },
+                            ) {
+                                Ok(new_doc_id) => Some(new_doc_id),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        }
+                    };
+
+                    if let Some(new_id) = doc_id {
+                        if !id_map.contains_key(&new_id) {
+                            added_docs.push(url.to_string());
+                            let update = indexed_document::ActiveModel {
+                                domain: Set(url_host.to_string()),
+                                url: Set(url.to_string()),
+                                open_url: Set(Some(url.to_string())),
+                                doc_id: Set(new_id),
+                                ..Default::default()
+                            };
+
+                            updates.push(update);
+                        }
+                    }
+                }
+                Err(error) => log::error!(
+                    "Error processing url: {:?} error: {:?}",
+                    canonical_url_str,
+                    error
+                ),
+            }
+        } else {
+            log::warn!("Invalid canonical URL: {:?}", crawl_result.title.clone())
         }
+    }
+
+    // Save the data
+    indexed_document::insert_many(&transaction, &updates).await?;
+    transaction.commit().await?;
+    if let Ok(mut writer) = state.index.writer.lock() {
+        let _ = writer.commit();
+    }
+
+    let added_entries: Vec<indexed_document::Model> = indexed_document::Entity::find()
+        .filter(indexed_document::Column::Url.is_in(added_docs))
+        .all(&state.db)
+        .await
+        .unwrap_or_default();
+
+    if !added_entries.is_empty() {
+        if let Err(err) =
+            indexed_document::insert_tags_for_docs(&state.db, &added_entries, &tag_list).await
+        {
+            log::error!("Error inserting tags {err}");
+        }
+    }
+
+    Ok(())
+}
+
+/// Processes an update tags request for the specified documents
+/// 1. Adds any tags to the database that are not present (database)
+/// 2. Accesses documents from the index (index)
+/// 3. Accesses documents and adds or removes associated tags (database)
+/// 4. Gets all tag ids associated with a document (database)
+/// 5. Updates the indexed document with the new tags (index)
+pub async fn update_tags(
+    state: &AppState,
+    doc_ids: &[DocAddress],
+    tag_modifications: &TagModification,
+) -> anyhow::Result<()> {
+    let mut tag_cache: HashMap<String, i64> = HashMap::new();
+    let add_ids = match &tag_modifications.add {
+        Some(to_add) => _get_tag_ids_string(&state.db, to_add, &mut tag_cache).await,
+        None => Vec::new(),
     };
 
-    let transaction_rslt = state.db.begin().await;
-    match transaction_rslt {
-        Ok(transaction) => {
-            let mut updates = Vec::new();
-            let mut added_docs = Vec::new();
-            for crawl_result in results {
-                let canonical_url = crawl_result.canonical_url.clone();
-                match canonical_url {
-                    Some(canonical_url_str) => {
-                        let url_rslt = Url::parse(canonical_url_str.as_str());
-                        match url_rslt {
-                            Ok(url) => {
-                                let url_host = url.host_str().unwrap_or("");
-                                // Add document to index
-                                let doc_id: Option<String> = {
-                                    if let Ok(mut index_writer) = state.index.writer.lock() {
-                                        match Searcher::upsert_document(
-                                            &mut index_writer,
-                                            DocumentUpdate {
-                                                doc_id: id_map.get(&canonical_url_str).cloned(),
-                                                title: &crawl_result
-                                                    .title
-                                                    .clone()
-                                                    .unwrap_or_default(),
-                                                description: &crawl_result.description.clone(),
-                                                domain: url_host,
-                                                url: url.as_str(),
-                                                content: &crawl_result.content,
-                                                tags: &tag_list,
-                                            },
-                                        ) {
-                                            Ok(new_doc_id) => Some(new_doc_id),
-                                            _ => None,
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                };
+    let remove_ids = match &tag_modifications.remove {
+        Some(to_add) => _get_tag_ids_string(&state.db, to_add, &mut tag_cache).await,
+        None => Vec::new(),
+    };
 
-                                if let Some(new_id) = doc_id {
-                                    if !id_map.contains_key(&new_id) {
-                                        added_docs.push(url.to_string());
-                                        let update = indexed_document::ActiveModel {
-                                            domain: Set(url_host.to_string()),
-                                            url: Set(url.to_string()),
-                                            open_url: Set(Some(url.to_string())),
-                                            doc_id: Set(new_id),
-                                            ..Default::default()
-                                        };
-
-                                        updates.push(update);
-                                    }
-                                }
-                            }
-                            Err(error) => log::error!(
-                                "Error processing url: {:?} error: {:?}",
-                                canonical_url_str,
-                                error
-                            ),
-                        }
-                    }
-                    None => log::error!(
-                        "None url is not value for content {:?}",
-                        crawl_result.content.truncate(80)
-                    ),
+    let documents = doc_ids
+        .iter()
+        .filter_map(|addr| {
+            if let Ok(doc) = state.index.reader.searcher().doc(*addr) {
+                if let Ok(retrieved_doc) = search::document_to_struct(&doc) {
+                    return Some(retrieved_doc);
                 }
             }
+            None
+        })
+        .collect::<Vec<RetrievedDocument>>();
 
-            let doc_insert = indexed_document::Entity::insert_many(updates)
-                .on_conflict(
-                    entities::sea_orm::sea_query::OnConflict::columns(vec![
-                        indexed_document::Column::Url,
-                    ])
-                    .do_nothing()
-                    .to_owned(),
-                )
-                .exec(&transaction)
-                .await;
+    let document_ids = &documents
+        .iter()
+        .map(|doc| doc.doc_id.clone())
+        .collect::<Vec<String>>();
 
-            if let Err(error) = doc_insert {
-                log::error!("Docs failed to insert {:?}", error);
-            }
+    let doc_uuids = find_by_doc_ids(&state.db, document_ids)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|id| id.id)
+        .collect::<Vec<i64>>();
 
-            let commit = transaction.commit().await;
-            match commit {
-                Ok(_) => {
-                    if let Ok(mut writer) = state.index.writer.lock() {
-                        let _ = writer.commit();
-                    }
+    let mut updated = false;
+    if !add_ids.is_empty() {
+        log::debug!(
+            "Inserting {} new tags and attaching to documents",
+            add_ids.len()
+        );
+        if let Err(err) =
+            indexed_document::insert_tags_for_docs_by_id(&state.db, &doc_uuids, &add_ids, false)
+                .await
+        {
+            log::error!("Error inserting tags {:?}", err);
+            return Err(anyhow::format_err!(err));
+        }
+        updated = true;
+    }
 
-                    let added_entries: Vec<indexed_document::Model> =
-                        indexed_document::Entity::find()
-                            .filter(indexed_document::Column::Url.is_in(added_docs))
-                            .all(&state.db)
-                            .await
-                            .unwrap_or_default();
+    if !remove_ids.is_empty() {
+        log::debug!("Removing tags {} from documents", remove_ids.len());
+        if let Err(err) =
+            indexed_document::remove_tags_for_docs_by_id(&state.db, &doc_uuids, &add_ids).await
+        {
+            log::error!("Error removing tags {:?}", err);
+            return Err(anyhow::format_err!(err));
+        }
+        updated = true;
+    }
 
-                    if !added_entries.is_empty() {
-                        let result = indexed_document::insert_tags_many(
-                            &state.db,
-                            &added_entries,
-                            &[(TagType::Lens, lens.to_string())],
-                        )
-                        .await;
-                        if let Err(error) = result {
-                            log::error!("Error inserting tags {:?}", error);
-                        }
-                    }
+    log::debug!("An update was made? {}", updated);
+    if updated {
+        let mut tag_map: HashMap<String, (RetrievedDocument, Vec<i64>)> = HashMap::new();
+        for doc in documents {
+            match indexed_document::get_tag_ids_by_doc_id(&state.db, &doc.doc_id).await {
+                Ok(ids) => {
+                    tag_map.insert(
+                        doc.doc_id.clone(),
+                        (
+                            doc,
+                            ids.iter().map(|tag_id| tag_id.id).collect::<Vec<i64>>(),
+                        ),
+                    );
                 }
                 Err(error) => {
-                    log::error!("Failed to commit transaction {:?}", error);
+                    log::error!(
+                        "Unable to update document, could not access tags {:?}",
+                        error
+                    );
                 }
             }
         }
-        Err(err) => log::error!("Transaction failed {:?}", err),
+
+        let _ = Searcher::delete_many_by_id(state, document_ids, false).await;
+        let _ = Searcher::save(state).await;
+
+        log::debug!("Tag map generated {}", tag_map.len());
+        if let Ok(mut index_writer) = state.index.writer.lock() {
+            for (_, (doc, ids)) in tag_map.iter() {
+                let _doc_id = Searcher::upsert_document(
+                    &mut index_writer,
+                    DocumentUpdate {
+                        doc_id: Some(doc.doc_id.clone()),
+                        title: &doc.title,
+                        description: &doc.description,
+                        domain: &doc.domain,
+                        url: &doc.url,
+                        content: &doc.content,
+                        tags: ids,
+                    },
+                )?;
+            }
+        }
     }
+
+    Ok(())
+}
+
+/// Helper method used to get the tag ids for a specific crawl result. The tag map and the tag cache
+/// will be modified as results are processed. The tag map contains the url to tag it mapping used
+/// for insertion to the database. The tag_cache is used to avoid additional loops for common tags
+/// that have already been processed.
+async fn _get_tag_ids_string(
+    db: &DatabaseConnection,
+    tags: &[(String, String)],
+    tag_cache: &mut HashMap<String, i64>,
+) -> Vec<i64> {
+    let mut tids = Vec::new();
+    let mut to_search = Vec::new();
+
+    for (tag_type, value) in tags {
+        let uid = format!("{tag_type}:{value}");
+        if let Some(id) = tag_cache.get(&uid) {
+            tids.push(*id);
+        } else {
+            to_search.push((tag_type.clone(), value.clone()));
+        }
+    }
+
+    if !to_search.is_empty() {
+        match tag::get_or_create_many_string(db, &to_search).await {
+            Ok(tag_models) => {
+                for tag in tag_models {
+                    let tag_id = tag.id;
+                    tids.push(tag_id);
+                    tag_cache.insert(format!("{}:{}", tag.label, tag.value), tag_id);
+                }
+            }
+            Err(error) => {
+                log::error!("Error accessing or creating tags {:?}", error);
+            }
+        }
+    }
+
+    tids
 }
 
 /// Helper method used to get the tag ids for a specific crawl result. The tag map and the tag cache
@@ -380,7 +522,7 @@ async fn _get_tag_ids(
     let mut to_search = Vec::new();
 
     for (tag_type, value) in tags {
-        let uid = format!("{tag_type}:{value}");
+        let uid = format!("{tag_type:?}:{value}");
         if let Some(id) = tag_cache.get(&uid) {
             tids.push(*id);
         } else {

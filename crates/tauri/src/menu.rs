@@ -23,6 +23,9 @@ pub enum MenuID {
     QUIT,
     SHOW_SEARCHBAR,
     VERSION,
+
+    INSTALL_CHROME_EXT,
+    INSTALL_FIREFOX_EXT,
 }
 
 pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTrayMenu {
@@ -92,6 +95,14 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
         .add_item(CustomMenuItem::new(
             MenuID::JOIN_DISCORD.to_string(),
             "Join our Discord",
+        ))
+        .add_item(CustomMenuItem::new(
+            MenuID::INSTALL_CHROME_EXT.to_string(),
+            "Install Chrome Extension",
+        ))
+        .add_item(CustomMenuItem::new(
+            MenuID::INSTALL_FIREFOX_EXT.to_string(),
+            "Install Firefox Extension",
         ))
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit)

@@ -1,3 +1,5 @@
+use serde::Serialize;
+use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -14,7 +16,7 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use crate::search::query::build_query;
+use crate::search::query::{build_document_query, build_query};
 use crate::state::AppState;
 use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{DocFields, SearchDocument};
@@ -43,6 +45,12 @@ pub struct Searcher {
 }
 
 #[derive(Clone)]
+pub struct ReadonlySearcher {
+    pub index: Index,
+    pub reader: IndexReader,
+}
+
+#[derive(Clone)]
 pub struct DocumentUpdate<'a> {
     pub doc_id: Option<String>,
     pub title: &'a str,
@@ -50,10 +58,18 @@ pub struct DocumentUpdate<'a> {
     pub domain: &'a str,
     pub url: &'a str,
     pub content: &'a str,
-    pub tags: &'a Option<Vec<i64>>,
+    pub tags: &'a [i64],
 }
 
 impl Debug for Searcher {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        f.debug_struct("Searcher")
+            .field("index", &self.index)
+            .finish()
+    }
+}
+
+impl Debug for ReadonlySearcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Searcher")
             .field("index", &self.index)
@@ -229,14 +245,61 @@ impl Searcher {
         doc.add_text(fields.id, &doc_id);
         doc.add_text(fields.title, doc_update.title);
         doc.add_text(fields.url, doc_update.url);
-        if let Some(tag) = doc_update.tags {
-            for t in tag {
-                doc.add_u64(fields.tags, *t as u64);
-            }
+        for t in doc_update.tags {
+            doc.add_u64(fields.tags, *t as u64);
         }
         writer.add_document(doc)?;
 
         Ok(doc_id)
+    }
+
+    /// Helper method to execute a search based on the provided document query
+    pub async fn search_by_query(
+        db: &DatabaseConnection,
+        searcher: &Searcher,
+        query: &DocumentQuery,
+    ) -> Vec<SearchResult> {
+        let tag_ids = match &query.has_tags {
+            Some(include_tags) => {
+                let tags = tag::get_tags_by_value(db, include_tags)
+                    .await
+                    .unwrap_or_default();
+                tags.iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let exclude_tag_ids = match &query.exclude_tags {
+            Some(excludes) => {
+                let exclude_tags = tag::get_tags_by_value(db, excludes)
+                    .await
+                    .unwrap_or_default();
+                exclude_tags
+                    .iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let urls = query.urls.clone().unwrap_or_default();
+        let ids = query.ids.clone().unwrap_or_default();
+
+        let fields = DocFields::as_fields();
+        let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
+
+        let collector = tantivy::collector::DocSetCollector;
+
+        let reader = &searcher.reader;
+        let index_search = reader.searcher();
+
+        let docs = index_search
+            .search(&query, &collector)
+            .expect("Unable to execute query");
+
+        docs.into_iter().map(|addr| (1.0, addr)).collect()
     }
 
     pub async fn search_with_lens(
@@ -249,7 +312,7 @@ impl Searcher {
 
         let mut tag_boosts = HashSet::new();
         let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
-            .filter(tag::Column::Label.eq(tag::TagType::Favorited))
+            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
             .one(&db)
             .await
         {
@@ -298,6 +361,108 @@ impl Searcher {
     }
 }
 
+// Readonly Searcher implementation used for utilities that can run while
+// the spyglass system is running
+impl ReadonlySearcher {
+    /// Get document with `doc_id` from index.
+    pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
+        let fields = DocFields::as_fields();
+        let searcher = reader.searcher();
+
+        let query = TermQuery::new(
+            Term::from_field_text(fields.id, doc_id),
+            IndexRecordOption::Basic,
+        );
+
+        let res = searcher
+            .search(&query, &TopDocs::with_limit(1))
+            .map_or(Vec::new(), |x| x);
+
+        if res.is_empty() {
+            return None;
+        }
+
+        if let Some((_, doc_address)) = res.first() {
+            if let Ok(doc) = searcher.doc(*doc_address) {
+                return Some(doc);
+            }
+        }
+
+        None
+    }
+
+    /// Constructs a new Searcher object w/ the index @ `index_path`
+    pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
+        let schema = DocFields::as_schema();
+        let index = match index_path {
+            IndexPath::LocalPath(path) => {
+                let dir = MmapDirectory::open(path)?;
+                Index::open_or_create(dir, schema)?
+            }
+            IndexPath::Memory => Index::create_in_ram(schema),
+        };
+
+        // For a search server you will typically create on reader for the entire
+        // lifetime of your program.
+        let reader = index
+            .reader_builder()
+            .reload_policy(ReloadPolicy::OnCommit)
+            .try_into()
+            .expect("Unable to create reader");
+
+        Ok(ReadonlySearcher { index, reader })
+    }
+
+    /// Helper method to execute a search based on the provided document query
+    pub async fn search_by_query(
+        db: &DatabaseConnection,
+        searcher: &ReadonlySearcher,
+        query: &DocumentQuery,
+    ) -> Vec<SearchResult> {
+        let tag_ids = match &query.has_tags {
+            Some(include_tags) => {
+                let tags = tag::get_tags_by_value(db, include_tags)
+                    .await
+                    .unwrap_or_default();
+                tags.iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let exclude_tag_ids = match &query.exclude_tags {
+            Some(excludes) => {
+                let exclude_tags = tag::get_tags_by_value(db, excludes)
+                    .await
+                    .unwrap_or_default();
+                exclude_tags
+                    .iter()
+                    .map(|model| model.id as u64)
+                    .collect::<Vec<u64>>()
+            }
+            None => Vec::new(),
+        };
+
+        let urls = query.urls.clone().unwrap_or_default();
+        let ids = query.ids.clone().unwrap_or_default();
+
+        let fields = DocFields::as_fields();
+        let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
+
+        let collector = tantivy::collector::DocSetCollector;
+
+        let reader = &searcher.reader;
+        let index_search = reader.searcher();
+
+        let docs = index_search
+            .search(&query, &collector)
+            .expect("Unable to execute query");
+
+        docs.into_iter().map(|addr| (1.0, addr)).collect()
+    }
+}
+
 // Helper method used to get the list of tag ids that should be included in the search
 async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64>> {
     let lower = search.to_lowercase();
@@ -315,6 +480,7 @@ async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64
     None
 }
 
+#[derive(Serialize)]
 pub struct RetrievedDocument {
     pub doc_id: String,
     pub domain: String,
@@ -322,8 +488,10 @@ pub struct RetrievedDocument {
     pub description: String,
     pub content: String,
     pub url: String,
+    pub tags: Vec<u64>,
 }
 
+// Helper method used to get the string value from a field
 fn field_to_string(doc: &Document, field: Field) -> String {
     doc.get_first(field)
         .map(|x| x.as_text().unwrap_or_default())
@@ -331,6 +499,12 @@ fn field_to_string(doc: &Document, field: Field) -> String {
         .unwrap_or_default()
 }
 
+// Helper method used to get the u64 vector from a field.
+fn field_to_u64vec(doc: &Document, field: Field) -> Vec<u64> {
+    doc.get_all(field).filter_map(|val| val.as_u64()).collect()
+}
+
+/// Helper method used to convert the provided document to a struct
 pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
     let fields = DocFields::as_fields();
     let doc_id = field_to_string(doc, fields.id);
@@ -343,6 +517,7 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
     let description = field_to_string(doc, fields.description);
     let url = field_to_string(doc, fields.url);
     let content = field_to_string(doc, fields.content);
+    let tags = field_to_u64vec(doc, fields.tags);
 
     Ok(RetrievedDocument {
         doc_id,
@@ -351,6 +526,7 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
         description,
         content,
         url,
+        tags,
     })
 }
 
@@ -379,7 +555,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![1_i64]),
+                tags: &vec![1_i64],
             },
         )
         .expect("Unable to add doc");
@@ -401,7 +577,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &Some(vec![2_i64]),
+                tags: &vec![2_i64],
             },
         )
         .expect("Unable to add doc");
@@ -421,7 +597,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-                tags: &Some(vec![2_i64]),
+                tags: &vec![2_i64],
             },
         )
         .expect("Unable to add doc");
@@ -438,7 +614,8 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-             tags: &Some(vec![1_i64]),}
+             tags: &vec![1_i64],
+        }
         )
         .expect("Unable to add doc");
 

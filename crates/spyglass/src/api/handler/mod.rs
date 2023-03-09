@@ -18,9 +18,10 @@ use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, ManagerCommand};
+use num_format::{Locale, ToFormattedString};
 use shared::config::{self, Config};
 use shared::metrics::Event;
-use shared::request::{RawDocType, RawDocumentRequest};
+use shared::request::{BatchDocumentRequest, RawDocType, RawDocumentRequest};
 use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
@@ -35,8 +36,53 @@ use super::response;
 
 pub mod search;
 
+pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) -> Result<(), Error> {
+    // Validate tags and consolidate tags
+    let mut tags = Vec::new();
+    tags.push((TagType::Source, req.source.to_string()));
+    for (tag_type, tag_value) in req.tags.iter() {
+        if let Ok(ttype) = TagType::from_str(tag_type) {
+            if !tag_value.is_empty() {
+                tags.push((ttype, tag_value.to_owned()));
+            } else {
+                log::warn!("Invalid tag value `{tag_value}` for tag type: {tag_type}");
+            }
+        } else {
+            log::warn!("Invalid tag type: {tag_type}");
+        }
+    }
+
+    // No need to process anything, simply add to the crawl queue for processing
+    log::debug!(
+        "Enqueueing {} URLs from webext w/ tags: {:?}",
+        req.urls.len(),
+        &tags
+    );
+    let overrides = EnqueueSettings {
+        force_allow: true,
+        is_recrawl: true,
+        tags,
+        ..Default::default()
+    };
+
+    if let Err(err) = crawl_queue::enqueue_all(
+        &state.db,
+        &req.urls,
+        &[],
+        &state.user_settings,
+        &overrides,
+        None,
+    )
+    .await
+    {
+        return Err(Error::Custom(format!("Unable to queue URL: {err}")));
+    }
+
+    Ok(())
+}
+
 /// Adds a raw document to the user's index.
-pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Result<(), Error> {
+pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Result<(), Error> {
     // Validate tags and consolidate tags
     let mut tags = Vec::new();
     tags.push((TagType::Source, req.source.to_string()));
@@ -82,7 +128,7 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
 
             // Add to index
             log::debug!("adding to index: {} - {:?}", crawl.url, crawl.tags);
-            if let Err(err) = process_crawl_results(&state, &[crawl], &Vec::new()).await {
+            if let Err(err) = process_crawl_results(state, &[crawl], &Vec::new()).await {
                 log::error!("Unable to add from webext: {}", err);
             }
         }
@@ -92,7 +138,7 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
         }
         // No need to process anything, simply add to the crawl queue for processing
         RawDocType::Url => {
-            log::debug!("Enqueueing URL fro webext: {} - {:?}", req.url, &tags);
+            log::debug!("Enqueueing URL from webext: {} - {:?}", req.url, &tags);
             let overrides = EnqueueSettings {
                 force_allow: true,
                 is_recrawl: true,
@@ -110,7 +156,7 @@ pub async fn add_raw_document(state: AppState, req: &RawDocumentRequest) -> Resu
             )
             .await
             {
-                return Err(Error::Custom(format!("Unable to queue URL: {}", err)));
+                return Err(Error::Custom(format!("Unable to queue URL: {err}")));
             }
         }
     }
@@ -273,19 +319,21 @@ pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, E
                 hash: lens.hash.clone(),
                 file_path: Some(lens.file_path.clone()),
                 progress,
-                html_url: None,
-                download_url: None,
                 lens_type: shared::response::LensType::Lens,
+                ..Default::default()
             }
         })
         .collect();
 
-    if let Some(result) =
-        build_filesystem_information(&state, stats.get(filesystem::FILES_LENS)).await
-    {
-        lenses.push(result);
-    }
-
+    build_filesystem_information(
+        &state,
+        &mut lenses,
+        &stats
+            .get(filesystem::FILES_LENS)
+            .map(|x| x.to_owned())
+            .unwrap_or_default(),
+    )
+    .await;
     add_connections_information(&state, &mut lenses, &stats).await;
 
     lenses.sort_by(|x, y| x.label.to_lowercase().cmp(&y.label.to_lowercase()));
@@ -308,7 +356,10 @@ async fn add_connections_information(
                 let progress = if connection.is_syncing {
                     InstallStatus::Installing {
                         percent: 0,
-                        status: "Syncing...".into(),
+                        status: format!(
+                            "Syncing {} of many...",
+                            stats.indexed.to_formatted_string(&Locale::en)
+                        ),
                     }
                 } else {
                     InstallStatus::Finished {
@@ -333,52 +384,51 @@ async fn add_connections_information(
 // Helper method used to build a len result for the filesystem
 async fn build_filesystem_information(
     state: &AppState,
-    lens_stats: Option<&LibraryStats>,
-) -> Option<LensResult> {
-    if filesystem::is_watcher_enabled() {
-        let watcher = state.file_watcher.lock().await;
-        let ref_watcher = watcher.as_ref();
-        if let Some(watcher) = ref_watcher {
-            let total_paths = watcher.processed_path_count().await as u32;
-            let mut indexed: u32 = 0;
-            let mut failed: u32 = 0;
-            if let Some(stats) = lens_stats {
-                indexed = stats.indexed as u32;
-                failed = stats.failed as u32;
-            }
-            let total_finished = indexed + failed;
+    lenses: &mut Vec<LensResult>,
+    stats: &LibraryStats,
+) {
+    if !filesystem::is_watcher_enabled() {
+        return;
+    }
 
-            let path = watcher.initializing_path().await;
-            let mut status = InstallStatus::Finished { num_docs: indexed };
-            if total_finished < total_paths {
-                let percent = ((indexed * 100) / total_paths) as i32;
-                let status_msg = match path {
-                    Some(path) => format!("Walking path {path}"),
-                    None => String::from("Processing local files..."),
-                };
-                status = InstallStatus::Installing {
-                    percent,
-                    status: status_msg,
-                }
-            }
+    let watcher = state.file_watcher.lock().await;
+    if let Some(watcher) = watcher.as_ref() {
+        let total_paths = watcher.processed_path_count().await as u32;
+        let path = watcher.initializing_path().await;
 
-            Some(LensResult {
+        let indexed: u32 = stats.indexed as u32;
+        let failed: u32 = stats.failed as u32;
+
+        let total_finished = indexed + failed;
+
+        let mut status = InstallStatus::Finished { num_docs: indexed };
+        if total_finished < total_paths {
+            let percent = (((indexed * 100) / total_paths) as i32).min(100);
+            let status_msg = format!(
+                "Processing {} of many",
+                indexed.to_formatted_string(&Locale::en)
+            );
+            let status_msg = match path {
+                Some(path) => format!("{}. Walking {path}.", status_msg),
+                None => status_msg,
+            };
+
+            status = InstallStatus::Installing {
+                percent,
+                status: status_msg,
+            };
+        }
+
+        let res = LensResult {
             author: String::from("spyglass-search"),
             name: String::from("local-file-system"),
             label: String::from("Local File System"),
-            description: String::from("Provides indexing for local files. All content is processed locally and stored locally! Contents of supported file types will be indexed. All unsupported file types and directories will be indexed based on their path, name and extension."),
-            hash: String::from("N/A"),
-            file_path: None,
+            description: String::from("All files are processed locally. Contents of supported file types will be indexed. All unsupported files/folders will be indexed based on their path, name, and extension."),
             progress: status,
-            html_url: None,
-            download_url: None,
-            lens_type: shared::response::LensType::Internal
-        })
-        } else {
-            None
-        }
-    } else {
-        None
+            lens_type: shared::response::LensType::Internal,
+            ..Default::default()
+        };
+        lenses.push(res);
     }
 }
 
@@ -612,7 +662,7 @@ mod test {
                     domain: "example.com",
                     url: "https://example.com/test",
                     content: "test content",
-                    tags: &None,
+                    tags: &[],
                 },
             )
             .expect("Unable to add doc");

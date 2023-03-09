@@ -1,22 +1,25 @@
-use anyhow::Error;
-use entities::models::tag::TagType;
-use ignore::WalkBuilder;
-use rusqlite::Connection;
+use crate::documents;
+use entities::models::indexed_document;
+use entities::models::tag;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use spyglass_plugin::{DocumentResult, PluginEvent};
+use std::path::Path;
+use tantivy::DocAddress;
 use tokio::sync::mpsc::Sender;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
-use super::{
-    wasi_read, wasi_read_string, wasi_write, PluginCommand, PluginConfig, PluginEnv, PluginId,
-};
-use crate::search::Searcher;
+use entities::sea_orm::ColumnTrait;
+use entities::sea_orm::EntityTrait;
+use entities::sea_orm::ModelTrait;
+use entities::sea_orm::QueryFilter;
+
+use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
+use crate::search::{self, Searcher};
 use crate::state::AppState;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
-use spyglass_plugin::{utils::path_to_uri, ListDirEntry, PluginCommandRequest};
+use spyglass_plugin::{DocumentQuery, PluginCommandRequest};
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -31,7 +34,7 @@ pub fn register_exports(
         id: plugin_id,
         name: plugin.name.clone(),
         app_state: state.clone(),
-        data_dir: plugin.data_folder(),
+        _data_dir: plugin.data_folder(),
         wasi_env: env.clone(),
         cmd_writer: cmd_writer.clone(),
     };
@@ -58,93 +61,142 @@ async fn handle_plugin_cmd_request(
         }
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
-        PluginCommandRequest::ListDir { path } => {
-            log::debug!("{} listing path: {}", env.name, path);
-            let entries = std::fs::read_dir(path)?
-                .flatten()
-                .map(|entry| {
-                    let path = entry.path();
-                    ListDirEntry {
-                        path: path.display().to_string(),
-                        is_file: path.is_file(),
-                        is_dir: path.is_dir(),
-                    }
-                })
-                .collect::<Vec<ListDirEntry>>();
-            wasi_write(&env.wasi_env, &entries)?;
-        }
-        // Subscribe to a plugin event
-        PluginCommandRequest::Subscribe(event) => {
-            env.cmd_writer
-                .send(PluginCommand::Subscribe(env.id, event.clone()))
-                .await?;
-            log::info!("<{}> subscribed to {}", env.name.clone(), event);
-        }
-        // NOTE: This is a hack since sqlite can't easily be compiled into WASM yet.
-        // This is for plugins who need to run a query against some sqlite3 file,
-        // for example the Firefox bookmarks/history are store in such a file.
-        PluginCommandRequest::SqliteQuery { path, query } => {
-            let db_path = env.data_dir.join(path);
-            if !db_path.exists() {
-                return Err(Error::msg(format!("Invalid sqlite db path: {path}")));
+        PluginCommandRequest::QueryDocuments { query, subscribe } => {
+            if *subscribe {
+                tokio::spawn(query_document_and_send_loop(env.clone(), query.clone()));
+            } else {
+                query_documents_and_send(env, query, true).await;
             }
-
-            let conn = Connection::open(db_path)?;
-            let mut stmt = conn.prepare(query)?;
-
-            let results = stmt.query_map([], |row| {
-                Ok(row.get::<usize, String>(0).unwrap_or_default())
-            })?;
-
-            let urls: Vec<String> = results
-                .map(|x| x.unwrap_or_default())
-                .collect::<Vec<String>>()
-                .into_iter()
-                .filter(|x| !x.is_empty())
-                .collect();
-
-            log::debug!("PCR::SqliteQUery: found {} urls", urls.len());
-            handle_plugin_enqueue(env, &urls);
         }
-        PluginCommandRequest::SyncFile { dst, src } => {
-            handle_sync_file(env, dst, src);
-            // Sleep a little bit to let the copy complete.
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
-        // Walk through a path & enqueue matching files for indexing.
-        PluginCommandRequest::WalkAndEnqueue { path, extensions } => {
-            let dir_path = Path::new(&path);
-            if !dir_path.exists() {
-                return Err(Error::msg(format!("Invalid path: {}", path.display())));
+        PluginCommandRequest::ModifyTags {
+            documents,
+            tag_modifications,
+        } => {
+            log::trace!("Received modify tags command {:?}", documents);
+            let docs =
+                Searcher::search_by_query(&env.app_state.db, &env.app_state.index, documents).await;
+            if !docs.is_empty() {
+                let doc_ids = docs
+                    .iter()
+                    .map(|(_, addr)| *addr)
+                    .collect::<Vec<DocAddress>>();
+                if let Err(error) =
+                    documents::update_tags(&env.app_state, &doc_ids, tag_modifications).await
+                {
+                    log::error!("Error updating document tags {:?}", error);
+                }
             }
-
-            log::info!("{} crawling path: {}", env.name, path.display());
-            let stats =
-                handle_walk_and_enqueue(&env.app_state, dir_path.to_path_buf(), extensions).await;
-            wasi_write(&env.wasi_env, &stats)?;
         }
     }
 
     Ok(())
 }
 
+async fn query_document_and_send_loop(env: PluginEnv, query: DocumentQuery) {
+    let mut timer = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    loop {
+        timer.tick().await;
+        {
+            let manager = &env.app_state.plugin_manager.lock().await;
+            if !manager.is_enabled(env.id) {
+                log::debug!("Plugin has been disabled removing subscription");
+                break;
+            }
+        }
+        query_documents_and_send(&env, &query, false).await;
+    }
+}
+
+async fn query_documents_and_send(env: &PluginEnv, query: &DocumentQuery, send_empty: bool) {
+    let docs = Searcher::search_by_query(&env.app_state.db, &env.app_state.index, query).await;
+    log::debug!("Found {:?} documents for query", docs.len());
+    let searcher = &env.app_state.index.reader.searcher();
+    let mut results = Vec::new();
+    let db = &env.app_state.db;
+    for (_score, doc_addr) in docs {
+        if let Ok(Ok(doc)) = searcher
+            .doc(doc_addr)
+            .map(|doc| search::document_to_struct(&doc))
+        {
+            log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
+            let indexed = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
+                .one(db)
+                .await;
+
+            let crawl_uri = doc.url;
+            if let Ok(Some(indexed)) = indexed {
+                let tags = indexed
+                    .find_related(tag::Entity)
+                    .all(db)
+                    .await
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                    .collect::<Vec<(String, String)>>();
+
+                let result = DocumentResult {
+                    doc_id: doc.doc_id.clone(),
+                    domain: doc.domain,
+                    title: doc.title,
+                    description: doc.description,
+                    url: indexed.open_url.unwrap_or(crawl_uri),
+                    tags,
+                };
+
+                results.push(result);
+            }
+        }
+    }
+
+    if !results.is_empty() || send_empty {
+        let _ = env
+            .cmd_writer
+            .send(PluginCommand::HandleUpdate {
+                plugin_id: env.id,
+                event: PluginEvent::DocumentResponse {
+                    request_id: String::from("ahhh_my_id"),
+                    page_count: 1,
+                    page: 0,
+                    documents: results,
+                },
+            })
+            .await;
+    }
+}
+
 /// Handle plugin calls into the host environment. These are run as separate tokio tasks
 /// so we don't block the main thread.
 pub(crate) fn plugin_cmd(env: &PluginEnv) {
-    if let Ok(cmd) = wasi_read::<PluginCommandRequest>(&env.wasi_env) {
-        // Handle the plugin command as a separate async task
-        let rt = tokio::runtime::Handle::current();
-        let env = env.clone();
-        rt.spawn(async move {
-            if let Err(e) = handle_plugin_cmd_request(&cmd, &env).await {
-                log::error!(
-                    "Could not handle cmd {:?} for plugin {}. Error: {}",
-                    cmd,
-                    env.name,
-                    e
-                );
-            }
-        });
+    log::debug!("Plugin Command Request Received");
+    match wasi_read::<PluginCommandRequest>(&env.wasi_env) {
+        Ok(cmd) => {
+            // Handle the plugin command as a separate async task
+            let rt = tokio::runtime::Handle::current();
+
+            #[cfg(feature = "tokio-console")]
+            tokio::task::Builder::new()
+                .name("Plugin Request")
+                .spawn_on(handle_plugin_cmd(cmd, env.clone()), &rt);
+
+            #[cfg(not(feature = "tokio-console"))]
+            rt.spawn(handle_plugin_cmd(cmd, env.clone()));
+        }
+        Err(error) => {
+            log::error!("Invalid command request received {:?}", error);
+        }
+    }
+}
+
+// Helper method used to handle the plugin command
+async fn handle_plugin_cmd(cmd: PluginCommandRequest, env: PluginEnv) {
+    if let Err(e) = handle_plugin_cmd_request(&cmd, &env).await {
+        log::error!(
+            "Could not handle cmd {:?} for plugin {}. Error: {}",
+            cmd,
+            env.name,
+            e
+        );
     }
 }
 
@@ -158,13 +210,13 @@ pub(crate) fn plugin_log(env: &PluginEnv) {
 
 /// Adds a file into the plugin data directory. Use this to copy files from elsewhere
 /// in the filesystem so that it can be processed by the plugin.
-fn handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
+fn _handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     log::info!("<{}> requesting access to file: {}", env.name, src);
     let dst = Path::new(dst.trim_start_matches('/'));
     let src = Path::new(&src);
 
     if let Some(file_name) = src.file_name() {
-        let dst = env.data_dir.join(dst).join(file_name);
+        let dst = env._data_dir.join(dst).join(file_name);
         // Attempt to copy file into plugin data directory
         if let Err(e) = std::fs::copy(src, dst) {
             log::error!("Unable to copy into plugin data dir: {}", e);
@@ -181,18 +233,6 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
     let rt = tokio::runtime::Handle::current();
     let urls = urls.clone();
 
-    // Hacky way to apply lenses to enqueues from the plugins.
-    let mut tags = vec![(TagType::Source, env.name.clone())];
-    match env.name.as_str() {
-        "chrome-importer" | "firefox-importer" => {
-            tags.push((TagType::Lens, "bookmarks".to_owned()));
-        }
-        "local-file-importer" => {
-            tags.push((TagType::Lens, "files".to_owned()));
-        }
-        _ => {}
-    }
-
     rt.spawn(async move {
         let state = state.clone();
         if let Err(e) = enqueue_all(
@@ -202,7 +242,6 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             &state.user_settings,
             &EnqueueSettings {
                 force_allow: true,
-                tags: tags.clone(),
                 ..Default::default()
             },
             Option::None,
@@ -219,130 +258,4 @@ pub struct WalkStats {
     pub dirs: i32,
     pub files: i32,
     pub skipped: i32,
-}
-
-async fn handle_walk_and_enqueue(
-    state: &AppState,
-    path: PathBuf,
-    supported_exts: &HashSet<String>,
-) -> WalkStats {
-    let walker = WalkBuilder::new(path.clone())
-        .standard_filters(true)
-        .build();
-    let enqueue_settings = EnqueueSettings {
-        force_allow: true,
-        tags: vec![
-            (TagType::Source, "local".to_string()),
-            (TagType::Lens, "files".to_string()),
-        ],
-        ..Default::default()
-    };
-
-    let mut stats = WalkStats::default();
-    let mut to_enqueue: Vec<String> = Vec::new();
-
-    for entry in walker.flatten() {
-        if let Some(file_type) = entry.file_type() {
-            if file_type.is_dir() {
-                stats.dirs += 1;
-                continue;
-            }
-
-            let ext = entry.path().extension().and_then(|ext| ext.to_str());
-
-            if let Some(ext) = ext {
-                if supported_exts.contains(ext) {
-                    to_enqueue.push(path_to_uri(entry.into_path()));
-                    stats.files += 1;
-                } else {
-                    stats.skipped += 1;
-                }
-            }
-        }
-
-        // Chunk out enqueues so we don't run into some crazy amount at once.
-        if to_enqueue.len() > 1000 {
-            let _ = enqueue_all(
-                &state.db,
-                &to_enqueue,
-                &[],
-                &state.user_settings,
-                &enqueue_settings,
-                None,
-            )
-            .await;
-            to_enqueue.clear();
-        }
-    }
-
-    // Add whatever is leftover
-    if !to_enqueue.is_empty() {
-        let _ = enqueue_all(
-            &state.db,
-            &to_enqueue,
-            &[],
-            &state.user_settings,
-            &enqueue_settings,
-            None,
-        )
-        .await;
-    }
-
-    log::info!("walked & enqueued: {:?}", stats);
-    stats
-}
-
-#[cfg(test)]
-mod test {
-    use std::collections::HashSet;
-    use std::path::Path;
-
-    use super::handle_walk_and_enqueue;
-    use crate::search::IndexPath;
-    use crate::state::AppStateBuilder;
-    use entities::models::crawl_queue::{num_queued, CrawlStatus};
-    use entities::test::setup_test_db;
-    use shared::config::UserSettings;
-
-    #[tokio::test]
-    async fn test_walk_and_enqueue() {
-        let test_folder = Path::new("/tmp/walk_and_enqueue");
-
-        let db = setup_test_db().await;
-        let state = AppStateBuilder::new()
-            .with_db(db)
-            .with_index(&IndexPath::Memory)
-            .with_user_settings(&UserSettings::default())
-            .build();
-
-        let ext: HashSet<String> = HashSet::from_iter(vec!["txt".into()].iter().cloned());
-
-        // Create a tmp directory for testing
-        std::fs::create_dir_all(test_folder)
-            .expect("Unable to create test dir for test_walk_and_enqueue");
-        // Generate some random files
-        for idx in 0..100 {
-            let ext = if idx % 5 == 0 { ".txt" } else { "" };
-
-            std::fs::write(
-                test_folder.join(format!("{idx}{ext}")),
-                format!("file contents {idx}"),
-            )
-            .expect("Unable to write test file");
-        }
-
-        let stats = handle_walk_and_enqueue(&state, test_folder.to_path_buf(), &ext).await;
-        assert!(stats.files > 0);
-
-        // Crawl queue should have the same number of documents
-        let num_queued = num_queued(&state.db, CrawlStatus::Queued)
-            .await
-            .expect("Unable to query queue");
-        assert_eq!(num_queued, stats.files as u64);
-
-        // Cleanup
-        if test_folder.exists() {
-            std::fs::remove_dir_all(test_folder).expect("Unable to clean up folder");
-        }
-    }
 }

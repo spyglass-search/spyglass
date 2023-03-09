@@ -7,7 +7,7 @@ use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::Config;
-use shared::request::{RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::RpcServer;
 use std::collections::HashMap;
@@ -24,11 +24,15 @@ pub struct SpyglassRpc {
 #[async_trait]
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
-        Ok("0.1.0".into())
+        Ok("0.1.1".into())
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
-        handler::add_raw_document(self.state.clone(), &req).await
+        handler::add_raw_document(&self.state, &req).await
+    }
+
+    async fn add_document_batch(&self, req: BatchDocumentRequest) -> Result<(), Error> {
+        handler::add_document_batch(&self.state, &req).await
     }
 
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {
@@ -72,22 +76,29 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn is_document_indexed(&self, url: String) -> Result<bool, Error> {
-        let result = indexed_document::Entity::find()
-            .filter(
-                Condition::any()
-                    // checks against raw urls that have been added
-                    .add(indexed_document::Column::Url.eq(url.clone()))
-                    // checks against URLs gathered through integrations,
-                    // e.g. A starred github repo should match against a github URL
-                    // if we have it.
-                    .add(indexed_document::Column::OpenUrl.eq(url)),
-            )
-            .one(&self.state.db)
-            .await;
+        // Normalize URL
+        if let Ok(mut url) = url::Url::parse(&url) {
+            url.set_fragment(None);
+            let url_str = url.to_string();
+            let result = indexed_document::Entity::find()
+                .filter(
+                    Condition::any()
+                        // checks against raw urls that have been added
+                        .add(indexed_document::Column::Url.eq(url_str.clone()))
+                        // checks against URLs gathered through integrations,
+                        // e.g. A starred github repo should match against a github URL
+                        // if we have it.
+                        .add(indexed_document::Column::OpenUrl.eq(url_str)),
+                )
+                .one(&self.state.db)
+                .await;
 
-        match result {
-            Ok(result) => Ok(result.is_some()),
-            Err(err) => Err(Error::Custom(format!("Unable to query db: {err}"))),
+            match result {
+                Ok(result) => Ok(result.is_some()),
+                Err(err) => Err(Error::Custom(format!("Unable to query db: {err}"))),
+            }
+        } else {
+            Ok(false)
         }
     }
 
@@ -120,6 +131,7 @@ impl RpcServer for SpyglassRpc {
             .schedule_work(ManagerCommand::Collect(CollectTask::ConnectionSync {
                 api_id,
                 account,
+                is_first_sync: false,
             }))
             .await;
 

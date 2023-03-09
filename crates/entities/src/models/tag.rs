@@ -1,5 +1,4 @@
-use sea_orm::{entity::prelude::*, ConnectionTrait};
-use sea_orm::{Condition, Set};
+use sea_orm::{entity::prelude::*, Condition, ConnectionTrait, Set};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumString};
 
@@ -8,27 +7,14 @@ use super::{crawl_queue, indexed_document};
 pub type TagPair = (TagType, String);
 
 #[derive(
-    AsRefStr,
-    Clone,
-    Debug,
-    DeriveActiveEnum,
-    Deserialize,
-    EnumIter,
-    EnumString,
-    Eq,
-    Hash,
-    PartialEq,
-    Serialize,
+    AsRefStr, Clone, Debug, Deserialize, EnumIter, EnumString, Eq, Hash, PartialEq, Serialize,
 )]
-#[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum TagType {
     /// Marked as liked/starred/hearted/etc.
-    #[sea_orm(string_value = "favorited")]
     #[strum(serialize = "favorited")]
     Favorited,
     /// Mimetype of the document. TODO: Need to keep a mapping between file extension and
     /// mimetypes somewhere
-    #[sea_orm(string_value = "mimetype")]
     #[strum(serialize = "mimetype")]
     MimeType,
     /// General type tag, Used for high level types ex: File, directory. The MimeType
@@ -36,33 +22,70 @@ pub enum TagType {
     /// For non-file docs, can be used to differentiate from others in this category.
     /// e.g. for a GitHub connection we can have an "Issue" or "Repo".
     ///     for a D&D lens we have equipment, magic items, skills, etc.
-    #[sea_orm(string_value = "type")]
     #[strum(serialize = "type")]
     Type,
     /// where this document came from,
-    #[sea_orm(string_value = "source")]
     #[strum(serialize = "source")]
     Source,
     /// Owner of a doc/item, if relevant.
-    #[sea_orm(string_value = "owner")]
     #[strum(serialize = "owner")]
     Owner,
     /// Shared/invited to a doc/event/etc.
-    #[sea_orm(string_value = "shared")]
     #[strum(serialize = "shared")]
     SharedWith,
     /// Part of this/these lens(es)
-    #[sea_orm(string_value = "lens")]
     #[strum(serialize = "lens")]
     Lens,
     /// Part of a specific repo
-    #[sea_orm(string_value = "repository")]
     #[strum(serialize = "repository")]
     Repository,
     /// For file based content this tag
-    #[sea_orm(string_value = "fileext")]
     #[strum(serialize = "fileext")]
     FileExt,
+    /// Pull from the lens categorization
+    #[strum(serialize = "category")]
+    Category,
+    /// Other custom generated TagTypes.
+    #[strum(serialize = "Other(String)")]
+    Other(String),
+}
+
+// Helper method used to convert a string into the
+// associate TagType
+fn string_to_tag_type(v: &str) -> TagType {
+    match v {
+        "favorited" => TagType::Favorited,
+        "mimetype" => TagType::MimeType,
+        "type" => TagType::Type,
+        "source" => TagType::Source,
+        "owner" => TagType::Owner,
+        "shared" => TagType::SharedWith,
+        "lens" => TagType::Lens,
+        "repository" => TagType::Repository,
+        "fileext" => TagType::FileExt,
+        "category" => TagType::Category,
+        other => TagType::Other(String::from(other)),
+    }
+}
+
+// Allows the TagType to be converted into a string
+impl ToString for TagType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Favorited => "favorited",
+            Self::MimeType => "mimetype",
+            Self::Type => "type",
+            Self::Source => "source",
+            Self::Owner => "owner",
+            Self::SharedWith => "shared",
+            Self::Lens => "lens",
+            Self::Repository => "repository",
+            Self::FileExt => "fileext",
+            Self::Category => "category",
+            Self::Other(label) => label.as_str(),
+        }
+        .to_owned()
+    }
 }
 
 #[derive(AsRefStr, Display, EnumString)]
@@ -84,7 +107,7 @@ pub enum TagValue {
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    pub label: TagType,
+    pub label: String,
     pub value: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
@@ -92,7 +115,7 @@ pub struct Model {
 
 impl Model {
     pub fn tag_pair(&self) -> TagPair {
-        (self.label.clone(), self.value.clone())
+        (string_to_tag_type(self.label.as_str()), self.value.clone())
     }
 }
 
@@ -111,9 +134,13 @@ impl RelationTrait for Relation {
     }
 }
 
+#[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
         if insert {
             self.created_at = Set(chrono::Utc::now());
             self.updated_at = Set(chrono::Utc::now());
@@ -152,7 +179,7 @@ where
     C: ConnectionTrait,
 {
     let tag = ActiveModel {
-        label: Set(label.clone()),
+        label: Set(label.to_string()),
         value: Set(value.to_string()),
         created_at: Set(chrono::Utc::now()),
         updated_at: Set(chrono::Utc::now()),
@@ -169,7 +196,7 @@ where
         .await;
 
     let tag = Entity::find()
-        .filter(Column::Label.eq(label.clone()))
+        .filter(Column::Label.eq(label.to_string()))
         .filter(Column::Value.eq(value))
         .one(db)
         .await;
@@ -178,11 +205,13 @@ where
         Ok(Some(model)) => Ok(model),
         Err(err) => Err(err),
         _ => Err(DbErr::RecordNotFound(format!(
-            "label: {label}, value: {value}"
+            "label: {label:?}, value: {value}"
         ))),
     }
 }
 
+/// Helper method used to get the database models for the associated tag pairs. If the tag
+/// pair does not exist they are created.
 pub async fn get_or_create_many<C>(db: &C, tags: &Vec<TagPair>) -> Result<Vec<Model>, DbErr>
 where
     C: ConnectionTrait,
@@ -190,7 +219,7 @@ where
     let tag_models = tags
         .iter()
         .map(|(label, value)| ActiveModel {
-            label: Set(label.clone()),
+            label: Set(label.to_string()),
             value: Set(value.to_string()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
@@ -211,6 +240,52 @@ where
     for (label, value) in tags {
         condition = condition.add(
             Condition::all()
+                .add(Column::Label.eq(label.to_string()))
+                .add(Column::Value.eq(value.clone())),
+        );
+    }
+    let db_tags = Entity::find().filter(condition).all(db).await;
+
+    match db_tags {
+        Ok(models) => Ok(models),
+        Err(err) => Err(err),
+    }
+}
+
+/// Helper method used to get the database models for the associated tag pairs. If the tag
+/// pair does not exist they are created. This method uses a pair of strings instead
+/// of the TagType enum
+pub async fn get_or_create_many_string<C>(
+    db: &C,
+    tags: &Vec<(String, String)>,
+) -> Result<Vec<Model>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let tag_models = tags
+        .iter()
+        .map(|(label, value)| ActiveModel {
+            label: Set(label.clone()),
+            value: Set(value.to_string()),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
+        })
+        .collect::<Vec<ActiveModel>>();
+
+    let _ = Entity::insert_many(tag_models)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns(vec![Column::Label, Column::Value])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(db)
+        .await;
+
+    let mut condition = Condition::any();
+    for (label, value) in tags {
+        condition = condition.add(
+            Condition::all()
                 .add(Column::Label.eq(label.clone()))
                 .add(Column::Value.eq(value.clone())),
         );
@@ -221,6 +296,22 @@ where
         Ok(models) => Ok(models),
         Err(err) => Err(err),
     }
+}
+
+/// Helper method used to access the database tag definitions based on the label
+/// and value.
+pub async fn get_tags_by_value(
+    db: &DatabaseConnection,
+    tags: &Vec<(String, String)>,
+) -> Result<Vec<Model>, DbErr> {
+    let mut find = Entity::find();
+    for (label, value) in tags {
+        find = find
+            .filter(Column::Label.eq(label.clone()))
+            .filter(Column::Value.eq(value.clone()));
+    }
+
+    find.all(db).await
 }
 
 #[cfg(test)]
@@ -244,7 +335,7 @@ mod test {
     async fn test_conflict() -> Result<(), DbErr> {
         let db = setup_test_db().await;
         let source_tag = tag::ActiveModel {
-            label: Set(tag::TagType::Source),
+            label: Set(tag::TagType::Source.to_string()),
             value: Set("web".to_string()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
@@ -252,7 +343,7 @@ mod test {
         };
 
         let mime_tag = tag::ActiveModel {
-            label: Set(tag::TagType::MimeType),
+            label: Set(tag::TagType::MimeType.to_string()),
             value: Set("text/html".to_string()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
@@ -260,7 +351,7 @@ mod test {
         };
 
         let conflict = tag::ActiveModel {
-            label: Set(tag::TagType::MimeType),
+            label: Set(tag::TagType::MimeType.to_string()),
             value: Set("text/html".to_string()),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),

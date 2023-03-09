@@ -1,11 +1,13 @@
+# Copy the Makefile.dev.template over to Makefile.dev to setup dev related
+# variables.
+-include Makefile.dev
+
 .PHONY: build-backend build-client build-plugins-dev build-plugins-release \
 	build-styles build-release check clippy fmt test test-with-ignored \
 	setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
-PLUGINS := chrome-importer firefox-importer
-# Set this up if you're working on the plugins
-PLUGINS_DEV_FOLDER := ~/Library/Application\ Support/com.athlabs.spyglass-dev/
+PLUGINS := rust
 
 # By default just run fmt & clippy
 default: fmt clippy
@@ -14,6 +16,7 @@ build-backend:
 	cargo build -p spyglass
 	mkdir -p crates/tauri/binaries
 	cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
+	cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-$(TARGET_ARCH)
 
 build-client:
 	cargo build -p spyglass-client -p spyglass-app
@@ -22,6 +25,9 @@ build-styles:
 	cd ./crates/client && npx tailwindcss -i ./public/input.css -o ./public/main.css
 
 build-plugins-dev:
+ifeq ("$(PLUGINS_DEV_FOLDER)","")
+		@echo "Error: Please set the PLUGINS_DEV_FOLDER variable in your Makefile before continuing";
+else
 	@for plugin in $(PLUGINS); do \
 		echo "-> building $${plugin}"; \
 		mkdir -p "assets/plugins/$${plugin}"; \
@@ -30,6 +36,7 @@ build-plugins-dev:
 	done
 	mkdir -p $(PLUGINS_DEV_FOLDER);
 	cp -r assets/plugins $(PLUGINS_DEV_FOLDER);
+endif
 
 build-plugins-release:
 	@for plugin in $(PLUGINS); do \

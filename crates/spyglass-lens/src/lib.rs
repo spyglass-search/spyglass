@@ -1,72 +1,15 @@
-use std::fmt;
 use std::path::PathBuf;
 
 use blake2::{Blake2s256, Digest};
 use serde::{Deserialize, Serialize};
 
 pub mod pipeline;
+pub mod types;
 mod utils;
+use types::{LensFilters, LensRule, LensSource};
 
 pub use crate::pipeline::PipelineConfiguration;
-use utils::{regex_for_domain, regex_for_prefix, regex_for_robots};
-
-/// Different rules that filter out the URLs that would be crawled for a lens
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum LensRule {
-    /// Limits the depth of a URL to a certain depth.
-    /// For example:
-    ///  - LimitURLDepth("https://example.com/", 1) will limit it to https://example.com/<path 1>
-    ///  - LimitURLDepth("https://example.com/", 2) will limit it to https://example.com/<path 1>/<path 2>
-    ///  - etc.
-    LimitURLDepth(String, u8),
-    /// Skips are applied when bootstrapping & crawling
-    SkipURL(String),
-}
-
-/// The lens source is used to identify if the lens was provided by a remote
-/// lens provider or if it is a locally created lens. Depending on the
-/// provider different features might be available
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
-pub enum LensSource {
-    /**
-     * Lens sourced locally
-     */
-    #[default]
-    Local,
-    /**
-     * Lens download from a remote source
-     */
-    Remote(String),
-}
-
-impl fmt::Display for LensRule {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LimitURLDepth(url, depth) => write!(f, "LimitURLDepth(\"{url}\", {depth})"),
-            Self::SkipURL(url) => write!(f, "SkipURL(\"{url}\")",),
-        }
-    }
-}
-
-impl LensRule {
-    pub fn to_regex(&self) -> String {
-        match &self {
-            LensRule::LimitURLDepth(prefix, max_depth) => {
-                let prefix = prefix.trim_end_matches('/');
-                let regex = format!("^{prefix}/?(/[^/]+/?){{0, {max_depth}}}$");
-                regex
-            }
-            LensRule::SkipURL(rule_str) => {
-                regex_for_robots(rule_str).expect("Invalid SkipURL regex")
-            }
-        }
-    }
-}
-
-pub struct LensFilters {
-    pub allowed: Vec<String>,
-    pub skipped: Vec<String>,
-}
+use utils::{regex_for_domain, regex_for_prefix};
 
 /// Contexts are a set of domains/URLs/etc. that restricts a search space to
 /// improve results.
@@ -74,15 +17,20 @@ pub struct LensFilters {
 pub struct LensConfig {
     #[serde(default = "LensConfig::default_author")]
     pub author: String,
+    /// Unique identifier for the lens
     pub name: String,
+    /// Human readable title for the lens
     #[serde(default)]
     pub label: String,
+    /// Optional description of the lens and what it contains.
     pub description: Option<String>,
+    /// Whole domains we want to be part of the index.
     pub domains: Vec<String>,
+    /// Specific URLs or URL prefixes that will be crawled
     pub urls: Vec<String>,
+    /// Semantic version of this lens (will be used to check for updates in the future).
     pub version: String,
-    #[serde(default = "LensConfig::default_is_enabled")]
-    pub is_enabled: bool,
+    /// Rules to skip/constrain what URLs are indexed
     #[serde(default)]
     pub rules: Vec<LensRule>,
     #[serde(default)]
@@ -91,11 +39,19 @@ pub struct LensConfig {
     pub pipeline: Option<String>,
     #[serde(default)]
     pub lens_source: LensSource,
-    // Used internally & should not be serialized/deserialized
+    /// Category(ies) this lens is in.
+    #[serde(default)]
+    pub categories: Vec<String>,
+    /// Tags to automatically apply to any URLs indexed by this lens
+    #[serde(default)]
+    pub tags: Vec<(String, String)>,
+    // Fields that are used internally & should not be serialized/deserialized
     #[serde(skip)]
     pub file_path: PathBuf,
     #[serde(skip)]
     pub hash: String,
+    #[serde(skip, default = "LensConfig::default_is_enabled")]
+    pub is_enabled: bool,
 }
 
 impl LensConfig {
@@ -161,12 +117,22 @@ impl LensConfig {
             Err(e) => Err(anyhow::Error::msg(e.to_string())),
         }
     }
+
+    pub fn all_tags(&self) -> Vec<(String, String)> {
+        let mut tags = Vec::new();
+
+        tags.push(("lens".into(), self.name.clone()));
+        for cat in self.categories.iter() {
+            tags.push(("category".into(), cat.clone()));
+        }
+        tags.extend(self.tags.clone().into_iter());
+
+        tags
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::LensRule;
-
     use super::LensConfig;
 
     #[test]
@@ -190,11 +156,24 @@ mod test {
     }
 
     #[test]
-    fn test_rules_display() {
-        let rule = LensRule::SkipURL("http://example.com".to_string());
-        assert_eq!(rule.to_string(), "SkipURL(\"http://example.com\")");
+    fn test_load_from_file() {
+        let lens_str = include_str!("../../../fixtures/lens/extra_fields.ron");
+        let config = ron::de::from_str::<LensConfig>(lens_str);
+        assert!(config.is_ok());
 
-        let rule = LensRule::LimitURLDepth("http://example.com".to_string(), 2);
-        assert_eq!(rule.to_string(), "LimitURLDepth(\"http://example.com\", 2)");
+        let config = config.expect("is err");
+        assert_eq!(config.name, "extra_fields");
+    }
+
+    #[test]
+    fn test_all_tags() {
+        let config = LensConfig {
+            name: "lens_name".into(),
+            categories: vec!["category_one".into(), "category_two".into()],
+            ..Default::default()
+        };
+
+        let tags = config.all_tags();
+        assert_eq!(tags.len(), 3);
     }
 }

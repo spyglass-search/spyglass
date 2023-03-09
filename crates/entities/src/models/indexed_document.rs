@@ -9,10 +9,11 @@ use sea_orm::{
     ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set,
     Statement,
 };
+use serde::Serialize;
 
 use super::tag::{get_or_create, TagPair};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "indexed_document")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -56,6 +57,7 @@ impl RelationTrait for Relation {
     }
 }
 
+#[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
@@ -66,7 +68,10 @@ impl ActiveModelBehavior for ActiveModel {
     }
 
     // Triggered before insert / update
-    fn before_save(mut self, insert: bool) -> Result<Self, DbErr> {
+    async fn before_save<C>(mut self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
         if !insert {
             self.updated_at = Set(chrono::Utc::now());
         }
@@ -136,18 +141,19 @@ pub async fn indexed_stats(
     Ok(res)
 }
 
-pub async fn insert_many(
-    db: &impl ConnectionTrait,
-    docs: Vec<ActiveModel>,
-) -> Result<InsertResult<ActiveModel>, DbErr> {
-    Entity::insert_many(docs)
-        .on_conflict(
-            OnConflict::columns(vec![Column::Url])
-                .update_column(Column::UpdatedAt)
-                .to_owned(),
-        )
-        .exec(db)
-        .await
+pub async fn insert_many(db: &impl ConnectionTrait, docs: &[ActiveModel]) -> Result<(), DbErr> {
+    for insert_chunk in docs.chunks(BATCH_SIZE) {
+        Entity::insert_many(insert_chunk.to_vec())
+            .on_conflict(
+                OnConflict::columns(vec![Column::Url])
+                    .update_column(Column::UpdatedAt)
+                    .to_owned(),
+            )
+            .exec(db)
+            .await?;
+    }
+
+    Ok(())
 }
 
 pub async fn insert_tags_for_docs<C: ConnectionTrait>(
@@ -160,20 +166,45 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
         return Ok(());
     }
 
-    // Remove dupes before adding
-    let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
     let doc_ids: Vec<i64> = docs.iter().map(|m| m.id).collect();
 
-    // Remove tags that are not in the tag set
-    let _ = document_tag::Entity::delete_many()
-        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids.clone()))
-        .filter(document_tag::Column::TagId.is_not_in(tags.clone()))
-        .exec(db)
-        .await;
+    insert_tags_for_docs_by_id(db, &doc_ids, tags, true).await
+}
+
+/// Creates connections between a set of tags and a set of documents
+/// The document its provided are the document db id field and the
+/// tag ids are the tags database id field.
+///
+/// The remove unused option is utilized to remove any links to tags
+/// that are not in the list. This can be used when replacing the
+/// current set of tags with the passed in set
+pub async fn insert_tags_for_docs_by_id<C: ConnectionTrait>(
+    db: &C,
+    doc_ids: &[i64],
+    tags: &[i64],
+    remove_unused: bool,
+) -> Result<(), DbErr> {
+    // Nothing to do if we have no docs or tags
+    if doc_ids.is_empty() || tags.is_empty() {
+        return Ok(());
+    }
+
+    // Remove dupes before adding
+    let tags: HashSet<i64> = HashSet::from_iter(tags.iter().cloned());
+    let doc_ids: Vec<i64> = doc_ids.to_vec();
+
+    if remove_unused {
+        // Remove tags that are not in the tag set
+        let _ = document_tag::Entity::delete_many()
+            .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids.clone()))
+            .filter(document_tag::Column::TagId.is_not_in(tags.clone()))
+            .exec(db)
+            .await;
+    }
 
     // Grab existing tags
     let existing_tags = document_tag::Entity::find()
-        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids))
+        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids.clone()))
         .all(db)
         .await
         .unwrap_or_default()
@@ -184,11 +215,11 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
     // Only add tags that have not been added before.
     let tags = tags.sub(&existing_tags);
     // create connections for each tag
-    let doc_tags = docs
+    let doc_tags = doc_ids
         .iter()
-        .flat_map(|model| {
+        .flat_map(|id| {
             tags.iter().map(|t| document_tag::ActiveModel {
-                indexed_document_id: Set(model.id),
+                indexed_document_id: Set(*id),
                 tag_id: Set(*t),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
@@ -220,6 +251,23 @@ pub async fn insert_tags_for_docs<C: ConnectionTrait>(
             return Err(err);
         }
     }
+
+    Ok(())
+}
+
+/// Removes the specified tags from the specified documents. The ids for the
+/// tags and documents are the database id fields
+pub async fn remove_tags_for_docs_by_id<C: ConnectionTrait>(
+    db: &C,
+    doc_ids: &[i64],
+    tags: &[i64],
+) -> Result<(), DbErr> {
+    // Remove specified tags
+    let _ = document_tag::Entity::delete_many()
+        .filter(document_tag::Column::IndexedDocumentId.is_in(doc_ids.to_vec()))
+        .filter(document_tag::Column::TagId.is_in(tags.to_vec()))
+        .exec(db)
+        .await;
 
     Ok(())
 }
@@ -328,6 +376,86 @@ pub async fn find_by_lens(
     ))
     .all(&db)
     .await
+}
+
+/// Helper method used to access the documents database id field from the
+/// string document id
+pub async fn find_by_doc_ids(
+    db: &DatabaseConnection,
+    ids: &[String],
+) -> Result<Vec<IndexedDocumentId>, sea_orm::DbErr> {
+    let doc_ids = ids
+        .iter()
+        .map(|str| format!("\"{str}\""))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    IndexedDocumentId::find_by_statement(Statement::from_string(
+        DatabaseBackend::Sqlite,
+        format!(
+            r#"
+        SELECT
+            id,
+            doc_id
+        FROM indexed_document
+        WHERE doc_id in ({})"#,
+            doc_ids
+        ),
+    ))
+    .all(db)
+    .await
+}
+
+/// Represents the tag id that is associated with a document
+#[derive(Debug, FromQueryResult)]
+pub struct IndexedDocumentTagId {
+    pub id: i64,
+}
+
+/// Helper method used to access the database ids of the tags associated with the
+/// specified document. The passed in document id is the string document id field.
+pub async fn get_tag_ids_by_doc_id(
+    db: &DatabaseConnection,
+    id: &str,
+) -> Result<Vec<IndexedDocumentTagId>, sea_orm::DbErr> {
+    IndexedDocumentTagId::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite,
+        r#"
+        SELECT
+            document_tag.tag_id as id
+        FROM document_tag as document_tag
+        LEFT JOIN indexed_document as indexed_doc on document_tag.indexed_document_id = indexed_doc.id
+        WHERE indexed_doc.doc_id = $1"#,
+        vec![id.into()],
+    ))
+    .all(db)
+    .await
+}
+
+pub enum DocumentIdentifier<'a> {
+    DocId(&'a str),
+    Url(&'a str),
+}
+
+pub async fn get_document_details(
+    db: &DatabaseConnection,
+    identifier: DocumentIdentifier<'_>,
+) -> Result<Option<(Model, Vec<tag::Model>)>, DbErr> {
+    let query = Entity::find();
+    let query = match identifier {
+        DocumentIdentifier::DocId(doc_id) => query.filter(Column::DocId.eq(doc_id)),
+        DocumentIdentifier::Url(url) => query.filter(Column::Url.eq(url)),
+    };
+
+    if let Some(doc) = query.one(db).await? {
+        let tags = doc
+            .find_related(tag::Entity)
+            .all(db)
+            .await
+            .unwrap_or_default();
+        return Ok(Some((doc, tags)));
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
