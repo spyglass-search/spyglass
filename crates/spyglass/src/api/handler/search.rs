@@ -67,7 +67,6 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
 
     let tokens = content
         .split_whitespace()
-        .into_iter()
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 

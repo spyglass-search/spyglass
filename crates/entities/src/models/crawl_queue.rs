@@ -63,7 +63,7 @@ pub enum CrawlStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
+#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq, Default)]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
 pub enum CrawlType {
     #[sea_orm(string_value = "API")]
@@ -71,13 +71,8 @@ pub enum CrawlType {
     #[sea_orm(string_value = "Bootstrap")]
     Bootstrap,
     #[sea_orm(string_value = "Normal")]
+    #[default]
     Normal,
-}
-
-impl Default for CrawlType {
-    fn default() -> Self {
-        CrawlType::Normal
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Eq)]
