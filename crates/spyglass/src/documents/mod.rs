@@ -50,7 +50,6 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
     // build a list of doc ids to delete from the index
     let doc_id_list = id_map
         .values()
-        .into_iter()
         .map(|x| x.to_owned())
         .collect::<Vec<String>>();
 
@@ -240,7 +239,6 @@ pub async fn process_records(
     // build a list of doc ids to delete from the index
     let doc_id_list = id_map
         .values()
-        .into_iter()
         .map(|x| x.to_owned())
         .collect::<Vec<String>>();
 

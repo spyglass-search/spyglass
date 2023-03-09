@@ -122,7 +122,7 @@ pub enum UserAction {
 
 // The user action settings configuration provides the ability
 // for the user to define custom behavior for a document.
-#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct UserActionSettings {
     pub actions: Vec<UserActionDefinition>,
     pub context_actions: Vec<ContextActions>,
@@ -185,10 +185,12 @@ impl UserActionSettings {
 
         None
     }
+}
 
+impl Default for UserActionSettings {
     // List of default actions when no other actions are configured
-    pub fn default_actions() -> UserActionSettings {
-        UserActionSettings {
+    fn default() -> Self {
+        Self {
             actions: vec![UserActionDefinition {
                 action: UserAction::CopyToClipboard(String::from("{{ open_url }}")),
                 key_binding: String::from("CmdOrCtrl+C"),
@@ -391,7 +393,7 @@ pub struct UserSettings {
     pub disable_autolaunch: bool,
     #[serde(default = "UserSettings::default_port")]
     pub port: u16,
-    #[serde(default = "UserActionSettings::default_actions")]
+    #[serde(default)]
     pub user_action_settings: UserActionSettings,
     // /// Hide the app icon from the dock/taskbar while running. Will still show up
     // /// in the menubar/systemtray.
