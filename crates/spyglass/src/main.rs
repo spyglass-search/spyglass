@@ -5,7 +5,6 @@ use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
-use migration::DbErr;
 #[allow(unused_imports)]
 use migration::Migrator;
 use shared::config::{self, Config};
@@ -116,6 +115,7 @@ async fn main() -> Result<(), ()> {
     // Run any migrations, only on headless mode.
     #[cfg(debug_assertions)]
     {
+        use migration::DbErr;
         let migration_status: Result<(), DbErr> = match Migrator::run_migrations().await {
             Ok(_) => Ok(()),
             Err(e) => {
