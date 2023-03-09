@@ -69,7 +69,9 @@ jobs:
         echo "target_ext=.exe" >> $env:GITHUB_ENV
     # search backend
     - name: build search backend
-      run: cargo build -p spyglass --profile sentry
+      run: |
+        cargo build -p spyglass --profile sentry
+        cargo build -p spyglass --bin spyglass-debug --profile sentry
     - name: upload backend to sentry
       run: |
         npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
@@ -81,6 +83,7 @@ jobs:
       run: |
         mkdir -p crates/tauri/binaries
         cp target/sentry/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
     - name: build frontend
       run: cd crates/client && trunk build
     - name: build tauri app
