@@ -83,7 +83,7 @@ jobs:
       run: |
         mkdir -p crates/tauri/binaries
         cp target/sentry/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-        cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/sentry/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
     - name: build frontend
       run: cd crates/client && trunk build
     - name: build tauri app
