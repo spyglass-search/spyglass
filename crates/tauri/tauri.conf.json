@@ -69,7 +69,7 @@
     },
     "windows": [],
     "security": {
-      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'self';"
+      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'self'; script-src 'unsafe-eval'"
     },
     "systemTray": {
       "iconPath": "icons/tray-icon.png",
