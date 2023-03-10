@@ -5,13 +5,13 @@
     <br />
     <br />
         Download now:
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2023.2.4/Spyglass_23.2.4_universal.dmg">
+        <a href="https://github.com/spyglass-search/spyglass/releases/download/v2023.2.4/Spyglass_23.2.4_universal.dmg">
             <strong>macOS (Intel/ARM)</strong>
         </a> |
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2023.2.4/Spyglass_23.2.4_x64_en-US.msi">
+        <a href="https://github.com/spyglass-search/spyglass/releases/download/v2023.2.4/Spyglass_23.2.4_x64_en-US.msi">
             <strong>Windows</strong>
         </a> |
-        <a href="https://github.com/a5huynh/spyglass/releases/download/v2023.2.4/spyglass_23.2.4_amd64.AppImage">
+        <a href="https://github.com/spyglass-search/spyglass/releases/download/v2023.2.4/spyglass_23.2.4_amd64.AppImage">
             <strong>Linux (AppImage)</strong>
         </a>
     <br />
@@ -27,7 +27,7 @@
     </a>
     <br />
     <br />
-    <img src="https://github.com/a5huynh/spyglass/actions/workflows/rust.yml/badge.svg">
+    <img src="https://github.com/spyglass-search/spyglass/actions/workflows/rust.yml/badge.svg">
     <a href="https://discord.gg/663wPVBSTB"><img src="https://img.shields.io/badge/Discord-Join%20Now-blue"></a>
   </p>
 </p>

@@ -51,7 +51,7 @@ def main():
 
     version = {
         'version': latest['tag_name'].replace('v20', ''),
-        'notes': f"See full release notes here: https://github.com/a5huynh/spyglass/releases/tag/{latest['tag_name']}",
+        'notes': f"See full release notes here: https://github.com/spyglass-search/spyglass/releases/tag/{latest['tag_name']}",
         'pub_date': latest['published_at'],
         'platforms': platforms
     }
