@@ -2,7 +2,7 @@ import os
 import requests
 import json
 
-RELEASE_URL = 'https://api.github.com/repos/a5huynh/spyglass/releases'
+RELEASE_URL = 'https://api.github.com/repos/spyglass-search/spyglass/releases'
 
 DARWIN_x86 = 'darwin-x86_64'
 DARWIN_ARM = 'darwin-aarch64'
