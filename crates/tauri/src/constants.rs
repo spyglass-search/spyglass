@@ -7,8 +7,8 @@ pub const MIN_WINDOW_HEIGHT: f64 = 480.0;
 
 // Check for a new version every 6 hours. 60 seconds * 60 minutes * 6 hours
 pub const VERSION_CHECK_INTERVAL_S: u64 = 60 * 60 * 6;
-// Check on start & every hour for new lenses
-pub const LENS_UPDATE_CHECK_INTERVAL_S: u64 = 60 * 60;
+// Check on start & every day for new lenses
+pub const LENS_UPDATE_CHECK_INTERVAL_S: u64 = 60 * 60 * 24;
 
 pub const SEARCH_WIN_NAME: &str = "main";
 pub const SETTINGS_WIN_NAME: &str = "settings_window";
