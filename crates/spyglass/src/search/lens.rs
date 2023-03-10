@@ -219,6 +219,23 @@ async fn install_lens_to_path(
     log::debug!("add {} to db: {:?}", config.name, model);
     log::info!("Installed new lens {}, new? {}", config.name, is_new);
 
+    // Find and remove the old lens
+    if let Ok(list) = std::fs::read_dir(lens_folder.clone()) {
+        for file in list.flatten() {
+            let path = file.path();
+            if path.is_file() {
+                if let Ok(lens) = ron::de::from_str::<LensConfig>(
+                    &std::fs::read_to_string(path.clone()).unwrap_or_default(),
+                ) {
+                    if lens.name == installable_lens.name {
+                        let _ = std::fs::remove_file(path);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Write to disk if we've successfully add to the database
     fs::write(lens_folder.join(file_name), file_contents)?;
     Ok(())
