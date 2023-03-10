@@ -23,6 +23,8 @@ pub enum Event {
     AuthorizeConnection { api_id: String },
     #[strum(serialize = "install_lens")]
     InstallLens { lens: String },
+    #[strum(serialize = "update_lens")]
+    UpdateLens { lens: String },
     #[strum(serialize = "search")]
     Search { filters: Vec<String> },
     #[strum(serialize = "search_result")]
@@ -93,6 +95,10 @@ impl Metrics {
                     .insert("api_id".into(), api_id.to_owned().into());
             }
             Event::InstallLens { lens } => {
+                data.properties
+                    .insert("lens".into(), lens.to_owned().into());
+            }
+            Event::UpdateLens { lens } => {
                 data.properties
                     .insert("lens".into(), lens.to_owned().into());
             }
