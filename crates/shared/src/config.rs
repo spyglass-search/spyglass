@@ -29,6 +29,7 @@ pub const LEGACY_PLUGIN_FOLDERS: &[&str] =
 
 // The default extensions
 pub const DEFAULT_EXTENSIONS: &[&str] = &["docx", "html", "md", "txt", "ods", "xls", "xlsx"];
+const USER_UUID_ENV_VAR: &str = "SPYGLASS_STATIC_USER_UUID";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -669,8 +670,13 @@ impl Config {
         if uid_file.exists() {
             std::fs::read_to_string(uid_file).unwrap_or_default()
         } else {
-            // Generate a random ID and associate it with this machine for error/metrics.
-            let new_uid = Uuid::new_v4().as_hyphenated().to_string();
+            let new_uid = match std::env::var(USER_UUID_ENV_VAR) {
+                Ok(uid) => uid,
+                Err(_) => {
+                    // Generate a random ID and associate it with this machine for error/metrics.
+                    Uuid::new_v4().as_hyphenated().to_string()
+                }
+            };
             let _ = std::fs::write(uid_file, new_uid.clone());
             new_uid
         }
