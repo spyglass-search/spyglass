@@ -59,8 +59,12 @@ pub fn show_search_bar(window: &Window) {
     #[cfg(target_os = "windows")]
     platform::windows::show_search_bar(window);
 
+    // Wait a little bit for the window to show being focusing on it.
     let window = window.clone();
-    let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(256)).await;
+        let _ = window.emit(ClientEvent::FocusWindow.as_ref(), true);
+    });
 }
 
 pub fn hide_search_bar(window: &Window) {
