@@ -7,6 +7,23 @@ use super::DocFields;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
 
+#[derive(Clone, Debug)]
+pub struct QueryStats {
+    pub term_count: i32,
+}
+
+impl Default for QueryStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QueryStats {
+    pub fn new() -> Self {
+        QueryStats { term_count: -1 }
+    }
+}
+
 fn _boosted_term(term: Term, boost: Score) -> Box<BoostQuery> {
     Box::new(BoostQuery::new(
         Box::new(TermQuery::new(
@@ -22,6 +39,7 @@ fn _boosted_phrase(terms: Vec<Term>, boost: Score) -> Box<BoostQuery> {
     Box::new(BoostQuery::new(Box::new(PhraseQuery::new(terms)), boost))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_query<I>(
     schema: Schema,
     tokenizers: TokenizerManager,
@@ -33,12 +51,15 @@ pub fn build_query<I>(
     tag_boosts: I,
     // Id of favorited boost
     favorite_boost: Option<i64>,
+    stats: &mut QueryStats,
 ) -> BooleanQuery
 where
     I: Iterator<Item = i64>,
 {
     let content_terms = terms_for_field(&schema, &tokenizers, query_string, fields.content);
     let title_terms: Vec<Term> = terms_for_field(&schema, &tokenizers, query_string, fields.title);
+
+    stats.term_count = content_terms.len() as i32;
 
     let mut term_query: QueryVec = Vec::new();
 
