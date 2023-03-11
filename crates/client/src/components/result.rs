@@ -214,11 +214,11 @@ pub fn lens_result_component(props: &LensResultProps) -> Html {
     let component_styles = classes!(
         "flex",
         "flex-col",
-        "border-t",
-        "border-neutral-600",
-        "px-8",
-        "py-4",
+        "p-2",
+        "mt-2",
         "text-white",
+        "rounded",
+        "scroll-mt-2",
         if is_selected {
             "bg-cyan-900"
         } else {
