@@ -269,6 +269,11 @@ async fn start_backend(state: AppState, config: Config) {
         plugin_cmd_rx,
     ));
 
+    state
+        .metrics
+        .track(shared::metrics::Event::SpyglassStarted)
+        .await;
+
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {

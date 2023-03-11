@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use strum_macros::{AsRefStr, Display};
 
+use crate::OS_STR;
+
 #[allow(dead_code)]
 const ENDPOINT: &str = "https://api.mixpanel.com/track";
 const PROJECT_TOKEN: &str = "51d84766a0838458d63998f1e4566d3b";
@@ -23,6 +25,12 @@ pub enum Event {
     AuthorizeConnection { api_id: String },
     #[strum(serialize = "install_lens")]
     InstallLens { lens: String },
+    #[strum(serialize = "spyglass_started")]
+    SpyglassStarted,
+    #[strum(serialize = "local_file_scanning_enabled")]
+    LocalFileScanningEnabled,
+    #[strum(serialize = "local_file_scanning_disabled")]
+    LocalFileScanningDisabled,
     #[strum(serialize = "update_lens")]
     UpdateLens { lens: String },
     #[strum(serialize = "search")]
@@ -49,6 +57,7 @@ impl EventProps {
         properties.insert("token".into(), PROJECT_TOKEN.into());
         properties.insert("time".into(), chrono::Utc::now().timestamp().into());
         properties.insert("distinct_id".into(), uid.into());
+        properties.insert("$os".into(), OS_STR.into());
         properties.insert(
             "$insert_id".into(),
             uuid::Uuid::new_v4().as_hyphenated().to_string().into(),
@@ -121,6 +130,11 @@ impl Metrics {
             Event::UpdateCheck { current_version } => {
                 data.properties
                     .insert("current_version".into(), current_version.as_str().into());
+            }
+            Event::LocalFileScanningEnabled
+            | Event::LocalFileScanningDisabled
+            | Event::SpyglassStarted => {
+                //noop
             }
         }
 

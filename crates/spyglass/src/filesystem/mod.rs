@@ -606,6 +606,10 @@ pub async fn configure_watcher(state: AppState) {
 
     if *enabled {
         log::info!("📂 Loading local file watcher");
+        state
+            .metrics
+            .track(shared::metrics::Event::LocalFileScanningEnabled)
+            .await;
 
         let extension = utils::get_supported_file_extensions(&state);
         let paths = utils::get_search_directories(&state);
@@ -651,6 +655,10 @@ pub async fn configure_watcher(state: AppState) {
         }
     } else {
         log::info!("❌ Local file watcher is disabled");
+        state
+            .metrics
+            .track(shared::metrics::Event::LocalFileScanningDisabled)
+            .await;
 
         let mut watcher = state.file_watcher.lock().await;
         if let Some(watcher) = watcher.as_mut() {
