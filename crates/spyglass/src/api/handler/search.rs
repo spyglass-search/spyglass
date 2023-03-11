@@ -214,9 +214,10 @@ pub async fn search_docs(
         .duration_since(start)
         .map_or_else(|_| 0, |duration| duration.as_millis() as u64);
 
+    let num_docs = searcher.num_docs();
     let meta = SearchMeta {
         query: search_req.query.clone(),
-        num_docs: searcher.num_docs() as u32,
+        num_docs: num_docs as u32,
         wall_time_ms: wall_time_ms as u32,
     };
 
@@ -225,6 +226,7 @@ pub async fn search_docs(
         .metrics
         .track(metrics::Event::SearchResult {
             num_results: results.len(),
+            num_docs,
             domains: domains.iter().cloned().collect(),
             wall_time_ms,
         })
