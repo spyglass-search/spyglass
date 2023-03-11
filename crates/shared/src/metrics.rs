@@ -39,6 +39,7 @@ pub enum Event {
     SearchResult {
         num_results: usize,
         num_docs: u64,
+        term_count: i32,
         domains: Vec<String>,
         wall_time_ms: u64,
     },
@@ -119,6 +120,7 @@ impl Metrics {
             Event::SearchResult {
                 num_results,
                 num_docs,
+                term_count,
                 domains,
                 wall_time_ms,
             } => {
@@ -126,6 +128,8 @@ impl Metrics {
                     .insert("num_results".into(), num_results.to_owned().into());
                 data.properties
                     .insert("num_docs".into(), num_docs.to_owned().into());
+                data.properties
+                    .insert("term_count".into(), term_count.to_owned().into());
                 data.properties
                     .insert("domains".into(), domains.to_owned().into());
                 data.properties

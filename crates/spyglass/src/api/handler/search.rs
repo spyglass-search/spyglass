@@ -5,7 +5,7 @@ use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
 use jsonrpsee::core::Error;
-use libspyglass::search::{document_to_struct, Searcher};
+use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
@@ -161,8 +161,15 @@ pub async fn search_docs(
         .map(|model| model.id as u64)
         .collect::<Vec<u64>>();
 
-    let docs =
-        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &search_req.query).await;
+    let mut stats = QueryStats::new();
+    let docs = Searcher::search_with_lens(
+        state.db.clone(),
+        &tag_ids,
+        index,
+        &search_req.query,
+        &mut stats,
+    )
+    .await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
@@ -227,6 +234,7 @@ pub async fn search_docs(
         .track(metrics::Event::SearchResult {
             num_results: results.len(),
             num_docs,
+            term_count: stats.term_count,
             domains: domains.iter().cloned().collect(),
             wall_time_ms,
         })

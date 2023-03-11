@@ -27,6 +27,8 @@ pub mod lens;
 mod query;
 mod utils;
 
+pub use query::QueryStats;
+
 type Score = f32;
 type SearchResult = (Score, DocAddress);
 
@@ -307,6 +309,7 @@ impl Searcher {
         applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
+        stats: &mut QueryStats,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
 
@@ -337,6 +340,7 @@ impl Searcher {
             applied_lenses,
             tag_boosts.into_iter(),
             favorite_boost,
+            stats,
         );
 
         let collector = TopDocs::with_limit(5);
@@ -532,7 +536,7 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
 
 #[cfg(test)]
 mod test {
-    use crate::search::{DocumentUpdate, IndexPath, Searcher};
+    use crate::search::{DocumentUpdate, IndexPath, QueryStats, Searcher};
     use entities::models::create_connection;
     use shared::config::{Config, LensConfig};
 
@@ -641,8 +645,10 @@ mod test {
         let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
+        let mut stats = QueryStats::new();
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
+        let results =
+            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -660,9 +666,11 @@ mod test {
 
         let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
 
+        let mut stats = QueryStats::new();
         _build_test_index(&mut searcher);
         let query = "salinas";
-        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
+        let results =
+            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -681,8 +689,10 @@ mod test {
         let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
+        let mut stats = QueryStats::new();
         let query = "salinasd";
-        let results = Searcher::search_with_lens(db, &vec![2_u64], &searcher, query).await;
+        let results =
+            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
         assert_eq!(results.len(), 0);
     }
 }
