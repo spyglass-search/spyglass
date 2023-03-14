@@ -404,7 +404,7 @@ pub async fn update_user_settings(
 }
 
 #[tauri::command]
-pub async fn _user_settings(win: tauri::Window) -> Result<UserSettings, String> {
+pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
         return match rpc.client.user_settings().await {

@@ -158,10 +158,10 @@ pub async fn load_action_settings(
 
 #[tauri::command]
 pub async fn load_user_settings(
-    _: tauri::Window,
+    window: tauri::Window,
     config: State<'_, Config>,
 ) -> Result<Vec<(String, SettingOpts)>, String> {
-    let current_settings = Config::load_user_settings().expect("Unable to read user settings");
+    let current_settings = crate::cmd::user_settings(window).await.expect("Unable to read user settings");
 
     let plugin_configs = config.load_plugin_config();
     let mut list: Vec<(String, SettingOpts)> = current_settings.clone().into();

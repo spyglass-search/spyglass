@@ -564,9 +564,9 @@ pub async fn update_user_settings(
     Ok(user_settings.clone())
 }
 
-#[instrument(skip(config))]
-pub async fn user_settings(config: &Config) -> Result<UserSettings, Error> {
-    Ok(config.user_settings.clone())
+#[instrument(skip(app))]
+pub async fn user_settings(app: &AppState) -> Result<UserSettings, Error> {
+    Ok(app.user_settings.load().as_ref().clone())
 }
 
 #[instrument(skip(state))]

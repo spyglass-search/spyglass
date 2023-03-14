@@ -191,7 +191,7 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn user_settings(&self) -> Result<UserSettings, Error> {
-        handler::user_settings(&self.config).await
+        handler::user_settings(&self.state).await
     }
 }
 
