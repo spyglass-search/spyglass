@@ -26,7 +26,6 @@ use diff::Diff;
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
-use tokio::time::sleep;
 
 #[cfg(target_os = "linux")]
 use platform::linux::os_open;

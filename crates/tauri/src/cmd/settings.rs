@@ -137,7 +137,7 @@ pub async fn save_user_settings(
             }
             Err(error) => {
                 let mut map = HashMap::new();
-                map.insert(String::from("all"), error.to_string());
+                map.insert(String::from("all"), error);
                 Err(map)
             }
         }

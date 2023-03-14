@@ -1,4 +1,3 @@
-use arc_swap::access::Access;
 use entities::get_library_stats;
 use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};

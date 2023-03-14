@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use diff::Diff;
 use directories::UserDirs;
 use entities::get_library_stats;
 use entities::models::crawl_queue::{CrawlStatus, EnqueueSettings};
@@ -11,7 +10,6 @@ use entities::models::{
 };
 use entities::sea_orm::{prelude::*, sea_query, Set};
 use jsonrpsee::core::Error;
-use jsonrpsee::types::ErrorResponse;
 use libnetrunner::parser::html::html_to_text;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::crawler::CrawlResult;
@@ -20,7 +18,7 @@ use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, ManagerCommand, UserSettingsChange};
+use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
 use shared::config::{self, Config, UserSettings};
 use shared::metrics::Event;
@@ -549,10 +547,10 @@ pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Resu
     Ok(())
 }
 
-#[instrument(skip(app, config))]
+#[instrument(skip(app, _config))]
 pub async fn update_user_settings(
     app: &AppState,
-    config: &Config,
+    _config: &Config,
     user_settings: &UserSettings,
 ) -> Result<UserSettings, Error> {
     if let Err(error) = app

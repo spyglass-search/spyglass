@@ -1,6 +1,6 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
-use shared::config::{Config, UserSettings};
+use shared::config::UserSettings;
 use std::collections::HashMap;
 
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
