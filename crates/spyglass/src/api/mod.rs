@@ -1,3 +1,4 @@
+use arc_swap::access::Access;
 use entities::get_library_stats;
 use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
@@ -6,7 +7,7 @@ use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
-use shared::config::Config;
+use shared::config::{Config, UserSettings};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::RpcServer;
@@ -182,12 +183,16 @@ impl RpcServer for SpyglassRpc {
         handler::toggle_plugin(self.state.clone(), name, enabled).await
     }
 
-    async fn toggle_filesystem(&self, enabled: bool) -> Result<(), Error> {
-        handler::toggle_filesystem(self.state.clone(), enabled).await
-    }
-
     async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
         handler::uninstall_lens(self.state.clone(), &self.config, &name).await
+    }
+
+    async fn update_user_settings(&self, settings: UserSettings) -> Result<UserSettings, Error> {
+        handler::update_user_settings(&self.state, &self.config, &settings).await
+    }
+
+    async fn user_settings(&self) -> Result<UserSettings, Error> {
+        handler::user_settings(&self.config).await
     }
 }
 
@@ -195,7 +200,10 @@ pub async fn start_api_server(
     state: AppState,
     config: Config,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
-    let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), state.user_settings.port);
+    let server_addr = SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::LOCALHOST),
+        state.user_settings.load_full().port,
+    );
     let server = ServerBuilder::default().build(server_addr).await?;
 
     let rpc_module = SpyglassRpc {

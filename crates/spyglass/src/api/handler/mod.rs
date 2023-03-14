@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+use diff::Diff;
 use directories::UserDirs;
 use entities::get_library_stats;
 use entities::models::crawl_queue::{CrawlStatus, EnqueueSettings};
@@ -9,6 +11,7 @@ use entities::models::{
 };
 use entities::sea_orm::{prelude::*, sea_query, Set};
 use jsonrpsee::core::Error;
+use jsonrpsee::types::ErrorResponse;
 use libnetrunner::parser::html::html_to_text;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::crawler::CrawlResult;
@@ -17,9 +20,9 @@ use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, ManagerCommand};
+use libspyglass::task::{AppPause, ManagerCommand, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
-use shared::config::{self, Config};
+use shared::config::{self, Config, UserSettings};
 use shared::metrics::Event;
 use shared::request::{BatchDocumentRequest, RawDocType, RawDocumentRequest};
 use shared::response::{
@@ -69,7 +72,7 @@ pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) ->
         &state.db,
         &req.urls,
         &[],
-        &state.user_settings,
+        &state.user_settings.load(),
         &overrides,
         None,
     )
@@ -150,7 +153,7 @@ pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Res
                 &state.db,
                 &[req.url.clone()],
                 &[],
-                &state.user_settings,
+                &state.user_settings.load(),
                 &overrides,
                 None,
             )
@@ -546,17 +549,26 @@ pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Resu
     Ok(())
 }
 
-#[instrument(skip(state))]
-pub async fn toggle_filesystem(state: AppState, enabled: bool) -> Result<(), Error> {
-    let mut cmd_tx = state.manager_cmd_tx.lock().await;
-    match &mut *cmd_tx {
-        Some(cmd_tx) => {
-            let _ = cmd_tx.send(ManagerCommand::ToggleFilesystem(enabled));
-        }
-        None => {}
+#[instrument(skip(app, config))]
+pub async fn update_user_settings(
+    app: &AppState,
+    config: &Config,
+    user_settings: &UserSettings,
+) -> Result<UserSettings, Error> {
+    if let Err(error) = app
+        .config_cmd_tx
+        .lock()
+        .await
+        .send(UserSettingsChange::SettingsChanged(user_settings.clone()))
+    {
+        return Err(anyhow!(error).into());
     }
+    Ok(user_settings.clone())
+}
 
-    Ok(())
+#[instrument(skip(config))]
+pub async fn user_settings(config: &Config) -> Result<UserSettings, Error> {
+    Ok(config.user_settings.clone())
 }
 
 #[instrument(skip(state))]

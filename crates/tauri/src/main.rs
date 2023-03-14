@@ -15,16 +15,18 @@ use rpc::RpcMutex;
 use tauri::api::process::current_binary;
 use tauri::{
     AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray,
-    SystemTrayEvent,
+    SystemTrayEvent, Window,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use shared::config::Config;
+use diff::Diff;
+use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
+use tokio::time::sleep;
 
 #[cfg(target_os = "linux")]
 use platform::linux::os_open;
@@ -77,25 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )))
     };
 
-    // Check and register this app to run on boot
-    let binary = current_binary(&Env::default());
-    if let Ok(path) = binary {
-        // NOTE: See how this works: https://github.com/Teamwork/node-auto-launch#how-does-it-work
-        if let Ok(auto) = AutoLaunchBuilder::new()
-            .set_app_name("Spyglass Search")
-            .set_app_path(&path.display().to_string())
-            .set_use_launch_agent(true)
-            .build()
-        {
-            if !config.user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
-                if let Ok(false) = auto.is_enabled() {
-                    let _ = auto.enable();
-                }
-            } else if let Ok(true) = auto.is_enabled() {
-                let _ = auto.disable();
-            }
-        }
-    }
+    update_auto_launch(&config.user_settings);
 
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -185,35 +169,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config.user_settings.disable_telemetry,
             ));
 
-            // Register global shortcut
-            let mut shortcuts = app_handle.global_shortcut_manager();
-            match shortcuts.is_registered(&config.user_settings.shortcut) {
-                Ok(is_registered) => {
-                    if !is_registered {
-                        log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
-                        let app_hand = app_handle;
-                        if let Err(e) =
-                            shortcuts.register(&config.user_settings.shortcut, move || {
-                                let window = window::get_searchbar(&app_hand);
-                                window::show_search_bar(&window);
-                            })
-                        {
-                            window::alert(
-                                &startup_win,
-                                "Error registering global shortcut",
-                                &format!("{e}"),
-                            );
-                        }
-                    }
-                }
-                Err(e) => {
-                    window::alert(
-                        &startup_win,
-                        "Error registering global shortcut",
-                        &format!("{e}"),
-                    );
-                }
-            }
+            register_global_shortcut(&startup_win, &app_handle, &config.user_settings);
 
             Ok(())
         })
@@ -305,6 +261,73 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     Ok(())
+}
+
+// Applies updated configuration to the client
+pub fn configuration_updated(
+    window: Window,
+    old_configuration: UserSettings,
+    new_configuration: UserSettings,
+) {
+    let diff = old_configuration.diff(&new_configuration);
+
+    if diff.disable_autolaunch.is_some() {
+        update_auto_launch(&new_configuration);
+    }
+
+    if diff.shortcut.is_some() {
+        register_global_shortcut(&window, &window.app_handle(), &new_configuration);
+    }
+}
+
+// Helper used to update the global shortcut
+fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &UserSettings) {
+    // Register global shortcut
+    let mut shortcuts = app_handle.global_shortcut_manager();
+    if let Err(error) = shortcuts.unregister_all() {
+        log::info!("Unable to unregister all shortcuts {:?}", error);
+    }
+
+    match shortcuts.is_registered(&settings.shortcut) {
+        Ok(is_registered) => {
+            if !is_registered {
+                log::info!("Registering {} as shortcut", &settings.shortcut);
+                let app_hand = app_handle.clone();
+                if let Err(e) = shortcuts.register(&settings.shortcut, move || {
+                    let window = window::get_searchbar(&app_hand);
+                    window::show_search_bar(&window);
+                }) {
+                    window::alert(window, "Error registering global shortcut", &format!("{e}"));
+                }
+            }
+        }
+        Err(e) => {
+            window::alert(window, "Error registering global shortcut", &format!("{e}"));
+        }
+    }
+}
+
+// Helper method used to update the auto launch configuration
+pub fn update_auto_launch(user_settings: &UserSettings) {
+    // Check and register this app to run on boot
+    let binary = current_binary(&Env::default());
+    if let Ok(path) = binary {
+        // NOTE: See how this works: https://github.com/Teamwork/node-auto-launch#how-does-it-work
+        if let Ok(auto) = AutoLaunchBuilder::new()
+            .set_app_name("Spyglass Search")
+            .set_app_path(&path.display().to_string())
+            .set_use_launch_agent(true)
+            .build()
+        {
+            if !user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
+                if let Ok(false) = auto.is_enabled() {
+                    let _ = auto.enable();
+                }
+            } else if let Ok(true) = auto.is_enabled() {
+                let _ = auto.disable();
+            }
+        }
+    }
 }
 
 async fn pause_crawler(app: AppHandle, menu_id: String) {

@@ -82,5 +82,6 @@ pub struct SettingOpts {
     pub label: String,
     pub value: String,
     pub form_type: FormType,
+    pub restart_required: bool,
     pub help_text: Option<String>,
 }

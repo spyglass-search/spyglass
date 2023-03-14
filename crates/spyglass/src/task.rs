@@ -1,7 +1,7 @@
 use entities::models::{bootstrap_queue, connection};
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
-use shared::config::{Config, LensConfig};
+use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;
@@ -14,6 +14,7 @@ use crate::search::lens::{load_lenses, read_lenses};
 use crate::search::Searcher;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
+use diff::Diff;
 
 mod manager;
 pub mod worker;
@@ -46,6 +47,11 @@ pub struct CleanupTask {
     pub missing_docs: Vec<(String, String)>,
 }
 
+#[derive(Clone, Debug)]
+pub enum UserSettingsChange {
+    SettingsChanged(UserSettings),
+}
+
 /// Tell the manager to schedule some tasks
 #[derive(Clone, Debug)]
 pub enum ManagerCommand {
@@ -54,7 +60,6 @@ pub enum ManagerCommand {
     /// General database cleanup command that sends a worker
     /// task request for cleanup
     CleanupDatabase(CleanupTask),
-    ToggleFilesystem(bool),
 }
 
 /// Send tasks to the worker
@@ -135,16 +140,6 @@ pub async fn manager_task(
                                 // first tick always completes immediately.
                                 queue_check_interval.tick().await;
                             }
-                        },
-                        ManagerCommand::ToggleFilesystem (enabled) => {
-                            let mut state = state.clone();
-                            if let Ok(mut loaded_settings) = Config::load_user_settings() {
-                                loaded_settings.filesystem_settings.enable_filesystem_scanning = enabled;
-                                let _ = Config::save_user_settings(&loaded_settings);
-                                state.user_settings = loaded_settings;
-                            }
-
-                            filesystem::configure_watcher(state).await;
                         }
                     }
                 }
@@ -165,6 +160,53 @@ pub async fn manager_task(
                 return;
             }
         };
+    }
+}
+
+/// Manages the worker pool, scheduling tasks based on type/priority/etc.
+#[tracing::instrument(skip_all)]
+pub async fn config_task(mut state: AppState) {
+    log::info!("Staring Configuration Watcher");
+
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
+    let mut config_rx = state.config_cmd_tx.lock().await.subscribe();
+
+    loop {
+        tokio::select! {
+            cmd = config_rx.recv() => {
+                if let Ok(cmd) = cmd {
+                    match cmd {
+                        UserSettingsChange::SettingsChanged (new_settings) => {
+                            log::debug!("User Settings Updated {:?}", new_settings);
+                            let old_config = state.user_settings.load_full();
+
+                            if Config::save_user_settings(&new_settings).is_ok() {
+                                state.reload_config();
+                                let diff = new_settings.diff(&old_config);
+
+                                process_filesystem_changes(&state, &diff).await;
+                            }
+                        }
+                    }
+                }
+            }
+            _ = shutdown_rx.recv() => {
+                log::info!("🛑 Shutting down configuration watcher");
+                return;
+            }
+        };
+    }
+}
+
+// Processes any needed filesystem configuration changes
+async fn process_filesystem_changes(state: &AppState, diff: &UserSettingsDiff) {
+    let fs_diff = &diff.filesystem_settings;
+    if fs_diff.enable_filesystem_scanning.is_some()
+        || !fs_diff.supported_extensions.0.is_empty()
+        || !fs_diff.watched_paths.0.is_empty()
+    {
+        // fs configuration has changed update fs
+        filesystem::configure_watcher(state.clone()).await;
     }
 }
 

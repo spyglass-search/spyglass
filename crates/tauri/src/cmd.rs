@@ -10,7 +10,7 @@ use tauri::{ClipboardManager, Manager};
 use crate::window::show_discover_window;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
-use shared::config::Config;
+use shared::config::{Config, UserSettings};
 use shared::{event::ClientEvent, request, response};
 use spyglass_rpc::RpcClient;
 
@@ -284,16 +284,6 @@ pub async fn toggle_plugin(window: tauri::Window, name: &str, enabled: bool) -> 
 }
 
 #[tauri::command]
-pub async fn toggle_filesystem(window: tauri::Window, enabled: bool) -> Result<(), String> {
-    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        let _ = rpc.client.toggle_filesystem(enabled).await;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
     let app_handle = window.app_handle();
     if let Ok(updater) = app_handle.updater().check().await {
@@ -360,11 +350,13 @@ pub async fn wizard_finished(
 ) -> Result<(), String> {
     let mut current_settings = config.user_settings.clone();
     current_settings.run_wizard = true;
+    current_settings
+        .filesystem_settings
+        .enable_filesystem_scanning = toggle_file_indexer;
 
-    let _ = Config::save_user_settings(&current_settings);
-
-    // Turn on/off the filesystem indexer
-    let _ = toggle_filesystem(win.clone(), toggle_file_indexer).await;
+    if let Err(error) = update_user_settings(win.clone(), &current_settings).await {
+        log::error!("Error saving initial settings {:?}", error);
+    }
 
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
@@ -391,4 +383,37 @@ pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, Strin
         file_paths: Vec::new(),
         extensions: Vec::new(),
     })
+}
+
+#[tauri::command]
+pub async fn update_user_settings(
+    win: tauri::Window,
+    settings: &UserSettings,
+) -> Result<UserSettings, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        return match rpc.client.update_user_settings(settings.clone()).await {
+            Ok(settings) => {
+                return Ok(settings);
+            }
+            Err(error) => Err(error.to_string()),
+        };
+    }
+
+    Err(String::from("Unable to access user settings"))
+}
+
+#[tauri::command]
+pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        return match rpc.client.user_settings().await {
+            Ok(settings) => {
+                return Ok(settings);
+            }
+            Err(error) => Err(error.to_string()),
+        };
+    }
+
+    Err(String::from("Unable to access user settings"))
 }

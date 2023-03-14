@@ -215,7 +215,7 @@ pub async fn num_queued(
     Ok(res)
 }
 
-fn gen_dequeue_sql(user_settings: UserSettings) -> Statement {
+fn gen_dequeue_sql(user_settings: &UserSettings) -> Statement {
     Statement::from_sql_and_values(
         DbBackend::Sqlite,
         include_str!("sql/dequeue.sqlx"),
@@ -288,7 +288,7 @@ pub async fn num_of_files_in_progress(db: &DatabaseConnection) -> anyhow::Result
 /// Get the next url in the crawl queue
 pub async fn dequeue(
     db: &DatabaseConnection,
-    user_settings: UserSettings,
+    user_settings: &UserSettings,
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     // Check for inflight limits
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
@@ -339,7 +339,7 @@ pub async fn dequeue(
 /// Get the next url in the crawl queue
 pub async fn dequeue_files(
     db: &DatabaseConnection,
-    user_settings: UserSettings,
+    user_settings: &UserSettings,
 ) -> anyhow::Result<Option<Model>, sea_orm::DbErr> {
     // Check for inflight limits
     if let Limit::Finite(inflight_crawl_limit) = user_settings.inflight_crawl_limit {
@@ -1033,7 +1033,7 @@ mod test {
     #[test]
     fn test_priority_sql() {
         let settings = UserSettings::default();
-        let sql = gen_dequeue_sql(settings);
+        let sql = gen_dequeue_sql(&settings);
         assert_eq!(
             sql.to_string(),
             "WITH\nindexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\" and\n    url not like \"file%\"\nORDER BY\n    cq.updated_at ASC"
@@ -1166,7 +1166,7 @@ mod test {
         .await
         .unwrap();
 
-        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, &settings).await.unwrap();
 
         assert!(queue.is_some());
         assert_eq!(queue.unwrap().url, url[0]);
@@ -1203,14 +1203,14 @@ mod test {
             ..Default::default()
         };
         doc.save(&db).await.unwrap();
-        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, &settings).await.unwrap();
         assert!(queue.is_some());
 
         let settings = UserSettings {
             domain_crawl_limit: Limit::Finite(1),
             ..Default::default()
         };
-        let queue = crawl_queue::dequeue(&db, settings).await.unwrap();
+        let queue = crawl_queue::dequeue(&db, &settings).await.unwrap();
         assert!(queue.is_none());
     }
 

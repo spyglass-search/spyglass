@@ -103,7 +103,7 @@ async fn start_crawl(
                         &state.db,
                         &to_enqueue,
                         &lenses,
-                        &state.user_settings,
+                        &state.user_settings.load(),
                         &Default::default(),
                         Some(pipeline_name.to_owned()),
                     )

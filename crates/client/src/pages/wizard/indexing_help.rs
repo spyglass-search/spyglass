@@ -55,6 +55,7 @@ pub fn index_files_help(props: &IndexFilesHelpProps) -> Html {
         label: "Enable local file searching".into(),
         value: serde_json::to_string(&props.toggle_file_indexer).unwrap_or_default(),
         form_type: FormType::Bool,
+        restart_required: false,
         help_text: None,
     };
 

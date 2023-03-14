@@ -27,6 +27,7 @@ pub struct UserSettingsPage {
     errors: HashMap<String, String>,
     changes: HashMap<String, String>,
     has_changes: bool,
+    restart_required: bool,
     req_settings: RequestState,
 }
 
@@ -61,6 +62,7 @@ impl Component for UserSettingsPage {
             changes: HashMap::new(),
             errors: HashMap::new(),
             has_changes: false,
+            restart_required: false,
             req_settings: RequestState::NotStarted,
         }
     }
@@ -79,14 +81,16 @@ impl Component for UserSettingsPage {
             Msg::HandleOnChange(evt) => {
                 self.has_changes = true;
                 self.changes.insert(evt.setting_name, evt.new_value);
+                self.restart_required |= evt.restart_required;
                 true
             }
             Msg::HandleSave => {
                 let changes = self.changes.clone();
                 // Send changes to backend to be validated & saved.
+                let restart_required = self.restart_required;
                 if let Ok(ser) = serde_wasm_bindgen::to_value(&changes) {
                     link.send_future(async move {
-                        if let Err(res) = save_user_settings(ser).await {
+                        if let Err(res) = save_user_settings(ser, restart_required).await {
                             if let Ok(errors) =
                                 serde_wasm_bindgen::from_value::<HashMap<String, String>>(res)
                             {
@@ -149,7 +153,7 @@ impl Component for UserSettingsPage {
                         {"Show Folder"}
                     </btn::Btn>
                     <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes}>
-                        {"Save & Restart"}
+                        { if self.restart_required {"Save & Restart"} else {"Save"} }
                     </btn::Btn>
                 </Header>
                 <div class="pt-8 bg-netural-800">

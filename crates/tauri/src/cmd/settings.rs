@@ -14,9 +14,11 @@ pub async fn save_user_settings(
     window: tauri::Window,
     config: State<'_, Config>,
     settings: HashMap<String, String>,
+    restart: bool,
 ) -> Result<(), HashMap<String, String>> {
     let mut current_settings =
         Config::load_user_settings().unwrap_or_else(|_| config.user_settings.clone());
+    let orig_settings = current_settings.clone();
 
     let config_list: Vec<(String, SettingOpts)> = config.user_settings.clone().into();
     let setting_configs: HashMap<String, SettingOpts> = config_list.into_iter().collect();
@@ -25,7 +27,6 @@ pub async fn save_user_settings(
     let plugin_configs = config.load_plugin_config();
 
     let mut fields_updated: usize = 0;
-
     // Loop through each updated settings value sent from the front-end and
     // validate the values.
     for (key, value) in settings.iter() {
@@ -41,6 +42,9 @@ pub async fn save_user_settings(
                                 match field {
                                     "data_directory" => {
                                         current_settings.data_directory = PathBuf::from(val);
+                                    }
+                                    "shortcut" => {
+                                        current_settings.shortcut = val;
                                     }
                                     "disable_autolaunch" => {
                                         current_settings.disable_autolaunch =
@@ -121,10 +125,22 @@ pub async fn save_user_settings(
 
     // Only save settings if everything is valid.
     if errors.is_empty() && fields_updated > 0 {
-        let _ = Config::save_user_settings(&current_settings);
-        let app = window.app_handle();
-        app.restart();
-        Ok(())
+        match crate::cmd::update_user_settings(window.clone(), &current_settings).await {
+            Ok(updates) => {
+                if restart {
+                    let app = window.app_handle();
+                    app.restart();
+                } else {
+                    crate::configuration_updated(window, orig_settings, updates);
+                }
+                Ok(())
+            }
+            Err(error) => {
+                let mut map = HashMap::new();
+                map.insert(String::from("all"), error.to_string());
+                Err(map)
+            }
+        }
     } else {
         Err(errors)
     }

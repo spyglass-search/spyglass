@@ -1,4 +1,5 @@
 pub use crate::keyboard::{KeyCode, ModifiersState};
+use diff::Diff;
 use directories::{ProjectDirs, UserDirs};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -44,7 +45,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Diff)]
 pub enum Limit {
     Infinite,
     Finite(u32),
@@ -67,7 +68,7 @@ impl Limit {
 
 pub type PluginSettings = HashMap<String, HashMap<String, String>>;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Diff)]
 pub struct FileSystemSettings {
     #[serde(default)]
     pub enable_filesystem_scanning: bool,
@@ -115,7 +116,7 @@ impl Default for FileSystemSettings {
 }
 
 // Enum of actions the user can take when a document is selected
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub enum UserAction {
     OpenApplication(String, String),
     CopyToClipboard(String),
@@ -123,7 +124,7 @@ pub enum UserAction {
 
 // The user action settings configuration provides the ability
 // for the user to define custom behavior for a document.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub struct UserActionSettings {
     pub actions: Vec<UserActionDefinition>,
     pub context_actions: Vec<ContextActions>,
@@ -206,7 +207,7 @@ impl Default for UserActionSettings {
 // Defines context specific actions. A context specific action
 // is a list of actions that are only valid when the document selected
 // matches the defined context.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub struct ContextActions {
     // Defines what context must be matched for the actions to be valid
     pub context: ContextFilter,
@@ -321,7 +322,7 @@ impl ContextActions {
 
 // Filter definition used to define what documents should match
 // against the context.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub struct ContextFilter {
     // Includes documents that match any of the defined tags
     pub has_tag: Option<Vec<Tag>>,
@@ -338,7 +339,7 @@ pub struct ContextFilter {
 }
 
 // The definition for an action
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub struct UserActionDefinition {
     pub label: String,
     pub status_msg: Option<String>,
@@ -358,7 +359,7 @@ impl UserActionDefinition {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Diff)]
 pub struct UserSettings {
     /// Number of pages allowed per domain. Sub-domains are treated as
     /// separate domains.
@@ -441,42 +442,56 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 label: "Data Directory".into(),
                 value: settings.data_directory.to_str().map_or(String::new(), |s| s.to_string()),
                 form_type: FormType::Path,
+                restart_required: true,
                 help_text: Some("The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.".into())
             }),
             ("_.disable_autolaunch".into(), SettingOpts {
                 label: "Disable Autolaunch".into(),
                 value: serde_json::to_string(&settings.disable_autolaunch).expect("Unable to ser autolaunch value"),
                 form_type: FormType::Bool,
+                restart_required: false,
                 help_text: Some("Prevents Spyglass from automatically launching when your computer first starts up.".into())
+            }),
+            ("_.shortcut".into(), SettingOpts {
+                label: "Global Shortcut".into(),
+                value: serde_json::to_string(&settings.shortcut).expect("Unable to ser shortcut value"),
+                form_type: FormType::Text,
+                restart_required: false,
+                help_text: Some("Defines the global keyboard shortcut used to open the Spyglass search window.".into())
             }),
             ("_.disable_telemetry".into(), SettingOpts {
                 label: "Disable Telemetry".into(),
                 value: serde_json::to_string(&settings.disable_telemetry).expect("Unable to ser autolaunch value"),
                 form_type: FormType::Bool,
-                help_text: Some("Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.".into())
+                restart_required: false,
+                help_text: Some("Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info. This will require a restart.".into())
             }),
             ("_.port".into(), SettingOpts {
                 label: "Spyglass Daemon Port".into(),
                 value: settings.port.to_string(),
                 form_type: FormType::Number,
-                help_text: Some("Port number used by the Spyglass background services. Only change this if you already have another serive running on this port.".into())
+                restart_required: true,
+                help_text: Some("Port number used by the Spyglass background services. Only change this if you already have another server running on this port. This will require a restart.".into())
             }),
             ("_.filesystem_settings.enable_filesystem_scanning".into(), SettingOpts {
                 label: "Enable Filesystem Indexing".into(),
                 value: settings.filesystem_settings.enable_filesystem_scanning.to_string(),
                 form_type: FormType::Bool,
+                restart_required: false,
                 help_text: Some("Enables and disables local filesystem indexing. When enabled configured folders will be scanned and indexed. Any supported file types will have their contents indexed.".into())
             }),
             ("_.filesystem_settings.watched_paths".into(), SettingOpts {
                 label: "Folder List".into(),
                 value: serde_json::to_string(&settings.filesystem_settings.watched_paths).unwrap_or(String::from("[]")),
                 form_type: FormType::PathList,
-                help_text: Some("List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specifiy the parent folder.".into())
+                restart_required: false,
+                help_text: Some("List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specify the parent folder.".into())
             }),
             ("_.filesystem_settings.supported_extensions".into(), SettingOpts {
                 label: "Extension List".into(),
                 value: serde_json::to_string(&settings.filesystem_settings.supported_extensions).unwrap_or(String::from("[]")),
                 form_type: FormType::StringList,
+                restart_required: false,
                 help_text: Some("List of file types to index.".into())
             }),
         ];
@@ -488,8 +503,9 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                     label: "Max number of crawlers".into(),
                     value: val.to_string(),
                     form_type: FormType::Number,
+                    restart_required: true,
                     help_text: Some(
-                        "Maximum number of concurrent crawlers in total used by Spyglass".into(),
+                        "Maximum number of concurrent crawlers in total used by Spyglass, This will require a restart".into(),
                     ),
                 },
             ));
@@ -502,6 +518,7 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                     label: "Max number crawlers per domain".into(),
                     value: val.to_string(),
                     form_type: FormType::Number,
+                    restart_required: false,
                     help_text: Some(
                         "Maximum number of concurrent crawlers used per site/app.".into(),
                     ),
