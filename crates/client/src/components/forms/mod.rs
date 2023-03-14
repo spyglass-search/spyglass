@@ -2,6 +2,7 @@ use yew::prelude::*;
 
 use shared::form::{FormType, SettingOpts};
 
+mod keybinding;
 mod pathlist;
 mod stringlist;
 mod text;
@@ -11,6 +12,8 @@ pub use pathlist::*;
 pub use stringlist::*;
 pub use text::*;
 pub use toggle::*;
+
+use crate::components::forms::keybinding::KeyBinding;
 
 #[derive(Clone)]
 pub struct SettingChangeEvent {
@@ -119,7 +122,7 @@ impl FormElement {
             }
             FormType::KeyBinding => {
                 html! {
-                    <Text
+                    <KeyBinding
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
                         restart_required={props.opts.restart_required}

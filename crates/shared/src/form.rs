@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use strum_macros::{Display, EnumString};
 
-use crate::{accelerator, MAC_OS};
+use crate::{accelerator, config::KeyCode, MAC_OS};
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum FormType {
@@ -85,6 +85,10 @@ impl FormType {
                     Ok(acc) => {
                         if !acc.mods.alt_key() && !acc.mods.control_key() && !acc.mods.super_key() {
                             return Err("Global key binding must have at least one modifier key (ALT, CMD, CTRL)".into());
+                        }
+
+                        if let KeyCode::Unidentified(_) = acc.key {
+                            return Err("Invalid key code binding".into());
                         }
                     }
                     Err(error) => {
