@@ -3,9 +3,11 @@ use url::Url;
 use yew::prelude::*;
 
 use super::{
+    btn,
     icons,
     tag::{Tag, TagIcon},
 };
+use shared::constants::FEEDBACK_FORM;
 use shared::response::{LensResult, SearchResult};
 
 #[derive(Properties, PartialEq)]
@@ -278,4 +280,23 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
     }
 
     None
+}
+
+pub struct FeedbackProps {
+
+}
+
+#[function_component(FeedbackResult)]
+pub fn feedback_result() -> Html {
+    html! {
+      <div class="p-4 text-base">
+        <div class="text-xl text-white">{"No results found"}</div>
+        <div class="text-neutral-400 flex flex-row gap-2 items-center">
+          {"Help us improve our results."}
+          <btn::Btn href={FEEDBACK_FORM} size={btn::BtnSize::Xs}>
+            {"Click to send feedback"}
+          </btn::Btn>
+        </div>
+      </div>
+    }
 }

@@ -12,3 +12,5 @@ pub const FIREFOX_EXT_LINK: &str = "https://addons.mozilla.org/en-US/firefox/add
 // SOON
 // pub const OPERA_EXT_LINK: &str = "";
 // pub const EDGE_EXT_LINK: &str = "";
+
+pub const FEEDBACK_FORM: &str = "https://forms.gle/7UWP8gvhnwBbwF3KA";
