@@ -454,8 +454,8 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
             }),
             ("_.shortcut".into(), SettingOpts {
                 label: "Global Shortcut".into(),
-                value: serde_json::to_string(&settings.shortcut).expect("Unable to ser shortcut value"),
-                form_type: FormType::Text,
+                value: settings.shortcut.clone(),
+                form_type: FormType::KeyBinding,
                 restart_required: false,
                 help_text: Some("Defines the global keyboard shortcut used to open the Spyglass search window.".into())
             }),

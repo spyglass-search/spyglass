@@ -117,6 +117,16 @@ impl FormElement {
                     />
                 }
             }
+            FormType::KeyBinding => {
+                html! {
+                    <Text
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
+                    />
+                }
+            }
         }
     }
 }
