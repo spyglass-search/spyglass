@@ -1,13 +1,24 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
+use serde::{Deserialize, Serialize};
 use shared::config::UserSettings;
-use std::collections::HashMap;
-
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
     SearchLensesResp, SearchResults,
 };
+use std::collections::HashMap;
+
+#[derive(Deserialize, Serialize)]
+pub enum RpcEventType {
+    FinishedLensInstall,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct RpcEvent {
+    pub event_type: RpcEventType,
+    pub payload: String,
+}
 
 /// Rpc trait
 #[rpc(server, client, namespace = "spyglass")]
@@ -92,4 +103,7 @@ pub trait Rpc {
 
     #[method(name = "uninstall_lens")]
     async fn uninstall_lens(&self, name: String) -> Result<(), Error>;
+
+    #[subscription(name = "subscribe_events", item = RpcEvent)]
+    fn subscribe_events(&self, events: Vec<RpcEventType>);
 }

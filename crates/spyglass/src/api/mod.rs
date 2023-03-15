@@ -3,13 +3,15 @@ use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
+use jsonrpsee::types::SubscriptionResult;
+use jsonrpsee::SubscriptionSink;
 use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
-use spyglass_rpc::RpcServer;
+use spyglass_rpc::{RpcEvent, RpcEventType, RpcServer};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -192,6 +194,14 @@ impl RpcServer for SpyglassRpc {
 
     async fn user_settings(&self) -> Result<UserSettings, Error> {
         handler::user_settings(&self.state).await
+    }
+
+    fn subscribe_events(
+        &self,
+        sink: SubscriptionSink,
+        events: Vec<RpcEventType>,
+    ) -> SubscriptionResult {
+        todo!()
     }
 }
 
