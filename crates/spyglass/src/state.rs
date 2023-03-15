@@ -34,7 +34,7 @@ pub struct AppState {
     pub shutdown_cmd_tx: Arc<Mutex<broadcast::Sender<AppShutdown>>>,
     pub config_cmd_tx: Arc<Mutex<broadcast::Sender<UserSettingsChange>>>,
     // Client events
-    pub rpc_events: Arc<Mutex<broadcast::Sender<RpcEvent>>>,
+    pub rpc_events: Arc<std::sync::Mutex<broadcast::Sender<RpcEvent>>>,
     // Pause/unpause worker pool.
     pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
     // Plugin command/control
@@ -54,8 +54,14 @@ impl AppState {
         AppStateBuilder::new()
             .with_db(db)
             .with_index(&IndexPath::LocalPath(config.index_dir()))
-            .with_lenses(&config.lenses.values().into_iter().cloned().collect())
-            .with_pipelines(&config.pipelines.values().into_iter().cloned().collect())
+            .with_lenses(&config.lenses.values().cloned().collect())
+            .with_pipelines(
+                &config
+                    .pipelines
+                    .values()
+                    .cloned()
+                    .collect::<Vec<PipelineConfiguration>>(),
+            )
             .with_user_settings(&config.user_settings)
             .build()
     }
@@ -142,7 +148,7 @@ impl AppStateBuilder {
             pipelines: Arc::new(pipelines),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
-            rpc_events: Arc::new(Mutex::new(rpc_events)),
+            rpc_events: Arc::new(std::sync::Mutex::new(rpc_events)),
             shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
             config_cmd_tx: Arc::new(Mutex::new(config_tx)),
             file_watcher: Arc::new(Mutex::new(None)),
@@ -164,8 +170,8 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn with_pipelines(&mut self, pipelines: &Vec<PipelineConfiguration>) -> &mut Self {
-        self.pipelines = Some(pipelines.clone());
+    pub fn with_pipelines(&mut self, pipelines: &[PipelineConfiguration]) -> &mut Self {
+        self.pipelines = Some(pipelines.to_owned());
         self
     }
 
