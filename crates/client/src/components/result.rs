@@ -1,12 +1,13 @@
 use js_sys::decode_uri_component;
 use url::Url;
 use yew::prelude::*;
+use yew_router::hooks::use_navigator;
 
 use super::{
-    btn,
-    icons,
+    btn, icons,
     tag::{Tag, TagIcon},
 };
+use crate::{pages::Tab, Route};
 use shared::constants::FEEDBACK_FORM;
 use shared::response::{LensResult, SearchResult};
 
@@ -282,21 +283,55 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
     None
 }
 
+#[derive(Properties, PartialEq)]
 pub struct FeedbackProps {
-
+    pub query: String,
+    pub num_docs: u32,
 }
 
 #[function_component(FeedbackResult)]
-pub fn feedback_result() -> Html {
+pub fn feedback_result(props: &FeedbackProps) -> Html {
+    let history = use_navigator().expect("History not available in this browser");
+
     html! {
       <div class="p-4 text-base">
-        <div class="text-xl text-white">{"No results found"}</div>
-        <div class="text-neutral-400 flex flex-row gap-2 items-center">
-          {"Help us improve our results."}
-          <btn::Btn href={FEEDBACK_FORM} size={btn::BtnSize::Xs}>
-            {"Click to send feedback"}
-          </btn::Btn>
-        </div>
+        <div class="text-xl text-white">{"No results found 😭"}</div>
+        {if props.num_docs > 0 {
+            html! {
+                <div class="text-neutral-400 flex flex-row gap-2 items-center">
+                    {"Help us improve our results."}
+                    <btn::Btn href={FEEDBACK_FORM} size={btn::BtnSize::Xs}>
+                        {"Click to send feedback"}
+                    </btn::Btn>
+                </div>
+            }
+        } else {
+            let discover_cb = {
+                let history = history.clone();
+                Callback::from(move |_| {
+                    history.push(&Route::SettingsPage { tab: Tab::Discover  });
+                })
+            };
+
+            let add_cb = {
+                let history = history.clone();
+                Callback::from(move |_| {
+                    history.push(&Route::SettingsPage { tab: Tab::ConnectionsManager });
+                })
+            };
+
+            html! {
+                <div class="text-neutral-400 flex flex-row gap-2 items-center">
+                    {"You don't currently have any documents in your library."}
+                    <btn::Btn onclick={discover_cb} size={btn::BtnSize::Xs}>
+                        {"Discover Lenses"}
+                    </btn::Btn>
+                    <btn::Btn onclick={add_cb} size={btn::BtnSize::Xs}>
+                        {"Add an Integration"}
+                    </btn::Btn>
+                </div>
+            }
+        }}
       </div>
     }
 }
