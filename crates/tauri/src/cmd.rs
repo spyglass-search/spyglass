@@ -417,3 +417,9 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
 
     Err(String::from("Unable to access user settings"))
 }
+
+#[tauri::command]
+pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
+    super::window::_show_tab(&win.app_handle(), &page);
+    Ok(())
+}

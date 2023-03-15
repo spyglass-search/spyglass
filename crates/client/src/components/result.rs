@@ -1,15 +1,15 @@
 use js_sys::decode_uri_component;
 use url::Url;
-use yew::prelude::*;
-use yew_router::hooks::use_navigator;
+use yew::{platform::spawn_local, prelude::*};
+use yew_router::Routable;
 
 use super::{
     btn, icons,
     tag::{Tag, TagIcon},
 };
-use crate::{pages::Tab, Route};
-use shared::constants::FEEDBACK_FORM;
+use crate::{pages::Tab, tauri_invoke, Route};
 use shared::response::{LensResult, SearchResult};
+use shared::{constants::FEEDBACK_FORM, event};
 
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
@@ -291,8 +291,6 @@ pub struct FeedbackProps {
 
 #[function_component(FeedbackResult)]
 pub fn feedback_result(props: &FeedbackProps) -> Html {
-    let history = use_navigator().expect("History not available in this browser");
-
     html! {
       <div class="p-4 text-base">
         <div class="text-xl text-white">{"No results found 😭"}</div>
@@ -306,19 +304,25 @@ pub fn feedback_result(props: &FeedbackProps) -> Html {
                 </div>
             }
         } else {
-            let discover_cb = {
-                let history = history.clone();
-                Callback::from(move |_| {
-                    history.push(&Route::SettingsPage { tab: Tab::Discover  });
-                })
-            };
+            let discover_cb = Callback::from(move |_| {
+                spawn_local(async move {
+                    let route = Route::SettingsPage { tab: Tab::Discover };
+                    let _ = tauri_invoke::<event::NavigateParams, ()>(
+                        event::ClientInvoke::Navigate,
+                        event::NavigateParams { page: route.to_path() }
+                    ).await;
+                });
+            });
 
-            let add_cb = {
-                let history = history.clone();
-                Callback::from(move |_| {
-                    history.push(&Route::SettingsPage { tab: Tab::ConnectionsManager });
-                })
-            };
+            let add_cb = Callback::from(move |_| {
+                spawn_local(async move {
+                    let route = Route::SettingsPage { tab: Tab::ConnectionsManager };
+                    let _ = tauri_invoke::<event::NavigateParams, ()>(
+                        event::ClientInvoke::Navigate,
+                        event::NavigateParams { page: route.to_path() }
+                    ).await;
+                });
+            });
 
             html! {
                 <div class="text-neutral-400 flex flex-row gap-2 items-center">
