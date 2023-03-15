@@ -2,8 +2,7 @@ use std::sync::{
     atomic::{AtomicU8, Ordering},
     Arc,
 };
-
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
 use tauri::api::dialog::blocking::message;
 use tauri::async_runtime::JoinHandle;
 use tauri::{
@@ -22,7 +21,7 @@ use crate::{window, AppShutdown};
 pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
 pub struct SpyglassServerClient {
-    pub client: HttpClient,
+    pub client: WsClient,
     pub endpoint: String,
     pub sidecar_handle: Option<JoinHandle<()>>,
     pub restarts: AtomicU8,
@@ -30,10 +29,11 @@ pub struct SpyglassServerClient {
 }
 
 /// Build client & attempt a connection to the health check endpoint.
-async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
-    match HttpClientBuilder::default()
+async fn try_connect(endpoint: &str) -> anyhow::Result<WsClient> {
+    match WsClientBuilder::default()
         .request_timeout(std::time::Duration::from_secs(30))
         .build(endpoint)
+        .await
     {
         Ok(client) => {
             // Wait until we have a connection
@@ -84,7 +84,7 @@ impl SpyglassServerClient {
     }
 
     pub async fn new(config: &Config, app_handle: &AppHandle) -> Self {
-        let endpoint = format!("http://127.0.0.1:{}", config.user_settings.port);
+        let endpoint = format!("ws://127.0.0.1:{}", config.user_settings.port);
         log::info!("Connecting to backend @ {}", &endpoint);
 
         // Only startup & manage sidecar in release mode.

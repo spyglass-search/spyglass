@@ -18,7 +18,7 @@ tauri-build = { version = "1.0.0", features = [] }
 anyhow = "1.0"
 auto-launch = "0.4.0"
 diff-struct = "0.5.1"
-jsonrpsee = { version = "0.16.2", features = ["http-client"] }
+jsonrpsee = { version = "0.16.2", features = ["ws-client"] }
 log = "0.4"
 migration = { path = "../migrations" }
 num-format = "0.4"
