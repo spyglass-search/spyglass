@@ -331,7 +331,7 @@ pub fn feedback_result(props: &FeedbackProps) -> Html {
                         {"Discover Lenses"}
                     </btn::Btn>
                     <btn::Btn onclick={add_cb} size={btn::BtnSize::Xs}>
-                        {"Add an Integration"}
+                        {"Add Connection"}
                     </btn::Btn>
                 </div>
             }
