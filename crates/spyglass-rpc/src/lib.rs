@@ -9,12 +9,12 @@ use shared::response::{
 };
 use std::collections::HashMap;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum RpcEventType {
     FinishedLensInstall,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcEvent {
     pub event_type: RpcEventType,
     pub payload: String,

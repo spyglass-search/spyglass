@@ -11,7 +11,7 @@ use shared::config::Config;
 use crate::rpc::SpyglassServerClient;
 use crate::window::show_wizard_window;
 
-use crate::{rpc::RpcMutex, window, AppShutdown};
+use crate::{rpc::RpcMutex, window, AppEvent};
 pub struct StartupProgressText(std::sync::Mutex<String>);
 
 impl StartupProgressText {
@@ -100,11 +100,14 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     let rpc_mutex = RpcMutex::new(Mutex::new(rpc));
     app_handle.manage(rpc_mutex.clone());
 
-    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+    // Let plugins know the server is connected.
+    let app_events = app_handle.state::<broadcast::Sender<AppEvent>>();
+    let _ = app_events.send(AppEvent::BackendConnected);
+
     // Watch and restart backend if it goes down
     tauri::async_runtime::spawn(SpyglassServerClient::daemon_eyes(
         rpc_mutex,
-        shutdown_tx.subscribe(),
+        app_events.subscribe(),
     ));
 
     // Will cancel and clear any interval checks in the client

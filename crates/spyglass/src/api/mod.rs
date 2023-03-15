@@ -3,7 +3,7 @@ use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
-use jsonrpsee::types::SubscriptionResult;
+use jsonrpsee::types::{SubscriptionEmptyError, SubscriptionResult};
 use jsonrpsee::SubscriptionSink;
 use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
@@ -11,8 +11,8 @@ use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
-use spyglass_rpc::{RpcEvent, RpcEventType, RpcServer};
-use std::collections::HashMap;
+use spyglass_rpc::{RpcEventType, RpcServer};
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod handler;
@@ -26,7 +26,7 @@ pub struct SpyglassRpc {
 #[async_trait]
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
-        Ok("0.1.1".into())
+        Ok("0.1.2".into())
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
@@ -198,10 +198,42 @@ impl RpcServer for SpyglassRpc {
 
     fn subscribe_events(
         &self,
-        sink: SubscriptionSink,
+        mut sink: SubscriptionSink,
         events: Vec<RpcEventType>,
     ) -> SubscriptionResult {
-        todo!()
+        let res = sink.accept();
+        if res.is_err() {
+            log::warn!("Unable to accept subscription: {:?}", res);
+            return Err(SubscriptionEmptyError);
+        }
+
+        // Spawn a new task that listens for events in the channel and sends them out
+        let mut receiver = self.state.rpc_events.lock().unwrap().subscribe();
+        tokio::spawn(async move {
+            let events: HashSet<RpcEventType> = events.clone().into_iter().collect();
+            log::info!("SUBSCRIBED TO EVENTS: {:?}", events);
+            loop {
+                tokio::select! {
+                    res = receiver.recv() => {
+                        match res {
+                            Ok(event) => {
+                                log::info!("received vent: {:?}", event);
+                                if events.contains(&event.event_type) {
+                                    if let Err(err) = sink.send(&event) {
+                                        log::warn!("unable to send to sub: {err}");
+                                    }
+                                }
+                            },
+                            Err(err) => {
+                                log::warn!("eror recev: {:?}", err);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(())
     }
 }
 
@@ -214,9 +246,8 @@ pub async fn start_api_server(
         state.user_settings.load_full().port,
     );
     let server = ServerBuilder::default().build(server_addr).await?;
-
     let rpc_module = SpyglassRpc {
-        state,
+        state: state.clone(),
         config: config.clone(),
     };
     let addr = server.local_addr()?;

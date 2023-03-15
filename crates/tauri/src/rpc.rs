@@ -16,7 +16,7 @@ use tokio_retry::Retry;
 use shared::config::Config;
 use spyglass_rpc::RpcClient;
 
-use crate::{window, AppShutdown};
+use crate::{window, AppEvent};
 
 pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
@@ -55,7 +55,7 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<WsClient> {
 
 impl SpyglassServerClient {
     /// Monitors the health of the backend & recreates it necessary.
-    pub async fn daemon_eyes(rpc: RpcMutex, mut shutdown: broadcast::Receiver<AppShutdown>) {
+    pub async fn daemon_eyes(rpc: RpcMutex, mut shutdown: broadcast::Receiver<AppEvent>) {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
         loop {
             tokio::select! {

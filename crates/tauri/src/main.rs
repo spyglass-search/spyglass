@@ -56,7 +56,10 @@ const SPYGLASS_LEVEL: &str = "spyglass_app=INFO";
 const SPYGLASS_LEVEL: &str = "spyglass_app=DEBUG";
 
 #[derive(Clone)]
-pub struct AppShutdown;
+pub enum AppEvent {
+    BackendConnected,
+    Shutdown,
+}
 type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -104,6 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = fix_path_env::fix();
     let app = tauri::Builder::default()
         .plugin(plugins::lens_updater::init())
+        .plugin(plugins::notify::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
@@ -142,8 +146,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let app_handle = app.app_handle();
             let startup_win = window::show_startup_window(&app_handle);
 
-            let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(1);
-            app.manage(shutdown_tx);
+            let (appevent_channel, _) = broadcast::channel::<AppEvent>(1);
+            app.manage(appevent_channel);
 
             let config = Config::new();
             log::info!("Loading prefs from: {:?}", Config::prefs_dir());
@@ -251,8 +255,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.run(|app_handle, e| match e {
         RunEvent::ExitRequested { .. } => {
             // Do some cleanup for long running tasks
-            let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
-            let _ = shutdown_tx.send(AppShutdown);
+            let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
+            let _ = shutdown_tx.send(AppEvent::Shutdown);
         }
         RunEvent::Exit { .. } => {
             log::info!("😔 bye bye");
@@ -384,7 +388,7 @@ async fn check_version_interval(current_version: String, app_handle: AppHandle) 
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
-    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+    let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
     let mut shutdown = shutdown_tx.subscribe();
     let metrics = app_handle.try_state::<Metrics>();
 
