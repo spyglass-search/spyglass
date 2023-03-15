@@ -42,6 +42,7 @@ async fn _subscribe(app: &AppHandle) -> anyhow::Result<Subscription<RpcEvent>> {
     let sub = rpc
         .client
         .subscribe_events(vec![
+            RpcEventType::ConnectionSyncFinished,
             RpcEventType::LensInstalled,
             RpcEventType::LensUninstalled,
         ])
@@ -83,6 +84,7 @@ async fn setup_notification_handler(app: AppHandle) {
                     Some(Ok(event)) =>  {
                         log::debug!("received event: {:?}", event);
                         let (title, blurb) = match &event.event_type {
+                            RpcEventType::ConnectionSyncFinished => ("Sync Completed", event.payload),
                             RpcEventType::LensInstalled => ("Lens Installed", event.payload),
                             RpcEventType::LensUninstalled => ("Lens Removed", event.payload),
                         };

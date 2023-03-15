@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum RpcEventType {
+    ConnectionSyncFinished,
     LensUninstalled,
     LensInstalled,
 }
