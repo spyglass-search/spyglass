@@ -1,8 +1,8 @@
+use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
 use std::sync::{
     atomic::{AtomicU8, Ordering},
     Arc,
 };
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
 use tauri::api::dialog::blocking::message;
 use tauri::async_runtime::JoinHandle;
 use tauri::{
