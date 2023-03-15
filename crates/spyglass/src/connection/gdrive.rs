@@ -151,7 +151,7 @@ impl Connection for DriveConnection {
                     &state.db,
                     &to_download,
                     &[],
-                    &state.user_settings,
+                    &state.user_settings.load(),
                     &enqueue_settings,
                     None,
                 )

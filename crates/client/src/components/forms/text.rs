@@ -36,6 +36,7 @@ impl Component for Text {
                     props.onchange.emit(SettingChangeEvent {
                         setting_name: props.name.clone(),
                         new_value: self.value.clone(),
+                        restart_required: props.restart_required,
                     });
                 }
 

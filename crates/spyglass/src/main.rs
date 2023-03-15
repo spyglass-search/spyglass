@@ -181,6 +181,7 @@ async fn start_backend(state: AppState, config: Config) {
     let (worker_cmd_tx, worker_cmd_rx) = mpsc::channel(
         state
             .user_settings
+            .load()
             .inflight_crawl_limit
             .value()
             .try_into()
@@ -233,6 +234,9 @@ async fn start_backend(state: AppState, config: Config) {
         manager_cmd_tx.clone(),
         manager_cmd_rx,
     ));
+
+    // Work scheduler
+    let config_handle = tokio::spawn(task::config_task(state.clone()));
 
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
@@ -304,6 +308,7 @@ async fn start_backend(state: AppState, config: Config) {
         manager_handle,
         worker_handle,
         pm_handle,
-        lens_watcher_handle
+        lens_watcher_handle,
+        config_handle
     );
 }

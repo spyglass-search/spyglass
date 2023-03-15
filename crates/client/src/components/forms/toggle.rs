@@ -31,6 +31,7 @@ impl Component for Toggle {
                     props.onchange.emit(SettingChangeEvent {
                         setting_name: props.name.clone(),
                         new_value,
+                        restart_required: props.restart_required,
                     });
                 }
 

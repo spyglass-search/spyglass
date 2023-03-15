@@ -117,7 +117,7 @@ pub async fn bootstrap(
             db,
             &urls,
             &[lens.clone()],
-            settings,
+            &settings.load(),
             &overrides,
             pipeline.clone(),
         )

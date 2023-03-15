@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use strum_macros::{Display, EnumString};
 
+use crate::{accelerator, config::KeyCode, MAC_OS};
+
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum FormType {
     Bool,
@@ -11,6 +13,7 @@ pub enum FormType {
     PathList,
     StringList,
     Text,
+    KeyBinding,
 }
 
 impl FormType {
@@ -73,6 +76,31 @@ impl FormType {
 
                 Ok(value.into())
             }
+            FormType::KeyBinding => {
+                if value.is_empty() {
+                    return Err("Value cannot be empty".into());
+                }
+
+                match accelerator::parse_accelerator(value, MAC_OS) {
+                    Ok(acc) => {
+                        if !acc.mods.alt_key() && !acc.mods.control_key() && !acc.mods.super_key() {
+                            return Err("Global key binding must have at least one modifier key (ALT, CMD, CTRL)".into());
+                        }
+
+                        if let KeyCode::Unidentified(_) = acc.key {
+                            return Err("Invalid key code binding".into());
+                        }
+                    }
+                    Err(error) => {
+                        return Err(format!(
+                            "Value does not represent a valid key binding {:?}",
+                            error
+                        ));
+                    }
+                }
+
+                Ok(value.to_owned())
+            }
         }
     }
 }
@@ -82,5 +110,6 @@ pub struct SettingOpts {
     pub label: String,
     pub value: String,
     pub form_type: FormType,
+    pub restart_required: bool,
     pub help_text: Option<String>,
 }

@@ -601,6 +601,7 @@ pub async fn configure_watcher(state: AppState) {
     // temp use plugin configuration
     let enabled = &state
         .user_settings
+        .load()
         .filesystem_settings
         .enable_filesystem_scanning;
 

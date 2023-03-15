@@ -195,7 +195,7 @@ pub async fn process_crawl(
         &state.db,
         &to_enqueue,
         &lenses,
-        &state.user_settings,
+        &state.user_settings.load_full(),
         &EnqueueSettings {
             tags: task_tags.clone(),
             ..Default::default()
@@ -226,7 +226,7 @@ pub async fn process_crawl(
 
 #[tracing::instrument(skip(state))]
 pub async fn handle_fetch(state: AppState, task: CrawlTask) -> FetchResult {
-    let crawler = Crawler::new(state.user_settings.domain_crawl_limit.value());
+    let crawler = Crawler::new(state.user_settings.load().domain_crawl_limit.value());
     let result = crawler.fetch_by_job(&state, task.id, true).await;
 
     match result {

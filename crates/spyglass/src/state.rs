@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
@@ -8,7 +9,7 @@ use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::filesystem::SpyglassFileWatcher;
-use crate::task::AppShutdown;
+use crate::task::{AppShutdown, UserSettingsChange};
 use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
@@ -24,13 +25,14 @@ pub struct AppState {
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, LensConfig>>,
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
-    pub user_settings: UserSettings,
+    pub user_settings: Arc<ArcSwap<UserSettings>>,
     pub index: Searcher,
     pub metrics: Metrics,
     pub config: Config,
     // Task scheduler command/control
     pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
     pub shutdown_cmd_tx: Arc<Mutex<broadcast::Sender<AppShutdown>>>,
+    pub config_cmd_tx: Arc<Mutex<broadcast::Sender<UserSettingsChange>>>,
     // Pause/unpause worker pool.
     pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
     // Plugin command/control
@@ -72,11 +74,12 @@ impl AppState {
         }
 
         let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
+        let (config_tx, _) = broadcast::channel::<UserSettingsChange>(16);
 
         AppState {
             db,
             app_state: Arc::new(app_state),
-            user_settings: config.user_settings.clone(),
+            user_settings: Arc::new(ArcSwap::from_pointee(config.user_settings.clone())),
             metrics: Metrics::new(
                 &Config::machine_identifier(),
                 config.user_settings.disable_telemetry,
@@ -86,6 +89,7 @@ impl AppState {
             pipelines: Arc::new(pipelines),
             index,
             shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
+            config_cmd_tx: Arc::new(Mutex::new(config_tx)),
             pause_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
@@ -99,7 +103,10 @@ impl AppState {
         log::debug!("reloading config...");
         let config = Config::new();
 
-        self.user_settings = config.user_settings.clone();
+        self.user_settings
+            .store(Arc::new(config.user_settings.clone()));
+
+        // self.user_settings = config.user_settings.clone();
         self.config = config;
     }
 
@@ -155,6 +162,7 @@ impl AppStateBuilder {
         };
 
         let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
+        let (config_tx, _) = broadcast::channel::<UserSettingsChange>(16);
 
         AppState {
             app_state: Arc::new(DashMap::new()),
@@ -173,8 +181,9 @@ impl AppStateBuilder {
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
             shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
+            config_cmd_tx: Arc::new(Mutex::new(config_tx)),
             file_watcher: Arc::new(Mutex::new(None)),
-            user_settings,
+            user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
         }
     }
 

@@ -239,7 +239,7 @@ fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
             &state.db.clone(),
             &urls,
             &[],
-            &state.user_settings,
+            &state.user_settings.load(),
             &EnqueueSettings {
                 force_allow: true,
                 ..Default::default()
