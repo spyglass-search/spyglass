@@ -41,7 +41,10 @@ async fn _subscribe(app: &AppHandle) -> anyhow::Result<Subscription<RpcEvent>> {
     let rpc = rpc.lock().await;
     let sub = rpc
         .client
-        .subscribe_events(vec![RpcEventType::FinishedLensInstall])
+        .subscribe_events(vec![
+            RpcEventType::LensInstalled,
+            RpcEventType::LensUninstalled,
+        ])
         .await?;
 
     Ok(sub)
@@ -78,8 +81,13 @@ async fn setup_notification_handler(app: AppHandle) {
             event = sub.next() => {
                 match event {
                     Some(Ok(event)) =>  {
-                        log::info!("received event: {:?}", event);
-                        let _ = notify(&app, "Notification", &event.payload);
+                        log::debug!("received event: {:?}", event);
+                        let (title, blurb) = match &event.event_type {
+                            RpcEventType::LensInstalled => ("Lens Installed", event.payload),
+                            RpcEventType::LensUninstalled => ("Lens Removed", event.payload),
+                        };
+
+                        let _ = notify(&app, title, &blurb);
                     },
                     Some(Err(err)) => log::warn!("error listening to event: {:?}", err),
                     // channel dropped, attempt to reconnect

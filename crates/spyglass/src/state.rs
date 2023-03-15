@@ -89,6 +89,15 @@ impl AppState {
         let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
         cmd_tx.send(task)
     }
+
+    pub async fn publish_event(&self, event: &RpcEvent) {
+        log::debug!("publishing event: {:?}", event);
+
+        let rpc_sub = self.rpc_events.lock().unwrap();
+        if let Err(err) = rpc_sub.send(event.clone()) {
+            log::error!("error sending event: {:?}", err);
+        }
+    }
 }
 
 #[derive(Default)]

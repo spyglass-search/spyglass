@@ -208,16 +208,25 @@ impl RpcServer for SpyglassRpc {
         }
 
         // Spawn a new task that listens for events in the channel and sends them out
-        let mut receiver = self.state.rpc_events.lock().unwrap().subscribe();
+        let rpc_event_channel = self.state.rpc_events.clone();
+        let shutdown_cmd_tx = self.state.shutdown_cmd_tx.clone();
         tokio::spawn(async move {
+            let mut receiver = rpc_event_channel
+                .lock()
+                .expect("rpc_events held by another thread")
+                .subscribe();
+            let mut shutdown = shutdown_cmd_tx.lock().await.subscribe();
+
             let events: HashSet<RpcEventType> = events.clone().into_iter().collect();
-            log::info!("SUBSCRIBED TO EVENTS: {:?}", events);
+            log::debug!("SUBSCRIBED TO: {:?}", events);
             loop {
                 tokio::select! {
+                    _ = shutdown.recv() => {
+                        return;
+                    }
                     res = receiver.recv() => {
                         match res {
                             Ok(event) => {
-                                log::info!("received vent: {:?}", event);
                                 if events.contains(&event.event_type) {
                                     if let Err(err) = sink.send(&event) {
                                         log::warn!("unable to send to sub: {err}");
