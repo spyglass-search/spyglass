@@ -251,7 +251,6 @@ pub fn alert(window: &Window, title: &str, message: &str) {
         .show(|_| {});
 }
 
-#[allow(dead_code)]
 pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     {
