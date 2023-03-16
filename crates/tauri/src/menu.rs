@@ -1,4 +1,4 @@
-use shared::config::Config;
+use shared::config::UserSettings;
 use strum_macros::{Display, EnumString};
 use tauri::{
     utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, SystemTrayMenu,
@@ -28,9 +28,12 @@ pub enum MenuID {
     INSTALL_FIREFOX_EXT,
 }
 
-pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTrayMenu {
+pub fn get_tray_menu(
+    ctx: &Context<EmbeddedAssets>,
+    user_settings: &UserSettings,
+) -> SystemTrayMenu {
     let show = CustomMenuItem::new(MenuID::SHOW_SEARCHBAR.to_string(), "Show search")
-        .accelerator(config.user_settings.shortcut.clone());
+        .accelerator(user_settings.shortcut.clone());
 
     let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "⏸ Pause indexing");
     let quit = CustomMenuItem::new(MenuID::QUIT.to_string(), "Quit");
