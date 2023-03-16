@@ -1,3 +1,4 @@
+use super::response;
 use anyhow::anyhow;
 use directories::UserDirs;
 use entities::get_library_stats;
@@ -27,13 +28,12 @@ use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
 };
+use spyglass_rpc::{RpcEvent, RpcEventType};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tracing::instrument;
 use url::Url;
-
-use super::response;
 
 pub mod search;
 
@@ -603,6 +603,14 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
     if let Some((_, config)) = config {
         let _ = bootstrap_queue::dequeue(&state.db, &config.name).await;
     }
+
+    state
+        .publish_event(&RpcEvent {
+            event_type: RpcEventType::LensUninstalled,
+            payload: format!("{} lens uninstalled", name),
+        })
+        .await;
+
     Ok(())
 }
 

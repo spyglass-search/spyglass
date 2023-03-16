@@ -1,9 +1,9 @@
-use std::sync::Arc;
-
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
+use spyglass_rpc::RpcEvent;
+use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
@@ -33,6 +33,8 @@ pub struct AppState {
     pub manager_cmd_tx: Arc<Mutex<Option<mpsc::UnboundedSender<ManagerCommand>>>>,
     pub shutdown_cmd_tx: Arc<Mutex<broadcast::Sender<AppShutdown>>>,
     pub config_cmd_tx: Arc<Mutex<broadcast::Sender<UserSettingsChange>>>,
+    // Client events
+    pub rpc_events: Arc<std::sync::Mutex<broadcast::Sender<RpcEvent>>>,
     // Pause/unpause worker pool.
     pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
     // Plugin command/control
@@ -49,54 +51,19 @@ impl AppState {
             .await
             .expect("Unable to connect to database");
 
-        log::debug!("Loading index from: {:?}", config.index_dir());
-        let index_dir = config.index_dir();
-        if !index_dir.exists() {
-            let _ = std::fs::create_dir_all(index_dir);
-        }
-
-        let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()))
-            .expect("Unable to open index.");
-
-        // TODO: Load from saved preferences
-        let app_state = DashMap::new();
-        app_state.insert("paused".to_string(), "false".to_string());
-
-        // Convert into dashmap
-        let lenses = DashMap::new();
-        for (key, value) in config.lenses.iter() {
-            lenses.insert(key.clone(), value.clone());
-        }
-
-        let pipelines = DashMap::new();
-        for (key, value) in config.pipelines.iter() {
-            pipelines.insert(key.clone(), value.clone());
-        }
-
-        let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
-        let (config_tx, _) = broadcast::channel::<UserSettingsChange>(16);
-
-        AppState {
-            db,
-            app_state: Arc::new(app_state),
-            user_settings: Arc::new(ArcSwap::from_pointee(config.user_settings.clone())),
-            metrics: Metrics::new(
-                &Config::machine_identifier(),
-                config.user_settings.disable_telemetry,
-            ),
-            config: config.clone(),
-            lenses: Arc::new(lenses),
-            pipelines: Arc::new(pipelines),
-            index,
-            shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
-            config_cmd_tx: Arc::new(Mutex::new(config_tx)),
-            pause_cmd_tx: Arc::new(Mutex::new(None)),
-            plugin_cmd_tx: Arc::new(Mutex::new(None)),
-            pipeline_cmd_tx: Arc::new(Mutex::new(None)),
-            plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
-            manager_cmd_tx: Arc::new(Mutex::new(None)),
-            file_watcher: Arc::new(Mutex::new(None)),
-        }
+        AppStateBuilder::new()
+            .with_db(db)
+            .with_index(&IndexPath::LocalPath(config.index_dir()))
+            .with_lenses(&config.lenses.values().cloned().collect())
+            .with_pipelines(
+                &config
+                    .pipelines
+                    .values()
+                    .cloned()
+                    .collect::<Vec<PipelineConfiguration>>(),
+            )
+            .with_user_settings(&config.user_settings)
+            .build()
     }
 
     pub fn reload_config(&mut self) {
@@ -121,6 +88,15 @@ impl AppState {
         let cmd_tx = self.manager_cmd_tx.lock().await;
         let cmd_tx = cmd_tx.as_ref().expect("Manager channel not open");
         cmd_tx.send(task)
+    }
+
+    pub async fn publish_event(&self, event: &RpcEvent) {
+        log::debug!("publishing event: {:?}", event);
+
+        let rpc_sub = self.rpc_events.lock().unwrap();
+        if let Err(err) = rpc_sub.send(event.clone()) {
+            log::error!("error sending event: {:?}", err);
+        }
     }
 }
 
@@ -163,6 +139,7 @@ impl AppStateBuilder {
 
         let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
         let (config_tx, _) = broadcast::channel::<UserSettingsChange>(16);
+        let (rpc_events, _) = broadcast::channel::<RpcEvent>(10);
 
         AppState {
             app_state: Arc::new(DashMap::new()),
@@ -180,6 +157,7 @@ impl AppStateBuilder {
             pipelines: Arc::new(pipelines),
             plugin_cmd_tx: Arc::new(Mutex::new(None)),
             plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
+            rpc_events: Arc::new(std::sync::Mutex::new(rpc_events)),
             shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
             config_cmd_tx: Arc::new(Mutex::new(config_tx)),
             file_watcher: Arc::new(Mutex::new(None)),
@@ -201,12 +179,23 @@ impl AppStateBuilder {
         self
     }
 
+    pub fn with_pipelines(&mut self, pipelines: &[PipelineConfiguration]) -> &mut Self {
+        self.pipelines = Some(pipelines.to_owned());
+        self
+    }
+
     pub fn with_user_settings(&mut self, user_settings: &UserSettings) -> &mut Self {
         self.user_settings = Some(user_settings.to_owned());
         self
     }
 
     pub fn with_index(&mut self, index: &IndexPath) -> &mut Self {
+        if let IndexPath::LocalPath(path) = &index {
+            if !path.exists() {
+                let _ = std::fs::create_dir_all(path);
+            }
+        }
+
         self.index = Some(Searcher::with_index(index).expect("Unable to open index"));
         self
     }

@@ -2,12 +2,13 @@ use entities::models::{bootstrap_queue, connection};
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
+use spyglass_rpc::{RpcEvent, RpcEventType};
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::connection::load_connection;
+use crate::connection::{api_id_to_label, load_connection};
 use crate::crawler::bootstrap;
 use crate::filesystem;
 use crate::search::lens::{load_lenses, read_lenses};
@@ -286,6 +287,15 @@ pub async fn worker_task(
                                                 Ok(mut conn) => {
                                                     let last_sync = if is_first_sync { None } else { Some(connection.updated_at) };
                                                     conn.as_mut().sync(&state, last_sync).await;
+
+                                                    let api_label = api_id_to_label(&api_id);
+                                                    let postfix = if is_first_sync { "finished" } else { "updated" };
+                                                    let payload = format!("{} ({}) {}", api_label, account, postfix);
+
+                                                    state.publish_event(&RpcEvent {
+                                                        event_type: RpcEventType::ConnectionSyncFinished,
+                                                        payload,
+                                                    }).await;
                                                 }
                                                 Err(err) => log::warn!("Unable to sync w/ connection: {account}@{api_id} - {err}"),
                                             }

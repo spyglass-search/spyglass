@@ -1,9 +1,8 @@
+use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
 use std::sync::{
     atomic::{AtomicU8, Ordering},
     Arc,
 };
-
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use tauri::api::dialog::blocking::message;
 use tauri::async_runtime::JoinHandle;
 use tauri::{
@@ -17,12 +16,12 @@ use tokio_retry::Retry;
 use shared::config::Config;
 use spyglass_rpc::RpcClient;
 
-use crate::{window, AppShutdown};
+use crate::{window, AppEvent};
 
 pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
 pub struct SpyglassServerClient {
-    pub client: HttpClient,
+    pub client: WsClient,
     pub endpoint: String,
     pub sidecar_handle: Option<JoinHandle<()>>,
     pub restarts: AtomicU8,
@@ -30,10 +29,11 @@ pub struct SpyglassServerClient {
 }
 
 /// Build client & attempt a connection to the health check endpoint.
-async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
-    match HttpClientBuilder::default()
+async fn try_connect(endpoint: &str) -> anyhow::Result<WsClient> {
+    match WsClientBuilder::default()
         .request_timeout(std::time::Duration::from_secs(30))
         .build(endpoint)
+        .await
     {
         Ok(client) => {
             // Wait until we have a connection
@@ -55,7 +55,7 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<HttpClient> {
 
 impl SpyglassServerClient {
     /// Monitors the health of the backend & recreates it necessary.
-    pub async fn daemon_eyes(rpc: RpcMutex, mut shutdown: broadcast::Receiver<AppShutdown>) {
+    pub async fn daemon_eyes(rpc: RpcMutex, mut shutdown: broadcast::Receiver<AppEvent>) {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
         loop {
             tokio::select! {
@@ -84,7 +84,7 @@ impl SpyglassServerClient {
     }
 
     pub async fn new(config: &Config, app_handle: &AppHandle) -> Self {
-        let endpoint = format!("http://127.0.0.1:{}", config.user_settings.port);
+        let endpoint = format!("ws://127.0.0.1:{}", config.user_settings.port);
         log::info!("Connecting to backend @ {}", &endpoint);
 
         // Only startup & manage sidecar in release mode.

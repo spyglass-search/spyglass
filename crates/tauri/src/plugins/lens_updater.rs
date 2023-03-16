@@ -8,7 +8,7 @@ use tauri::{
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
-use crate::{constants, rpc, AppShutdown};
+use crate::{constants, rpc, AppEvent};
 use serde_json::Value;
 use shared::response::{InstallableLens, LensResult};
 use shared::{
@@ -38,14 +38,16 @@ pub fn init() -> TauriPlugin<Wry> {
                     ));
 
                     let app_handle = app_handle.clone();
-                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
                     let mut shutdown = shutdown_tx.subscribe();
 
                     loop {
                         tokio::select! {
-                            _ = shutdown.recv() => {
-                                log::info!("🛑 Shutting down lens updater");
-                                return;
+                            event = shutdown.recv() => {
+                                if let Ok(AppEvent::Shutdown) = event {
+                                    log::info!("🛑 Shutting down lens updater");
+                                    return;
+                                }
                             },
                             _ = interval.tick() => {
                                 let _ = check_for_lens_updates(&app_handle).await;
