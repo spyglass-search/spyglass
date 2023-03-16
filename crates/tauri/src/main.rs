@@ -141,7 +141,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::wizard_finished,
         ])
         .menu(menu::get_app_menu())
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
+        .system_tray(
+            SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.user_settings.clone())),
+        )
         .setup(move |app| {
             let app_handle = app.app_handle();
             let startup_win = window::show_startup_window(&app_handle);
@@ -281,6 +283,14 @@ pub fn configuration_updated(
 
     if diff.shortcut.is_some() {
         register_global_shortcut(&window, &window.app_handle(), &new_configuration);
+        let ctx = tauri::generate_context!();
+        if let Err(error) = window
+            .app_handle()
+            .tray_handle()
+            .set_menu(menu::get_tray_menu(&ctx, &new_configuration))
+        {
+            log::error!("Error updating system tray {:?}", error);
+        }
     }
 }
 
