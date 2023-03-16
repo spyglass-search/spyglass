@@ -401,13 +401,13 @@ async fn build_filesystem_information(
         let failed: u32 = stats.failed as u32;
 
         let total_finished = indexed + failed;
-
         let mut status = InstallStatus::Finished { num_docs: indexed };
-        if total_finished < total_paths {
+        if stats.enqueued > 0 && total_finished < total_paths {
             let percent = (((indexed * 100) / total_paths) as i32).min(100);
             let status_msg = format!(
-                "Processing {} of many",
-                indexed.to_formatted_string(&Locale::en)
+                "Processing {} of {}",
+                indexed.to_formatted_string(&Locale::en),
+                total_paths.to_formatted_string(&Locale::en),
             );
             let status_msg = match path {
                 Some(path) => format!("{}. Walking {path}.", status_msg),
