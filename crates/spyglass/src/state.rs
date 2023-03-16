@@ -190,6 +190,12 @@ impl AppStateBuilder {
     }
 
     pub fn with_index(&mut self, index: &IndexPath) -> &mut Self {
+        if let IndexPath::LocalPath(path) = &index {
+            if !path.exists() {
+                let _ = std::fs::create_dir_all(path);
+            }
+        }
+
         self.index = Some(Searcher::with_index(index).expect("Unable to open index"));
         self
     }
