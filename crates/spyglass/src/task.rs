@@ -2,7 +2,7 @@ use entities::models::{bootstrap_queue, connection};
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
-use spyglass_rpc::{RpcEventType, RpcEvent};
+use spyglass_rpc::{RpcEvent, RpcEventType};
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;

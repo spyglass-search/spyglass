@@ -607,7 +607,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
     state
         .publish_event(&RpcEvent {
             event_type: RpcEventType::LensUninstalled,
-            payload: format!("\"{}\" lens uninstalled", name),
+            payload: format!("{} lens uninstalled", name),
         })
         .await;
 

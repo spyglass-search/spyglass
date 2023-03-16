@@ -137,7 +137,7 @@ pub fn api_id_to_label(api_id: &str) -> String {
         "drive.google.com" => gdrive::TITLE.to_string(),
         "api.github.com" => github::TITLE.to_string(),
         "oauth.reddit.com" => reddit::TITLE.to_string(),
-        _ => "Unknown".into()
+        _ => "Unknown".into(),
     }
 }
 
