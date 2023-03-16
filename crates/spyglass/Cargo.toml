@@ -41,8 +41,8 @@ regex = "1"
 reqwest = { version = "0.11", features = ["json"] }
 ron = "0.8"
 rusqlite = { version = "*", features = ["bundled"] }
-sentry = "0.29.0"
-sentry-tracing = "0.29.0"
+sentry = "0.30.0"
+sentry-tracing = "0.30.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
@@ -63,6 +63,7 @@ warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
+whisper-rs = "0.4.0"
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
