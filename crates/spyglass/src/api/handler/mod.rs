@@ -1,3 +1,5 @@
+use super::response;
+use anyhow::anyhow;
 use directories::UserDirs;
 use entities::get_library_stats;
 use entities::models::crawl_queue::{CrawlStatus, EnqueueSettings};
@@ -17,22 +19,21 @@ use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
 use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
-use libspyglass::task::{AppPause, ManagerCommand};
+use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
-use shared::config::{self, Config};
+use shared::config::{self, Config, UserSettings};
 use shared::metrics::Event;
 use shared::request::{BatchDocumentRequest, RawDocType, RawDocumentRequest};
 use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
 };
+use spyglass_rpc::{RpcEvent, RpcEventType};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tracing::instrument;
 use url::Url;
-
-use super::response;
 
 pub mod search;
 
@@ -69,7 +70,7 @@ pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) ->
         &state.db,
         &req.urls,
         &[],
-        &state.user_settings,
+        &state.user_settings.load(),
         &overrides,
         None,
     )
@@ -150,7 +151,7 @@ pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Res
                 &state.db,
                 &[req.url.clone()],
                 &[],
-                &state.user_settings,
+                &state.user_settings.load(),
                 &overrides,
                 None,
             )
@@ -400,13 +401,13 @@ async fn build_filesystem_information(
         let failed: u32 = stats.failed as u32;
 
         let total_finished = indexed + failed;
-
         let mut status = InstallStatus::Finished { num_docs: indexed };
-        if total_finished < total_paths {
+        if stats.enqueued > 0 && total_finished < total_paths {
             let percent = (((indexed * 100) / total_paths) as i32).min(100);
             let status_msg = format!(
-                "Processing {} of many",
-                indexed.to_formatted_string(&Locale::en)
+                "Processing {} of {}",
+                indexed.to_formatted_string(&Locale::en),
+                total_paths.to_formatted_string(&Locale::en),
             );
             let status_msg = match path {
                 Some(path) => format!("{}. Walking {path}.", status_msg),
@@ -546,17 +547,26 @@ pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Resu
     Ok(())
 }
 
-#[instrument(skip(state))]
-pub async fn toggle_filesystem(state: AppState, enabled: bool) -> Result<(), Error> {
-    let mut cmd_tx = state.manager_cmd_tx.lock().await;
-    match &mut *cmd_tx {
-        Some(cmd_tx) => {
-            let _ = cmd_tx.send(ManagerCommand::ToggleFilesystem(enabled));
-        }
-        None => {}
+#[instrument(skip(app, _config))]
+pub async fn update_user_settings(
+    app: &AppState,
+    _config: &Config,
+    user_settings: &UserSettings,
+) -> Result<UserSettings, Error> {
+    if let Err(error) = app
+        .config_cmd_tx
+        .lock()
+        .await
+        .send(UserSettingsChange::SettingsChanged(user_settings.clone()))
+    {
+        return Err(anyhow!(error).into());
     }
+    Ok(user_settings.clone())
+}
 
-    Ok(())
+#[instrument(skip(app))]
+pub async fn user_settings(app: &AppState) -> Result<UserSettings, Error> {
+    Ok(app.user_settings.load().as_ref().clone())
 }
 
 #[instrument(skip(state))]
@@ -593,6 +603,14 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
     if let Some((_, config)) = config {
         let _ = bootstrap_queue::dequeue(&state.db, &config.name).await;
     }
+
+    state
+        .publish_event(&RpcEvent {
+            event_type: RpcEventType::LensUninstalled,
+            payload: format!("{} lens uninstalled", name),
+        })
+        .await;
+
     Ok(())
 }
 

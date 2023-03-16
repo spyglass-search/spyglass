@@ -114,6 +114,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d301b3b94cb4b2f23d7917810addbbaff90738e0ca2be692bd027e70d7e0330c"
 
 [[package]]
+name = "arc-swap"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bddcadddf5e9015d310179a59bb28c4d4b9920ad0f11e8e14dbadf654890c9a6"
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1398,6 +1404,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
+name = "diff-struct"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a699d33d273c6226fd3e8f310a9c90ca94f72be84f7aed95b22bb676f34fc90"
+dependencies = [
+ "diff_derive",
+ "num",
+ "serde",
+]
+
+[[package]]
+name = "diff_derive"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe165e7ead196bbbf44c7ce11a7a21157b5c002ce46d7098ff9c556784a4912d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1726,6 +1754,18 @@ dependencies = [
  "libc",
  "redox_syscall",
  "windows-sys 0.42.0",
+]
+
+[[package]]
+name = "findshlibs"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40b9e59cd0f7e0806cca4be089683ecb6434e602038df21fe6bf6711b2f07f64"
+dependencies = [
+ "cc",
+ "lazy_static",
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -3942,6 +3982,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02e0d21255c828d6f128a1e41534206671e8c3ea0c62f32291e808dc82cff17d"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "num-derive"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3973,12 +4047,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-iter"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d03e6c028c5dc5cac6e2dec0efda81fc887605bb3d884578bb6d6bf7514e252"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-rational"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
 dependencies = [
  "autocfg",
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -5815,10 +5901,28 @@ dependencies = [
  "httpdate",
  "native-tls",
  "reqwest",
- "sentry-backtrace",
- "sentry-contexts",
- "sentry-core",
- "sentry-panic",
+ "sentry-backtrace 0.29.2",
+ "sentry-contexts 0.29.2",
+ "sentry-core 0.29.2",
+ "sentry-panic 0.29.2",
+ "tokio",
+ "ureq",
+]
+
+[[package]]
+name = "sentry"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5ce6d3512e2617c209ec1e86b0ca2fea06454cd34653c91092bf0f3ec41f8e3"
+dependencies = [
+ "httpdate",
+ "native-tls",
+ "reqwest",
+ "sentry-backtrace 0.30.0",
+ "sentry-contexts 0.30.0",
+ "sentry-core 0.30.0",
+ "sentry-debug-images",
+ "sentry-panic 0.30.0",
  "tokio",
  "ureq",
 ]
@@ -5832,7 +5936,19 @@ dependencies = [
  "backtrace",
  "once_cell",
  "regex",
- "sentry-core",
+ "sentry-core 0.29.2",
+]
+
+[[package]]
+name = "sentry-backtrace"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e7fe408d4d1f8de188a9309916e02e129cbe51ca19e55badea5a64899399b1a"
+dependencies = [
+ "backtrace",
+ "once_cell",
+ "regex",
+ "sentry-core 0.30.0",
 ]
 
 [[package]]
@@ -5845,7 +5961,21 @@ dependencies = [
  "libc",
  "os_info",
  "rustc_version 0.4.0",
- "sentry-core",
+ "sentry-core 0.29.2",
+ "uname",
+]
+
+[[package]]
+name = "sentry-contexts"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5695096a059a89973ec541062d331ff4c9aeef9c2951416c894f0fff76340e7d"
+dependencies = [
+ "hostname",
+ "libc",
+ "os_info",
+ "rustc_version 0.4.0",
+ "sentry-core 0.30.0",
  "uname",
 ]
 
@@ -5857,9 +5987,33 @@ checksum = "fc43eb7e4e3a444151a0fe8a0e9ce60eabd905dae33d66e257fa26f1b509c1bd"
 dependencies = [
  "once_cell",
  "rand 0.8.5",
- "sentry-types",
+ "sentry-types 0.29.2",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "sentry-core"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b22828bfd118a7b660cf7a155002a494755c0424cebb7061e4743ecde9c7dbc"
+dependencies = [
+ "once_cell",
+ "rand 0.8.5",
+ "sentry-types 0.30.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "sentry-debug-images"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a9164d44a2929b1b7670afd7e87552514b70d3ae672ca52884639373d912a3d"
+dependencies = [
+ "findshlibs",
+ "once_cell",
+ "sentry-core 0.30.0",
 ]
 
 [[package]]
@@ -5868,8 +6022,18 @@ version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccab4fab11e3e63c45f4524bee2e75cde39cdf164cb0b0cbe6ccd1948ceddf66"
 dependencies = [
- "sentry-backtrace",
- "sentry-core",
+ "sentry-backtrace 0.29.2",
+ "sentry-core 0.29.2",
+]
+
+[[package]]
+name = "sentry-panic"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f4ced2a7a8c14899d58eec402d946f69d5ed26a3fc363a7e8b1e5cb88473a01"
+dependencies = [
+ "sentry-backtrace 0.30.0",
+ "sentry-core 0.30.0",
 ]
 
 [[package]]
@@ -5878,7 +6042,18 @@ version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46ebf58c2bd1d97152c316ff170ee736c59a16967738aeb8ed0d79b80e3713ae"
 dependencies = [
- "sentry-core",
+ "sentry-core 0.29.2",
+ "tracing-core",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "sentry-tracing"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f4eda5496b64975306ce37b7ccdc5f264fd1da25c1d5aac324b460edab29ded"
+dependencies = [
+ "sentry-core 0.30.0",
  "tracing-core",
  "tracing-subscriber",
 ]
@@ -5888,6 +6063,23 @@ name = "sentry-types"
 version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f63708ec450b6bdcb657af760c447416d69c38ce421f34e5e2e9ce8118410bc7"
+dependencies = [
+ "debugid",
+ "getrandom 0.2.8",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "time 0.3.17",
+ "url",
+ "uuid 1.2.2",
+]
+
+[[package]]
+name = "sentry-types"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "360ee3270f7a4a1eee6c667f7d38360b995431598a73b740dfe420da548d9cc9"
 dependencies = [
  "debugid",
  "getrandom 0.2.8",
@@ -6127,6 +6319,7 @@ dependencies = [
  "anyhow",
  "bitflags",
  "chrono",
+ "diff-struct",
  "directories",
  "log",
  "num-format",
@@ -6271,10 +6464,11 @@ dependencies = [
 
 [[package]]
 name = "spyglass"
-version = "23.3.1"
+version = "23.3.2"
 dependencies = [
  "addr",
  "anyhow",
+ "arc-swap",
  "auth_core",
  "bytes",
  "calamine",
@@ -6282,6 +6476,7 @@ dependencies = [
  "clap 4.1.4",
  "console-subscriber",
  "dashmap",
+ "diff-struct",
  "digest 0.10.6",
  "directories",
  "docx",
@@ -6312,8 +6507,8 @@ dependencies = [
  "reqwest",
  "ron",
  "rusqlite",
- "sentry",
- "sentry-tracing",
+ "sentry 0.29.2",
+ "sentry-tracing 0.29.2",
  "serde",
  "serde_json",
  "sha2 0.10.6",
@@ -6347,6 +6542,7 @@ dependencies = [
  "anyhow",
  "auto-launch",
  "cocoa",
+ "diff-struct",
  "fix-path-env",
  "jsonrpsee",
  "log",
@@ -6356,8 +6552,8 @@ dependencies = [
  "open",
  "reqwest",
  "ron",
- "sentry",
- "sentry-tracing",
+ "sentry 0.30.0",
+ "sentry-tracing 0.30.0",
  "serde",
  "serde_json",
  "shared",
@@ -6485,6 +6681,7 @@ name = "spyglass-rpc"
 version = "0.1.0"
 dependencies = [
  "jsonrpsee",
+ "serde",
  "shared",
 ]
 

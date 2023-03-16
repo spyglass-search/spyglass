@@ -27,6 +27,7 @@ impl PathField {
         props.onchange.emit(SettingChangeEvent {
             setting_name: props.name.clone(),
             new_value: self.path.display().to_string(),
+            restart_required: props.restart_required,
         });
     }
 }
@@ -156,6 +157,7 @@ impl PathList {
             props.onchange.emit(SettingChangeEvent {
                 setting_name: props.name.clone(),
                 new_value,
+                restart_required: props.restart_required,
             });
         }
     }

@@ -137,6 +137,7 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
 pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
     state
         .user_settings
+        .load()
         .filesystem_settings
         .watched_paths
         .clone()
@@ -148,6 +149,7 @@ pub fn get_supported_file_extensions(state: &AppState) -> HashSet<String> {
     HashSet::from_iter(
         state
             .user_settings
+            .load()
             .filesystem_settings
             .supported_extensions
             .iter()

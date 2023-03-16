@@ -10,7 +10,7 @@ use crate::state::AppState;
 pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand>) -> bool {
     let mut started_task = None;
     // Do we have any crawl tasks?
-    match crawl_queue::dequeue(&state.db, state.user_settings.clone()).await {
+    match crawl_queue::dequeue(&state.db, &state.user_settings.load()).await {
         Ok(Some(task)) => {
             match &task.pipeline {
                 Some(pipeline) => {
@@ -44,7 +44,7 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
     }
 
     // Do we have any crawl tasks?
-    match crawl_queue::dequeue_files(&state.db, state.user_settings.clone()).await {
+    match crawl_queue::dequeue_files(&state.db, &state.user_settings.load()).await {
         Ok(Some(task)) => {
             match &task.pipeline {
                 Some(pipeline) => {

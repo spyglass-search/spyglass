@@ -8,7 +8,7 @@ use tauri::{
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
-use crate::{constants, rpc, AppShutdown};
+use crate::{constants, rpc, AppEvent};
 use serde_json::Value;
 use shared::response::{InstallableLens, LensResult};
 use shared::{
@@ -38,14 +38,16 @@ pub fn init() -> TauriPlugin<Wry> {
                     ));
 
                     let app_handle = app_handle.clone();
-                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
                     let mut shutdown = shutdown_tx.subscribe();
 
                     loop {
                         tokio::select! {
-                            _ = shutdown.recv() => {
-                                log::info!("🛑 Shutting down lens updater");
-                                return;
+                            event = shutdown.recv() => {
+                                if let Ok(AppEvent::Shutdown) = event {
+                                    log::info!("🛑 Shutting down lens updater");
+                                    return;
+                                }
                             },
                             _ = interval.tick() => {
                                 let _ = check_for_lens_updates(&app_handle).await;
@@ -92,7 +94,7 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
                     latest.download_url
                 );
 
-                if let Err(e) = handle_install_lens(app_handle, &latest.name).await {
+                if let Err(e) = handle_install_lens(app_handle, &latest.name, true).await {
                     log::error!("Unable to install lens: {}", e);
                 } else {
                     lenses_updated += 1;
@@ -144,7 +146,11 @@ async fn get_installed_lenses(app_handle: &AppHandle) -> anyhow::Result<Vec<Lens
 
 /// Helper to install the lens with the specified name. A request to the server
 /// will be made to install the lens.
-pub async fn handle_install_lens(app_handle: &AppHandle, name: &str) -> anyhow::Result<()> {
+pub async fn handle_install_lens(
+    app_handle: &AppHandle,
+    name: &str,
+    is_update: bool,
+) -> anyhow::Result<()> {
     log::debug!("Lens install requested {}", name);
     let mutex = app_handle
         .try_state::<rpc::RpcMutex>()
@@ -154,11 +160,17 @@ pub async fn handle_install_lens(app_handle: &AppHandle, name: &str) -> anyhow::
     match rpc.client.install_lens(name.to_string()).await {
         Ok(_) => {
             if let Some(metrics) = app_handle.try_state::<Metrics>() {
-                metrics
-                    .track(Event::InstallLens {
+                let event = if is_update {
+                    Event::InstallLens {
                         lens: name.to_owned(),
-                    })
-                    .await;
+                    }
+                } else {
+                    Event::UpdateLens {
+                        lens: name.to_owned(),
+                    }
+                };
+
+                metrics.track(event).await;
             }
             Ok(())
         }
@@ -173,7 +185,7 @@ pub async fn handle_install_lens(app_handle: &AppHandle, name: &str) -> anyhow::
 #[tauri::command]
 pub async fn install_lens(win: tauri::Window, name: &str) -> Result<(), String> {
     let app_handle = win.app_handle();
-    let _ = handle_install_lens(&app_handle, name).await;
+    let _ = handle_install_lens(&app_handle, name, false).await;
     let _ = app_handle.emit_all(ClientEvent::RefreshDiscover.as_ref(), Value::Null);
     Ok(())
 }

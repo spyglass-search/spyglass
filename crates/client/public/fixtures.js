@@ -6,12 +6,18 @@ export let invoke = async (func_name, params) => {
   console.log(`calling: ${func_name} w/`, params);
 
   if (func_name == "search_docs") {
+    let meta =  {
+      query: params.query,
+      num_docs: 426552,
+      wall_time_ms: 1234,
+    };
+
+    if (params.query == "blank") {
+      return { meta, results: [] };
+    }
+
     return {
-      meta: {
-        query: params.query,
-        num_docs: 426552,
-        wall_time_ms: 1234,
-      },
+      meta,
       results: [
         {
           doc_id: "123",
@@ -461,6 +467,8 @@ export let invoke = async (func_name, params) => {
         "/Applications",
       ],
     };
+  } else if (func_name == "open_result") {
+    window.open(params.url);
   }
 
   return [];
@@ -484,8 +492,8 @@ export async function recrawl_domain(domain) {
   return await invoke("recrawl_domain", { domain });
 }
 
-export async function save_user_settings(settings) {
-  return await invoke("save_user_settings", { settings });
+export async function save_user_settings(settings, restart) {
+  return await invoke("save_user_settings", { settings, restart });
 }
 
 export async function searchDocs(lenses, query) {

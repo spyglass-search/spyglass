@@ -5,12 +5,12 @@ use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
-#[allow(unused_imports)]
-use migration::Migrator;
+use sentry::ClientInitGuard;
 use shared::config::{self, Config};
 use std::io;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
@@ -36,7 +36,7 @@ struct CliArgs {
 }
 
 #[cfg(feature = "tokio-console")]
-pub fn setup_logging(_config: &Config) {
+pub fn setup_logging(_config: &Config) -> (Option<WorkerGuard>, Option<ClientInitGuard>) {
     let subscriber = tracing_subscriber::registry()
         .with(
             EnvFilter::from_default_env()
@@ -49,12 +49,14 @@ pub fn setup_logging(_config: &Config) {
                 .spawn(),
         );
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
+
+    (None, None)
 }
 
 #[cfg(not(feature = "tokio-console"))]
-pub fn setup_logging(config: &Config) {
+pub fn setup_logging(config: &Config) -> (Option<WorkerGuard>, Option<ClientInitGuard>) {
     #[cfg(not(debug_assertions))]
-    let _guard = if config.user_settings.disable_telemetry {
+    let sentry_guard = if config.user_settings.disable_telemetry {
         None
     } else {
         Some(sentry::init((
@@ -66,9 +68,11 @@ pub fn setup_logging(config: &Config) {
             },
         )))
     };
+    #[cfg(debug_assertions)]
+    let sentry_guard = None;
 
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = tracing_subscriber::registry()
         .with(
@@ -92,6 +96,8 @@ pub fn setup_logging(config: &Config) {
         .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
         .with(sentry_tracing::layer());
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
+
+    (Some(tracing_guard), sentry_guard)
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -99,7 +105,7 @@ async fn main() -> Result<(), ()> {
     let mut config = Config::new();
     let args = CliArgs::parse();
 
-    setup_logging(&config);
+    let (_trace_guard, _sentry_guard) = setup_logging(&config);
     LogTracer::init().expect("Unable to initialize LogTracer");
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());
@@ -115,7 +121,7 @@ async fn main() -> Result<(), ()> {
     // Run any migrations, only on headless mode.
     #[cfg(debug_assertions)]
     {
-        use migration::DbErr;
+        use migration::{DbErr, Migrator};
         let migration_status: Result<(), DbErr> = match Migrator::run_migrations().await {
             Ok(_) => Ok(()),
             Err(e) => {
@@ -181,6 +187,7 @@ async fn start_backend(state: AppState, config: Config) {
     let (worker_cmd_tx, worker_cmd_rx) = mpsc::channel(
         state
             .user_settings
+            .load()
             .inflight_crawl_limit
             .value()
             .try_into()
@@ -234,6 +241,9 @@ async fn start_backend(state: AppState, config: Config) {
         manager_cmd_rx,
     ));
 
+    // Work scheduler
+    let config_handle = tokio::spawn(task::config_task(state.clone()));
+
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
         state.clone(),
@@ -269,6 +279,11 @@ async fn start_backend(state: AppState, config: Config) {
         plugin_cmd_rx,
     ));
 
+    state
+        .metrics
+        .track(shared::metrics::Event::SpyglassStarted)
+        .await;
+
     // Gracefully handle shutdowns
     match signal::ctrl_c().await {
         Ok(()) => {
@@ -299,6 +314,7 @@ async fn start_backend(state: AppState, config: Config) {
         manager_handle,
         worker_handle,
         pm_handle,
-        lens_watcher_handle
+        lens_watcher_handle,
+        config_handle
     );
 }

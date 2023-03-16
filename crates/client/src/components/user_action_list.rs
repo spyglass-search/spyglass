@@ -1,11 +1,8 @@
 use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
-use crate::components::{icons, KeyComponent};
-use crate::utils::{self, OsName};
+use crate::components::{KeyComponent, ModifierIcon};
+use crate::utils;
 use shared::accelerator;
-use shared::{
-    config::{self, UserAction, UserActionDefinition},
-    keyboard::ModifiersState,
-};
+use shared::config::{self, UserAction, UserActionDefinition};
 use yew::function_component;
 use yew::prelude::*;
 
@@ -32,40 +29,6 @@ pub struct UserActionProps {
     pub action_id: String,
     #[prop_or_default]
     pub onclick: Callback<UserActionDefinition>,
-}
-
-#[derive(Properties, PartialEq)]
-pub struct ModifierProps {
-    pub modifier: ModifiersState,
-}
-
-#[function_component(ModifierIcon)]
-fn modifier_icon(props: &ModifierProps) -> Html {
-    let mut nodes: Vec<Html> = Vec::new();
-
-    if props.modifier.control_key() {
-        nodes.push(html! { <KeyComponent>{"CTRL"}</KeyComponent> });
-    }
-
-    if props.modifier.super_key() {
-        match utils::get_os() {
-            OsName::MacOS => {
-                nodes.push(html! { <KeyComponent><icons::CmdIcon height="h-3" width="w-3" /></KeyComponent> })
-            }
-            _ => nodes
-                .push(html! { <KeyComponent><icons::WinKeyIcon height="h-3" width="w-3" /></KeyComponent> }),
-        }
-    }
-
-    if props.modifier.alt_key() {
-        nodes.push(html! { <KeyComponent>{"ALT"}</KeyComponent> });
-    }
-
-    if props.modifier.shift_key() {
-        nodes.push(html! { <KeyComponent>{"SHIFT"}</KeyComponent> });
-    }
-
-    html! { <>{nodes}</> }
 }
 
 #[function_component(UserActionComponent)]

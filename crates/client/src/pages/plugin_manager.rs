@@ -62,6 +62,7 @@ pub fn plugin_comp(props: &PluginProps) -> Html {
                 <Toggle
                     name={format!("{}-toggle", plugin.title)}
                     value={serde_json::to_string(&plugin.is_enabled).expect("Unable to serialize")}
+                    restart_required={false}
                     onchange={onclick}
                 />
             </div>

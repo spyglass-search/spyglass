@@ -1,8 +1,7 @@
-use shared::config::Config;
+use shared::config::UserSettings;
 use strum_macros::{Display, EnumString};
 use tauri::{
-    utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, SystemTrayMenu,
-    SystemTrayMenuItem, SystemTraySubmenu,
+    CustomMenuItem, Menu, PackageInfo, SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu,
 };
 #[cfg(not(target_os = "linux"))]
 use tauri::{MenuItem, Submenu};
@@ -28,9 +27,9 @@ pub enum MenuID {
     INSTALL_FIREFOX_EXT,
 }
 
-pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTrayMenu {
+pub fn get_tray_menu(package_info: &PackageInfo, user_settings: &UserSettings) -> SystemTrayMenu {
     let show = CustomMenuItem::new(MenuID::SHOW_SEARCHBAR.to_string(), "Show search")
-        .accelerator(config.user_settings.shortcut.clone());
+        .accelerator(user_settings.shortcut.clone());
 
     let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "⏸ Pause indexing");
     let quit = CustomMenuItem::new(MenuID::QUIT.to_string(), "Quit");
@@ -41,7 +40,7 @@ pub fn get_tray_menu(ctx: &Context<EmbeddedAssets>, config: &Config) -> SystemTr
     let app_version: String = if cfg!(debug_assertions) {
         "🚧 dev-build 🚧".into()
     } else {
-        format!("v20{}", ctx.package_info().version)
+        format!("v20{}", package_info.version)
     };
 
     let mut tray = SystemTrayMenu::new();

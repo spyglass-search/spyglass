@@ -141,7 +141,7 @@ fn show_window(window: &Window) {
     let _ = window.center();
 }
 
-fn _show_tab(app: &AppHandle, tab_url: &str) {
+pub fn _show_tab(app: &AppHandle, tab_url: &str) {
     let window = if let Some(window) = app.get_window(constants::SETTINGS_WIN_NAME) {
         window
     } else {
@@ -251,7 +251,6 @@ pub fn alert(window: &Window, title: &str, message: &str) {
         .show(|_| {});
 }
 
-#[allow(dead_code)]
 pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     {

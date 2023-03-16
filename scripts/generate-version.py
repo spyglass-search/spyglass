@@ -2,7 +2,7 @@ import os
 import requests
 import json
 
-RELEASE_URL = 'https://api.github.com/repos/a5huynh/spyglass/releases'
+RELEASE_URL = 'https://api.github.com/repos/spyglass-search/spyglass/releases'
 
 DARWIN_x86 = 'darwin-x86_64'
 DARWIN_ARM = 'darwin-aarch64'
@@ -51,7 +51,7 @@ def main():
 
     version = {
         'version': latest['tag_name'].replace('v20', ''),
-        'notes': f"See full release notes here: https://github.com/a5huynh/spyglass/releases/tag/{latest['tag_name']}",
+        'notes': f"See full release notes here: https://github.com/spyglass-search/spyglass/releases/tag/{latest['tag_name']}",
         'pub_date': latest['published_at'],
         'platforms': platforms
     }

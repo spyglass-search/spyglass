@@ -79,6 +79,8 @@ pub enum ClientInvoke {
     UpdateAndRestart,
     #[strum(serialize = "wizard_finished")]
     WizardFinished,
+    #[strum(serialize = "navigate")]
+    Navigate,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -123,4 +125,9 @@ pub struct UninstallLensParams {
 pub struct WizardFinishedParams {
     #[serde(rename(serialize = "toggleFileIndexer"))]
     pub toggle_file_indexer: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct NavigateParams {
+    pub page: String,
 }

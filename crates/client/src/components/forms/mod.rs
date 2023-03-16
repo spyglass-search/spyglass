@@ -2,6 +2,7 @@ use yew::prelude::*;
 
 use shared::form::{FormType, SettingOpts};
 
+mod keybinding;
 mod pathlist;
 mod stringlist;
 mod text;
@@ -12,16 +13,20 @@ pub use stringlist::*;
 pub use text::*;
 pub use toggle::*;
 
+use crate::components::forms::keybinding::KeyBinding;
+
 #[derive(Clone)]
 pub struct SettingChangeEvent {
     pub setting_name: String,
     pub new_value: String,
+    pub restart_required: bool,
 }
 
 #[derive(Properties, PartialEq)]
 pub struct FormFieldProps {
     pub name: String,
     pub value: String,
+    pub restart_required: bool,
     pub onchange: Callback<SettingChangeEvent>,
 }
 
@@ -60,6 +65,7 @@ impl FormElement {
                     <Toggle
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }
@@ -69,6 +75,7 @@ impl FormElement {
                     <Text
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }
@@ -78,6 +85,7 @@ impl FormElement {
                     <PathField
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }
@@ -87,6 +95,7 @@ impl FormElement {
                     <PathList
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }
@@ -96,6 +105,7 @@ impl FormElement {
                     <StringList
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }
@@ -105,6 +115,17 @@ impl FormElement {
                     <Text
                         name={props.setting_name.clone()}
                         value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
+                        onchange={Callback::from(move |evt| onchange.emit(evt))}
+                    />
+                }
+            }
+            FormType::KeyBinding => {
+                html! {
+                    <KeyBinding
+                        name={props.setting_name.clone()}
+                        value={self.opts.value.clone()}
+                        restart_required={props.opts.restart_required}
                         onchange={Callback::from(move |evt| onchange.emit(evt))}
                     />
                 }

@@ -1,12 +1,15 @@
 use js_sys::decode_uri_component;
 use url::Url;
-use yew::prelude::*;
+use yew::{platform::spawn_local, prelude::*};
+use yew_router::Routable;
 
 use super::{
-    icons,
+    btn, icons,
     tag::{Tag, TagIcon},
 };
+use crate::{pages::Tab, tauri_invoke, Route};
 use shared::response::{LensResult, SearchResult};
+use shared::{constants::FEEDBACK_FORM, event};
 
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
@@ -214,11 +217,11 @@ pub fn lens_result_component(props: &LensResultProps) -> Html {
     let component_styles = classes!(
         "flex",
         "flex-col",
-        "border-t",
-        "border-neutral-600",
-        "px-8",
-        "py-4",
+        "p-2",
+        "mt-2",
         "text-white",
+        "rounded",
+        "scroll-mt-2",
         if is_selected {
             "bg-cyan-900"
         } else {
@@ -278,4 +281,61 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
     }
 
     None
+}
+
+#[derive(Properties, PartialEq)]
+pub struct FeedbackProps {
+    pub query: String,
+    pub num_docs: u32,
+}
+
+#[function_component(FeedbackResult)]
+pub fn feedback_result(props: &FeedbackProps) -> Html {
+    html! {
+      <div class="p-4 text-base">
+        <div class="text-xl text-white">{"No results found 😭"}</div>
+        {if props.num_docs > 0 {
+            html! {
+                <div class="text-neutral-400 flex flex-row gap-2 items-center">
+                    {"Help us improve our results."}
+                    <btn::Btn href={FEEDBACK_FORM} size={btn::BtnSize::Xs}>
+                        {"Click to send feedback"}
+                    </btn::Btn>
+                </div>
+            }
+        } else {
+            let discover_cb = Callback::from(move |_| {
+                spawn_local(async move {
+                    let route = Route::SettingsPage { tab: Tab::Discover };
+                    let _ = tauri_invoke::<event::NavigateParams, ()>(
+                        event::ClientInvoke::Navigate,
+                        event::NavigateParams { page: route.to_path() }
+                    ).await;
+                });
+            });
+
+            let add_cb = Callback::from(move |_| {
+                spawn_local(async move {
+                    let route = Route::SettingsPage { tab: Tab::ConnectionsManager };
+                    let _ = tauri_invoke::<event::NavigateParams, ()>(
+                        event::ClientInvoke::Navigate,
+                        event::NavigateParams { page: route.to_path() }
+                    ).await;
+                });
+            });
+
+            html! {
+                <div class="text-neutral-400 flex flex-row gap-2 items-center">
+                    {"You don't currently have any documents in your library."}
+                    <btn::Btn onclick={discover_cb} size={btn::BtnSize::Xs}>
+                        {"Discover Lenses"}
+                    </btn::Btn>
+                    <btn::Btn onclick={add_cb} size={btn::BtnSize::Xs}>
+                        {"Add Connection"}
+                    </btn::Btn>
+                </div>
+            }
+        }}
+      </div>
+    }
 }

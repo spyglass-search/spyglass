@@ -3,14 +3,16 @@ use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 use jsonrpsee::core::{async_trait, Error};
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
+use jsonrpsee::types::{SubscriptionEmptyError, SubscriptionResult};
+use jsonrpsee::SubscriptionSink;
 use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
-use shared::config::Config;
+use shared::config::{Config, UserSettings};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
-use spyglass_rpc::RpcServer;
-use std::collections::HashMap;
+use spyglass_rpc::{RpcEventType, RpcServer};
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod handler;
@@ -24,7 +26,7 @@ pub struct SpyglassRpc {
 #[async_trait]
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
-        Ok("0.1.1".into())
+        Ok("0.1.2".into())
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
@@ -182,12 +184,65 @@ impl RpcServer for SpyglassRpc {
         handler::toggle_plugin(self.state.clone(), name, enabled).await
     }
 
-    async fn toggle_filesystem(&self, enabled: bool) -> Result<(), Error> {
-        handler::toggle_filesystem(self.state.clone(), enabled).await
-    }
-
     async fn uninstall_lens(&self, name: String) -> Result<(), Error> {
         handler::uninstall_lens(self.state.clone(), &self.config, &name).await
+    }
+
+    async fn update_user_settings(&self, settings: UserSettings) -> Result<UserSettings, Error> {
+        handler::update_user_settings(&self.state, &self.config, &settings).await
+    }
+
+    async fn user_settings(&self) -> Result<UserSettings, Error> {
+        handler::user_settings(&self.state).await
+    }
+
+    fn subscribe_events(
+        &self,
+        mut sink: SubscriptionSink,
+        events: Vec<RpcEventType>,
+    ) -> SubscriptionResult {
+        let res = sink.accept();
+        if res.is_err() {
+            log::warn!("Unable to accept subscription: {:?}", res);
+            return Err(SubscriptionEmptyError);
+        }
+
+        // Spawn a new task that listens for events in the channel and sends them out
+        let rpc_event_channel = self.state.rpc_events.clone();
+        let shutdown_cmd_tx = self.state.shutdown_cmd_tx.clone();
+        tokio::spawn(async move {
+            let mut receiver = rpc_event_channel
+                .lock()
+                .expect("rpc_events held by another thread")
+                .subscribe();
+            let mut shutdown = shutdown_cmd_tx.lock().await.subscribe();
+
+            let events: HashSet<RpcEventType> = events.clone().into_iter().collect();
+            log::debug!("SUBSCRIBED TO: {:?}", events);
+            loop {
+                tokio::select! {
+                    _ = shutdown.recv() => {
+                        return;
+                    }
+                    res = receiver.recv() => {
+                        match res {
+                            Ok(event) => {
+                                if events.contains(&event.event_type) {
+                                    if let Err(err) = sink.send(&event) {
+                                        log::warn!("unable to send to sub: {err}");
+                                    }
+                                }
+                            },
+                            Err(err) => {
+                                log::warn!("eror recev: {:?}", err);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(())
     }
 }
 
@@ -195,11 +250,13 @@ pub async fn start_api_server(
     state: AppState,
     config: Config,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
-    let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), state.user_settings.port);
+    let server_addr = SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::LOCALHOST),
+        state.user_settings.load_full().port,
+    );
     let server = ServerBuilder::default().build(server_addr).await?;
-
     let rpc_module = SpyglassRpc {
-        state,
+        state: state.clone(),
         config: config.clone(),
     };
     let addr = server.local_addr()?;

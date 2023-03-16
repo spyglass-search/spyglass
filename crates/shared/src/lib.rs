@@ -17,6 +17,8 @@ pub const OS_STR: &str = "mac";
 pub const OS_STR: &str = "windows";
 #[cfg(target_os = "linux")]
 pub const OS_STR: &str = "linux";
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows",)))]
+pub const OS_STR: &str = "Unknown";
 
 pub const MAC_OS: &str = "mac";
 pub const WINDOWS_OS: &str = "windows";

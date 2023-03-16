@@ -131,6 +131,16 @@ async fn handle_sync_credentials(
     });
 }
 
+pub fn api_id_to_label(api_id: &str) -> String {
+    match api_id {
+        "calendar.google.com" => gcal::TITLE.to_string(),
+        "drive.google.com" => gdrive::TITLE.to_string(),
+        "api.github.com" => github::TITLE.to_string(),
+        "oauth.reddit.com" => reddit::TITLE.to_string(),
+        _ => "Unknown".into(),
+    }
+}
+
 /// Load a connection for sync/crawls
 pub async fn load_connection(
     state: &AppState,

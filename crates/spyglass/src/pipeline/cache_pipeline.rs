@@ -103,5 +103,11 @@ pub async fn process_update(state: AppState, lens: &LensConfig, cache_path: Path
 
     // attempt to remove processed cache file
     let _ = cache::delete_cache(&cache_path);
-    log::debug!("Processing Cache Took: {:?}", now.elapsed().as_millis())
+    log::debug!("Processing Cache Took: {:?}", now.elapsed().as_millis());
+    state
+        .publish_event(&spyglass_rpc::RpcEvent {
+            event_type: spyglass_rpc::RpcEventType::LensInstalled,
+            payload: format!("{} lens installed!", lens.label()),
+        })
+        .await;
 }

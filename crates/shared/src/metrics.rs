@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use strum_macros::{AsRefStr, Display};
 
+use crate::OS_STR;
+
 #[allow(dead_code)]
 const ENDPOINT: &str = "https://api.mixpanel.com/track";
 const PROJECT_TOKEN: &str = "51d84766a0838458d63998f1e4566d3b";
@@ -23,11 +25,21 @@ pub enum Event {
     AuthorizeConnection { api_id: String },
     #[strum(serialize = "install_lens")]
     InstallLens { lens: String },
+    #[strum(serialize = "spyglass_started")]
+    SpyglassStarted,
+    #[strum(serialize = "local_file_scanning_enabled")]
+    LocalFileScanningEnabled,
+    #[strum(serialize = "local_file_scanning_disabled")]
+    LocalFileScanningDisabled,
+    #[strum(serialize = "update_lens")]
+    UpdateLens { lens: String },
     #[strum(serialize = "search")]
     Search { filters: Vec<String> },
     #[strum(serialize = "search_result")]
     SearchResult {
         num_results: usize,
+        num_docs: u64,
+        term_count: i32,
         domains: Vec<String>,
         wall_time_ms: u64,
     },
@@ -47,6 +59,7 @@ impl EventProps {
         properties.insert("token".into(), PROJECT_TOKEN.into());
         properties.insert("time".into(), chrono::Utc::now().timestamp().into());
         properties.insert("distinct_id".into(), uid.into());
+        properties.insert("$os".into(), OS_STR.into());
         properties.insert(
             "$insert_id".into(),
             uuid::Uuid::new_v4().as_hyphenated().to_string().into(),
@@ -96,17 +109,27 @@ impl Metrics {
                 data.properties
                     .insert("lens".into(), lens.to_owned().into());
             }
+            Event::UpdateLens { lens } => {
+                data.properties
+                    .insert("lens".into(), lens.to_owned().into());
+            }
             Event::Search { filters } => {
                 data.properties
                     .insert("filter".into(), filters.to_owned().into());
             }
             Event::SearchResult {
                 num_results,
+                num_docs,
+                term_count,
                 domains,
                 wall_time_ms,
             } => {
                 data.properties
                     .insert("num_results".into(), num_results.to_owned().into());
+                data.properties
+                    .insert("num_docs".into(), num_docs.to_owned().into());
+                data.properties
+                    .insert("term_count".into(), term_count.to_owned().into());
                 data.properties
                     .insert("domains".into(), domains.to_owned().into());
                 data.properties
@@ -115,6 +138,11 @@ impl Metrics {
             Event::UpdateCheck { current_version } => {
                 data.properties
                     .insert("current_version".into(), current_version.as_str().into());
+            }
+            Event::LocalFileScanningEnabled
+            | Event::LocalFileScanningDisabled
+            | Event::SpyglassStarted => {
+                //noop
             }
         }
 

@@ -19,7 +19,7 @@ use shared::{
 use crate::components::user_action_list::{self, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
-    result::{LensResultItem, SearchResultItem},
+    result::{FeedbackResult, LensResultItem, SearchResultItem},
     KeyComponent, SelectedLens,
 };
 use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
@@ -800,27 +800,38 @@ impl Component for SearchPage {
         let link = ctx.link();
 
         let results = match self.result_display {
-            ResultDisplay::None => html! { },
+            ResultDisplay::None => html! {},
             ResultDisplay::Docs => {
-                self.docs_results
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, res)| {
-                        let is_selected = idx == self.selected_idx && !self.action_menu_button_selected;
-                        let open_msg = Msg::OpenResult(res.to_owned());
-                        html! {
-                            <SearchResultItem
-                                 id={format!("{RESULT_PREFIX}{idx}")}
-                                 onclick={link.callback(move |_| open_msg.clone())}
-                                 result={res.clone()}
-                                 {is_selected}
-                            />
-                        }
-                    })
-                    .collect::<Html>()
-            },
+                // If we are unable to find anything, let's attempt to get some
+                // feedback from the user.
+                if self.docs_results.is_empty() {
+                    let num_docs = &self.search_meta.as_ref().map_or_else(|| 0, |x| x.num_docs);
+                    html! { <FeedbackResult query={self.query.clone()} num_docs={num_docs} /> }
+                } else {
+                    let html = self
+                        .docs_results
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, res)| {
+                            let is_selected =
+                                idx == self.selected_idx && !self.action_menu_button_selected;
+                            let open_msg = Msg::OpenResult(res.to_owned());
+                            html! {
+                                <SearchResultItem
+                                    id={format!("{RESULT_PREFIX}{idx}")}
+                                    onclick={link.callback(move |_| open_msg.clone())}
+                                    result={res.clone()}
+                                    {is_selected}
+                                />
+                            }
+                        })
+                        .collect::<Html>();
+
+                    html! { <div class="pb-2">{html}</div> }
+                }
+            }
             ResultDisplay::Lens => {
-                self.lens_results
+                let html = self.lens_results
                     .iter()
                     .enumerate()
                     .map(|(idx, res)| {
@@ -829,7 +840,9 @@ impl Component for SearchPage {
                             <LensResultItem id={format!("{RESULT_PREFIX}{idx}")} result={res.clone()} {is_selected} />
                         }
                     })
-                    .collect::<Html>()
+                    .collect::<Html>();
+
+                html! { <div class="pb-2">{html}</div> }
             }
         };
 
@@ -959,13 +972,17 @@ impl Component for SearchPage {
                         tabindex="-1"
                     />
                 </div>
-                { if !self.docs_results.is_empty() || !self.lens_results.is_empty() {
-                    html! {
-                        <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 pb-2 border-t border-neutral-600">
-                            <div class="w-full flex flex-col">{results}</div>
-                        </div>
+                {
+                    if self.result_display != ResultDisplay::None {
+                        html! {
+                            <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
+                                <div class="w-full flex flex-col">{results}</div>
+                            </div>
+                        }
+                    } else {
+                        html! { }
                     }
-                } else { html!{} }}
+                }
                 <div class="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
                   <div class="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
                       {search_meta}

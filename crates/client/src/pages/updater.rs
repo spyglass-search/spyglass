@@ -50,7 +50,7 @@ pub fn updater_page() -> Html {
             </div>
             <div class={classes!("fixed", "w-full", "bottom-0", "py-4", "px-8", "bg-stone-800", "z-400", "border-t-2", "border-stone-900")}>
                 <div class="flex flex-row place-content-center gap-4">
-                    <Btn href="https://github.com/a5huynh/spyglass/releases">
+                    <Btn href="https://github.com/spyglass-search/spyglass/releases">
                         {"Release Notes"}
                     </Btn>
                     <Btn {onclick} disabled={*is_updating}>

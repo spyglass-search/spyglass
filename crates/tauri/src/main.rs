@@ -15,14 +15,15 @@ use rpc::RpcMutex;
 use tauri::api::process::current_binary;
 use tauri::{
     AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray,
-    SystemTrayEvent,
+    SystemTrayEvent, Window,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
-use shared::config::Config;
+use diff::Diff;
+use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
 
@@ -55,7 +56,10 @@ const SPYGLASS_LEVEL: &str = "spyglass_app=INFO";
 const SPYGLASS_LEVEL: &str = "spyglass_app=DEBUG";
 
 #[derive(Clone)]
-pub struct AppShutdown;
+pub enum AppEvent {
+    BackendConnected,
+    Shutdown,
+}
 type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -77,25 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )))
     };
 
-    // Check and register this app to run on boot
-    let binary = current_binary(&Env::default());
-    if let Ok(path) = binary {
-        // NOTE: See how this works: https://github.com/Teamwork/node-auto-launch#how-does-it-work
-        if let Ok(auto) = AutoLaunchBuilder::new()
-            .set_app_name("Spyglass Search")
-            .set_app_path(&path.display().to_string())
-            .set_use_launch_agent(true)
-            .build()
-        {
-            if !config.user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
-                if let Ok(false) = auto.is_enabled() {
-                    let _ = auto.enable();
-                }
-            } else if let Ok(true) = auto.is_enabled() {
-                let _ = auto.disable();
-            }
-        }
-    }
+    update_auto_launch(&config.user_settings);
 
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -121,10 +107,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = fix_path_env::fix();
     let app = tauri::Builder::default()
         .plugin(plugins::lens_updater::init())
+        .plugin(plugins::notify::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
+            cmd::copy_to_clipboard,
             cmd::default_indices,
             cmd::delete_doc,
             cmd::escape,
@@ -132,19 +120,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::get_shortcut,
             cmd::list_connections,
             cmd::list_plugins,
-            cmd::load_user_settings,
             cmd::load_action_settings,
+            cmd::load_user_settings,
+            cmd::navigate,
             cmd::network_change,
             cmd::open_folder_path,
             cmd::open_lens_folder,
             cmd::open_plugins_folder,
             cmd::open_result,
-            cmd::copy_to_clipboard,
             cmd::open_settings_folder,
             cmd::recrawl_domain,
             cmd::resize_window,
-            cmd::revoke_connection,
             cmd::resync_connection,
+            cmd::revoke_connection,
             cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,
@@ -153,13 +141,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::wizard_finished,
         ])
         .menu(menu::get_app_menu())
-        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(&ctx, &config.clone())))
+        .system_tray(SystemTray::new().with_menu(menu::get_tray_menu(
+            ctx.package_info(),
+            &config.user_settings.clone(),
+        )))
         .setup(move |app| {
             let app_handle = app.app_handle();
             let startup_win = window::show_startup_window(&app_handle);
 
-            let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(1);
-            app.manage(shutdown_tx);
+            let (appevent_channel, _) = broadcast::channel::<AppEvent>(1);
+            app.manage(appevent_channel);
 
             let config = Config::new();
             log::info!("Loading prefs from: {:?}", Config::prefs_dir());
@@ -185,35 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config.user_settings.disable_telemetry,
             ));
 
-            // Register global shortcut
-            let mut shortcuts = app_handle.global_shortcut_manager();
-            match shortcuts.is_registered(&config.user_settings.shortcut) {
-                Ok(is_registered) => {
-                    if !is_registered {
-                        log::info!("Registering {} as shortcut", &config.user_settings.shortcut);
-                        let app_hand = app_handle;
-                        if let Err(e) =
-                            shortcuts.register(&config.user_settings.shortcut, move || {
-                                let window = window::get_searchbar(&app_hand);
-                                window::show_search_bar(&window);
-                            })
-                        {
-                            window::alert(
-                                &startup_win,
-                                "Error registering global shortcut",
-                                &format!("{e}"),
-                            );
-                        }
-                    }
-                }
-                Err(e) => {
-                    window::alert(
-                        &startup_win,
-                        "Error registering global shortcut",
-                        &format!("{e}"),
-                    );
-                }
-            }
+            register_global_shortcut(&startup_win, &app_handle, &config.user_settings);
 
             Ok(())
         })
@@ -295,8 +258,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.run(|app_handle, e| match e {
         RunEvent::ExitRequested { .. } => {
             // Do some cleanup for long running tasks
-            let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
-            let _ = shutdown_tx.send(AppShutdown);
+            let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
+            let _ = shutdown_tx.send(AppEvent::Shutdown);
         }
         RunEvent::Exit { .. } => {
             log::info!("😔 bye bye");
@@ -305,6 +268,83 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     Ok(())
+}
+
+// Applies updated configuration to the client
+pub fn configuration_updated(
+    window: Window,
+    old_configuration: UserSettings,
+    new_configuration: UserSettings,
+) {
+    let diff = old_configuration.diff(&new_configuration);
+
+    if diff.disable_autolaunch.is_some() {
+        update_auto_launch(&new_configuration);
+    }
+
+    if diff.shortcut.is_some() {
+        register_global_shortcut(&window, &window.app_handle(), &new_configuration);
+        if let Err(error) = window
+            .app_handle()
+            .tray_handle()
+            .set_menu(menu::get_tray_menu(
+                window.app_handle().package_info(),
+                &new_configuration,
+            ))
+        {
+            log::error!("Error updating system tray {:?}", error);
+        }
+    }
+}
+
+// Helper used to update the global shortcut
+fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &UserSettings) {
+    // Register global shortcut
+    let mut shortcuts = app_handle.global_shortcut_manager();
+    if let Err(error) = shortcuts.unregister_all() {
+        log::info!("Unable to unregister all shortcuts {:?}", error);
+    }
+
+    match shortcuts.is_registered(&settings.shortcut) {
+        Ok(is_registered) => {
+            if !is_registered {
+                log::info!("Registering {} as shortcut", &settings.shortcut);
+                let app_hand = app_handle.clone();
+                if let Err(e) = shortcuts.register(&settings.shortcut, move || {
+                    let window = window::get_searchbar(&app_hand);
+                    window::show_search_bar(&window);
+                }) {
+                    window::alert(window, "Error registering global shortcut", &format!("{e}"));
+                }
+            }
+        }
+        Err(e) => {
+            window::alert(window, "Error registering global shortcut", &format!("{e}"));
+        }
+    }
+}
+
+// Helper method used to update the auto launch configuration
+pub fn update_auto_launch(user_settings: &UserSettings) {
+    // Check and register this app to run on boot
+    let binary = current_binary(&Env::default());
+    if let Ok(path) = binary {
+        // NOTE: See how this works: https://github.com/Teamwork/node-auto-launch#how-does-it-work
+        if let Ok(auto) = AutoLaunchBuilder::new()
+            .set_app_name("Spyglass Search")
+            .set_app_path(&path.display().to_string())
+            .set_use_launch_agent(true)
+            .build()
+        {
+            if !user_settings.disable_autolaunch && cfg!(not(debug_assertions)) {
+                if let Ok(false) = auto.is_enabled() {
+                    let _ = auto.enable();
+                }
+            } else if let Ok(true) = auto.is_enabled() {
+                let _ = auto.disable();
+            }
+        }
+    }
 }
 
 async fn pause_crawler(app: AppHandle, menu_id: String) {
@@ -361,7 +401,7 @@ async fn check_version_interval(current_version: String, app_handle: AppHandle) 
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
 
-    let shutdown_tx = app_handle.state::<broadcast::Sender<AppShutdown>>();
+    let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
     let mut shutdown = shutdown_tx.subscribe();
     let metrics = app_handle.try_state::<Metrics>();
 

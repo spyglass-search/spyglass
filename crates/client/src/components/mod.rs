@@ -6,7 +6,10 @@ pub mod result;
 pub mod tag;
 pub mod tooltip;
 pub mod user_action_list;
+use shared::keyboard::ModifiersState;
 use yew::{prelude::*, virtual_dom::AttrValue};
+
+use crate::utils::{self, OsName};
 
 #[derive(Properties, PartialEq, Eq)]
 pub struct SelectLensProps {
@@ -146,4 +149,38 @@ pub fn txt_bubble(props: &KeyCodeProps) -> Html {
         {props.children.clone()}
       </div>
     }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct ModifierProps {
+    pub modifier: ModifiersState,
+}
+
+#[function_component(ModifierIcon)]
+pub fn modifier_icon(props: &ModifierProps) -> Html {
+    let mut nodes: Vec<Html> = Vec::new();
+
+    if props.modifier.control_key() {
+        nodes.push(html! { <KeyComponent>{"CTRL"}</KeyComponent> });
+    }
+
+    if props.modifier.super_key() {
+        match utils::get_os() {
+            OsName::MacOS => {
+                nodes.push(html! { <KeyComponent><icons::CmdIcon height="h-3" width="w-3" /></KeyComponent> })
+            }
+            _ => nodes
+                .push(html! { <KeyComponent><icons::WinKeyIcon height="h-3" width="w-3" /></KeyComponent> }),
+        }
+    }
+
+    if props.modifier.alt_key() {
+        nodes.push(html! { <KeyComponent>{"ALT"}</KeyComponent> });
+    }
+
+    if props.modifier.shift_key() {
+        nodes.push(html! { <KeyComponent>{"SHIFT"}</KeyComponent> });
+    }
+
+    html! { <>{nodes}</> }
 }
