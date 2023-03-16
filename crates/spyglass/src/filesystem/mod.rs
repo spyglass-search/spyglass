@@ -13,6 +13,7 @@ use tokio::task::JoinHandle;
 use url::Url;
 
 use crate::crawler::CrawlResult;
+use crate::filesystem::extensions::SupportedExt;
 use crate::state::AppState;
 use entities::sea_orm::Set;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
@@ -35,6 +36,8 @@ use notify_debouncer_mini::{DebouncedEvent, DebouncedEventKind, Debouncer};
 
 use crate::documents;
 
+pub mod audio;
+pub mod extensions;
 pub mod utils;
 
 /// The lens name for indexed files
@@ -807,33 +810,26 @@ async fn _process_file_and_dir(
         let path = event.path;
         let uri = utils::path_to_uri(&path);
 
-        if path.exists() {
-            if utils::is_windows_shortcut(path.as_path()) {
-                let location = utils::get_shortcut_destination(path.as_path());
+        let path = if utils::is_windows_shortcut(path.as_path()) {
+            utils::get_shortcut_destination(path.as_path())
+        } else if path.exists() {
+            Some(path.to_path_buf())
+        } else {
+            None
+        };
 
-                if let Some(location) = location {
-                    let ext = &location
-                        .extension()
-                        .and_then(|x| x.to_str())
-                        .map(|x| x.to_string())
-                        .unwrap_or_default();
-
-                    // If the shortcut points to a file we can process then
-                    // process the file instead of the shortcut
-                    if extensions.contains(ext) {
-                        let file_uri = utils::path_to_uri(&location);
-                        enqueue_list.push(file_uri);
-                    }
-                }
-            }
-
+        if let Some(path) = path {
             let ext = &path
                 .extension()
                 .and_then(|x| x.to_str())
                 .map(|x| x.to_string())
                 .unwrap_or_default();
-            if extensions.contains(ext) {
-                enqueue_list.push(uri);
+
+            // If the shortcut points to a file we can process then
+            // process the file instead of the shortcut
+            if SupportedExt::from_ext(&ext) != SupportedExt::NotSupported {
+                let file_uri = utils::path_to_uri(&path);
+                enqueue_list.push(file_uri);
             } else {
                 general_processing.push(uri);
             }
