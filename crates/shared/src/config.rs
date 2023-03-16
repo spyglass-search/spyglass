@@ -376,8 +376,8 @@ pub struct UserSettings {
     pub block_list: Vec<String>,
     /// Search bar activation hot key
     #[serde(default = "UserSettings::default_shortcut")]
-    /// Directory for metadata & index
     pub shortcut: String,
+    /// Directory for metadata & index
     #[serde(default = "UserSettings::default_data_dir")]
     pub data_directory: PathBuf,
     /// Should we crawl links that don't match our lens rules?
