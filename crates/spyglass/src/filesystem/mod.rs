@@ -800,7 +800,7 @@ async fn _process_messages(
 async fn _process_file_and_dir(
     state: &AppState,
     events: Vec<DebouncedEvent>,
-    extensions: &HashSet<String>,
+    _extensions: &HashSet<String>,
 ) -> anyhow::Result<()> {
     log::info!("Processing received updates");
     let mut enqueue_list = Vec::new();
@@ -827,7 +827,7 @@ async fn _process_file_and_dir(
 
             // If the shortcut points to a file we can process then
             // process the file instead of the shortcut
-            if SupportedExt::from_ext(&ext) != SupportedExt::NotSupported {
+            if SupportedExt::from_ext(ext) != SupportedExt::NotSupported {
                 let file_uri = utils::path_to_uri(&path);
                 enqueue_list.push(file_uri);
             } else {

@@ -40,6 +40,7 @@ percent-encoding = "2.2"
 regex = "1"
 reqwest = { version = "0.11", features = ["json"] }
 ron = "0.8"
+rubato = "0.12.0"
 rusqlite = { version = "*", features = ["bundled"] }
 sentry = "0.30.0"
 sentry-tracing = "0.30.0"
@@ -64,7 +65,7 @@ warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
-whisper-rs = "0.4.0"
+whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "cf278027eeb5aa849360f664de2c34287418c625" }
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
