@@ -296,7 +296,7 @@ impl SpyglassFileWatcher {
         }
     }
 
-    async fn _remove_path(&mut self, path: &Path) {
+    async fn remove_path(&mut self, path: &Path) {
         if let Some((_key, _watchers)) = self.path_map.remove(&path.to_path_buf()) {
             let _ = self.watcher.lock().await.watcher().unwatch(path);
         }
@@ -332,6 +332,26 @@ impl SpyglassFileWatcher {
     fn add_ignore_file(&self, file: &Path) {
         if let Ok(patterns) = utils::patterns_from_file(file) {
             self.ignore_files.insert(file.to_path_buf(), patterns);
+        }
+    }
+
+    /// Remove any watched paths that is not in the provided list
+    async fn remove_unwatched_paths(&mut self, paths: &[PathBuf]) {
+        let mut missing_paths = Vec::new();
+        for map_ref in self.path_map.iter() {
+            let mut found = false;
+            for watched_path in paths {
+                if map_ref.key() == watched_path {
+                    found = true;
+                }
+            }
+            if !found {   
+                missing_paths.push(map_ref.key().clone());
+            }
+        }
+
+        for path_to_remove in missing_paths {
+            self.remove_path(path_to_remove.as_path()).await;
         }
     }
 
@@ -623,7 +643,7 @@ pub async fn configure_watcher(state: AppState) {
 
         let mut watcher = state.file_watcher.lock().await;
         if let Some(watcher) = watcher.as_mut() {
-            for path in paths {
+            for path in &paths {
                 if !watcher.is_path_initialized(path.as_path()) {
                     log::debug!("Adding {:?} to watch list", path);
                     let updates = watcher.initialize_path(path.as_path()).await;
@@ -637,9 +657,11 @@ pub async fn configure_watcher(state: AppState) {
                     ));
                 }
             }
+            watcher.remove_unwatched_paths(&paths).await;
         } else {
             log::error!("Watcher is missing");
         }
+
 
         match processed_files::remove_unmatched_paths(&state.db, &path_names, false).await {
             Ok(removed) => {
