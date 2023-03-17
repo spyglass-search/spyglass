@@ -48,7 +48,7 @@ serde_json = "1.0"
 sha2 = "0.10"
 strum = "0.24"
 strum_macros = "0.24"
-tantivy = "0.18"
+tantivy = "0.19"
 tendril = "0.4.2"
 thiserror = "1.0.37"
 tokio = { version = "1", features = ["full"] }

@@ -16,7 +16,8 @@ serde_json = "1.0"
 shared = { path = "../shared" }
 strum = "0.24"
 strum_macros = "0.24"
-tantivy = "0.18"
+tantivy_18 = { package="tantivy", version="0.18" }
+tantivy = "0.19"
 thiserror = "1.0.38"
 tokio = { version = "1", features = ["full"] }
 url = "2.2"

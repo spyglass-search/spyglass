@@ -1,14 +1,10 @@
-use tantivy::schema::*;
+use tantivy_18::schema::*;
 
 pub type FieldName = String;
-
-/// The current schema version
-pub const SCHEMA_VERSION: &str = "4";
 pub struct SchemaMapping {
     pub text_fields: Option<Vec<(FieldName, TextOptions)>>,
-    pub date_fields: Option<Vec<(FieldName, DateOptions)>>,
-    pub unsigned_fields: Option<Vec<(FieldName, NumericOptions)>>,
 }
+
 pub trait SearchDocument {
     fn as_field_vec() -> SchemaMapping;
 
@@ -26,18 +22,6 @@ pub fn mapping_to_schema(mapping: &SchemaMapping) -> Schema {
             schema_builder.add_text_field(name, opts.clone());
         }
     }
-
-    if let Some(fields) = &mapping.date_fields {
-        for (name, opts) in fields {
-            schema_builder.add_date_field(name, opts.clone());
-        }
-    }
-
-    if let Some(fields) = &mapping.unsigned_fields {
-        for (name, opts) in fields {
-            schema_builder.add_u64_field(name, opts.clone());
-        }
-    }
     schema_builder.build()
 }
 
@@ -49,9 +33,7 @@ pub struct DocFields {
     pub description: Field,
     pub title: Field,
     pub url: Field,
-    pub tags: Field,
-    pub published: Field,
-    pub lastmodified: Field,
+    pub raw: Field,
 }
 
 impl SearchDocument for DocFields {
@@ -68,41 +50,17 @@ impl SearchDocument for DocFields {
         SchemaMapping {
             text_fields: Some(vec![
                 // Used to reference this document
-                ("id".into(), STRING | STORED | FAST),
+                ("id".into(), STRING | STORED),
                 // Document contents
-                ("domain".into(), STRING | STORED | FAST),
-                ("title".into(), TEXT | STORED | FAST),
-                // Used for display purposes
+                ("domain".into(), STRING | STORED),
+                ("title".into(), TEXT | STORED),
                 ("description".into(), TEXT | STORED),
-                ("url".into(), STRING | STORED | FAST),
-                // Indexed
-                ("content".into(), TEXT | STORED),
+                ("url".into(), STRING | STORED),
+                // Indexed but don't store for retreival
+                ("content".into(), TEXT),
+                // Stored but not indexed
+                ("raw".into(), STORED.into()),
             ]),
-            date_fields: Some(vec![
-                (
-                    "published".into(),
-                    DateOptions::default()
-                        .set_precision(DatePrecision::Microseconds)
-                        .set_fast(Cardinality::SingleValue)
-                        .set_indexed()
-                        .set_stored(),
-                ),
-                (
-                    "lastmodified".into(),
-                    DateOptions::default()
-                        .set_precision(DatePrecision::Microseconds)
-                        .set_fast(Cardinality::SingleValue)
-                        .set_indexed()
-                        .set_stored(),
-                ),
-            ]),
-            unsigned_fields: Some(vec![(
-                "tags".into(),
-                NumericOptions::default()
-                    .set_fast(Cardinality::MultiValues)
-                    .set_indexed()
-                    .set_stored(),
-            )]),
         }
     }
 
@@ -117,13 +75,7 @@ impl SearchDocument for DocFields {
                 .expect("No description in schema"),
             title: schema.get_field("title").expect("No title in schema"),
             url: schema.get_field("url").expect("No url in schema"),
-            tags: schema.get_field("tags").expect("No tags in schema"),
-            published: schema
-                .get_field("published")
-                .expect("No published date in schema"),
-            lastmodified: schema
-                .get_field("lastmodified")
-                .expect("No last modified date in schema"),
+            raw: schema.get_field("raw").expect("No raw in schema"),
         }
     }
 }

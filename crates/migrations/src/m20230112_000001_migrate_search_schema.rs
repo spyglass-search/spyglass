@@ -2,18 +2,19 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use entities::models::schema::v2::{self, SearchDocument as SearchDocumentV2};
+use entities::models::schema::v3::{self, SearchDocument as sSearchDocumentV3};
 use entities::sea_orm::QueryResult;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use sea_orm_migration::prelude::*;
-use tantivy::collector::TopDocs;
-use tantivy::directory::MmapDirectory;
-use tantivy::query::TermQuery;
-use tantivy::TantivyError;
-use tantivy::{schema::*, IndexWriter};
-use tantivy::{Index, IndexReader, ReloadPolicy};
+use tantivy_18::collector::TopDocs;
+use tantivy_18::directory::MmapDirectory;
+use tantivy_18::query::TermQuery;
+use tantivy_18::TantivyError;
+use tantivy_18::{schema::*, IndexWriter};
+use tantivy_18::{Index, IndexReader, ReloadPolicy};
 
-use entities::schema::{mapping_to_schema, SchemaMapping};
 use entities::sea_orm::{ConnectionTrait, Statement};
 use shared::config::Config;
 
@@ -21,27 +22,13 @@ use crate::utils::migration_utils;
 
 pub struct Migration;
 impl Migration {
-    pub fn before_schema(&self) -> SchemaMapping {
-        SchemaMapping {
-            text_fields: Some(vec![
-                // Used to reference this document
-                ("id".into(), STRING | STORED | FAST),
-                // Document contents
-                ("domain".into(), STRING | STORED | FAST),
-                ("title".into(), TEXT | STORED | FAST),
-                // Used for display purposes
-                ("description".into(), TEXT | STORED),
-                ("url".into(), STRING | STORED | FAST),
-                // Indexed
-                ("content".into(), TEXT | STORED),
-            ]),
-            unsigned_fields: None,
-        }
+    pub fn before_schema(&self) -> v2::SchemaMapping {
+        v2::DocFields::as_field_vec()
     }
 
     pub fn before_reader(&self, path: &PathBuf) -> Result<IndexReader, TantivyError> {
         let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
-        let index = Index::open_or_create(dir, mapping_to_schema(&self.before_schema()))?;
+        let index = Index::open_or_create(dir, v2::mapping_to_schema(&self.before_schema()))?;
 
         index
             .reader_builder()
@@ -49,33 +36,13 @@ impl Migration {
             .try_into()
     }
 
-    pub fn after_schema(&self) -> SchemaMapping {
-        SchemaMapping {
-            text_fields: Some(vec![
-                // Used to reference this document
-                ("id".into(), STRING | STORED | FAST),
-                // Document contents
-                ("domain".into(), STRING | STORED | FAST),
-                ("title".into(), TEXT | STORED | FAST),
-                // Used for display purposes
-                ("description".into(), TEXT | STORED),
-                ("url".into(), STRING | STORED | FAST),
-                // Indexed
-                ("content".into(), TEXT | STORED),
-            ]),
-            unsigned_fields: Some(vec![(
-                "tags".into(),
-                NumericOptions::default()
-                    .set_fast(Cardinality::MultiValues)
-                    .set_indexed()
-                    .set_stored(),
-            )]),
-        }
+    pub fn after_schema(&self) -> v3::SchemaMapping {
+        v3::DocFields::as_field_vec()
     }
 
     pub fn after_writer(&self, path: &PathBuf) -> IndexWriter {
         let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
-        let index = Index::open_or_create(dir, mapping_to_schema(&self.after_schema()))
+        let index = Index::open_or_create(dir, v3::mapping_to_schema(&self.after_schema()))
             .expect("Unable to open search index");
 
         index.writer(50_000_000).expect("Unable to create writer")
@@ -223,8 +190,8 @@ impl MigrationTrait for Migration {
 
         println!("Migrating index @ {old_index_path:?} to {new_index_path:?}");
 
-        let old_schema = mapping_to_schema(&self.before_schema());
-        let new_schema = mapping_to_schema(&self.after_schema());
+        let old_schema = v2::mapping_to_schema(&self.before_schema());
+        let new_schema = v3::mapping_to_schema(&self.after_schema());
         let old_reader_res = self.before_reader(&old_index_path);
         if let Err(err) = old_reader_res {
             // Potentially already migrated?
