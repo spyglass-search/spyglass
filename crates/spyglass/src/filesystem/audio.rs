@@ -15,8 +15,6 @@ use symphonia::core::{
 };
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
 
-const MODEL_PATH: &str = "../../assets/models/whisper.base.en.bin";
-
 fn resample(og: &[f32], og_rate: u32) -> Result<Vec<f32>, ResamplerConstructionError> {
     let params = InterpolationParameters {
         sinc_len: 256,
@@ -160,14 +158,14 @@ impl Segment {
 }
 
 /// Given a path to a wav file, transcribe it using our **shhhh** models.
-pub fn transcibe_audio(path: PathBuf, segment_len: i32) -> anyhow::Result<Vec<Segment>> {
+pub fn transcibe_audio(path: PathBuf, model_path: PathBuf, segment_len: i32) -> anyhow::Result<Vec<Segment>> {
     if !path.exists() || !path.is_file() {
         return Err(anyhow!("Invalid file path"));
     }
 
     let mut segments = Vec::new();
     if let Ok(samples) = parse_audio_file(&path) {
-        let mut ctx = WhisperContext::new(MODEL_PATH).expect("failed to open model");
+        let mut ctx = WhisperContext::new(&model_path.to_string_lossy()).expect("failed to open model");
 
         let mut params = FullParams::new(SamplingStrategy::default());
         params.set_max_len(segment_len);
@@ -191,6 +189,7 @@ pub fn transcibe_audio(path: PathBuf, segment_len: i32) -> anyhow::Result<Vec<Se
 
 #[cfg(test)]
 mod test {
+    const MODEL_PATH: &str = "../../assets/models/whisper.base.en.bin";
     use super::transcibe_audio;
 
     #[test]
@@ -198,7 +197,7 @@ mod test {
     fn test_wav_transcription() {
         let expected = include_str!("../../../../fixtures/audio/jfk.txt");
         let path = "../../fixtures/audio/jfk.wav".into();
-        let segments = transcibe_audio(path, 1).expect("Unable to transcribe");
+        let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
         assert!(segments.len() > 0);
 
         let combined = segments
@@ -214,7 +213,7 @@ mod test {
     fn test_ogg_transcription() {
         let expected = include_str!("../../../../fixtures/audio/armstrong.txt");
         let path = "../../fixtures/audio/armstrong.ogg".into();
-        let segments = transcibe_audio(path, 1).expect("Unable to transcribe");
+        let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
         assert!(segments.len() > 0);
         let combined = segments
             .iter()

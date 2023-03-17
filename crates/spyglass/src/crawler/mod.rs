@@ -505,7 +505,7 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
             SupportedExt::Audio(_) => {
                 // Attempt to transcribe audio
-                match audio::transcibe_audio(path.to_path_buf(), 0) {
+                match audio::transcibe_audio(path.to_path_buf(), "assets/models/whisper.base.en.bin".into(), 0) {
                     Ok(segments) => {
                         // Combine segments into one large string.
                         let combined = segments
