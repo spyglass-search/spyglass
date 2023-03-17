@@ -35,6 +35,7 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<WsClient> {
     let retry_strategy = FixedInterval::from_millis(5000).take(4);
     match Retry::spawn(retry_strategy, || {
         WsClientBuilder::default()
+            .connection_timeout(std::time::Duration::from_secs(10))
             .request_timeout(std::time::Duration::from_secs(10))
             .build(endpoint)
     })
