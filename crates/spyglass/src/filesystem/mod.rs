@@ -345,7 +345,7 @@ impl SpyglassFileWatcher {
                     found = true;
                 }
             }
-            if !found {   
+            if !found {
                 missing_paths.push(map_ref.key().clone());
             }
         }
@@ -661,7 +661,6 @@ pub async fn configure_watcher(state: AppState) {
         } else {
             log::error!("Watcher is missing");
         }
-
 
         match processed_files::remove_unmatched_paths(&state.db, &path_names, false).await {
             Ok(removed) => {
