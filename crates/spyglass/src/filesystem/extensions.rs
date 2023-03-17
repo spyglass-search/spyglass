@@ -1,21 +1,33 @@
 use std::str::FromStr;
-
-use strum_macros::{Display, EnumString};
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter, EnumString};
 
 // snake_case ensures that everything is lowercase
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 #[strum(serialize_all = "snake_case")]
 pub enum SupportedExt {
-    /// Handle by our audio transcription pipeline
+    /// Handled by our audio transcription pipeline
     Audio(AudioExt),
     /// Handled by our code symbol extraction pipeline
     Code(CodeExt),
+    /// Handled by our doc/spreadsheet extraction pipeline.
+    Document(DocumentExt),
     /// Read & immediately indexed. No processing required.
     Text(TextExt),
     NotSupported,
 }
 
 impl SupportedExt {
+    pub fn list_all() -> Vec<String> {
+        let mut list = Vec::new();
+        list.extend(AudioExt::iter().map(|x| x.to_string()));
+        list.extend(CodeExt::iter().map(|x| x.to_string()));
+        list.extend(DocumentExt::iter().map(|x| x.to_string()));
+        list.extend(TextExt::iter().map(|x| x.to_string()));
+
+        list
+    }
+
     pub fn from_ext(ext: &str) -> Self {
         let ext = ext.to_lowercase();
         if let Ok(ext) = AudioExt::from_str(&ext) {
@@ -28,14 +40,14 @@ impl SupportedExt {
     }
 }
 
-#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq)]
+#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum AudioExt {
     M4a,
     Wav,
 }
 
-#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq)]
+#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum CodeExt {
     C,
@@ -45,17 +57,23 @@ pub enum CodeExt {
     Ts,
 }
 
-#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq)]
+#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub enum DocumentExt {
+    Docx,
+    Ods,
+    Xls,
+    Xlsx,
+}
+
+#[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum TextExt {
     Cfg,
     Csv,
-    Json,
     Md,
-    Rtf,
     Toml,
     Txt,
-    Xml,
     Yaml,
     Yml,
 }

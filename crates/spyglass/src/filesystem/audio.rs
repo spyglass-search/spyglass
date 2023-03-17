@@ -160,7 +160,7 @@ impl Segment {
 }
 
 /// Given a path to a wav file, transcribe it using our **shhhh** models.
-fn transcibe_audio(path: PathBuf, segment_len: i32) -> anyhow::Result<Vec<Segment>> {
+pub fn transcibe_audio(path: PathBuf, segment_len: i32) -> anyhow::Result<Vec<Segment>> {
     if !path.exists() || !path.is_file() {
         return Err(anyhow!("Invalid file path"));
     }

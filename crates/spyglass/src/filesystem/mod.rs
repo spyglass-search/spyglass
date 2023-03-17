@@ -635,14 +635,13 @@ pub async fn configure_watcher(state: AppState) {
             .track(shared::metrics::Event::LocalFileScanningEnabled)
             .await;
 
-        let extension = utils::get_supported_file_extensions(&state);
         let paths = utils::get_search_directories(&state);
         let path_names = paths
             .iter()
             .map(|path| utils::path_to_uri(path))
             .collect::<Vec<String>>();
 
-        _handle_extension_reprocessing(&state, &extension).await;
+        _handle_extension_reprocessing(&state).await;
 
         let mut watcher = state.file_watcher.lock().await;
         if let Some(watcher) = watcher.as_mut() {
@@ -652,12 +651,7 @@ pub async fn configure_watcher(state: AppState) {
                     let updates = watcher.initialize_path(path.as_path()).await;
                     let rx1 = watcher.watch_path(path.as_path(), None, true).await;
 
-                    tokio::spawn(_process_messages(
-                        state.clone(),
-                        rx1,
-                        updates,
-                        extension.clone(),
-                    ));
+                    tokio::spawn(_process_messages(state.clone(), rx1, updates));
                 }
             }
             watcher.remove_unwatched_paths(&paths).await;
@@ -706,52 +700,28 @@ pub async fn configure_watcher(state: AppState) {
     }
 }
 
-// Helper method used to process any updates required for changes in the configured
-// extensions
-async fn _handle_extension_reprocessing(state: &AppState, extension: &HashSet<String>) {
-    match crawl_queue::process_urls_for_removed_exts(extension.iter().cloned().collect(), &state.db)
-        .await
-    {
-        Ok(urls) => {
-            let reprocessed_docs = urls
-                .iter()
-                .map(|url| _uri_to_debounce(&url.url))
-                .collect::<Vec<DebouncedEvent>>();
-            if let Err(err) = _process_file_and_dir(state, reprocessed_docs, extension).await {
-                log::error!(
-                    "Error processing document updates for removed extensions {:?}",
-                    err
-                );
-            }
-        }
-        Err(error) => {
-            log::error!("Error running recrawl {:?}", error);
-        }
-    }
-
+/// Helper method used to process any updates required for changes in the configured
+/// extensions
+async fn _handle_extension_reprocessing(state: &AppState) {
     let mut updates: Vec<DebouncedEvent> = Vec::new();
-    for ext in extension {
-        match processed_files::get_files_to_recrawl(ext, &state.db).await {
-            Ok(recrawls) => {
-                if !recrawls.is_empty() {
-                    updates.extend(recrawls.iter().map(|uri| DebouncedEvent {
+    for ext in SupportedExt::list_all() {
+        if let Ok(recrawls) = processed_files::get_files_to_recrawl(&ext, &state.db).await {
+            updates.extend(recrawls.iter().flat_map(|uri| {
+                if let Ok(path) = utils::uri_to_path(uri) {
+                    Some(DebouncedEvent {
                         kind: DebouncedEventKind::Any,
-                        path: utils::uri_to_path(uri).unwrap_or_default(),
-                    }));
+                        path,
+                    })
+                } else {
+                    None
                 }
-            }
-            Err(err) => {
-                log::error!("Error collecting recrawls {:?}", err);
-            }
+            }));
         }
     }
 
     if !updates.is_empty() {
-        if let Err(err) = _process_file_and_dir(state, updates, extension).await {
-            log::error!(
-                "Error processing updates for newly added extensions {:?}",
-                err
-            );
+        if let Err(err) = _process_file_and_dir(state, updates).await {
+            log::warn!("Error processing updates for newly added extensions {err}");
         }
     }
 }
@@ -773,10 +743,9 @@ async fn _process_messages(
     state: AppState,
     mut rx: Receiver<Vec<DebouncedEvent>>,
     initial: Vec<DebouncedEvent>,
-    extensions: HashSet<String>,
 ) {
     log::info!("Processing {:?} initial updates.", initial.len());
-    if let Err(error) = _process_file_and_dir(&state, initial, &extensions).await {
+    if let Err(error) = _process_file_and_dir(&state, initial).await {
         log::error!("Error processing initial files {:?}", error);
     }
 
@@ -784,7 +753,7 @@ async fn _process_messages(
         let msg = rx.recv().await;
         match msg {
             Some(event) => {
-                if let Err(error) = _process_file_and_dir(&state, event, &extensions).await {
+                if let Err(error) = _process_file_and_dir(&state, event).await {
                     log::error!("Error processing updates {:?}", error);
                 }
             }
@@ -800,7 +769,6 @@ async fn _process_messages(
 async fn _process_file_and_dir(
     state: &AppState,
     events: Vec<DebouncedEvent>,
-    _extensions: &HashSet<String>,
 ) -> anyhow::Result<()> {
     log::info!("Processing received updates");
     let mut enqueue_list = Vec::new();
