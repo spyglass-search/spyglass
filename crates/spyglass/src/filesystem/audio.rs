@@ -23,11 +23,16 @@ fn resample(og: &[f32], og_rate: u32) -> Vec<f32> {
     };
 
     let mut resampler =
-        SincFixedIn::<f32>::new(16_000f64 / og_rate as f64, 2.0, params, og.len(), 1).unwrap();
+        SincFixedIn::<f32>::new(16_000f64 / og_rate as f64, 2.0, params, og.len(), 1)
+            .expect("Unable to create resampler");
 
     let waves_in = vec![og.to_vec()];
-    let mut waves_out = resampler.process(&waves_in, None).unwrap();
-    waves_out.pop().unwrap_or_default()
+    let mut waves_out = resampler.process(&waves_in, None).unwrap_or_default();
+    if waves_out.is_empty() {
+        Vec::new()
+    } else {
+        waves_out.pop().unwrap_or_default()
+    }
 }
 
 // todo: handling streaming in large files
