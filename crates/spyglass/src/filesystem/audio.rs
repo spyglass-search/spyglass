@@ -169,8 +169,13 @@ pub fn transcibe_audio(
 
     let mut segments = Vec::new();
     if let Ok(samples) = parse_audio_file(&path) {
-        let mut ctx =
-            WhisperContext::new(&model_path.to_string_lossy()).expect("failed to open model");
+        let mut ctx = match WhisperContext::new(&model_path.to_string_lossy()) {
+            Ok(ctx) => ctx,
+            Err(err) => {
+                println!("unable to load model: {:?}", err);
+                return Err(anyhow!("Unable to load model: {:?}", err));
+            }
+        };
 
         let mut params = FullParams::new(SamplingStrategy::default());
         params.set_max_len(segment_len);
