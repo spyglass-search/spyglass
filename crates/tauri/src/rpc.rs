@@ -30,23 +30,24 @@ pub struct SpyglassServerClient {
 
 /// Build client & attempt a connection to the health check endpoint.
 async fn try_connect(endpoint: &str) -> anyhow::Result<WsClient> {
-    match WsClientBuilder::default()
-        .request_timeout(std::time::Duration::from_secs(30))
-        .build(endpoint)
-        .await
+    log::info!("connecting to backend via {}", endpoint);
+    // Wait until we have a connection
+    let retry_strategy = FixedInterval::from_millis(5000).take(4);
+    match Retry::spawn(retry_strategy, || {
+        WsClientBuilder::default()
+            .connection_timeout(std::time::Duration::from_secs(10))
+            .request_timeout(std::time::Duration::from_secs(10))
+            .build(endpoint)
+    })
+    .await
     {
         Ok(client) => {
-            // Wait until we have a connection
-            let retry_strategy = FixedInterval::from_millis(5000).take(4);
-            match Retry::spawn(retry_strategy, || client.protocol_version()).await {
-                Ok(v) => {
-                    log::info!("connected to daemon w/ version: {}", v);
-                    Ok(client)
-                }
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
-            }
+            let v = client.protocol_version().await;
+            log::info!("connected to daemon w/ version: {:?}", v);
+            Ok(client)
         }
         Err(e) => {
+            log::warn!("error connecting: {:?}", e);
             sentry::capture_error(&e);
             Err(anyhow::anyhow!(e.to_string()))
         }
@@ -91,7 +92,6 @@ impl SpyglassServerClient {
         #[cfg(not(debug_assertions))]
         let sidecar_handle = Some(SpyglassServerClient::check_and_start_backend());
 
-        log::info!("backend started");
         let client = match try_connect(&endpoint).await {
             Ok(client) => Some(client),
             Err(err) => {
