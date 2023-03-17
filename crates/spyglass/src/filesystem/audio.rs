@@ -161,6 +161,7 @@ fn transcibe_audio(path: PathBuf, segment_len: i32) -> Vec<Segment> {
     let mut params = FullParams::new(SamplingStrategy::default());
     params.set_max_len(segment_len);
     params.set_print_progress(false);
+    params.set_token_timestamps(true);
 
     ctx.full(params, &samples)
         .expect("failed to convert samples");
@@ -190,9 +191,9 @@ mod test {
 
         let combined = segments
             .iter()
-            .map(|x| x.segment.trim().to_string())
+            .map(|x| x.segment.to_string())
             .collect::<Vec<String>>()
-            .join(" ");
+            .join("");
         assert_eq!(combined.trim(), expected.trim());
     }
 
@@ -205,9 +206,9 @@ mod test {
         assert!(segments.len() > 0);
         let combined = segments
             .iter()
-            .map(|x| x.segment.trim().to_string())
+            .map(|x| x.segment.to_string())
             .collect::<Vec<String>>()
-            .join(" ");
+            .join("");
         assert_eq!(combined.trim(), expected.trim());
     }
 }
