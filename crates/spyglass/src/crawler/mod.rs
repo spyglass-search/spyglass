@@ -383,7 +383,7 @@ impl Crawler {
 
     async fn handle_file_fetch(
         &self,
-        _state: &AppState,
+        state: &AppState,
         task: &crawl_queue::Model,
         url: &Url,
     ) -> Result<CrawlResult, CrawlError> {
@@ -414,7 +414,7 @@ impl Crawler {
             .map(|x| x.to_string())
             .expect("Unable to convert path file name to string");
 
-        _process_path(path, file_name, url).await
+        _process_path(state, path, file_name, url).await
     }
 
     /// Handle HTTP related requests
@@ -496,7 +496,12 @@ impl Crawler {
     }
 }
 
-fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResult, CrawlError> {
+fn _process_file(
+    _state: &AppState,
+    path: &Path,
+    file_name: String,
+    url: &Url,
+) -> Result<CrawlResult, CrawlError> {
     // Attempt to read file
     let ext = path.extension();
     let mut content = None;
@@ -505,7 +510,12 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
             SupportedExt::Audio(_) => {
                 // Attempt to transcribe audio
-                match audio::transcibe_audio(path.to_path_buf(), "assets/models/whisper.base.en.bin".into(), 0) {
+                #[cfg(debug_assertions)]
+                let model_path = "assets/models/whisper.base.en.bin".into();
+                #[cfg(not(debug_assertions))]
+                let model_path = _state.config.model_dir().join("whisper.base.en.bin");
+
+                match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
                     Ok(segments) => {
                         // Combine segments into one large string.
                         let combined = segments
@@ -525,8 +535,7 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
                 Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
             },
             // todo: also parse symbols from code files.
-            SupportedExt::Code(_) |
-            SupportedExt::Text(_) => match std::fs::read_to_string(path) {
+            SupportedExt::Code(_) | SupportedExt::Text(_) => match std::fs::read_to_string(path) {
                 Ok(x) => {
                     content = Some(x);
                 }
@@ -539,25 +548,19 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
         }
     }
 
-    let content_hash = if let Some(content) = &content {
+    let content_hash = content.as_ref().map(|x| {
         let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        Some(hex::encode(&hasher.finalize()[..]))
-    } else {
-        None
-    };
+        hasher.update(x.as_bytes());
+        hex::encode(&hasher.finalize()[..])
+    });
 
     // TODO: Better description building for text files?
-    let description = if let Some(string) = &content {
-        let desc = string
-            .split(' ')
+    let description = content.as_ref().map(|x| {
+        x.split(' ')
             .take(DEFAULT_DESC_LENGTH)
             .collect::<Vec<&str>>()
-            .join(" ");
-        Some(desc)
-    } else {
-        None
-    };
+            .join(" ")
+    });
 
     let tags = filesystem::build_file_tags(path);
     Ok(CrawlResult {
@@ -574,12 +577,13 @@ fn _process_file(path: &Path, file_name: String, url: &Url) -> Result<CrawlResul
 }
 
 async fn _process_path(
+    state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
     if path.is_file() {
-        return _process_file(path, file_name, url);
+        return _process_file(state, path, file_name, url);
     }
     Err(CrawlError::NotFound)
 }

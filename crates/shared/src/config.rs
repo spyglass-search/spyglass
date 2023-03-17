@@ -721,6 +721,10 @@ impl Config {
         self.data_dir().join("logs")
     }
 
+    pub fn model_dir(&self) -> PathBuf {
+        self.data_dir().join("models")
+    }
+
     pub fn prefs_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier())
             .expect("Unable to find a suitable settings directory");
@@ -786,6 +790,8 @@ impl Config {
 
         let plugins_dir = config.plugins_dir();
         fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
+
+        fs::create_dir_all(config.model_dir()).expect("Unable to create models folder");
 
         Self::cleanup_legacy_plugins(&plugins_dir);
 

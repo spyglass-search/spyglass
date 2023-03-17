@@ -158,14 +158,19 @@ impl Segment {
 }
 
 /// Given a path to a wav file, transcribe it using our **shhhh** models.
-pub fn transcibe_audio(path: PathBuf, model_path: PathBuf, segment_len: i32) -> anyhow::Result<Vec<Segment>> {
+pub fn transcibe_audio(
+    path: PathBuf,
+    model_path: PathBuf,
+    segment_len: i32,
+) -> anyhow::Result<Vec<Segment>> {
     if !path.exists() || !path.is_file() {
         return Err(anyhow!("Invalid file path"));
     }
 
     let mut segments = Vec::new();
     if let Ok(samples) = parse_audio_file(&path) {
-        let mut ctx = WhisperContext::new(&model_path.to_string_lossy()).expect("failed to open model");
+        let mut ctx =
+            WhisperContext::new(&model_path.to_string_lossy()).expect("failed to open model");
 
         let mut params = FullParams::new(SamplingStrategy::default());
         params.set_max_len(segment_len);
