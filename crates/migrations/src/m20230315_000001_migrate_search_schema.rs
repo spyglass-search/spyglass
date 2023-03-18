@@ -8,7 +8,7 @@ use entities::schema::DocFields;
 use sea_orm_migration::prelude::*;
 use tantivy::directory::MmapDirectory;
 use tantivy::DateTime;
-use tantivy::{schema::*, IndexWriter, Index};
+use tantivy::{schema::*, Index, IndexWriter};
 
 use entities::schema::{mapping_to_schema, SchemaMapping, SearchDocument};
 use entities::sea_orm::{ConnectionTrait, Statement};
@@ -72,10 +72,7 @@ impl Migration {
 
         let date_time = DateTime::from_timestamp_millis(unix_time.as_millis() as i64);
 
-        new_doc.add_date(
-            new_schema.get_field("published").unwrap(),
-            date_time,
-        );
+        new_doc.add_date(new_schema.get_field("published").unwrap(), date_time);
         new_doc.add_date(new_schema.get_field("lastmodified").unwrap(), date_time);
 
         new_doc
