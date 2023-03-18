@@ -86,7 +86,9 @@ setup-dev-linux:
 		libssl-dev \
 		libgtk-3-dev \
 		libayatana-appindicator3-dev \
-		librsvg2-dev
+		librsvg2-dev \
+		cmake \
+		libsdl2-dev
 
 run-client-dev:
 	cargo tauri dev

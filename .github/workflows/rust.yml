@@ -20,10 +20,10 @@ jobs:
     # Cleanup Disk
     - name: Cleanup Disk
       run: |
-            df -h
-            sudo rm -rf /usr/local/lib/android
-            sudo rm -rf /usr/share/dotnet
-            df -h
+        df -h;
+        sudo rm -rf /usr/local/lib/android;
+        sudo rm -rf /usr/share/dotnet;
+        df -h
     # Setup arch target for sidecar build
     - name: Setup arch target
       run: echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
