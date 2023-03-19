@@ -73,11 +73,13 @@ jobs:
       with:
         command: build
         args: -p spyglass
-    # Setup models used in tests
+    # Download model used for testing
     - name: Download models
       run: |
-        mkdir -p "assets/models";
-        curl -iL https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin -o assets/models/whisper.base.en.bin
+        mkdir -p assets/models;
+        curl -L --output whisper.base.en.bin https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
+        mv whisper.base.en.bin assets/models;
+        ls -al assets/models;
     # Run tests
     - name: Run tests
       uses: actions-rs/cargo@v1
