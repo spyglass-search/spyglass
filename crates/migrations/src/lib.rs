@@ -29,6 +29,7 @@ mod m20230131_000001_add_is_syncing_to_connection_table;
 mod m20230201_000001_add_tag_index;
 mod m20230203_000001_add_indexed_document_index;
 mod m20230220_000001_remove_legacy_plugins;
+mod m20230315_000001_migrate_search_schema;
 mod utils;
 
 pub struct Migrator;
@@ -63,6 +64,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230201_000001_add_tag_index::Migration),
             Box::new(m20230203_000001_add_indexed_document_index::Migration),
             Box::new(m20230220_000001_remove_legacy_plugins::Migration),
+            Box::new(m20230315_000001_migrate_search_schema::Migration),
         ]
     }
 }

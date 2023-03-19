@@ -11,6 +11,7 @@ pub mod lens;
 pub mod link;
 pub mod processed_files;
 pub mod resource_rule;
+pub mod schema;
 pub mod tag;
 
 use shared::config::Config;
