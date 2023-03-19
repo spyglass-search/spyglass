@@ -15,6 +15,7 @@ use symphonia::core::{
 };
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
 
+/// Resamples from the <og_rate> to the 16khz required by whisper
 fn resample(og: &[f32], og_rate: u32) -> Result<Vec<f32>, ResamplerConstructionError> {
     let params = InterpolationParameters {
         sinc_len: 256,
@@ -41,11 +42,11 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
     let src = std::fs::File::open(path).expect("Unable open media");
     let mss = MediaSourceStream::new(Box::new(src), Default::default());
 
-    let ext = path.extension().and_then(|x| x.to_str()).unwrap_or("mp3");
-
-    // Create a probe hint using the file's extension. [Optional]
+    // Create a probe hint using the file's extension if available.
     let mut hint = Hint::new();
-    hint.with_extension(ext);
+    if let Some(ext) = path.extension() {
+        hint.with_extension(&ext.to_string_lossy());
+    }
 
     // Use the default options for metadata and format readers.
     let meta_opts: MetadataOptions = Default::default();
@@ -95,7 +96,7 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
 
         // If the packet does not belong to the selected track, skip over it.
         if packet.track_id() != track_id {
-            println!("{} != {}", packet.track_id(), track_id);
+            log::debug!("{} != {}", packet.track_id(), track_id);
             continue;
         }
 
@@ -168,29 +169,35 @@ pub fn transcibe_audio(
     }
 
     let mut segments = Vec::new();
-    if let Ok(samples) = parse_audio_file(&path) {
-        let mut ctx = match WhisperContext::new(&model_path.to_string_lossy()) {
-            Ok(ctx) => ctx,
-            Err(err) => {
-                println!("unable to load model: {:?}", err);
-                return Err(anyhow!("Unable to load model: {:?}", err));
+    match parse_audio_file(&path) {
+        Ok(samples) => {
+            let mut ctx = match WhisperContext::new(&model_path.to_string_lossy()) {
+                Ok(ctx) => ctx,
+                Err(err) => {
+                    log::warn!("unable to load model: {:?}", err);
+                    return Err(anyhow!("Unable to load model: {:?}", err));
+                }
+            };
+
+            let mut params = FullParams::new(SamplingStrategy::default());
+            params.set_max_len(segment_len);
+            params.set_print_progress(false);
+            params.set_token_timestamps(true);
+
+            ctx.full(params, &samples)
+                .expect("failed to convert samples");
+            let num_segments = ctx.full_n_segments();
+            log::debug!("Extracted {} segments", num_segments);
+            for i in 0..num_segments {
+                let segment = ctx.full_get_segment_text(i).expect("failed to get segment");
+                let start_timestamp = ctx.full_get_segment_t0(i);
+                let end_timestamp = ctx.full_get_segment_t1(i);
+                segments.push(Segment::new(start_timestamp, end_timestamp, &segment));
             }
-        };
-
-        let mut params = FullParams::new(SamplingStrategy::default());
-        params.set_max_len(segment_len);
-        params.set_print_progress(false);
-        params.set_token_timestamps(true);
-
-        ctx.full(params, &samples)
-            .expect("failed to convert samples");
-        let num_segments = ctx.full_n_segments();
-        println!("Extracted {} segments", num_segments);
-        for i in 0..num_segments {
-            let segment = ctx.full_get_segment_text(i).expect("failed to get segment");
-            let start_timestamp = ctx.full_get_segment_t0(i);
-            let end_timestamp = ctx.full_get_segment_t1(i);
-            segments.push(Segment::new(start_timestamp, end_timestamp, &segment));
+        },
+        Err(err) => {
+            log::warn!("Unable to parse audio file: {err}");
+            return Err(anyhow!(err));
         }
     }
 
