@@ -164,6 +164,7 @@ pub fn transcibe_audio(
     model_path: PathBuf,
     segment_len: i32,
 ) -> anyhow::Result<Vec<Segment>> {
+    let start = std::time::Instant::now();
     if !path.exists() || !path.is_file() {
         return Err(anyhow!("Invalid file path"));
     }
@@ -201,6 +202,7 @@ pub fn transcibe_audio(
         }
     }
 
+    log::debug!("transcribed in {} secs", start.elapsed().as_secs_f32());
     Ok(segments)
 }
 
@@ -210,8 +212,8 @@ mod test {
     use super::transcibe_audio;
 
     #[test]
-    // Use the sample from whisper.cpp as a baseline test.
     fn test_wav_transcription() {
+        // Use the sample from whisper.cpp as a baseline test.
         let expected = include_str!("../../../../fixtures/audio/jfk.txt");
         let path = "../../fixtures/audio/jfk.wav".into();
         let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
@@ -226,7 +228,6 @@ mod test {
     }
 
     #[test]
-    // Use the sample from whisper.cpp as a baseline test.
     fn test_ogg_transcription() {
         let expected = include_str!("../../../../fixtures/audio/armstrong.txt");
         let path = "../../fixtures/audio/armstrong.ogg".into();
