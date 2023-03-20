@@ -893,16 +893,21 @@ pub async fn delete_many_by_id(
 /// delete all related tag references before deleting the crawl entries
 pub async fn delete_many_by_url(
     db: &DatabaseConnection,
-    urls: &Vec<String>,
+    urls: &[String],
 ) -> Result<u64, sea_orm::DbErr> {
-    let entries = Entity::find()
-        .filter(Column::Url.is_in(urls.to_owned()))
-        .all(db)
-        .await?;
+    let mut num_deleted = 0;
+    for chunk in urls.chunks(BATCH_SIZE) {
+        let entries = Entity::find()
+            .filter(Column::Url.is_in(chunk.to_owned()))
+            .all(db)
+            .await?;
 
-    let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
+        let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
 
-    delete_many_by_id(db, &id_list).await
+        num_deleted += delete_many_by_id(db, &id_list).await?;
+    }
+
+    Ok(num_deleted)
 }
 
 #[derive(Debug, FromQueryResult)]

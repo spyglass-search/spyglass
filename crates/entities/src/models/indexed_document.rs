@@ -328,12 +328,16 @@ pub async fn delete_many_by_id(
         .await?;
 
     // Delete item
-    let res = Entity::delete_many()
-        .filter(Column::Id.is_in(dbids.to_owned()))
-        .exec(db)
-        .await?;
+    let mut num_deleted = 0;
+    for chunk in dbids.chunks(BATCH_SIZE) {
+        let res = Entity::delete_many()
+            .filter(Column::Id.is_in(chunk.to_owned()))
+            .exec(db)
+            .await?;
+        num_deleted += res.rows_affected;
+    }
 
-    Ok(res.rows_affected)
+    Ok(num_deleted)
 }
 
 /// Helper method used to delete multiple documents by url. This method will first
@@ -342,14 +346,19 @@ pub async fn delete_many_by_url(
     db: &DatabaseConnection,
     urls: Vec<String>,
 ) -> Result<u64, sea_orm::DbErr> {
-    let entries = Entity::find()
-        .filter(Column::Url.is_in(urls))
-        .all(db)
-        .await?;
+    let mut num_deleted = 0;
+    for chunk in urls.chunks(BATCH_SIZE) {
+        let entries = Entity::find()
+            .filter(Column::Url.is_in(chunk))
+            .all(db)
+            .await?;
 
-    let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
+        let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
 
-    delete_many_by_id(db, &id_list).await
+        num_deleted += delete_many_by_id(db, &id_list).await?;
+    }
+
+    Ok(num_deleted)
 }
 
 #[derive(Debug, FromQueryResult)]
