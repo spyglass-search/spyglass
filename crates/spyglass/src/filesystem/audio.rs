@@ -240,4 +240,20 @@ mod test {
             .join("");
         assert_eq!(combined.trim(), expected.trim());
     }
+
+    // Ignored by default since it takes a while to run
+    #[ignore]
+    #[test]
+    fn test_mp3_transcription() {
+        let expected = include_str!("../../../../fixtures/audio/count_of_monte_cristo.txt");
+        let path = "../../fixtures/audio/count_of_monte_cristo.mp3".into();
+        let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        assert!(segments.len() > 0);
+        let combined = segments
+            .iter()
+            .map(|x| x.segment.to_string())
+            .collect::<Vec<String>>()
+            .join("");
+        assert_eq!(combined.trim(), expected.trim());
+    }
 }
