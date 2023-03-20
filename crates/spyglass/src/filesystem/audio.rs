@@ -194,7 +194,7 @@ pub fn transcibe_audio(
                 let end_timestamp = ctx.full_get_segment_t1(i);
                 segments.push(Segment::new(start_timestamp, end_timestamp, &segment));
             }
-        },
+        }
         Err(err) => {
             log::warn!("Unable to parse audio file: {err}");
             return Err(anyhow!(err));
