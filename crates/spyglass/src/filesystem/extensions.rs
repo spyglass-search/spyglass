@@ -43,8 +43,14 @@ impl SupportedExt {
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
 #[strum(serialize_all = "snake_case")]
 pub enum AudioExt {
+    Aac,
+    Avi,
+    Flac,
     M4a,
+    Mp3,
+    Ogg,
     Wav,
+    Webm
 }
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
