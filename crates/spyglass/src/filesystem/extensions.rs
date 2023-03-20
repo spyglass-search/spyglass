@@ -50,7 +50,7 @@ pub enum AudioExt {
     Mp3,
     Ogg,
     Wav,
-    Webm
+    Webm,
 }
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]

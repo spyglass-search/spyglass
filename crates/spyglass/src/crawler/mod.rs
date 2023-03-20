@@ -18,6 +18,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::num::NonZeroU32;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use url::{Host, Url};
@@ -509,23 +510,35 @@ fn _process_file(
     if let Some(ext) = ext {
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
             SupportedExt::Audio(_) => {
-                // Attempt to transcribe audio
+                // Attempt to transcribe audio, assumes the model has been downloaded
+                // and ready to go
                 #[cfg(debug_assertions)]
-                let model_path = "assets/models/whisper.base.en.bin".into();
+                let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
                 #[cfg(not(debug_assertions))]
-                let model_path = _state.config.model_dir().join("whisper.base.en.bin");
+                let model_path: PathBuf = _state.config.model_dir().join("whisper.base.en.bin");
 
-                match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
-                    Ok(segments) => {
-                        // Combine segments into one large string.
-                        let combined = segments
-                            .iter()
-                            .map(|x| x.segment.to_string())
-                            .collect::<Vec<String>>()
-                            .join("");
-                        content = Some(combined);
+                if !model_path.exists() {
+                    log::warn!("whisper model not installed, skipping transcription");
+                    content = None;
+                } else {
+                    match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
+                        Ok(segments) => {
+                            // Combine segments into one large string.
+                            let combined = segments
+                                .iter()
+                                .map(|x| x.segment.to_string())
+                                .collect::<Vec<String>>()
+                                .join("");
+                            content = Some(combined);
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Skipping transcription: unable to transcribe: `{}`: {}",
+                                path.display(),
+                                err
+                            );
+                        }
                     }
-                    Err(err) => log::warn!("Unable to transcribe: `{}`: {}", path.display(), err),
                 }
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
