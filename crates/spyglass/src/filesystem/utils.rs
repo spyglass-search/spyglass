@@ -2,7 +2,6 @@ extern crate glob;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use ignore::{gitignore::Gitignore, Error};
 use std::{
-    collections::HashSet,
     ffi::OsStr,
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
@@ -141,20 +140,6 @@ pub fn get_search_directories(state: &AppState) -> Vec<PathBuf> {
         .filesystem_settings
         .watched_paths
         .clone()
-}
-
-/// Helper method used to access the configured file extensions from
-/// user settings.
-pub fn get_supported_file_extensions(state: &AppState) -> HashSet<String> {
-    HashSet::from_iter(
-        state
-            .user_settings
-            .load()
-            .filesystem_settings
-            .supported_extensions
-            .iter()
-            .cloned(),
-    )
 }
 
 /// Helper method used to identify if the provided path represents a gitignore file

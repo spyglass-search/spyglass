@@ -18,6 +18,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::num::NonZeroU32;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use url::{Host, Url};
@@ -25,6 +26,8 @@ use url::{Host, Url};
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
+use crate::filesystem::audio;
+use crate::filesystem::extensions::SupportedExt;
 use crate::parser;
 use crate::state::AppState;
 
@@ -495,55 +498,87 @@ impl Crawler {
 }
 
 fn _process_file(
-    state: &AppState,
+    _state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
-    let supported_ext = crate::filesystem::utils::get_supported_file_extensions(state);
     // Attempt to read file
-    let contents = match path.extension() {
-        Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
-            Err(err) => return Err(CrawlError::ParseError(err.to_string())),
-            Ok(contents) => contents,
-        },
-        Some(ext) if supported_ext.contains(ext.to_str().unwrap_or_default()) => {
-            match std::fs::read_to_string(path) {
-                Ok(x) => x,
-                Err(err) => {
-                    return Err(CrawlError::FetchError(err.to_string()));
+    let ext = path.extension();
+    let mut content = None;
+
+    if let Some(ext) = ext {
+        match SupportedExt::from_ext(&ext.to_string_lossy()) {
+            SupportedExt::Audio(_) => {
+                // Attempt to transcribe audio, assumes the model has been downloaded
+                // and ready to go
+                #[cfg(debug_assertions)]
+                let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
+                #[cfg(not(debug_assertions))]
+                let model_path: PathBuf = _state.config.model_dir().join("whisper.base.en.bin");
+
+                if !model_path.exists() {
+                    log::warn!("whisper model not installed, skipping transcription");
+                    content = None;
+                } else {
+                    match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
+                        Ok(segments) => {
+                            // Combine segments into one large string.
+                            let combined = segments
+                                .iter()
+                                .map(|x| x.segment.to_string())
+                                .collect::<Vec<String>>()
+                                .join("");
+                            content = Some(combined);
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Skipping transcription: unable to transcribe: `{}`: {}",
+                                path.display(),
+                                err
+                            );
+                        }
+                    }
                 }
             }
+            SupportedExt::Document(_) => match parser::parse_file(ext, path) {
+                Ok(parsed) => {
+                    content = Some(parsed);
+                }
+                Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
+            },
+            // todo: also parse symbols from code files.
+            SupportedExt::Code(_) | SupportedExt::Text(_) => match std::fs::read_to_string(path) {
+                Ok(x) => {
+                    content = Some(x);
+                }
+                Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
+            },
+            // Do nothing for these
+            SupportedExt::NotSupported => {
+                log::warn!("File `{:?}` unsupported returning empty content", path);
+            }
         }
-        _ => {
-            log::warn!(
-                "File type for path {:?} unsupported returning empty content",
-                path
-            );
-            "".to_string()
-        }
-    };
+    }
 
-    let mut hasher = Sha256::new();
-    hasher.update(contents.as_bytes());
-    let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+    let content_hash = content.as_ref().map(|x| {
+        let mut hasher = Sha256::new();
+        hasher.update(x.as_bytes());
+        hex::encode(&hasher.finalize()[..])
+    });
 
     // TODO: Better description building for text files?
-    let description = if !contents.is_empty() {
-        let desc = contents
-            .split(' ')
+    let description = content.as_ref().map(|x| {
+        x.split(' ')
             .take(DEFAULT_DESC_LENGTH)
             .collect::<Vec<&str>>()
-            .join(" ");
-        Some(desc)
-    } else {
-        None
-    };
+            .join(" ")
+    });
 
     let tags = filesystem::build_file_tags(path);
     Ok(CrawlResult {
         content_hash,
-        content: Some(contents.clone()),
+        content,
         // Does a file have a description? Pull the first part of the file
         description,
         title: Some(file_name),

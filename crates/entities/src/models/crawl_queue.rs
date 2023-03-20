@@ -893,16 +893,21 @@ pub async fn delete_many_by_id(
 /// delete all related tag references before deleting the crawl entries
 pub async fn delete_many_by_url(
     db: &DatabaseConnection,
-    urls: &Vec<String>,
+    urls: &[String],
 ) -> Result<u64, sea_orm::DbErr> {
-    let entries = Entity::find()
-        .filter(Column::Url.is_in(urls.to_owned()))
-        .all(db)
-        .await?;
+    let mut num_deleted = 0;
+    for chunk in urls.chunks(BATCH_SIZE) {
+        let entries = Entity::find()
+            .filter(Column::Url.is_in(chunk.to_owned()))
+            .all(db)
+            .await?;
 
-    let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
+        let id_list = entries.iter().map(|entry| entry.id).collect::<Vec<i64>>();
 
-    delete_many_by_id(db, &id_list).await
+        num_deleted += delete_many_by_id(db, &id_list).await?;
+    }
+
+    Ok(num_deleted)
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -933,44 +938,6 @@ pub async fn find_by_lens(
 pub struct CrawlTaskIdsUrls {
     pub id: i64,
     pub url: String,
-}
-
-/// Helper method to access the urls for any extensions that have been removed
-/// and delete those from the crawl queue.
-pub async fn process_urls_for_removed_exts(
-    exts: Vec<String>,
-    db: &DatabaseConnection,
-) -> Result<Vec<CrawlTaskIdsUrls>, DbErr> {
-    let statement = Statement::from_string(
-        DatabaseBackend::Sqlite,
-        format!(
-            r#"
-            with tags_list as (
-                SELECT id FROM tags WHERE label = 'fileext' and value not in ({})
-            )
-            SELECT cq.id, cq.url
-            FROM crawl_queue as cq join crawl_tag as ct on cq.id = ct.crawl_queue_id
-            WHERE cq.url like 'file%' and ct.tag_id in tags_list order by cq.url
-            "#,
-            exts.iter()
-                .map(|str| format!("'{str}'"))
-                .collect::<Vec<String>>()
-                .join(",")
-        ),
-    );
-    let tasks = CrawlTaskIdsUrls::find_by_statement(statement)
-        .all(db)
-        .await?;
-
-    if !tasks.is_empty() {
-        let delete_rslt =
-            delete_many_by_id(db, &tasks.iter().map(|task| task.id).collect::<Vec<i64>>()).await;
-
-        if let Err(error) = delete_rslt {
-            log::error!("Error removing from crawl queue {:?}", error);
-        }
-    }
-    Ok(tasks)
 }
 
 /// Helper method used to get the details for the task. This method will return the associated task and any
