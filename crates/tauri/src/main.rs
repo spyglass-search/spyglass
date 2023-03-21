@@ -63,6 +63,7 @@ pub enum AppEvent {
 type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tauri_plugin_deep_link::prepare("com.athlabs.spyglass");
     let ctx = tauri::generate_context!();
     let current_version = format!("v20{}", &ctx.package_info().version);
     let config = Config::new();
@@ -177,6 +178,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ));
 
             register_global_shortcut(&startup_win, &app_handle, &config.user_settings);
+            if let Err(err) = tauri_plugin_deep_link::register("spyglass", move |request| {
+                dbg!(&request);
+                app_handle
+                    .emit_all("scheme-request-received", request)
+                    .unwrap();
+            }) {
+                log::warn!("Unable to register custom scheme: {}", err);
+            }
 
             Ok(())
         })
