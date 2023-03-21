@@ -92,10 +92,12 @@ impl AppState {
 
     pub async fn publish_event(&self, event: &RpcEvent) {
         log::debug!("publishing event: {:?}", event);
-
         let rpc_sub = self.rpc_events.lock().unwrap();
-        if let Err(err) = rpc_sub.send(event.clone()) {
-            log::error!("error sending event: {:?}", err);
+        // no use sending if no one is listening.
+        if rpc_sub.receiver_count() > 0 {
+            if let Err(err) = rpc_sub.send(event.clone()) {
+                log::warn!("error sending event: {:?}", err);
+            }
         }
     }
 }
