@@ -13,7 +13,7 @@ use symphonia::core::{
     meta::MetadataOptions,
     probe::Hint,
 };
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, convert_stereo_to_mono_audio};
+use whisper_rs::{convert_stereo_to_mono_audio, FullParams, SamplingStrategy, WhisperContext};
 
 /// Resamples from the <og_rate> to the 16khz required by whisper
 fn resample(og: &[f32], og_rate: u32) -> Result<Vec<f32>, ResamplerConstructionError> {
