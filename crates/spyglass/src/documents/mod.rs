@@ -195,9 +195,8 @@ pub async fn process_crawl_results(
     tx.commit().await?;
 
     log::debug!(
-        "Took {:?} to process crawl {} results",
-        now.elapsed().as_millis(),
-        num_entries,
+        "Took {}ms to process crawl {num_entries} results",
+        now.elapsed().as_millis()
     );
 
     let num_updates = existing.len();

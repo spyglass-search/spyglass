@@ -13,7 +13,7 @@ use symphonia::core::{
     meta::MetadataOptions,
     probe::Hint,
 };
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
+use whisper_rs::{convert_stereo_to_mono_audio, FullParams, SamplingStrategy, WhisperContext};
 
 /// Resamples from the <og_rate> to the 16khz required by whisper
 fn resample(og: &[f32], og_rate: u32) -> Result<Vec<f32>, ResamplerConstructionError> {
@@ -72,6 +72,8 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
     let sample_rate = track.codec_params.sample_rate.unwrap_or_default();
+    let channels = track.codec_params.channels.unwrap_or_default();
+
     if sample_rate == 0 {
         return Err(anyhow!("Invalid sample rate"));
     }
@@ -120,6 +122,12 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
             Err(Error::DecodeError(_)) => (),
             Err(_) => break,
         }
+    }
+
+    log::debug!("Detected {} audio channels", channels.count());
+    if channels.count() > 1 {
+        // convert stereo audio to mono for whisper.
+        samples = convert_stereo_to_mono_audio(&samples);
     }
 
     log::debug!(
