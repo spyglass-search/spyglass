@@ -179,10 +179,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             register_global_shortcut(&startup_win, &app_handle, &config.user_settings);
             if let Err(err) = tauri_plugin_deep_link::register("spyglass", move |request| {
-                dbg!(&request);
-                app_handle
-                    .emit_all("scheme-request-received", request)
-                    .unwrap();
+                log::debug!("Received custom uri request: {}", &request);
+                if let Err(err) = app_handle.emit_all("scheme-request-received", request) {
+                    log::warn!("Unable to emit event: {}", err);
+                }
             }) {
                 log::warn!("Unable to register custom scheme: {}", err);
             }
