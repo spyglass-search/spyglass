@@ -4,6 +4,7 @@
 )]
 #[allow(unused_imports)]
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -178,13 +179,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ));
 
             register_global_shortcut(&startup_win, &app_handle, &config.user_settings);
+            let app_handle_clone = app_handle.clone();
             if let Err(err) = tauri_plugin_deep_link::register("spyglass", move |request| {
-                log::debug!("Received custom uri request: {}", &request);
-                if let Err(err) = app_handle.emit_all("scheme-request-received", request) {
-                    log::warn!("Unable to emit event: {}", err);
-                }
+                app_handle_clone.trigger_global("scheme-request-received", Some(request));
             }) {
                 log::warn!("Unable to register custom scheme: {}", err);
+            } else {
+                // Otherwise register a handler for the scheme evetn
+                let ah = app_handle.clone();
+                app_handle.listen_global("scheme-request-received", move |event| {
+                    tauri::async_runtime::spawn(on_custom_scheme_request(ah.clone(), event));
+                });
             }
 
             Ok(())
@@ -277,6 +282,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     Ok(())
+}
+
+/// Handle custom scheme requests (spyglass:// urls).
+async fn on_custom_scheme_request(app_handle: AppHandle, event: tauri::Event) {
+    if let Some(request) = event.payload().and_then(|s| url::Url::parse(s).ok()) {
+        log::debug!("Received custom uri request: {}", &request);
+        // Parse the command from the request
+        let event = request.domain().unwrap_or_default();
+        let command = request.path();
+        let args = request
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<String, String>>();
+
+        // Only really one event right now but gives us room to grow.
+        if event == "command" && command == "/install-lens" {
+            if let Some(lens_name) = args.get("name") {
+                log::info!("installing lens from app url: {}", lens_name);
+                let _ = window::notify(&app_handle, "Spyglass", "Installing lens...");
+
+                // track stuff if metrics is enabled
+                if let Some(metrics) = app_handle.try_state::<Metrics>() {
+                    metrics
+                        .track(Event::InstallLensFromUrl {
+                            lens: lens_name.clone(),
+                        })
+                        .await;
+                }
+
+                let _ = crate::plugins::lens_updater::handle_install_lens(
+                    &app_handle,
+                    lens_name,
+                    false,
+                )
+                .await;
+            }
+        }
+
+        log::debug!("parsed: {} - {} - {:?}", event, command, args);
+    }
 }
 
 // Applies updated configuration to the client
