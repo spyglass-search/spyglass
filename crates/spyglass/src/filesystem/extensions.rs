@@ -34,6 +34,10 @@ impl SupportedExt {
             Self::Audio(ext)
         } else if let Ok(ext) = CodeExt::from_str(&ext) {
             Self::Code(ext)
+        } else if let Ok(ext) = DocumentExt::from_str(&ext) {
+            Self::Document(ext)
+        } else if let Ok(ext) = TextExt::from_str(&ext) {
+            Self::Text(ext)
         } else {
             Self::NotSupported
         }
