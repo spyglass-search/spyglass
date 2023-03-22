@@ -10,7 +10,6 @@
                 <string>com.athlabs.spyglass</string>
                 <key>CFBundleURLSchemes</key>
                 <array>
-                    <!-- register the myapp:// and myscheme:// schemes -->
                     <string>spyglass</string>
                 </array>
             </dict>
