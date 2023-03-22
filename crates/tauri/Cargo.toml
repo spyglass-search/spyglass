@@ -34,6 +34,7 @@ spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"
 strum_macros = "0.24"
 tauri = { version = "1.2.4", features = ["api-all", "clipboard", "devtools", "macos-private-api", "notification", "system-tray", "updater"] }
+tauri-plugin-deep-link = { git = "https://github.com/FabianLars/tauri-plugin-deep-link.git", rev = "644046bc08e1066d00fa9be60b46cc6de8f2a901" }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"
