@@ -1,11 +1,16 @@
+use crate::crawler::CrawlResult;
 use crate::documents;
 use entities::models::indexed_document;
 use entities::models::tag;
+use entities::models::tag::TagPair;
+use entities::models::tag::TagType;
 use serde::{Deserialize, Serialize};
+use spyglass_plugin::DocumentUpdate;
 use spyglass_plugin::{DocumentResult, PluginEvent};
 use std::path::Path;
 use tantivy::DocAddress;
 use tokio::sync::mpsc::Sender;
+use url::Url;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
@@ -87,9 +92,66 @@ async fn handle_plugin_cmd_request(
                 }
             }
         }
+        PluginCommandRequest::AddDocuments { documents, tags } => {
+            if !documents.is_empty() {
+                let (crawl_results, tags) = convert_docs_to_crawl(&documents, &tags);
+
+                if let Err(error) =
+                    documents::process_crawl_results(&env.app_state, &crawl_results, &tags).await
+                {
+                    log::error!("Error updating documents {:?}", error);
+                }
+            }
+        },
+        PluginCommandRequest::SubscribeForUpdates => {
+            env.cmd_writer
+                .send(PluginCommand::SubscribeForUpdates(env.id))
+                .await?;
+        }
     }
 
     Ok(())
+}
+
+fn convert_docs_to_crawl(
+    documents: &[DocumentUpdate],
+    tags: &[(String, String)],
+) -> (Vec<CrawlResult>, Vec<TagPair>) {
+    let crawls = documents
+        .iter()
+        .filter_map(|doc| {
+            let tags = convert_tags(&doc.tags);
+            match Url::parse(doc.url.as_str()) {
+                Ok(url) => {
+                    let mut crawl = CrawlResult::new(
+                        &url,
+                        doc.open_url.clone(),
+                        doc.content.clone().unwrap_or(String::from("")).as_str(),
+                        doc.title.clone().unwrap_or(String::from("")).as_str(),
+                        doc.description.clone(),
+                    );
+                    crawl.tags = tags;
+                    Some(crawl)
+                }
+                Err(error) => {
+                    log::error!("Invalid url specified for document {:?}", error);
+                    None
+                }
+            }
+        })
+        .collect::<Vec<CrawlResult>>();
+
+    let converted_tags = convert_tags(&tags);
+    (crawls, converted_tags)
+}
+
+fn convert_tags(tags: &[(String, String)]) -> Vec<TagPair> {
+    tags.iter()
+        .map(|(key, val)| {
+            let tag_type = TagType::string_to_tag_type(key);
+            (tag_type, val.clone())
+        })
+        .collect::<Vec<TagPair>>()
 }
 
 async fn query_document_and_send_loop(env: PluginEnv, query: DocumentQuery) {

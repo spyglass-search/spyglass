@@ -10,6 +10,7 @@ use serde::Serialize;
 use spyglass_plugin::SearchFilter;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
+use tokio::time::Duration;
 use wasmer::{Instance, Module, Store, WasmerEnv};
 use wasmer_wasi::{Pipe, WasiEnv, WasiState};
 
@@ -33,6 +34,8 @@ pub enum PluginCommand {
         plugin_id: PluginId,
         event: PluginEvent,
     },
+    QueueIntervalCheck,
+    SubscribeForUpdates(PluginId),
 }
 
 /// Plugin context whenever we get a call from the one of the plugins
@@ -180,6 +183,7 @@ pub async fn plugin_event_loop(
     let mut config = config.clone();
     plugin_load(&state, &mut config, &cmd_writer).await;
 
+    let mut interval = tokio::time::interval(Duration::from_secs(10 * 60));
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
 
     loop {
@@ -187,6 +191,7 @@ pub async fn plugin_event_loop(
         let next_cmd = tokio::select! {
             // Listen for plugin requests
             res = cmd_queue.recv() => res,
+            _ = interval.tick() => Some(PluginCommand::QueueIntervalCheck),
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down plugin manager");
                 cmd_queue.close();
@@ -255,6 +260,27 @@ pub async fn plugin_event_loop(
                     }
                     Err(e) => log::error!("Unable to init plugin <{}>: {}", plugin.name, e),
                 }
+            }
+            Some(PluginCommand::QueueIntervalCheck) => {
+                let manager = state.plugin_manager.lock().await;
+                for plugin_id in &manager.check_update_subs {
+                    let _ = cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id: *plugin_id,
+                            event: PluginEvent::IntervalUpdate,
+                        })
+                        .await;
+                }
+            }
+            Some(PluginCommand::SubscribeForUpdates(plugin_id)) => {
+                let mut manager = state.plugin_manager.lock().await;
+                manager.check_update_subs.insert(plugin_id);
+                let _ = cmd_writer
+                    .send(PluginCommand::HandleUpdate {
+                        plugin_id,
+                        event: PluginEvent::IntervalUpdate,
+                    })
+                    .await;
             }
             None => {}
         }
