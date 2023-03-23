@@ -65,7 +65,6 @@ warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
-whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "cf278027eeb5aa849360f664de2c34287418c625" }
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
@@ -78,6 +77,10 @@ shared = { path = "../shared", features = ["metrics"] }
 spyglass-netrunner = "0.2.10"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
+
+# Experimental
+llama-rs = { git = "https://github.com/setzer22/llama-rs", rev = "6403f0906d1c4f5f3edfd39a1dedc229f9e95993" }
+whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "cf278027eeb5aa849360f664de2c34287418c625" }
 
 [dev-dependencies]
 tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
