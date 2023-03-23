@@ -61,17 +61,17 @@ jobs:
       run: |
         echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
         echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=linux" >> $env::GITHUB_ENV
+        echo "target_os_name=linux" >> $GITHUB_ENV
     - name: Setup arch target (windows only)
       if: ${{startsWith(matrix.platform, 'windows')}}
       run: |
         echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
         echo "target_ext=.exe" >> $env:GITHUB_ENV
-        echo "target_os_name=win" >> $env::GITHUB_ENV 
+        echo "target_os_name=win" >> $env:GITHUB_ENV 
     - name: Setup arch target (mac only)
       if: matrix.platform == 'macos-latest'
       run: |
-        echo "target_os_name=mac" >> $env::GITHUB_ENV
+        echo "target_os_name=mac" >> $GITHUB_ENV
     # Build stuff
     - name: build sidecar (windows/linux)
       if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
