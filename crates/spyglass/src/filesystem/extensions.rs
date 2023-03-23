@@ -74,6 +74,7 @@ pub enum DocumentExt {
     Ods,
     Xls,
     Xlsx,
+    Pdf,
 }
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
