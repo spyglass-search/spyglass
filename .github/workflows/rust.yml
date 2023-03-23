@@ -53,6 +53,9 @@ jobs:
         command: build
         args: -p spyglass
      # Setup arch targets - linux
+    - name: Output platform 
+      run: |
+        echo "${{ matrix.platform }}"
     - name: setup arch target - linux
       if: ${{startsWith(matrix.platform, 'ubuntu')}}
       run: |
