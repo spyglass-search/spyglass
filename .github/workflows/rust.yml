@@ -26,7 +26,10 @@ jobs:
         df -h
     # Setup arch target for sidecar build
     - name: Setup arch target
-      run: echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
+      run: |
+        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV;
+        echo "target_ext=" >> $GITHUB_ENV;
+        echo "target_os_name=linux" >> $env::GITHUB_ENV;
     # Setup rust toolchain
     - name: Setup rust toolchain
       uses: actions-rs/toolchain@v1
@@ -53,27 +56,6 @@ jobs:
         command: build
         args: -p spyglass
      # Setup arch targets - linux
-    - name: Output platform 
-      run: |
-        echo "${{ matrix.platform }}"
-    - name: setup arch target - linux
-      if: ${{startsWith(matrix.platform, 'ubuntu')}}
-      run: |
-        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
-        echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=linux" >> $env::GITHUB_ENV 
-    - name: setup arch target - macos
-      if: ${{startsWith(matrix.platform, 'macos')}}
-      run: |
-        echo "target_arch=x86_64-apple-darwin" >> $GITHUB_ENV
-        echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=mac" >> $env::GITHUB_ENV 
-    - name: Setup arch target (windows only)
-      if: ${{startsWith(matrix.platform, 'windows')}}
-      run: |
-        echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
-        echo "target_ext=.exe" >> $env:GITHUB_ENV
-        echo "target_os_name=win" >> $env::GITHUB_ENV 
     - name: Move sidecar into place
       run: |
         mkdir -p crates/tauri/binaries
