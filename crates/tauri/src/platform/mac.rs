@@ -1,18 +1,17 @@
 use shared::event::ClientEvent;
-use tauri::Window;
+use tauri::{Window, Manager};
 use url::Url;
 
 use crate::window;
 
 pub fn show_search_bar(window: &Window) {
-    let _ = window.show();
+    let _ = tauri::AppHandle::show(&window.app_handle());
     window::center_search_bar(window);
-    let _ = window.set_always_on_top(true);
     let _ = window.set_focus();
 }
 
 pub fn hide_search_bar(window: &Window) {
-    let _ = window.hide();
+    let _ = tauri::AppHandle::hide(&window.app_handle());
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
 
