@@ -8,8 +8,8 @@ use tokio::sync::{broadcast, Mutex};
 use migration::Migrator;
 use shared::config::Config;
 
-use crate::{rpc::SpyglassServerClient, window::get_searchbar};
 use crate::window::show_wizard_window;
+use crate::{rpc::SpyglassServerClient, window::get_searchbar};
 
 use crate::{rpc::RpcMutex, window, AppEvent};
 pub struct StartupProgressText(std::sync::Mutex<String>);

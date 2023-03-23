@@ -1,5 +1,5 @@
 use shared::event::ClientEvent;
-use tauri::{Window, Manager};
+use tauri::{Manager, Window};
 use url::Url;
 
 use crate::window;

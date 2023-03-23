@@ -74,7 +74,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(sentry::init((
             "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
             sentry::ClientOptions {
-                release: Some(std::borrow::Cow::from(ctx.package_info().version.to_string())),
+                release: Some(std::borrow::Cow::from(
+                    ctx.package_info().version.to_string(),
+                )),
                 traces_sample_rate: 0.1,
                 ..Default::default()
             },
