@@ -3,6 +3,9 @@ use std::{env, fs, path::Path, process};
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
 const EXE_NAME: &str = "./pdftotext.exe";
 
+#[cfg(all(not(target_os = "windows"), not(debug_assertions)))]
+const EXE_NAME: &str = "./pdftotext";
+
 #[cfg(all(target_os = "windows", debug_assertions))]
 const EXE_NAME: &str = "../../utils/win/pdftotext.exe";
 
@@ -11,9 +14,6 @@ const EXE_NAME: &str = "../../utils/mac/pdftotext";
 
 #[cfg(all(target_os = "linux", debug_assertions))]
 const EXE_NAME: &str = "../../utils/linux/pdftotext";
-
-#[cfg(not(target_os = "windows"))]
-const EXE_NAME: &str = "./pdftotext";
 
 // Uses utility pdftotxt. The utility documentation is as follows
 //
