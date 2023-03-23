@@ -8,8 +8,8 @@ use tokio::sync::{broadcast, Mutex};
 use migration::Migrator;
 use shared::config::Config;
 
-use crate::rpc::SpyglassServerClient;
 use crate::window::show_wizard_window;
+use crate::{rpc::SpyglassServerClient, window::get_searchbar};
 
 use crate::{rpc::RpcMutex, window, AppEvent};
 pub struct StartupProgressText(std::sync::Mutex<String>);
@@ -117,5 +117,8 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     // Run wizard on first run
     if !config.user_settings.run_wizard {
         show_wizard_window(&window.app_handle());
+    } else {
+        let sbar = get_searchbar(&app_handle);
+        let _ = sbar.show();
     }
 }
