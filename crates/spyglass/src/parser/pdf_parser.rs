@@ -55,13 +55,7 @@ pub fn parse(path: &Path) -> anyhow::Result<String> {
     let uuid = uuid::Uuid::new_v4().as_hyphenated().to_string();
 
     let current_dir = match env::current_exe() {
-        Ok(current_exe) => {
-            if let Some(path) = current_exe.parent() {
-                Some(path.to_owned())
-            } else {
-                None
-            }
-        }
+        Ok(current_exe) => current_exe.parent().map(|path| path.to_owned()),
         Err(err) => {
             log::error!("Unable to access current exe {:?}", err);
             None
@@ -114,7 +108,7 @@ pub fn parse(path: &Path) -> anyhow::Result<String> {
         }
         Err(err) => {
             let _ = fs::remove_file(txt_path);
-            return Err(anyhow::format_err!(err));
+            Err(anyhow::format_err!(err))
         }
     }
 }
