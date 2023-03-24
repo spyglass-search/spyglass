@@ -69,7 +69,6 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
     if let Some(window) = app.get_window(constants::SEARCH_WIN_NAME) {
         window
     } else {
-        let default_height = 101.0;
         let window =
             WindowBuilder::new(app, constants::SEARCH_WIN_NAME, WindowUrl::App("/".into()))
                 .menu(get_app_menu())
@@ -78,7 +77,7 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
                 .transparent(true)
                 .visible(false)
                 .disable_file_drop_handler()
-                .inner_size(640.0, default_height)
+                .inner_size(640.0, 108.0)
                 .build()
                 .expect("Unable to create searchbar window");
 
