@@ -4,7 +4,7 @@ use tauri::api::process::current_binary;
 use tauri::{Env, Window};
 use url::Url;
 
-pub fn is_visible(window: &Window) {
+pub fn is_visible(window: &Window) -> bool {
     window.is_visible().unwrap_or_default()
 }
 
