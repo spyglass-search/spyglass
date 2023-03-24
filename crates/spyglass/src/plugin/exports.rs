@@ -94,7 +94,7 @@ async fn handle_plugin_cmd_request(
         }
         PluginCommandRequest::AddDocuments { documents, tags } => {
             if !documents.is_empty() {
-                let (crawl_results, tags) = convert_docs_to_crawl(&documents, &tags);
+                let (crawl_results, tags) = convert_docs_to_crawl(documents, tags);
 
                 if let Err(error) =
                     documents::process_crawl_results(&env.app_state, &crawl_results, &tags).await
@@ -102,7 +102,7 @@ async fn handle_plugin_cmd_request(
                     log::error!("Error updating documents {:?}", error);
                 }
             }
-        },
+        }
         PluginCommandRequest::SubscribeForUpdates => {
             env.cmd_writer
                 .send(PluginCommand::SubscribeForUpdates(env.id))
@@ -141,7 +141,7 @@ fn convert_docs_to_crawl(
         })
         .collect::<Vec<CrawlResult>>();
 
-    let converted_tags = convert_tags(&tags);
+    let converted_tags = convert_tags(tags);
     (crawls, converted_tags)
 }
 

@@ -108,7 +108,7 @@ pub enum PluginCommandRequest {
         tags: Vec<Tag>,
     },
     // Requests that the plugin be called at a regular interval
-    // (currently every 10 minutes) to allow the plugin to 
+    // (currently every 10 minutes) to allow the plugin to
     // process an new updates.
     SubscribeForUpdates,
 }
