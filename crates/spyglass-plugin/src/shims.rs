@@ -1,7 +1,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io;
 
-use crate::{DocumentQuery, PluginCommandRequest, TagModification};
+use crate::{DocumentQuery, DocumentUpdate, PluginCommandRequest, Tag, TagModification};
 pub fn delete_doc(url: &str) {
     if object_to_stdout(&PluginCommandRequest::DeleteDoc {
         url: url.to_string(),
@@ -67,6 +67,24 @@ pub fn subscribe_for_documents(query: DocumentQuery) -> Result<(), ron::Error> {
         query,
         subscribe: true,
     })?;
+
+    unsafe {
+        plugin_cmd();
+    }
+    Ok(())
+}
+
+pub fn add_document(documents: Vec<DocumentUpdate>, tags: Vec<Tag>) -> Result<(), ron::Error> {
+    object_to_stdout(&PluginCommandRequest::AddDocuments { documents, tags })?;
+
+    unsafe {
+        plugin_cmd();
+    }
+    Ok(())
+}
+
+pub fn subscribe_for_updates() -> Result<(), ron::Error> {
+    object_to_stdout(&PluginCommandRequest::SubscribeForUpdates)?;
 
     unsafe {
         plugin_cmd();
