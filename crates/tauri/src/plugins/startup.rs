@@ -119,6 +119,6 @@ async fn run_and_check_backend(app_handle: AppHandle) {
         show_wizard_window(&window.app_handle());
     } else {
         let sbar = get_searchbar(&app_handle);
-        let _ = sbar.show();
+        window::show_search_bar(&sbar);
     }
 }

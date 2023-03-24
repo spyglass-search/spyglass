@@ -22,16 +22,10 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use diff::Diff;
+use platform::os_open;
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
-
-#[cfg(target_os = "linux")]
-use platform::linux::os_open;
-#[cfg(target_os = "macos")]
-use platform::mac::os_open;
-#[cfg(target_os = "windows")]
-use platform::windows::os_open;
 
 mod cmd;
 mod constants;
@@ -356,7 +350,7 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
     // Register global shortcut
     let mut shortcuts = app_handle.global_shortcut_manager();
     if let Err(error) = shortcuts.unregister_all() {
-        log::info!("Unable to unregister all shortcuts {:?}", error);
+        log::warn!("Unable to unregister all shortcuts {:?}", error);
     }
 
     match shortcuts.is_registered(&settings.shortcut) {
@@ -366,7 +360,11 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
                 let app_hand = app_handle.clone();
                 if let Err(e) = shortcuts.register(&settings.shortcut, move || {
                     let window = window::get_searchbar(&app_hand);
-                    window::show_search_bar(&window);
+                    if platform::is_visible(&window) {
+                        window::hide_search_bar(&window)
+                    } else {
+                        window::show_search_bar(&window);
+                    }
                 }) {
                     window::alert(window, "Error registering global shortcut", &format!("{e}"));
                 }

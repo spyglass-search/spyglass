@@ -4,10 +4,14 @@ use url::Url;
 
 use crate::window;
 
+pub fn is_visible(window: &Window) -> bool {
+    window.is_visible().unwrap_or_default()
+}
+
 pub fn show_search_bar(window: &Window) {
     let _ = tauri::AppHandle::show(&window.app_handle());
-    window::center_search_bar(window);
     let _ = window.set_focus();
+    window::center_search_bar(window);
 }
 
 pub fn hide_search_bar(window: &Window) {
