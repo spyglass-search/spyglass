@@ -4,16 +4,19 @@ use tauri::Window;
 use url::Url;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowPlacement;
-use windows::Win32::UI::WindowsAndMessaging::WINDOWPLACEMENT;
+use windows::Win32::UI::WindowsAndMessaging::{SHOW_WINDOW_CMD, WINDOWPLACEMENT};
 
-pub fn is_visible(window: &Window) {
+pub fn is_visible(window: &Window) -> bool {
     if let Ok(handle) = window.hwnd() {
         let mut lpwndpl = WINDOWPLACEMENT::default();
         unsafe {
-            let _ = GetWindowPlacement(handle, &lpwndpl);
-            dbg!(lpwndpl);
+            let _ = GetWindowPlacement::<HWND>(handle, &mut lpwndpl);
+            // SHOW_WINDOW_CMD(2) == minimized
+            return lpwndpl.showCmd != SHOW_WINDOW_CMD(2);
         }
     }
+
+    false
 }
 
 pub fn show_search_bar(window: &Window) {

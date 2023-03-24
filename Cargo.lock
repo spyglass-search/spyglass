@@ -6559,6 +6559,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "url",
+ "windows 0.39.0",
 ]
 
 [[package]]
