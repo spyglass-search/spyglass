@@ -356,7 +356,7 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
     // Register global shortcut
     let mut shortcuts = app_handle.global_shortcut_manager();
     if let Err(error) = shortcuts.unregister_all() {
-        log::info!("Unable to unregister all shortcuts {:?}", error);
+        log::warn!("Unable to unregister all shortcuts {:?}", error);
     }
 
     match shortcuts.is_registered(&settings.shortcut) {
@@ -366,7 +366,13 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
                 let app_hand = app_handle.clone();
                 if let Err(e) = shortcuts.register(&settings.shortcut, move || {
                     let window = window::get_searchbar(&app_hand);
-                    window::show_search_bar(&window);
+                    if window.is_maximized().unwrap_or_default()
+                        || window.is_visible().unwrap_or_default()
+                    {
+                        window::hide_search_bar(&window)
+                    } else {
+                        window::show_search_bar(&window);
+                    }
                 }) {
                     window::alert(window, "Error registering global shortcut", &format!("{e}"));
                 }

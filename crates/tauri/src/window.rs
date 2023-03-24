@@ -112,7 +112,7 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
-    if let Some(monitor) = find_monitor(window) {
+    let new_size = if let Some(monitor) = find_monitor(window) {
         let size = monitor.size();
         let scale = monitor.scale_factor();
         let monitor_height = size.height as f64 - (constants::INPUT_Y * scale);
@@ -120,19 +120,21 @@ pub async fn resize_window(window: &Window, height: f64) {
         // If the requested height is greater than the monitor size, use the monitor
         // height so we don't go offscreen.
         let height = monitor_height.min(height);
-
-        let _ = window.set_size(Size::Physical(PhysicalSize {
+        Size::Physical(PhysicalSize {
             width: (constants::INPUT_WIDTH * scale) as u32,
             height: (height * scale) as u32,
-        }));
+        })
     } else {
         log::warn!("Unable to detect monitor size, resizing using defaults");
-        // No monitor info available so just set!
-        let _ = window.set_size(Size::Physical(PhysicalSize {
+        Size::Physical(PhysicalSize {
             width: constants::INPUT_WIDTH as u32,
             height: height as u32,
-        }));
-    }
+        })
+    };
+
+    // recenter after resize
+    let _ = window.set_size(new_size);
+    center_search_bar(window);
 }
 
 fn show_window(window: &Window) {
