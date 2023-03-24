@@ -50,14 +50,7 @@ pub fn center_search_bar(window: &Window) {
 }
 
 pub fn show_search_bar(window: &Window) {
-    #[cfg(target_os = "linux")]
-    platform::linux::show_search_bar(window);
-
-    #[cfg(target_os = "macos")]
-    platform::mac::show_search_bar(window);
-
-    #[cfg(target_os = "windows")]
-    platform::windows::show_search_bar(window);
+    platform::show_search_bar(window);
 
     // Wait a little bit for the window to show being focusing on it.
     let window = window.clone();
@@ -68,14 +61,7 @@ pub fn show_search_bar(window: &Window) {
 }
 
 pub fn hide_search_bar(window: &Window) {
-    #[cfg(target_os = "linux")]
-    platform::linux::hide_search_bar(window);
-
-    #[cfg(target_os = "macos")]
-    platform::mac::hide_search_bar(window);
-
-    #[cfg(target_os = "windows")]
-    platform::windows::hide_search_bar(window);
+    platform::hide_search_bar(window);
 }
 
 /// Builds or returns the main searchbar window

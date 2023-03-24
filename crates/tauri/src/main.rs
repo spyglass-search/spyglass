@@ -25,13 +25,7 @@ use diff::Diff;
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
-
-#[cfg(target_os = "linux")]
-use platform::linux::os_open;
-#[cfg(target_os = "macos")]
-use platform::mac::os_open;
-#[cfg(target_os = "windows")]
-use platform::windows::os_open;
+use platform::os_open;
 
 mod cmd;
 mod constants;
