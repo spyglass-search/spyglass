@@ -366,9 +366,7 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
                 let app_hand = app_handle.clone();
                 if let Err(e) = shortcuts.register(&settings.shortcut, move || {
                     let window = window::get_searchbar(&app_hand);
-                    if window.is_maximized().unwrap_or_default()
-                        || window.is_visible().unwrap_or_default()
-                    {
+                    if platform::is_visible(&window) {
                         window::hide_search_bar(&window)
                     } else {
                         window::show_search_bar(&window);

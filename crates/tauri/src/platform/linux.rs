@@ -4,6 +4,10 @@ use tauri::api::process::current_binary;
 use tauri::{Env, Window};
 use url::Url;
 
+pub fn is_visible(window: &Window) {
+    window.is_visible().unwrap_or_default()
+}
+
 pub fn show_search_bar(window: &Window) {
     let _ = window.show();
     let _ = window.unminimize();
