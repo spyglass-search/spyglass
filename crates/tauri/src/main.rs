@@ -22,10 +22,10 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use diff::Diff;
+use platform::os_open;
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
-use platform::os_open;
 
 mod cmd;
 mod constants;
