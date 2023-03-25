@@ -52,6 +52,7 @@ pub enum AudioExt {
     Flac,
     M4a,
     Mp3,
+    Mp4,
     Ogg,
     Wav,
     Webm,
