@@ -1,20 +1,26 @@
-pub use crate::keyboard::{KeyCode, ModifiersState};
+use crate::{
+    form::{FormType, SettingOpts},
+    plugin::PluginConfig,
+};
 use diff::Diff;
-use directories::{ProjectDirs, UserDirs};
+use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-pub use crate::accelerator::{self, Accelerator};
-use crate::response::SearchResult;
-use crate::{
-    form::{FormType, SettingOpts},
-    plugin::PluginConfig,
+pub use spyglass_lens::{
+    types::{LensFilters, LensRule, LensSource},
+    LensConfig, PipelineConfiguration,
 };
-pub use spyglass_lens::types::{LensRule, LensSource};
-pub use spyglass_lens::{LensConfig, PipelineConfiguration};
+
+mod beta;
+mod filesystem;
+mod user_actions;
+pub use beta::*;
+pub use filesystem::*;
+pub use user_actions::*;
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
@@ -28,9 +34,10 @@ pub const LEGACY_PLUGIN_SETTINGS: &[&str] =
 pub const LEGACY_PLUGIN_FOLDERS: &[&str] =
     &["local-file-indexer", "chrome-importer", "firefox-importer"];
 
-// The default extensions
-pub const DEFAULT_EXTENSIONS: &[&str] = &["docx", "html", "md", "txt", "ods", "xls", "xlsx"];
 const USER_UUID_ENV_VAR: &str = "SPYGLASS_STATIC_USER_UUID";
+
+// Represents a Tag on a document
+pub type Tag = (String, String);
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -66,55 +73,6 @@ impl Limit {
     }
 }
 
-pub type PluginSettings = HashMap<String, HashMap<String, String>>;
-
-#[derive(Clone, Debug, Deserialize, Serialize, Diff)]
-pub struct FileSystemSettings {
-    #[serde(default)]
-    pub enable_filesystem_scanning: bool,
-    #[serde(default = "FileSystemSettings::default_paths")]
-    pub watched_paths: Vec<PathBuf>,
-    #[serde(default = "FileSystemSettings::default_extensions")]
-    pub supported_extensions: Vec<String>,
-}
-
-impl FileSystemSettings {
-    pub fn default_paths() -> Vec<PathBuf> {
-        let mut file_paths: Vec<PathBuf> = Vec::new();
-
-        if let Some(user_dirs) = UserDirs::new() {
-            if let Some(path) = user_dirs.desktop_dir() {
-                file_paths.push(path.to_path_buf());
-            }
-
-            if let Some(path) = user_dirs.document_dir() {
-                file_paths.push(path.to_path_buf());
-            }
-        }
-        file_paths
-    }
-
-    pub fn default_extensions() -> Vec<String> {
-        DEFAULT_EXTENSIONS
-            .iter()
-            .map(|val| String::from(*val))
-            .collect()
-    }
-}
-
-// Represents a Tag on a document
-pub type Tag = (String, String);
-
-impl Default for FileSystemSettings {
-    fn default() -> Self {
-        FileSystemSettings {
-            enable_filesystem_scanning: false,
-            watched_paths: FileSystemSettings::default_paths(),
-            supported_extensions: FileSystemSettings::default_extensions(),
-        }
-    }
-}
-
 // Enum of actions the user can take when a document is selected
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub enum UserAction {
@@ -122,242 +80,7 @@ pub enum UserAction {
     CopyToClipboard(String),
 }
 
-// The user action settings configuration provides the ability
-// for the user to define custom behavior for a document.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
-pub struct UserActionSettings {
-    pub actions: Vec<UserActionDefinition>,
-    pub context_actions: Vec<ContextActions>,
-}
-
-impl UserActionSettings {
-    // Helper used to identify if the user action settings contains
-    // an action that would be triggered by the passed in keyboard
-    // combination.
-    pub fn contains_trigger(
-        &self,
-        modifiers: &ModifiersState,
-        key: &KeyCode,
-        context: Option<&SearchResult>,
-        os: &str,
-    ) -> bool {
-        for action in &self.actions {
-            if action.is_triggered(modifiers, key, os) {
-                return true;
-            }
-        }
-
-        if let Some(context) = context {
-            for action in &self.context_actions {
-                if action.is_applicable(context) && action.contains_trigger(modifiers, key, os) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    // Helper method used to access the action definition for the action
-    // that should be triggered by the passed in keyboard combination.
-    // Note that context specific actions will be checked before general
-    // actions. This allows a user to configure a general action for all
-    // documents and custom actions for specific documents
-    pub fn get_triggered_action(
-        &self,
-        modifiers: &ModifiersState,
-        key: &KeyCode,
-        os: &str,
-        context: Option<&SearchResult>,
-    ) -> Option<UserActionDefinition> {
-        if let Some(context) = context {
-            for action in &self.context_actions {
-                if action.is_applicable(context) {
-                    if let Some(context_action) = action.get_triggered_action(modifiers, key, os) {
-                        return Some(context_action);
-                    }
-                }
-            }
-        }
-
-        for action in &self.actions {
-            if action.is_triggered(modifiers, key, os) {
-                return Some(action.clone());
-            }
-        }
-
-        None
-    }
-}
-
-impl Default for UserActionSettings {
-    // List of default actions when no other actions are configured
-    fn default() -> Self {
-        Self {
-            actions: vec![UserActionDefinition {
-                action: UserAction::CopyToClipboard(String::from("{{ open_url }}")),
-                key_binding: String::from("CmdOrCtrl+C"),
-                label: String::from("Copy URL to Clipboard"),
-                status_msg: Some(String::from("Copying...")),
-            }],
-            context_actions: vec![],
-        }
-    }
-}
-
-// Defines context specific actions. A context specific action
-// is a list of actions that are only valid when the document selected
-// matches the defined context.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
-pub struct ContextActions {
-    // Defines what context must be matched for the actions to be valid
-    pub context: ContextFilter,
-    // The list of actions for this context
-    pub actions: Vec<UserActionDefinition>,
-}
-
-impl ContextActions {
-    // Helper method used to identify if the context contains an actions that should
-    // be triggered by the passed in keyboard combination. Note this method does not
-    // check to see if the context is valid, just if the key combination matches.
-    pub fn contains_trigger(&self, modifiers: &ModifiersState, key: &KeyCode, os: &str) -> bool {
-        for action in &self.actions {
-            if action.is_triggered(modifiers, key, os) {
-                return true;
-            }
-        }
-        false
-    }
-
-    // Helper method used to access the action that should be triggered by the passed
-    // in key combination. Note this method does not check to see if the context is valid.
-    pub fn get_triggered_action(
-        &self,
-        modifiers: &ModifiersState,
-        key: &KeyCode,
-        os: &str,
-    ) -> Option<UserActionDefinition> {
-        for action in &self.actions {
-            if action.is_triggered(modifiers, key, os) {
-                return Some(action.clone());
-            }
-        }
-        None
-    }
-
-    // Helper method used to identify if the context actions are valid based on the
-    // passed in search result
-    pub fn is_applicable(&self, context: &SearchResult) -> bool {
-        let mut current_tags = HashMap::new();
-        for (tag, value) in &context.tags {
-            current_tags
-                .entry(tag.clone())
-                .or_insert(Vec::new())
-                .push(value.clone());
-        }
-        // Process exclude tag first to remove unwanted items
-        if let Some(exclude_types) = &self.context.exclude_tag_type {
-            for tag_type in exclude_types {
-                if current_tags.contains_key(tag_type.as_str()) {
-                    return false;
-                }
-            }
-        }
-
-        if let Some(exclude_tags) = &self.context.exclude_tag {
-            for (tag, value) in exclude_tags {
-                if let Some(current_vals) = current_tags.get(tag.as_str()) {
-                    if current_vals.contains(value) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        let tags_configured = self.context.has_tag_type.is_some() | self.context.has_tag.is_some();
-        let mut include: bool = !tags_configured;
-        if let Some(tags) = &self.context.has_tag_type {
-            for tag in tags {
-                if current_tags.contains_key(tag.as_str()) {
-                    // The current context has a tag type we are
-                    // looking for, set to true and break out of
-                    // the loop
-                    include |= true;
-                    break;
-                }
-            }
-        }
-
-        if !include {
-            if let Some(tags) = &self.context.has_tag {
-                for (tag, value) in tags {
-                    if let Some(current_vals) = current_tags.get(tag.as_str()) {
-                        if current_vals.contains(value) {
-                            // The current context has a tag we are
-                            // looking for, set to true and break out of
-                            // the loop
-                            include |= true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if let Some(urls) = &self.context.url_like {
-            let mut has_url = false;
-            for url in urls {
-                if url.eq(&context.url) {
-                    has_url = true;
-                    break;
-                }
-            }
-            // We have urls to check so the context must match
-            // one of the urls and any tags that were
-            // previously defined
-            include &= has_url;
-        }
-        include
-    }
-}
-
-// Filter definition used to define what documents should match
-// against the context.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
-pub struct ContextFilter {
-    // Includes documents that match any of the defined tags
-    pub has_tag: Option<Vec<Tag>>,
-    // Includes documents that match any of the defined tag types
-    pub has_tag_type: Option<Vec<String>>,
-    // Excludes documents that match the specified tag
-    pub exclude_tag: Option<Vec<Tag>>,
-    // Exclude documents that match the defined tag type
-    pub exclude_tag_type: Option<Vec<String>>,
-    // Include only documents that match the specified url. When
-    // set a document must match the url and any specified tags
-    // to be included
-    pub url_like: Option<Vec<String>>,
-}
-
-// The definition for an action
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
-pub struct UserActionDefinition {
-    pub label: String,
-    pub status_msg: Option<String>,
-    pub action: UserAction,
-    pub key_binding: String,
-}
-
-impl UserActionDefinition {
-    // Helper used to identify if the key binding specified in the action definition
-    // matches the passed in key code and modifiers
-    pub fn is_triggered(&self, modifiers: &ModifiersState, key: &KeyCode, os: &str) -> bool {
-        //todo preprocess accelerator like a normal person
-        if let Ok(accelerator) = accelerator::parse_accelerator(&self.key_binding, os) {
-            return accelerator.matches(modifiers, key);
-        }
-        false
-    }
-}
+pub type PluginSettings = HashMap<String, HashMap<String, String>>;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Diff)]
 pub struct UserSettings {
@@ -473,29 +196,9 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 restart_required: true,
                 help_text: Some("Port number used by the Spyglass background services. Only change this if you already have another server running on this port. This will require a restart.".into())
             }),
-            ("_.filesystem_settings.enable_filesystem_scanning".into(), SettingOpts {
-                label: "Enable Filesystem Indexing".into(),
-                value: settings.filesystem_settings.enable_filesystem_scanning.to_string(),
-                form_type: FormType::Bool,
-                restart_required: false,
-                help_text: Some("Enables and disables local filesystem indexing. When enabled configured folders will be scanned and indexed. Any supported file types will have their contents indexed.".into())
-            }),
-            ("_.filesystem_settings.watched_paths".into(), SettingOpts {
-                label: "Folder List".into(),
-                value: serde_json::to_string(&settings.filesystem_settings.watched_paths).unwrap_or(String::from("[]")),
-                form_type: FormType::PathList,
-                restart_required: false,
-                help_text: Some("List of folders that will be crawled & indexed. These folders will be crawled recursively, so you only need to specify the parent folder.".into())
-            }),
-            ("_.filesystem_settings.supported_extensions".into(), SettingOpts {
-                label: "Extension List".into(),
-                value: serde_json::to_string(&settings.filesystem_settings.supported_extensions).unwrap_or(String::from("[]")),
-                form_type: FormType::StringList,
-                restart_required: false,
-                help_text: Some("List of file types to index.".into())
-            }),
         ];
 
+        config.extend(fs_setting_opts(&settings));
         if let Limit::Finite(val) = settings.inflight_crawl_limit {
             config.push((
                 "_.inflight_crawl_limit".into(),
@@ -773,27 +476,15 @@ impl Config {
             user_settings,
         };
 
-        let data_dir = config.data_dir();
-        fs::create_dir_all(data_dir).expect("Unable to create data folder");
-
-        let index_dir = config.index_dir();
-        fs::create_dir_all(index_dir).expect("Unable to create index folder");
-
-        let logs_dir = config.logs_dir();
-        fs::create_dir_all(logs_dir).expect("Unable to create logs folder");
-
-        let lenses_dir = config.lenses_dir();
-        fs::create_dir_all(lenses_dir).expect("Unable to create `lenses` folder");
-
-        let pipelines_dir = config.pipelines_dir();
-        fs::create_dir_all(pipelines_dir).expect("Unable to create `pipelines` folder");
-
-        let plugins_dir = config.plugins_dir();
-        fs::create_dir_all(&plugins_dir).expect("Unable to create `plugin` folder");
-
+        fs::create_dir_all(config.data_dir()).expect("Unable to create data folder");
+        fs::create_dir_all(config.index_dir()).expect("Unable to create index folder");
+        fs::create_dir_all(config.logs_dir()).expect("Unable to create logs folder");
+        fs::create_dir_all(config.lenses_dir()).expect("Unable to create `lenses` folder");
+        fs::create_dir_all(config.pipelines_dir()).expect("Unable to create `pipelines` folder");
+        fs::create_dir_all(config.plugins_dir()).expect("Unable to create `plugin` folder");
         fs::create_dir_all(config.model_dir()).expect("Unable to create models folder");
 
-        Self::cleanup_legacy_plugins(&plugins_dir);
+        Self::cleanup_legacy_plugins(&config.plugins_dir());
 
         config
     }

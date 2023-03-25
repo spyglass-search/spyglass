@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use strum_macros::{Display, EnumString};
 
-use crate::{accelerator, config::KeyCode, MAC_OS};
+use crate::keyboard::KeyCode;
+use crate::{accelerator, MAC_OS};
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
 pub enum FormType {
