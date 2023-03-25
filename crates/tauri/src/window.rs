@@ -1,3 +1,4 @@
+use crate::constants::SETTINGS_WIN_NAME;
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
 use shared::event::ClientEvent;
@@ -61,6 +62,14 @@ pub fn show_search_bar(window: &Window) {
 }
 
 pub fn hide_search_bar(window: &Window) {
+    let handle = window.app_handle();
+    // don't hide if the settings window is open
+    if let Some(settings_window) = handle.get_window(SETTINGS_WIN_NAME) {
+        if settings_window.is_visible().unwrap_or_default() {
+            return;
+        }
+    }
+
     platform::hide_search_bar(window);
 }
 
