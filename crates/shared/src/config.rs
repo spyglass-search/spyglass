@@ -120,6 +120,8 @@ pub struct UserSettings {
     pub port: u16,
     #[serde(default)]
     pub user_action_settings: UserActionSettings,
+    #[serde(default)]
+    pub beta_settings: BetaSettings,
     // /// Hide the app icon from the dock/taskbar while running. Will still show up
     // /// in the menubar/systemtray.
     // #[serde(default)]
@@ -199,6 +201,8 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
         ];
 
         config.extend(fs_setting_opts(&settings));
+        config.extend(beta_setting_opts(&settings));
+
         if let Limit::Finite(val) = settings.inflight_crawl_limit {
             config.push((
                 "_.inflight_crawl_limit".into(),
@@ -256,6 +260,7 @@ impl Default for UserSettings {
             disable_autolaunch: false,
             port: UserSettings::default_port(),
             user_action_settings: UserActionSettings::default(),
+            beta_settings: BetaSettings::default(),
         }
     }
 }
