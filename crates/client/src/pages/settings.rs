@@ -140,6 +140,7 @@ impl Component for UserSettingsPage {
             })
             .collect::<Html>();
 
+        let save_btn_type = if self.has_changes { btn::BtnType::Success } else { btn::BtnType::Default };
         html! {
             <div>
                 <div class="px-4 pb-2 sticky top-0 bg-neutral-800 py-4 flex flex-row items-center">
@@ -149,8 +150,16 @@ impl Component for UserSettingsPage {
                             <icons::FolderOpenIcon classes={classes!("mr-1")} width="w-4" height="h-4" />
                             {"Show Folder"}
                         </btn::Btn>
-                        <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes} size={btn::BtnSize::Sm}>
-                            { if self.restart_required {"Save & Restart"} else {"Save"} }
+                        <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes} size={btn::BtnSize::Sm} _type={save_btn_type}>
+                            {
+                                if !self.has_changes {
+                                    "No changes"
+                                } else if self.restart_required {
+                                    "Apply Changes & Restart"
+                                } else {
+                                    "Apply Changes"
+                                }
+                            }
                         </btn::Btn>
                     </div>
                 </div>
