@@ -234,13 +234,14 @@ async fn download_model(state: &AppState, model_name: &str) -> anyhow::Result<()
 
                 // Send an update to client every ~10 secs
                 if last_update.elapsed().as_secs() > 10 {
+                    let percent_downloaded = (downloaded as f32 / (total_size * 100) as f32) as u8;
                     state
                         .publish_event(&RpcEvent {
                             event_type: RpcEventType::ModelDownloadStatus,
                             payload: serde_json::to_string(
                                 &ModelDownloadStatusPayload::InProgress {
                                     model_name: model_name.into(),
-                                    percent: (downloaded / total_size * 100) as u8,
+                                    percent: percent_downloaded as u8,
                                 },
                             )
                             .unwrap_or_default(),
