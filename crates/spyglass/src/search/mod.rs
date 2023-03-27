@@ -1,5 +1,6 @@
 use serde::Serialize;
 use spyglass_plugin::DocumentQuery;
+use tantivy::tokenizer::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ use uuid::Uuid;
 use crate::search::query::{build_document_query, build_query};
 use crate::state::AppState;
 use entities::models::{document_tag, indexed_document, tag};
-use entities::schema::{DocFields, SearchDocument};
+use entities::schema::{self, DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
 pub mod grouping;
@@ -200,13 +201,11 @@ impl Searcher {
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
     pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
-        let schema = DocFields::as_schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
-                let dir = MmapDirectory::open(path)?;
-                Index::open_or_create(dir, schema)?
+                schema::initialize_index(path)?
             }
-            IndexPath::Memory => Index::create_in_ram(schema),
+            IndexPath::Memory => schema::initialize_in_memory_index(),
         };
 
         // Should only be one writer at a time. This single IndexWriter is already
@@ -397,13 +396,11 @@ impl ReadonlySearcher {
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
     pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
-        let schema = DocFields::as_schema();
         let index = match index_path {
             IndexPath::LocalPath(path) => {
-                let dir = MmapDirectory::open(path)?;
-                Index::open_or_create(dir, schema)?
+                schema::initialize_index(path)?
             }
-            IndexPath::Memory => Index::create_in_ram(schema),
+            IndexPath::Memory => schema::initialize_in_memory_index(),
         };
 
         // For a search server you will typically create on reader for the entire
@@ -464,6 +461,67 @@ impl ReadonlySearcher {
             .expect("Unable to execute query");
 
         docs.into_iter().map(|addr| (1.0, addr)).collect()
+    }
+
+    pub async fn explain_search_with_lens(
+        db: &DatabaseConnection,
+        doc_address: DocAddress,
+        applied_lenses: &Vec<u64>,
+        searcher: &ReadonlySearcher,
+        query_string: &str,
+        stats: &mut QueryStats,
+    ) -> Option<f32> {
+
+        let mut tag_boosts = HashSet::new();
+        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
+            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
+            .one(db)
+            .await
+        {
+            Some(favorited.id)
+        } else {
+            None
+        };
+
+        let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
+        tag_boosts.extend(tag_checks);
+
+        let index = &searcher.index;
+        let reader = &searcher.reader;
+        let fields = DocFields::as_fields();
+        let searcher = reader.searcher();
+        let tokenizers = index.tokenizers().clone();
+        let query = build_query(
+            index.schema(),
+            tokenizers.clone(),
+            fields.clone(),
+            query_string,
+            applied_lenses,
+            tag_boosts.into_iter(),
+            favorite_boost,
+            stats,
+        );
+
+        let content_terms = query::terms_for_field(&index.schema(), &tokenizers, query_string, fields.content);
+        log::info!("Content Tokens {:?}", content_terms);
+
+        let collector = tantivy::collector::TopDocs::with_limit(600000);
+        
+        let docs = searcher
+            .search(&query, &collector)
+            .expect("Unable to execute query");
+        for (score, addr) in docs {
+            if addr == doc_address {
+                for t in content_terms {
+                    let info = searcher.segment_reader(addr.segment_ord).inverted_index(fields.content).unwrap().get_term_info(&t);
+                    log::info!("Term {:?} Info {:?} ", t, info);
+                }
+                
+                return Some(score);
+            }
+        }
+        None
+        // query.explain(&searcher, doc_address)
     }
 }
 
