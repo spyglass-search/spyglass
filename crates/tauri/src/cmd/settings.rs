@@ -187,6 +187,5 @@ pub async fn load_user_settings(
         }
     }
 
-    list.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(list)
 }

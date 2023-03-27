@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::forms::{FormElement, SettingChangeEvent};
 use crate::{
-    components::{btn, icons, Header},
-    invoke, save_user_settings,
+    components::{btn, icons},
+    save_user_settings, tauri_invoke,
     utils::RequestState,
 };
 use shared::event::ClientInvoke;
@@ -33,14 +32,10 @@ pub struct UserSettingsPage {
 
 impl UserSettingsPage {
     async fn fetch_user_settings() -> Vec<(String, SettingOpts)> {
-        match invoke(ClientInvoke::LoadUserSettings.as_ref(), JsValue::NULL).await {
-            Ok(results) => match serde_wasm_bindgen::from_value(results) {
-                Ok(parsed) => parsed,
-                Err(e) => {
-                    log::error!("Unable to deserialize results: {}", e.to_string());
-                    Vec::new()
-                }
-            },
+        match tauri_invoke::<(), Vec<(String, SettingOpts)>>(ClientInvoke::LoadUserSettings, ())
+            .await
+        {
+            Ok(results) => results,
             Err(e) => {
                 log::error!("Error fetching user settings: {:?}", e);
                 Vec::new()
@@ -109,7 +104,7 @@ impl Component for UserSettingsPage {
             }
             Msg::HandleShowFolder => {
                 spawn_local(async move {
-                    let _ = invoke(ClientInvoke::OpenSettingsFolder.as_ref(), JsValue::NULL).await;
+                    let _ = tauri_invoke::<(), ()>(ClientInvoke::OpenSettingsFolder, ()).await;
                 });
 
                 false
@@ -147,16 +142,19 @@ impl Component for UserSettingsPage {
 
         html! {
             <div>
-                <Header label="User Settings">
-                    <btn::Btn onclick={link.callback(|_| Msg::HandleShowFolder)}>
-                        <icons::FolderOpenIcon classes={classes!("mr-2")}/>
-                        {"Show Folder"}
-                    </btn::Btn>
-                    <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes}>
-                        { if self.restart_required {"Save & Restart"} else {"Save"} }
-                    </btn::Btn>
-                </Header>
-                <div class="pt-8 bg-netural-800">
+                <div class="px-4 pb-2 sticky top-0 bg-neutral-800 py-4 flex flex-row items-center">
+                    <div class="font-bold">{"User Settings"}</div>
+                    <div class="ml-auto flex flex-row gap-2">
+                        <btn::Btn onclick={link.callback(|_| Msg::HandleShowFolder)} size={btn::BtnSize::Sm}>
+                            <icons::FolderOpenIcon classes={classes!("mr-1")} width="w-4" height="h-4" />
+                            {"Show Folder"}
+                        </btn::Btn>
+                        <btn::Btn onclick={link.callback(|_| Msg::HandleSave)} disabled={!self.has_changes} size={btn::BtnSize::Sm}>
+                            { if self.restart_required {"Save & Restart"} else {"Save"} }
+                        </btn::Btn>
+                    </div>
+                </div>
+                <div class="px-4 pb-2">
                     {contents}
                 </div>
             </div>

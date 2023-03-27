@@ -129,7 +129,7 @@ impl Component for KeyBinding {
         };
 
         html! {
-            <div class="w-full flex flex-row items-center gap-1">
+            <div class="w-full flex flex-row items-center">
                 <input
                     ref={self.node_ref.clone()}
                     spellcheck="false"
@@ -137,10 +137,11 @@ impl Component for KeyBinding {
                     onkeydown={link.callback(Msg::KeyDown)}
                     value={self.value.clone()}
                     type="text"
-                    class="grow form-input w-full text-sm rounded bg-stone-700 border-stone-800"
+                    class="grow form-input w-full text-sm rounded bg-stone-700 border-stone-800 mr-4"
                 />
-
-                {key_binding}
+                <div class="flex flex-row gap-1 items-center">
+                    {key_binding}
+                </div>
             </div>
         }
     }

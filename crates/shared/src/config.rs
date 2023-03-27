@@ -200,9 +200,6 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
             }),
         ];
 
-        config.extend(fs_setting_opts(&settings));
-        config.extend(beta_setting_opts(&settings));
-
         if let Limit::Finite(val) = settings.inflight_crawl_limit {
             config.push((
                 "_.inflight_crawl_limit".into(),
@@ -232,6 +229,9 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 },
             ));
         }
+
+        config.extend(fs_setting_opts(&settings));
+        config.extend(beta_setting_opts(&settings));
 
         config
     }

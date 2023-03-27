@@ -8,7 +8,7 @@ pub fn beta_setting_opts(settings: &UserSettings) -> Vec<(String, SettingOpts)> 
     vec![(
         "_.beta_settings.enable_audio_transcription".into(),
         SettingOpts {
-            label: "Enable Audio Indexing".into(),
+            label: "Beta: Enable Audio Indexing".into(),
             value: settings
                 .beta_settings
                 .enable_audio_transcription
@@ -16,8 +16,9 @@ pub fn beta_setting_opts(settings: &UserSettings) -> Vec<(String, SettingOpts)> 
             form_type: FormType::Bool,
             restart_required: false,
             help_text: Some(
-                r#"Toggles audio content indexing. Files with audio content (mp3s, mp4s, etc.)
-                will be transcribed and the contents indexed."#
+                r#"Files with audio content (mp3s, mp4s, etc.) will be transcribed and
+                the contents indexed. Enabling this will download the model
+                required to do the transcription."#
                     .into(),
             ),
         },
