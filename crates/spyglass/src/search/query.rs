@@ -173,7 +173,7 @@ pub fn build_document_query(
  * Responsible for parsing the input query for a particular field. The tokenizer for the field
  * is used to ensure consistent tokens between indexing and queries.
  */
-fn terms_for_field(
+pub fn terms_for_field(
     schema: &Schema,
     tokenizers: &TokenizerManager,
     query: &str,
