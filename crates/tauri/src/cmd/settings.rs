@@ -86,6 +86,10 @@ pub async fn save_user_settings(
                                             .enable_filesystem_scanning =
                                             serde_json::from_str(value).unwrap_or_default()
                                     }
+                                    "audio_settings.enable_audio_transcription" => {
+                                        current_settings.audio_settings.enable_audio_transcription =
+                                            serde_json::from_str(value).unwrap_or_default()
+                                    }
                                     _ => {}
                                 }
                             }

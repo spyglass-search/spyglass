@@ -15,10 +15,10 @@ pub use spyglass_lens::{
     LensConfig, PipelineConfiguration,
 };
 
-mod beta;
+mod audio;
 mod filesystem;
 mod user_actions;
-pub use beta::*;
+pub use audio::*;
 pub use filesystem::*;
 pub use user_actions::*;
 
@@ -121,7 +121,7 @@ pub struct UserSettings {
     #[serde(default)]
     pub user_action_settings: UserActionSettings,
     #[serde(default)]
-    pub beta_settings: BetaSettings,
+    pub audio_settings: AudioSettings,
     // /// Hide the app icon from the dock/taskbar while running. Will still show up
     // /// in the menubar/systemtray.
     // #[serde(default)]
@@ -160,6 +160,7 @@ impl UserSettings {
 }
 
 // TODO: Turn this into procedural macro that we can use to tag attributes in the UserSetting struct
+// NOTE: Settings page will be in the exact order that the config list is constructed.
 impl From<UserSettings> for Vec<(String, SettingOpts)> {
     fn from(settings: UserSettings) -> Self {
         let mut config = vec![
@@ -231,7 +232,7 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
         }
 
         config.extend(fs_setting_opts(&settings));
-        config.extend(beta_setting_opts(&settings));
+        config.extend(audio_setting_opts(&settings));
 
         config
     }
@@ -260,7 +261,7 @@ impl Default for UserSettings {
             disable_autolaunch: false,
             port: UserSettings::default_port(),
             user_action_settings: UserActionSettings::default(),
-            beta_settings: BetaSettings::default(),
+            audio_settings: AudioSettings::default(),
         }
     }
 }

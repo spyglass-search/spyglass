@@ -184,8 +184,12 @@ pub async fn config_task(mut state: AppState) {
                             if Config::save_user_settings(&new_settings).is_ok() {
                                 state.reload_config();
                                 let diff = new_settings.diff(&old_config);
-
+                                // Process any new added paths
                                 process_filesystem_changes(&state, &diff).await;
+                                // Enable audio transcription?
+                                if new_settings.audio_settings.enable_audio_transcription {
+                                    // Download model
+                                }
                             }
                         }
                     }
