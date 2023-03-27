@@ -2,7 +2,7 @@ use crate::window::notify;
 use crate::{rpc, AppEvent};
 use anyhow::anyhow;
 use jsonrpsee::core::client::Subscription;
-use spyglass_rpc::{RpcClient, RpcEvent, RpcEventType};
+use spyglass_rpc::{ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType};
 use tauri::{
     async_runtime::JoinHandle,
     plugin::{Builder, TauriPlugin},
@@ -45,6 +45,7 @@ async fn _subscribe(app: &AppHandle) -> anyhow::Result<Subscription<RpcEvent>> {
             RpcEventType::ConnectionSyncFinished,
             RpcEventType::LensInstalled,
             RpcEventType::LensUninstalled,
+            RpcEventType::ModelDownloadStatus,
         ])
         .await?;
 
@@ -83,13 +84,39 @@ async fn setup_notification_handler(app: AppHandle) {
                 match event {
                     Some(Ok(event)) =>  {
                         log::debug!("received event: {:?}", event);
-                        let (title, blurb) = match &event.event_type {
-                            RpcEventType::ConnectionSyncFinished => ("Sync Completed", event.payload),
-                            RpcEventType::LensInstalled => ("Lens Installed", event.payload),
-                            RpcEventType::LensUninstalled => ("Lens Removed", event.payload),
+                        let notif: Option<(String, String)> = match &event.event_type {
+                            RpcEventType::ConnectionSyncFinished => Some(("Sync Completed".into(), event.payload)),
+                            RpcEventType::LensInstalled => Some(("Lens Installed".into(), event.payload)),
+                            RpcEventType::LensUninstalled => Some(("Lens Removed".into(), event.payload)),
+                            RpcEventType::ModelDownloadStatus => {
+                                if let Ok(status) = serde_json::de::from_str::<ModelDownloadStatusPayload>(&event.payload) {
+                                    match status {
+                                        ModelDownloadStatusPayload::Finished { model_name } => {
+                                            Some((
+                                                "Model Installed".into(),
+                                                format!("Finished downloading {}", model_name)
+                                            ))
+                                        },
+                                        ModelDownloadStatusPayload::Error { model_name, msg } => {
+                                            Some((
+                                                "Model Download Failed".into(),
+                                                format!("Unable to download {} model: {}", model_name, msg)
+                                            ))
+                                        },
+                                        ModelDownloadStatusPayload::InProgress { model_name, percent } => {
+                                            log::info!("downloading: {} - {}", model_name, percent);
+                                            None
+                                        }
+                                    }
+                                } else {
+                                    None
+                                }
+                            }
                         };
 
-                        let _ = notify(&app, title, &blurb);
+                        if let Some((title, blurb)) = notif {
+                            let _ = notify(&app, &title, &blurb);
+                        }
                     },
                     Some(Err(err)) => log::warn!("error listening to event: {:?}", err),
                     // channel dropped, attempt to reconnect

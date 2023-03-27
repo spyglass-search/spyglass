@@ -1,6 +1,5 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
-use serde::{Deserialize, Serialize};
 use shared::config::UserSettings;
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{
@@ -9,18 +8,8 @@ use shared::response::{
 };
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-pub enum RpcEventType {
-    ConnectionSyncFinished,
-    LensUninstalled,
-    LensInstalled,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RpcEvent {
-    pub event_type: RpcEventType,
-    pub payload: String,
-}
+mod events;
+pub use events::*;
 
 /// Rpc trait
 #[rpc(server, client, namespace = "spyglass")]
