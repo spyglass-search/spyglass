@@ -92,6 +92,9 @@ async fn setup_notification_handler(app: AppHandle) {
                                 if let Ok(status) = serde_json::de::from_str::<ModelDownloadStatusPayload>(&event.payload) {
                                     match status {
                                         ModelDownloadStatusPayload::Finished { model_name } => {
+                                            let window = crate::window::update_progress_window(&app, &model_name, 100);
+                                            let _ = window.close();
+
                                             Some((
                                                 "Model Installed".into(),
                                                 format!("Finished downloading {}", model_name)
@@ -105,6 +108,7 @@ async fn setup_notification_handler(app: AppHandle) {
                                         },
                                         ModelDownloadStatusPayload::InProgress { model_name, percent } => {
                                             log::info!("downloading: {} - {}", model_name, percent);
+                                            crate::window::update_progress_window(&app, &model_name, percent);
                                             None
                                         }
                                     }

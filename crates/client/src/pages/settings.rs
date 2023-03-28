@@ -140,7 +140,11 @@ impl Component for UserSettingsPage {
             })
             .collect::<Html>();
 
-        let save_btn_type = if self.has_changes { btn::BtnType::Success } else { btn::BtnType::Default };
+        let save_btn_type = if self.has_changes {
+            btn::BtnType::Success
+        } else {
+            btn::BtnType::Default
+        };
         html! {
             <div>
                 <div class="px-4 pb-2 sticky top-0 bg-neutral-800 py-4 flex flex-row items-center">

@@ -483,6 +483,13 @@ export let invoke = async (func_name, params) => {
 export let listen = async (event, callback) => {
   console.log(`listen called w/ ${event}`);
   CALLBACKS[event] = callback;
+
+  if (event == "progress_update") {
+    window.setTimeout(() => {
+      CALLBACKS["progress_update"](["test", "10"]);
+    }, 5000);
+  }
+
   return {};
 };
 

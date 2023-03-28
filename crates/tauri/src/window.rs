@@ -1,7 +1,7 @@
 use crate::constants::SETTINGS_WIN_NAME;
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
-use shared::event::ClientEvent;
+use shared::event::{ClientEvent, ModelStatusPayload};
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{
     AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
@@ -216,6 +216,35 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
     };
 
     show_window(&window);
+    window
+}
+
+pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Window {
+    let window = if let Some(window) = app.get_window(constants::PROGRESS_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::PROGRESS_WIN_NAME,
+            WindowUrl::App("/progress".into()),
+        )
+        .title("Progress")
+        .menu(Menu::new())
+        .resizable(true)
+        .inner_size(300.0, 64.0)
+        .build()
+        .expect("Unable to build window for progress")
+    };
+
+    let payload = ModelStatusPayload {
+        msg: msg.to_string(),
+        percent: progress.to_string(),
+    };
+
+    log::debug!("emitting update: {:?}", payload);
+    let _ = window.emit("progress_update", payload);
+    let _ = window.show();
+    let _ = window.set_focus();
     window
 }
 

@@ -7,6 +7,7 @@ use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
 use spyglass_rpc::{ModelDownloadStatusPayload, RpcEvent, RpcEventType};
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;
@@ -179,28 +180,29 @@ pub async fn config_task(mut state: AppState) {
     loop {
         tokio::select! {
             cmd = config_rx.recv() => {
-                match cmd {
-                    Ok(UserSettingsChange::SettingsChanged (new_settings)) => {
-                        log::debug!("User Settings Updated {:?}", new_settings);
-                        let old_config = state.user_settings.load_full();
+                if let Ok(UserSettingsChange::SettingsChanged(new_settings)) = cmd {
+                    log::debug!("User Settings Updated {:?}", new_settings);
+                    let old_config = state.user_settings.load_full();
 
-                        if Config::save_user_settings(&new_settings).is_ok() {
-                            state.reload_config();
-                            let diff = new_settings.diff(&old_config);
-                            // Process any new added paths
-                            process_filesystem_changes(&state, &diff).await;
-                            // Audio transcriptions enabled?
-                            if new_settings.audio_settings.enable_audio_transcription {
+                    if Config::save_user_settings(&new_settings).is_ok() {
+                        state.reload_config();
+                        let diff = new_settings.diff(&old_config);
+                        // Process any new added paths
+                        process_filesystem_changes(&state, &diff).await;
+                        // Audio transcriptions enabled?
+                        if new_settings.audio_settings.enable_audio_transcription {
+                            // Do we already have this model?
+                            let model_path = state.config.model_dir().join("whisper.base.en.bin");
+                            if !model_path.exists() {
                                 // Spawn a background task to download and send progress updates to
                                 // any listening clients
                                 let state_clone = state.clone();
                                 tokio::spawn(async move {
-                                    let _ = download_model(&state_clone, "Whisper Audio").await;
+                                    let _ = download_model(&state_clone, "Whisper Audio", model_path).await;
                                 });
                             }
                         }
-                    },
-                    _ => {}
+                    }
                 }
             }
             _ = shutdown_rx.recv() => {
@@ -211,19 +213,25 @@ pub async fn config_task(mut state: AppState) {
     }
 }
 
-async fn download_model(state: &AppState, model_name: &str) -> anyhow::Result<()> {
+/// Downloads a model from our assets S3 bucket
+async fn download_model(
+    state: &AppState,
+    model_name: &str,
+    model_path: PathBuf,
+) -> anyhow::Result<()> {
+    // Currently we only have the audio model :)
     match reqwest::get(shared::constants::WHISPER_MODEL).await {
         Ok(res) => {
             let total_size = res.content_length().expect("Unable to get content length");
-
-            let model_path = state.config.model_dir().join("whisper.base.en.bin");
             let mut file = File::create(model_path).or(Err(anyhow!("Failed to create file")))?;
 
             let mut downloaded: u64 = 0;
             let mut stream = res.bytes_stream();
 
             // Download model in chunks, writing to model path.
-            let mut last_update = std::time::Instant::now();
+
+            // Set the last update to some time in the past so we immediately send an update
+            let mut last_update = std::time::Instant::now() - std::time::Duration::from_secs(100);
             while let Some(item) = stream.next().await {
                 let chunk = item.or(Err(anyhow!("Error while downloading file")))?;
                 file.write_all(&chunk)
@@ -234,14 +242,14 @@ async fn download_model(state: &AppState, model_name: &str) -> anyhow::Result<()
 
                 // Send an update to client every ~10 secs
                 if last_update.elapsed().as_secs() > 10 {
-                    let percent_downloaded = (downloaded as f32 / (total_size * 100) as f32) as u8;
+                    let percent = ((downloaded as f32 / total_size as f32) * 100f32) as u8;
                     state
                         .publish_event(&RpcEvent {
                             event_type: RpcEventType::ModelDownloadStatus,
                             payload: serde_json::to_string(
                                 &ModelDownloadStatusPayload::InProgress {
                                     model_name: model_name.into(),
-                                    percent: percent_downloaded as u8,
+                                    percent,
                                 },
                             )
                             .unwrap_or_default(),
