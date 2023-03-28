@@ -228,7 +228,7 @@ pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Windo
             constants::PROGRESS_WIN_NAME,
             WindowUrl::App("/progress".into()),
         )
-        .title("Progress")
+        .title("Download Progress")
         .menu(Menu::new())
         .resizable(true)
         .inner_size(300.0, 64.0)
