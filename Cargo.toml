@@ -10,6 +10,8 @@ members = [
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",
+    # Experimental
+    "crates/spyglass-clippy",
 ]
 
 [profile.release]
