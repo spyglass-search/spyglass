@@ -1,12 +1,10 @@
-use std::{convert::Infallible, io::Write};
+use std::{convert::Infallible, io::Write, path::PathBuf};
 
 use llama_rs::{
     InferenceParameters, InferenceSessionParameters, LoadError, LoadProgress, ModelKVMemoryType,
     TokenBias,
 };
 use rand::SeedableRng;
-
-const MODEL_PATH: &str = "../../assets/models/alpaca-native.7b.bin";
 
 fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
     // Begin the template in the form alpaca expects
@@ -39,6 +37,7 @@ fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
 }
 
 pub async fn unleash_clippy(
+    model: PathBuf,
     prompt: &str,
     doc_context: Option<Vec<String>>,
 ) -> Result<(), LoadError> {
@@ -65,7 +64,7 @@ pub async fn unleash_clippy(
         }
     };
 
-    let (model, vocab) = llama_rs::Model::load(MODEL_PATH, 2048, |progress| match progress {
+    let (model, vocab) = llama_rs::Model::load(model, 2048, |progress| match progress {
         LoadProgress::HyperparametersLoaded(hparams) => {
             println!("Loaded HyperParams {hparams:#?}")
         }
@@ -125,10 +124,12 @@ pub async fn unleash_clippy(
 
 #[cfg(test)]
 mod test {
+    const MODEL_PATH: &str = "../../assets/models/alpaca-native.7b.bin";
+
     #[ignore]
     #[tokio::test]
     pub async fn test_basic_prompt() {
-        super::unleash_clippy("what is the difference between an alpaca & llama?", None)
+        super::unleash_clippy(MODEL_PATH.into(), "what is the difference between an alpaca & llama?", None)
             .await
             .expect("Unable to prompt");
     }
@@ -142,7 +143,7 @@ mod test {
             "We are releasing our training recipe and data, and intend to release the model weights in the future. We are also hosting an interactive demo to enable the research community to better understand the behavior of Alpaca. Interaction can expose unexpected capabilities and failures, which will guide us for the future evaluation of these models. We also encourage users to report any concerning behaviors in our web demo so that we can better understand and mitigate these behaviors. As any release carries risks, we discuss our thought process for this open release later in this blog post.".into(),
             "We emphasize that Alpaca is intended only for academic research and any commercial use is prohibited. There are three factors in this decision: First, Alpaca is based on LLaMA, which has a non-commercial license, so we necessarily inherit this decision. Second, the instruction data is based on OpenAI’s text-davinci-003, whose terms of use prohibit developing models that compete with OpenAI. Finally, we have not designed adequate safety measures, so Alpaca is not ready to be deployed for general use.".into(),
         ];
-        super::unleash_clippy("what is alpaca?", Some(data))
+        super::unleash_clippy(MODEL_PATH.into(), "what is alpaca?", Some(data))
             .await
             .expect("Unable to prompt");
     }
