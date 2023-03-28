@@ -167,7 +167,7 @@ impl Component for UserSettingsPage {
                         </btn::Btn>
                     </div>
                 </div>
-                <div class="px-4 pb-2">
+                <div class="px-8 mt-2 pb-2">
                     {contents}
                 </div>
             </div>
