@@ -154,14 +154,17 @@ export let invoke = async (func_name, params) => {
         {
           id: "calendar.google.com",
           account: "a5.t.huynh@gmail.com",
+          is_syncing: false,
         },
         {
           id: "drive.google.com",
           account: "a5.t.huynh@gmail.com",
+          is_syncing: true,
         },
         {
           id: "drive.google.com",
           account: "andrew@spyglass.fyi",
+          is_syncing: false,
         },
       ],
     };
@@ -413,6 +416,7 @@ export let invoke = async (func_name, params) => {
           value:
             "/Users/a5huynh/Library/Application Support/com.athlabs.spyglass-dev",
           form_type: "Path",
+          restart_required: true,
           help_text:
             "The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.",
         },
@@ -423,6 +427,7 @@ export let invoke = async (func_name, params) => {
           label: "Disable Autolaunch",
           value: "false",
           form_type: "Bool",
+          restart_required: false,
           help_text:
             "Prevents Spyglass from automatically launching when your computer first starts up.",
         },
@@ -433,6 +438,7 @@ export let invoke = async (func_name, params) => {
           label: "Disable Telemetry",
           value: "false",
           form_type: "Bool",
+          restart_required: false,
           help_text:
             "Stop sending data to any 3rd-party service. See https://spyglass.fyi/telemetry for more info.",
         },
@@ -477,6 +483,13 @@ export let invoke = async (func_name, params) => {
 export let listen = async (event, callback) => {
   console.log(`listen called w/ ${event}`);
   CALLBACKS[event] = callback;
+
+  if (event == "progress_update") {
+    window.setTimeout(() => {
+      CALLBACKS["progress_update"](["test", "10"]);
+    }, 5000);
+  }
+
   return {};
 };
 

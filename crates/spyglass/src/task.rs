@@ -1,8 +1,13 @@
+use anyhow::anyhow;
 use entities::models::{bootstrap_queue, connection};
+use futures::StreamExt;
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
-use spyglass_rpc::{RpcEvent, RpcEventType};
+use spyglass_rpc::{ModelDownloadStatusPayload, RpcEvent, RpcEventType};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
 use std::time::Duration;
@@ -164,10 +169,10 @@ pub async fn manager_task(
     }
 }
 
-/// Manages the worker pool, scheduling tasks based on type/priority/etc.
+/// Manages changes to the user's settings
 #[tracing::instrument(skip_all)]
 pub async fn config_task(mut state: AppState) {
-    log::info!("Staring Configuration Watcher");
+    log::info!("Starting Configuration Watcher");
 
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
     let mut config_rx = state.config_cmd_tx.lock().await.subscribe();
@@ -175,17 +180,26 @@ pub async fn config_task(mut state: AppState) {
     loop {
         tokio::select! {
             cmd = config_rx.recv() => {
-                if let Ok(cmd) = cmd {
-                    match cmd {
-                        UserSettingsChange::SettingsChanged (new_settings) => {
-                            log::debug!("User Settings Updated {:?}", new_settings);
-                            let old_config = state.user_settings.load_full();
+                if let Ok(UserSettingsChange::SettingsChanged(new_settings)) = cmd {
+                    log::debug!("User Settings Updated {:?}", new_settings);
+                    let old_config = state.user_settings.load_full();
 
-                            if Config::save_user_settings(&new_settings).is_ok() {
-                                state.reload_config();
-                                let diff = new_settings.diff(&old_config);
-
-                                process_filesystem_changes(&state, &diff).await;
+                    if Config::save_user_settings(&new_settings).is_ok() {
+                        state.reload_config();
+                        let diff = new_settings.diff(&old_config);
+                        // Process any new added paths
+                        process_filesystem_changes(&state, &diff).await;
+                        // Audio transcriptions enabled?
+                        if new_settings.audio_settings.enable_audio_transcription {
+                            // Do we already have this model?
+                            let model_path = state.config.model_dir().join("whisper.base.en.bin");
+                            if !model_path.exists() {
+                                // Spawn a background task to download and send progress updates to
+                                // any listening clients
+                                let state_clone = state.clone();
+                                tokio::spawn(async move {
+                                    let _ = download_model(&state_clone, "Whisper Audio", model_path).await;
+                                });
                             }
                         }
                     }
@@ -196,6 +210,81 @@ pub async fn config_task(mut state: AppState) {
                 return;
             }
         };
+    }
+}
+
+/// Downloads a model from our assets S3 bucket
+async fn download_model(
+    state: &AppState,
+    model_name: &str,
+    model_path: PathBuf,
+) -> anyhow::Result<()> {
+    // Currently we only have the audio model :)
+    match reqwest::get(shared::constants::WHISPER_MODEL).await {
+        Ok(res) => {
+            let total_size = res.content_length().expect("Unable to get content length");
+            let mut file = File::create(model_path).or(Err(anyhow!("Failed to create file")))?;
+
+            let mut downloaded: u64 = 0;
+            let mut stream = res.bytes_stream();
+
+            // Download model in chunks, writing to model path.
+
+            // Set the last update to some time in the past so we immediately send an update
+            let mut last_update = std::time::Instant::now() - std::time::Duration::from_secs(100);
+            while let Some(item) = stream.next().await {
+                let chunk = item.or(Err(anyhow!("Error while downloading file")))?;
+                file.write_all(&chunk)
+                    .or(Err(anyhow!("Error while writing to file")))?;
+
+                let new = std::cmp::min(downloaded + (chunk.len() as u64), total_size);
+                downloaded = new;
+
+                // Send an update to client every ~10 secs
+                if last_update.elapsed().as_secs() > 10 {
+                    let percent = ((downloaded as f32 / total_size as f32) * 100f32) as u8;
+                    state
+                        .publish_event(&RpcEvent {
+                            event_type: RpcEventType::ModelDownloadStatus,
+                            payload: serde_json::to_string(
+                                &ModelDownloadStatusPayload::InProgress {
+                                    model_name: model_name.into(),
+                                    percent,
+                                },
+                            )
+                            .unwrap_or_default(),
+                        })
+                        .await;
+                    last_update = std::time::Instant::now();
+                }
+            }
+
+            // finished download!
+            state
+                .publish_event(&RpcEvent {
+                    event_type: RpcEventType::ModelDownloadStatus,
+                    payload: serde_json::to_string(&ModelDownloadStatusPayload::Finished {
+                        model_name: model_name.into(),
+                    })
+                    .unwrap_or_default(),
+                })
+                .await;
+            Ok(())
+        }
+        Err(err) => {
+            state
+                .publish_event(&RpcEvent {
+                    event_type: RpcEventType::ModelDownloadStatus,
+                    payload: serde_json::to_string(&ModelDownloadStatusPayload::Error {
+                        model_name: model_name.into(),
+                        msg: err.to_string(),
+                    })
+                    .unwrap_or_default(),
+                })
+                .await;
+
+            Ok(())
+        }
     }
 }
 

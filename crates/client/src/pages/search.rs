@@ -1,9 +1,9 @@
 use gloo::timers::callback::Timeout;
 use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
-use shared::config::{KeyCode, ModifiersState};
 use shared::config::{UserAction, UserActionDefinition, UserActionSettings};
 use shared::event::CopyContext;
+use shared::keyboard::{KeyCode, ModifiersState};
 use shared::response::SearchResultTemplate;
 use std::str::FromStr;
 use wasm_bindgen::{prelude::*, JsCast};

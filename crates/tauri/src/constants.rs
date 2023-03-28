@@ -15,3 +15,4 @@ pub const SETTINGS_WIN_NAME: &str = "settings_window";
 pub const STARTUP_WIN_NAME: &str = "startup_window";
 pub const UPDATE_WIN_NAME: &str = "update_window";
 pub const WIZARD_WIN_NAME: &str = "wizard_window";
+pub const PROGRESS_WIN_NAME: &str = "progress_window";
