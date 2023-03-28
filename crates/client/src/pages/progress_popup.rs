@@ -1,5 +1,5 @@
 use serde_wasm_bindgen::from_value;
-use shared::event::ModelStatusPayloadWrapper;
+use shared::event::{ListenPayload, ModelStatusPayload};
 use wasm_bindgen::{prelude::Closure, JsValue};
 use yew::{platform::spawn_local, prelude::*};
 
@@ -24,7 +24,7 @@ impl Component for ProgressPopup {
             let link = link.clone();
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-                    if let Ok(res) = from_value::<ModelStatusPayloadWrapper>(payload) {
+                    if let Ok(res) = from_value::<ListenPayload<ModelStatusPayload>>(payload) {
                         link.send_message(Msg::UpdateStatus(res.payload.msg, res.payload.percent));
                     }
                 }) as Box<dyn Fn(JsValue)>);
@@ -43,7 +43,6 @@ impl Component for ProgressPopup {
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::UpdateStatus(msg, percent) => {
-                log::debug!("UPDATE RECEIVED");
                 self.msg = Some(msg);
                 self.percent = Some(percent);
                 true

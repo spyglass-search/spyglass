@@ -2,7 +2,10 @@ use crate::window::notify;
 use crate::{rpc, AppEvent};
 use anyhow::anyhow;
 use jsonrpsee::core::client::Subscription;
-use spyglass_rpc::{ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType};
+use shared::event::ClientEvent;
+use spyglass_rpc::{
+    LLMResponsePayload, ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType,
+};
 use tauri::{
     async_runtime::JoinHandle,
     plugin::{Builder, TauriPlugin},
@@ -88,6 +91,15 @@ async fn setup_notification_handler(app: AppHandle) {
                             RpcEventType::ConnectionSyncFinished => Some(("Sync Completed".into(), event.payload)),
                             RpcEventType::LensInstalled => Some(("Lens Installed".into(), event.payload)),
                             RpcEventType::LensUninstalled => Some(("Lens Removed".into(), event.payload)),
+                            RpcEventType::LLMResponse => {
+                                // Load payload & send to llm listener
+                                if let Ok(payload) = serde_json::de::from_str::<LLMResponsePayload>(&event.payload) {
+                                    let window = crate::window::get_searchbar(&app);
+                                    let _ = window.emit(ClientEvent::LLMResponse.as_ref(), payload);
+                                }
+
+                                None
+                            }
                             RpcEventType::ModelDownloadStatus => {
                                 if let Ok(status) = serde_json::de::from_str::<ModelDownloadStatusPayload>(&event.payload) {
                                     match status {

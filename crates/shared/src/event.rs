@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ListenPayload {
-    pub payload: String,
+pub struct ListenPayload<T> {
+    pub payload: T,
 }
 
 #[derive(AsRefStr, Display)]
@@ -11,6 +11,7 @@ pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
     FolderChosen,
+    LLMResponse,
     Navigate,
     RefreshConnections,
     /// Request a refresh of the discover lens page when a lens is succesfully installed.
@@ -139,6 +140,6 @@ pub struct ModelStatusPayload {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ModelStatusPayloadWrapper {
-    pub payload: ModelStatusPayload,
+pub struct LLMResultPayload {
+    pub token: String,
 }

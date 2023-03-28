@@ -1,5 +1,13 @@
 use js_sys::decode_uri_component;
+use serde_wasm_bindgen::from_value;
+use shared::event::{ListenPayload, LLMResultPayload};
+use shared::{constants::FEEDBACK_FORM, event};
+use shared::{
+    event::ClientEvent,
+    response::{LensResult, SearchResult},
+};
 use url::Url;
+use wasm_bindgen::{prelude::Closure, JsValue};
 use yew::{platform::spawn_local, prelude::*};
 use yew_router::Routable;
 
@@ -8,8 +16,6 @@ use super::{
     tag::{Tag, TagIcon},
 };
 use crate::{pages::Tab, tauri_invoke, Route};
-use shared::response::{LensResult, SearchResult};
-use shared::{constants::FEEDBACK_FORM, event};
 
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
@@ -337,5 +343,73 @@ pub fn feedback_result(props: &FeedbackProps) -> Html {
             }
         }}
       </div>
+    }
+}
+
+pub struct LLMResult {
+    tokens: String,
+    listeners: Vec<JsValue>,
+}
+
+pub enum LLMResultMsg {
+    AddListener(JsValue),
+    UpdateTokens(String),
+}
+
+impl Component for LLMResult {
+    type Message = LLMResultMsg;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let link = ctx.link();
+
+        // Listen for new tokens
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let link_cb = link.clone();
+                let cb = Closure::wrap(Box::new(move |payload: JsValue| {
+                    if let Ok(res) = from_value::<ListenPayload<LLMResultPayload>>(payload) {
+                        link_cb.send_message(LLMResultMsg::UpdateTokens(res.payload.token));
+                    }
+                }) as Box<dyn Fn(JsValue)>);
+
+                if let Ok(listener) = crate::listen(ClientEvent::LLMResponse.as_ref(), &cb).await {
+                    link.send_message(LLMResultMsg::AddListener(listener));
+                }
+
+                cb.forget();
+            });
+        }
+
+        Self {
+            tokens: String::new(),
+            listeners: Vec::new(),
+        }
+    }
+
+    fn destroy(&mut self, _ctx: &Context<Self>) {
+        // for listener in self.listeners {
+        //     let unlisten: Result<dyn Fn()> = listener.try_into();
+        // }
+    }
+
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            LLMResultMsg::AddListener(listener) => {
+                self.listeners.push(listener);
+                false
+            }
+            LLMResultMsg::UpdateTokens(token) => {
+                self.tokens += &token;
+                true
+            }
+        }
+    }
+
+    fn view(&self, _ctx: &Context<Self>) -> Html {
+        html! {
+            <div class="p-8">{"Answer: "}{self.tokens.clone()}</div>
+        }
     }
 }

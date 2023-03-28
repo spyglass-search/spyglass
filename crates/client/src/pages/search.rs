@@ -19,7 +19,7 @@ use shared::{
 use crate::components::user_action_list::{self, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
-    result::{FeedbackResult, LensResultItem, SearchResultItem},
+    result::{FeedbackResult, LensResultItem, SearchResultItem, LLMResult},
     KeyComponent, SelectedLens,
 };
 use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
@@ -976,6 +976,9 @@ impl Component for SearchPage {
                     if self.result_display != ResultDisplay::None {
                         html! {
                             <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
+                                <div>
+                                    <LLMResult />
+                                </div>
                                 <div class="w-full flex flex-col">{results}</div>
                             </div>
                         }

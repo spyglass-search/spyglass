@@ -68,7 +68,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
+            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload<String>>(payload) {
                 match payload.payload.as_str() {
                     "/settings/discover" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::Discover,

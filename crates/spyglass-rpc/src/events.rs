@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum RpcEventType {
     ConnectionSyncFinished,
-    LensUninstalled,
     LensInstalled,
+    LensUninstalled,
+    LLMResponse,
     ModelDownloadStatus,
 }
 
@@ -21,4 +22,11 @@ pub enum ModelDownloadStatusPayload {
     Finished { model_name: String },
     Error { model_name: String, msg: String },
     InProgress { model_name: String, percent: u8 },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum LLMResponsePayload {
+    Loading,
+    Token(String),
+    Finished,
 }

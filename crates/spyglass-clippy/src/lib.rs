@@ -129,9 +129,13 @@ mod test {
     #[ignore]
     #[tokio::test]
     pub async fn test_basic_prompt() {
-        super::unleash_clippy(MODEL_PATH.into(), "what is the difference between an alpaca & llama?", None)
-            .await
-            .expect("Unable to prompt");
+        super::unleash_clippy(
+            MODEL_PATH.into(),
+            "what is the difference between an alpaca & llama?",
+            None,
+        )
+        .await
+        .expect("Unable to prompt");
     }
 
     #[tokio::test]
