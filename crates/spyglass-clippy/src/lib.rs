@@ -10,21 +10,28 @@ const MODEL_PATH: &str = "../../assets/models/alpaca-native.7b.bin";
 
 fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
     // Begin the template in the form alpaca expects
-    let mut start: String = r#"
-Below is an instruction that describes a task. Write a response that appropriately completes the request.
+    let mut start: String = if doc_context.is_some() {
+        r#"Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 ### Instruction:
-"#.into();
+"#.into()
+    } else {
+        r#"Below is an instruction that describes a task. Write a response that appropriately completes the request.
+### Instruction:
+"#.into()
+    };
+
+    // Add the user question/prompt
+    start.push_str(prompt);
+
     // Add any additional context for the LLM to use.
     if let Some(ctxt) = doc_context {
-        start.push_str("Using info from the following text: ");
+        start.push_str("\n### Input:\n");
         for data in ctxt {
             start.push_str(&data);
             start.push('\n');
         }
     }
 
-    // Add the user question/prompt
-    start.push_str(prompt);
     // wrap it up
     start.push_str("\n### Response:\n");
 
@@ -118,14 +125,14 @@ pub async fn unleash_clippy(
 
 #[cfg(test)]
 mod test {
+    #[ignore]
     #[tokio::test]
     pub async fn test_basic_prompt() {
-        super::unleash_clippy("how much water should you drink daily?", None)
+        super::unleash_clippy("what is the difference between an alpaca & llama?", None)
             .await
             .expect("Unable to prompt");
     }
 
-    #[ignore]
     #[tokio::test]
     pub async fn test_prompt_with_data() {
         let data: Vec<String> = vec![
