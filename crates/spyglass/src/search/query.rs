@@ -1,6 +1,6 @@
 use tantivy::query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, Query, TermQuery};
 use tantivy::schema::*;
-use tantivy::tokenizer::TokenizerManager;
+use tantivy::tokenizer::*;
 use tantivy::Score;
 
 use super::DocFields;
@@ -35,8 +35,15 @@ fn _boosted_term(term: Term, boost: Score) -> Box<BoostQuery> {
     ))
 }
 
-fn _boosted_phrase(terms: Vec<Term>, boost: Score) -> Box<BoostQuery> {
-    Box::new(BoostQuery::new(Box::new(PhraseQuery::new(terms)), boost))
+fn _boosted_phrase(terms: Vec<(usize, Term)>, boost: Score) -> Box<BoostQuery> {
+    let slop = terms
+        .last()
+        .map(|(position, _)| (position - 2).max(0).min(3) as u32)
+        .unwrap_or(0);
+    Box::new(BoostQuery::new(
+        Box::new(PhraseQuery::new_with_offset_and_slop(terms, slop)),
+        boost,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -57,7 +64,7 @@ where
     I: Iterator<Item = i64>,
 {
     let content_terms = terms_for_field(&schema, &tokenizers, query_string, fields.content);
-    let title_terms: Vec<Term> = terms_for_field(&schema, &tokenizers, query_string, fields.title);
+    let title_terms = terms_for_field(&schema, &tokenizers, query_string, fields.title);
 
     stats.term_count = content_terms.len() as i32;
 
@@ -80,11 +87,11 @@ where
         term_query.push((Occur::Should, _boosted_phrase(title_terms.clone(), boost)));
     }
 
-    for term in content_terms {
+    for (_position, term) in content_terms {
         term_query.push((Occur::Should, _boosted_term(term, 1.0)));
     }
 
-    for term in title_terms {
+    for (_position, term) in title_terms {
         term_query.push((Occur::Should, _boosted_term(term, 2.0)));
     }
 
@@ -178,7 +185,7 @@ pub fn terms_for_field(
     tokenizers: &TokenizerManager,
     query: &str,
     field: Field,
-) -> Vec<Term> {
+) -> Vec<(usize, Term)> {
     let mut terms = Vec::new();
 
     let field_entry = schema.get_field_entry(field);
@@ -190,7 +197,7 @@ pub fn terms_for_field(
         let mut token_stream = text_analyzer.token_stream(query);
         token_stream.process(&mut |token| {
             let term = Term::from_field_text(field, &token.text);
-            terms.push(term);
+            terms.push((token.position, term));
         });
     }
 

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use entities::models::{self, indexed_document::DocumentIdentifier};
-use libspyglass::search::{self, IndexPath, ReadonlySearcher, QueryStats};
+use libspyglass::search::{self, IndexPath, QueryStats, ReadonlySearcher};
 use ron::ser::PrettyConfig;
 use shared::config::Config;
 use spyglass_plugin::DocumentQuery;
@@ -27,7 +27,7 @@ pub struct CdxCli {
 enum Command {
     CrawlDetails { crawl_task_id: i64 },
     GetDocumentDetails { id_or_url: String },
-    GetDocumentQueryExplanation { id_or_url: String, query: String }
+    GetDocumentQueryExplanation { id_or_url: String, query: String },
 }
 
 #[tokio::main]
@@ -139,7 +139,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                     }
                     None => println!("No document found for identifier: {}", id_or_url),
                 }
-            },
+            }
             Command::GetDocumentQueryExplanation { id_or_url, query } => {
                 let db = models::create_connection(&config, false).await?;
 
@@ -155,27 +155,31 @@ async fn main() -> anyhow::Result<ExitCode> {
                     }
                 };
 
-                let index =
-                    ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
-                        .expect("Unable to open index.");
+                let index = ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
+                    .expect("Unable to open index.");
 
-                
-                let docs = ReadonlySearcher::search_by_query(
-                    &db,
-                    &index,
-                    &doc_query,
-                )
-                .await;
+                let docs = ReadonlySearcher::search_by_query(&db, &index, &doc_query).await;
 
                 if docs.is_empty() {
                     println!("No indexed document for url {:?}", id_or_url);
                 } else {
                     for (_score, doc_addr) in docs {
                         let mut stats = QueryStats::default();
-                        let explain = ReadonlySearcher::explain_search_with_lens(& db, doc_addr.clone(), &vec![], &index, query.as_str(), &mut stats).await;
+                        let explain = ReadonlySearcher::explain_search_with_lens(
+                            &db,
+                            doc_addr,
+                            &vec![],
+                            &index,
+                            query.as_str(),
+                            &mut stats,
+                        )
+                        .await;
                         match explain {
                             Some(explanation) => {
-                                println!("Query \"{:?}\" for document {:?} \n {:?}", query, id_or_url, explanation);
+                                println!(
+                                    "Query \"{:?}\" for document {:?} \n {:?}",
+                                    query, id_or_url, explanation
+                                );
                             }
                             None => {
                                 println!("Could not get score for document");

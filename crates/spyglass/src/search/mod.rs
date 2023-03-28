@@ -1,6 +1,5 @@
 use serde::Serialize;
 use spyglass_plugin::DocumentQuery;
-use tantivy::tokenizer::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -11,8 +10,7 @@ use anyhow::anyhow;
 use entities::BATCH_SIZE;
 use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
-use tantivy::directory::MmapDirectory;
-use tantivy::query::TermQuery;
+use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
@@ -202,9 +200,7 @@ impl Searcher {
     /// Constructs a new Searcher object w/ the index @ `index_path`
     pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
         let index = match index_path {
-            IndexPath::LocalPath(path) => {
-                schema::initialize_index(path)?
-            }
+            IndexPath::LocalPath(path) => schema::initialize_index(path)?,
             IndexPath::Memory => schema::initialize_in_memory_index(),
         };
 
@@ -397,9 +393,7 @@ impl ReadonlySearcher {
     /// Constructs a new Searcher object w/ the index @ `index_path`
     pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
         let index = match index_path {
-            IndexPath::LocalPath(path) => {
-                schema::initialize_index(path)?
-            }
+            IndexPath::LocalPath(path) => schema::initialize_index(path)?,
             IndexPath::Memory => schema::initialize_in_memory_index(),
         };
 
@@ -471,7 +465,6 @@ impl ReadonlySearcher {
         query_string: &str,
         stats: &mut QueryStats,
     ) -> Option<f32> {
-
         let mut tag_boosts = HashSet::new();
         let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
             .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
@@ -483,13 +476,13 @@ impl ReadonlySearcher {
             None
         };
 
-        let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
+        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
         tag_boosts.extend(tag_checks);
 
         let index = &searcher.index;
         let reader = &searcher.reader;
         let fields = DocFields::as_fields();
-        let searcher = reader.searcher();
+        let tantivy_searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
         let query = build_query(
             index.schema(),
@@ -502,26 +495,48 @@ impl ReadonlySearcher {
             stats,
         );
 
-        let content_terms = query::terms_for_field(&index.schema(), &tokenizers, query_string, fields.content);
+        let mut combined: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Should, Box::new(query))];
+        if let Ok(Ok(doc)) = searcher
+            .reader
+            .searcher()
+            .doc(doc_address)
+            .map(|doc| document_to_struct(&doc))
+        {
+            combined.push((
+                Occur::Must,
+                Box::new(TermQuery::new(
+                    Term::from_field_text(fields.id, &doc.doc_id),
+                    // Needs WithFreqs otherwise scoring is wonky.
+                    IndexRecordOption::WithFreqs,
+                )),
+            ));
+        }
+
+        let content_terms =
+            query::terms_for_field(&index.schema(), &tokenizers, query_string, fields.content);
         log::info!("Content Tokens {:?}", content_terms);
 
-        let collector = tantivy::collector::TopDocs::with_limit(600000);
-        
-        let docs = searcher
-            .search(&query, &collector)
+        let final_query = BooleanQuery::new(combined);
+        let collector = tantivy::collector::TopDocs::with_limit(1);
+
+        let docs = tantivy_searcher
+            .search(&final_query, &collector)
             .expect("Unable to execute query");
         for (score, addr) in docs {
             if addr == doc_address {
                 for t in content_terms {
-                    let info = searcher.segment_reader(addr.segment_ord).inverted_index(fields.content).unwrap().get_term_info(&t);
+                    let info = tantivy_searcher
+                        .segment_reader(addr.segment_ord)
+                        .inverted_index(fields.content)
+                        .unwrap()
+                        .get_term_info(&t.1);
                     log::info!("Term {:?} Info {:?} ", t, info);
                 }
-                
+
                 return Some(score);
             }
         }
         None
-        // query.explain(&searcher, doc_address)
     }
 }
 

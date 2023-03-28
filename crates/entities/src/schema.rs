@@ -1,5 +1,5 @@
-use tantivy::{Index, schema::*, directory::MmapDirectory, tokenizer::*};
 use std::path::PathBuf;
+use tantivy::{directory::MmapDirectory, schema::*, tokenizer::*, Index};
 
 pub type FieldName = String;
 
@@ -59,7 +59,7 @@ pub fn initialize_in_memory_index() -> Index {
     let schema = DocFields::as_schema();
     let index = Index::create_in_ram(schema);
     register_tokenizer(&index);
-    
+
     index
 }
 
@@ -68,10 +68,13 @@ pub fn register_tokenizer(index: &Index) {
     let full_content_tokenizer_en = TextAnalyzer::from(SimpleTokenizer)
         .filter(RemoveLongFilter::limit(40))
         .filter(LowerCaser)
-        .filter(AsciiFoldingFilter);
+        .filter(AsciiFoldingFilter)
+        .filter(StopWordFilter::new(Language::English).unwrap())
+        .filter(Stemmer::new(Language::English));
 
-    index.tokenizers()
-            .register(TOKENIZER_NAME, full_content_tokenizer_en);
+    index
+        .tokenizers()
+        .register(TOKENIZER_NAME, full_content_tokenizer_en);
 }
 
 #[derive(Clone)]
@@ -87,17 +90,15 @@ pub struct DocFields {
     pub lastmodified: Field,
 }
 
-
 impl SearchDocument for DocFields {
     fn as_field_vec() -> SchemaMapping {
-
         let text_field_indexing = TextFieldIndexing::default()
             .set_tokenizer(TOKENIZER_NAME)
             .set_index_option(IndexRecordOption::WithFreqsAndPositions);
         let text_options = TextOptions::default()
             .set_indexing_options(text_field_indexing)
             .set_stored();
-        
+
         // FAST:    Fast fields can be random-accessed rapidly. Use this for fields useful
         //          for scoring, filtering, or collection.
         // TEXT:    Means the field should be tokenized and indexed, along with its term
