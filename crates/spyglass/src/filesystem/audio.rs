@@ -74,6 +74,10 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
     let sample_rate = track.codec_params.sample_rate.unwrap_or_default();
     let channels = track.codec_params.channels.unwrap_or_default();
 
+    if channels.count() == 0 {
+        return Err(anyhow!("No audio detected!"));
+    }
+
     if sample_rate == 0 {
         return Err(anyhow!("Invalid sample rate"));
     }
