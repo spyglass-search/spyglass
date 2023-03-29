@@ -1,19 +1,19 @@
 use anyhow::anyhow;
-use entities::models::crawl_queue::CrawlStatus;
 use entities::models::{bootstrap_queue, connection, crawl_queue};
-use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, sea_query::Expr, QueryFilter};
+use entities::models::crawl_queue::CrawlStatus;
+use entities::sea_orm::{sea_query::Expr, ColumnTrait, Condition, EntityTrait, QueryFilter};
 use futures::StreamExt;
-use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
+use notify::event::ModifyKind;
 use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
 use spyglass_rpc::{ModelDownloadStatusPayload, RpcEvent, RpcEventType};
-use strum::IntoEnumIterator;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicI32, Arc};
+use std::sync::atomic::Ordering;
 use std::time::Duration;
+use strum::IntoEnumIterator;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::connection::{api_id_to_label, load_connection};
