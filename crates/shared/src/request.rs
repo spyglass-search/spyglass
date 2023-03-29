@@ -56,3 +56,9 @@ pub struct BatchDocumentRequest {
     pub source: RawDocSource,
     pub tags: Vec<(String, String)>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AskClippyRequest {
+    pub question: String,
+    pub doc_ids: Vec<String>,
+}

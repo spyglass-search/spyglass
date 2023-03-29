@@ -133,6 +133,13 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
     format!("<span>{}</span>", desc.join(" "))
 }
 
+/// Ask clippy about a set of documents
+#[instrument(skip(_state))]
+pub async fn ask_clippy(_state: AppState, params: request::AskClippyRequest) -> Result<(), Error> {
+    log::debug!("ask_clippy: {:?}", params);
+    Ok(())
+}
+
 /// Search the user's indexed documents
 #[instrument(skip(state))]
 pub async fn search_docs(

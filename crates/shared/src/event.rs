@@ -26,6 +26,8 @@ pub enum ClientEvent {
 
 #[derive(AsRefStr, Display)]
 pub enum ClientInvoke {
+    #[strum(serialize = "ask_clippy")]
+    AskClippy,
     #[strum(serialize = "authorize_connection")]
     AuthorizeConnection,
     #[strum(serialize = "choose_folder")]

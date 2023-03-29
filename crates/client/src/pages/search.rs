@@ -19,7 +19,7 @@ use shared::{
 use crate::components::user_action_list::{self, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
-    result::{FeedbackResult, LensResultItem, SearchResultItem, LLMResult},
+    result::{FeedbackResult, LLMResult, LensResultItem, SearchResultItem},
     KeyComponent, SelectedLens,
 };
 use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
@@ -448,20 +448,20 @@ impl Component for SearchPage {
                 false
             }
             Msg::Blur => {
-                let link = link.clone();
-                self.show_actions = false;
-                self.selected_action_idx = 0;
-                // Handle the hide as a timeout since there's a brief moment when
-                // alt-tabbing / clicking on the task will yield a blur event & then a
-                // focus event.
-                let handle = Timeout::new(100, move || {
-                    spawn_local(async move {
-                        let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
-                        link.send_message(Msg::ClearQuery);
-                    });
-                });
+                // let link = link.clone();
+                // self.show_actions = false;
+                // self.selected_action_idx = 0;
+                // // Handle the hide as a timeout since there's a brief moment when
+                // // alt-tabbing / clicking on the task will yield a blur event & then a
+                // // focus event.
+                // let handle = Timeout::new(100, move || {
+                //     spawn_local(async move {
+                //         let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
+                //         link.send_message(Msg::ClearQuery);
+                //     });
+                // });
 
-                self.blur_timeout = Some(handle.forget());
+                // self.blur_timeout = Some(handle.forget());
                 false
             }
             Msg::Focus => {
@@ -929,10 +929,12 @@ impl Component for SearchPage {
             );
 
             html! {
-                <button class={classes}
-                  onclick={link.callback(|_| Msg::ToggleShowActions)}>
-                  <KeyComponent>{"ENTER"}</KeyComponent>
-                  <span class="ml-1">{"to open."}</span>
+                <button
+                    class={classes}
+                    onclick={link.callback(|_| Msg::ToggleShowActions)}
+                >
+                    <KeyComponent>{"ENTER"}</KeyComponent>
+                    <span class="ml-1">{"to open."}</span>
                 </button>
             }
         } else {
@@ -955,7 +957,6 @@ impl Component for SearchPage {
         html! {
             <div ref={self.search_wrapper_ref.clone()}
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
-                onclick={link.callback(|_| Msg::Focus)}
             >
                 <div class="flex flex-nowrap w-full bg-neutral-800">
                     <SelectedLens lens={self.lens.clone()} />
@@ -976,9 +977,7 @@ impl Component for SearchPage {
                     if self.result_display != ResultDisplay::None {
                         html! {
                             <div class="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
-                                <div>
-                                    <LLMResult />
-                                </div>
+                                <LLMResult />
                                 <div class="w-full flex flex-col">{results}</div>
                             </div>
                         }

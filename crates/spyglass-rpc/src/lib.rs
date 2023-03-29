@@ -1,7 +1,9 @@
 use jsonrpsee::core::Error;
 use jsonrpsee::proc_macros::rpc;
 use shared::config::UserSettings;
-use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::request::{
+    AskClippyRequest, BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam,
+};
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
     SearchLensesResp, SearchResults,
@@ -37,6 +39,10 @@ pub trait Rpc {
 
     #[method(name = "index.delete_document_by_url")]
     async fn delete_document_by_url(&self, url: String) -> Result<(), Error>;
+
+    /// Ask clippy, LLM magic
+    #[method(name = "clippy.ask")]
+    async fn ask_clippy(&self, query: AskClippyRequest) -> Result<(), Error>;
 
     #[method(name = "authorize_connection")]
     async fn authorize_connection(&self, id: String) -> Result<(), Error>;

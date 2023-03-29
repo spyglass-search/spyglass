@@ -106,6 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(plugins::notify::init())
         .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
+            cmd::ask_clippy,
             cmd::authorize_connection,
             cmd::choose_folder,
             cmd::copy_to_clipboard,

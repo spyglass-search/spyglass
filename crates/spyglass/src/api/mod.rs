@@ -9,7 +9,9 @@ use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
-use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::request::{
+    AskClippyRequest, BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam,
+};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::{RpcEventType, RpcServer};
 use std::collections::{HashMap, HashSet};
@@ -35,6 +37,10 @@ impl RpcServer for SpyglassRpc {
 
     async fn add_document_batch(&self, req: BatchDocumentRequest) -> Result<(), Error> {
         handler::add_document_batch(&self.state, &req).await
+    }
+
+    async fn ask_clippy(&self, query: AskClippyRequest) -> Result<(), Error> {
+        handler::search::ask_clippy(self.state.clone(), query).await
     }
 
     async fn authorize_connection(&self, id: String) -> Result<(), Error> {

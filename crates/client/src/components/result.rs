@@ -1,6 +1,8 @@
+use gloo::console::console_dbg;
 use js_sys::decode_uri_component;
 use serde_wasm_bindgen::from_value;
-use shared::event::{ListenPayload, LLMResultPayload};
+use shared::event::{LLMResultPayload, ListenPayload};
+use shared::request::AskClippyRequest;
 use shared::{constants::FEEDBACK_FORM, event};
 use shared::{
     event::ClientEvent,
@@ -347,12 +349,15 @@ pub fn feedback_result(props: &FeedbackProps) -> Html {
 }
 
 pub struct LLMResult {
+    clippy_input_ref: NodeRef,
     tokens: String,
     listeners: Vec<JsValue>,
+    in_progress: bool,
 }
 
 pub enum LLMResultMsg {
     AddListener(JsValue),
+    AskClippy,
     UpdateTokens(String),
 }
 
@@ -383,8 +388,10 @@ impl Component for LLMResult {
         }
 
         Self {
+            clippy_input_ref: NodeRef::default(),
             tokens: String::new(),
             listeners: Vec::new(),
+            in_progress: false,
         }
     }
 
@@ -400,6 +407,21 @@ impl Component for LLMResult {
                 self.listeners.push(listener);
                 false
             }
+            LLMResultMsg::AskClippy => {
+                self.in_progress = true;
+                spawn_local(async move {
+                    let res = tauri_invoke::<AskClippyRequest, ()>(
+                        event::ClientInvoke::AskClippy,
+                        AskClippyRequest {
+                            question: "what is an alpaca?".into(),
+                            doc_ids: [].into(),
+                        },
+                    )
+                    .await;
+                    console_dbg!(res);
+                });
+                true
+            }
             LLMResultMsg::UpdateTokens(token) => {
                 self.tokens += &token;
                 true
@@ -407,9 +429,31 @@ impl Component for LLMResult {
         }
     }
 
-    fn view(&self, _ctx: &Context<Self>) -> Html {
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let link = ctx.link();
         html! {
-            <div class="p-8">{"Answer: "}{self.tokens.clone()}</div>
+            <div class="p-4">
+                <div class="flex flex-row gap-1">
+                    <input
+                        ref={self.clippy_input_ref.clone()}
+                        type="text"
+                        placeholder="ask clippy"
+                        class="bg-neutral-800 text-white text-2xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+                    />
+                    <btn::Btn
+                        disabled={self.in_progress}
+                        size={btn::BtnSize::Lg}
+                        onclick={link.callback(|_| LLMResultMsg::AskClippy)}
+                    >
+                        { if self.in_progress { "..." } else { "Ask"} }
+                    </btn::Btn>
+                </div>
+                <div>
+                    { if !self.tokens.is_empty() {
+                        html! { <div>{self.tokens.clone()}</div> }
+                    } else { html! {} }}
+                </div>
+            </div>
         }
     }
 }

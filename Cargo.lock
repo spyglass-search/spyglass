@@ -6529,6 +6529,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.6",
  "shared",
+ "spyglass-clippy",
  "spyglass-netrunner",
  "spyglass-plugin",
  "spyglass-rpc",

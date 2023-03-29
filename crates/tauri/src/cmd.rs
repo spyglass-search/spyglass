@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{atomic::Ordering, Arc};
 
+use shared::request::AskClippyRequest;
 use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
@@ -380,7 +381,6 @@ pub async fn default_indices(win: tauri::Window) -> Result<DefaultIndices, Strin
     })
 }
 
-#[tauri::command]
 pub async fn update_user_settings(
     win: tauri::Window,
     settings: &UserSettings,
@@ -417,4 +417,27 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
 pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
     super::window::_show_tab(&win.app_handle(), &page);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn ask_clippy(
+    win: tauri::Window,
+    question: &str,
+    doc_ids: Vec<String>,
+) -> Result<(), String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        if let Err(err) = rpc
+            .client
+            .ask_clippy(AskClippyRequest {
+                question: question.to_string(),
+                doc_ids,
+            })
+            .await
+        {
+            return Err(err.to_string());
+        }
+    }
+
+    Err(String::from("Unable to ask clippy"))
 }
