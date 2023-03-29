@@ -1,8 +1,8 @@
 use gloo::console::console_dbg;
 use js_sys::decode_uri_component;
 use serde_wasm_bindgen::from_value;
-use shared::event::{LLMResultPayload, ListenPayload};
-use shared::request::AskClippyRequest;
+use shared::event::ListenPayload;
+use shared::request::{AskClippyRequest, LLMResponsePayload};
 use shared::{constants::FEEDBACK_FORM, event};
 use shared::{
     event::ClientEvent,
@@ -358,6 +358,8 @@ pub struct LLMResult {
 pub enum LLMResultMsg {
     AddListener(JsValue),
     AskClippy,
+    SetInProgress(bool),
+    SetError(String),
     UpdateTokens(String),
 }
 
@@ -374,8 +376,24 @@ impl Component for LLMResult {
             spawn_local(async move {
                 let link_cb = link.clone();
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-                    if let Ok(res) = from_value::<ListenPayload<LLMResultPayload>>(payload) {
-                        link_cb.send_message(LLMResultMsg::UpdateTokens(res.payload.token));
+                    console_dbg!("received payload: ", payload);
+                    if let Ok(res) = from_value::<ListenPayload<LLMResponsePayload>>(payload) {
+                        match &res.payload {
+                            LLMResponsePayload::Loading => {
+                                link_cb.send_message(LLMResultMsg::SetInProgress(true));
+                            }
+                            LLMResponsePayload::Token(c) => {
+                                link_cb.send_message(LLMResultMsg::UpdateTokens(c.to_owned()));
+                            }
+                            LLMResponsePayload::Finished => {
+                                link_cb.send_message(LLMResultMsg::SetInProgress(false));
+                            }
+                            LLMResponsePayload::Error(err) => {
+                                link_cb.send_message(LLMResultMsg::SetError(err.to_owned()));
+                            }
+                        }
+                    } else {
+                        console_dbg!("danger will robnison");
                     }
                 }) as Box<dyn Fn(JsValue)>);
 
@@ -414,12 +432,20 @@ impl Component for LLMResult {
                         event::ClientInvoke::AskClippy,
                         AskClippyRequest {
                             question: "what is an alpaca?".into(),
-                            doc_ids: [].into(),
+                            docs: [].into(),
                         },
                     )
                     .await;
                     console_dbg!(res);
                 });
+                true
+            }
+            LLMResultMsg::SetError(err) => {
+                gloo::console::error!("LLM error: {}", err);
+                false
+            }
+            LLMResultMsg::SetInProgress(in_progress) => {
+                self.in_progress = in_progress;
                 true
             }
             LLMResultMsg::UpdateTokens(token) => {

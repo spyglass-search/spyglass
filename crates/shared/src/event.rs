@@ -142,8 +142,3 @@ pub struct ModelStatusPayload {
     pub msg: String,
     pub percent: String,
 }
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct LLMResultPayload {
-    pub token: String,
-}

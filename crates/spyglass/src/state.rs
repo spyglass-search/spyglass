@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
 
 use crate::filesystem::SpyglassFileWatcher;
 use crate::task::{AppShutdown, UserSettingsChange};
@@ -51,6 +52,8 @@ pub struct AppState {
     pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
     // Keep track of in-flight tasks
     pub fetch_limits: Arc<DashMap<FetchLimitType, usize>>,
+    // We should have only one LLM request going at a time.
+    pub llm_request: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl AppState {
@@ -173,6 +176,7 @@ impl AppStateBuilder {
             file_watcher: Arc::new(Mutex::new(None)),
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
+            llm_request: Arc::new(Mutex::new(None)),
         }
     }
 

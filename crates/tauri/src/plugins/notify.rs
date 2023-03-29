@@ -1,17 +1,17 @@
-use crate::window::notify;
-use crate::{rpc, AppEvent};
 use anyhow::anyhow;
 use jsonrpsee::core::client::Subscription;
 use shared::event::ClientEvent;
-use spyglass_rpc::{
-    LLMResponsePayload, ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType,
-};
+use shared::request::LLMResponsePayload;
+use spyglass_rpc::{ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType};
 use tauri::{
     async_runtime::JoinHandle,
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
 use tokio::sync::broadcast;
+
+use crate::window::notify;
+use crate::{rpc, AppEvent};
 
 pub struct NotificationHandler(JoinHandle<()>);
 
@@ -48,6 +48,7 @@ async fn _subscribe(app: &AppHandle) -> anyhow::Result<Subscription<RpcEvent>> {
             RpcEventType::ConnectionSyncFinished,
             RpcEventType::LensInstalled,
             RpcEventType::LensUninstalled,
+            RpcEventType::LLMResponse,
             RpcEventType::ModelDownloadStatus,
         ])
         .await?;
@@ -96,6 +97,8 @@ async fn setup_notification_handler(app: AppHandle) {
                                 if let Ok(payload) = serde_json::de::from_str::<LLMResponsePayload>(&event.payload) {
                                     let window = crate::window::get_searchbar(&app);
                                     let _ = window.emit(ClientEvent::LLMResponse.as_ref(), payload);
+                                } else {
+                                    log::debug!("unable to deserialize payload");
                                 }
 
                                 None

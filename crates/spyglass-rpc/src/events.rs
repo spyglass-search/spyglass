@@ -23,10 +23,3 @@ pub enum ModelDownloadStatusPayload {
     Error { model_name: String, msg: String },
     InProgress { model_name: String, percent: u8 },
 }
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum LLMResponsePayload {
-    Loading,
-    Token(String),
-    Finished,
-}

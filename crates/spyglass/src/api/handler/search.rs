@@ -9,10 +9,14 @@ use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
-use shared::request;
+use shared::request::{AskClippyRequest, LLMResponsePayload, SearchLensesParam, SearchParam};
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_clippy::{unleash_clippy, TokenResult};
+use spyglass_rpc::{RpcEvent, RpcEventType};
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::time::SystemTime;
+use tokio::sync::mpsc;
 use tracing::instrument;
 
 /// Max number of tokens we'll look at for matches before stopping.
@@ -134,18 +138,82 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
 }
 
 /// Ask clippy about a set of documents
+<<<<<<< HEAD
 #[instrument(skip(_state))]
 pub async fn ask_clippy(_state: AppState, params: request::AskClippyRequest) -> Result<(), Error> {
     log::debug!("ask_clippy: {:?}", params);
+=======
+#[instrument(skip(state))]
+pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(), Error> {
+    // Assumes a valid model has been downloaded and ready to go
+    #[cfg(debug_assertions)]
+    let model_path: PathBuf = "assets/models/alpaca-native.7b.bin".into();
+    #[cfg(not(debug_assertions))]
+    let model_path: PathBuf = state.config.model_dir().join("alpaca-native.7b.bin");
+
+    log::debug!("ask_clippy: {:?}", params);
+    let mut request = state.llm_request.lock().await;
+    if request.is_none() {
+        let s2 = state.clone();
+        let handle = tokio::spawn(async move {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            // Spawn a task to send tokens to frontend
+            tokio::spawn(async move {
+                while let Some(msg) = rx.recv().await {
+                    match msg {
+                        TokenResult::Token(c) => {
+                            let payload = serde_json::to_string(&LLMResponsePayload::Token(c))
+                                .expect("Unable to serialize LLMResponse payload");
+                            s2.publish_event(&RpcEvent {
+                                event_type: RpcEventType::LLMResponse,
+                                payload,
+                            })
+                            .await;
+                        }
+                        TokenResult::Error(msg) => {
+                            log::warn!("Received an error: {}", msg);
+                            let payload = serde_json::to_string(&LLMResponsePayload::Error(msg))
+                                .expect("Unable to serialize LLMResponse payload");
+                            s2.publish_event(&RpcEvent {
+                                event_type: RpcEventType::LLMResponse,
+                                payload,
+                            })
+                            .await;
+
+                            break;
+                        }
+                        TokenResult::EndOfText => {
+                            let payload = serde_json::to_string(&LLMResponsePayload::Finished)
+                                .expect("Unable to serialize LLMResponse payload");
+                            s2.publish_event(&RpcEvent {
+                                event_type: RpcEventType::LLMResponse,
+                                payload,
+                            })
+                            .await;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // Spawn the clippy LLM
+            if let Err(err) = unleash_clippy(model_path, tx, "what is an alpaca?", None) {
+                log::warn!("Unable to complete clippy: {}", err);
+            }
+        });
+
+        *request = Some(handle);
+    } else {
+        log::warn!("LLM request already underway");
+    }
+
+>>>>>>> b42f438 (add an ask_clippy API endpoint & pipe results from llm question back to frontend as they occur)
     Ok(())
 }
 
 /// Search the user's indexed documents
 #[instrument(skip(state))]
-pub async fn search_docs(
-    state: AppState,
-    search_req: request::SearchParam,
-) -> Result<SearchResults, Error> {
+pub async fn search_docs(state: AppState, search_req: SearchParam) -> Result<SearchResults, Error> {
     state
         .metrics
         .track(metrics::Event::Search {
@@ -274,7 +342,7 @@ struct LensSearch {
 #[instrument(skip(state))]
 pub async fn search_lenses(
     state: AppState,
-    param: request::SearchLensesParam,
+    param: SearchLensesParam,
 ) -> Result<SearchLensesResp, Error> {
     let mut results = Vec::new();
     let query_result = tag::Entity::find()

@@ -427,7 +427,7 @@ pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
 pub async fn ask_clippy(
     win: tauri::Window,
     question: &str,
-    doc_ids: Vec<String>,
+    docs: Vec<String>,
 ) -> Result<(), String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
@@ -435,13 +435,14 @@ pub async fn ask_clippy(
             .client
             .ask_clippy(AskClippyRequest {
                 question: question.to_string(),
-                doc_ids,
+                docs,
             })
             .await
         {
             return Err(err.to_string());
         }
+        Ok(())
+    } else {
+        Err(String::from("Unable to ask clippy"))
     }
-
-    Err(String::from("Unable to ask clippy"))
 }

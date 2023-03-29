@@ -60,5 +60,13 @@ pub struct BatchDocumentRequest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AskClippyRequest {
     pub question: String,
-    pub doc_ids: Vec<String>,
+    pub docs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum LLMResponsePayload {
+    Error(String),
+    Finished,
+    Loading,
+    Token(String),
 }

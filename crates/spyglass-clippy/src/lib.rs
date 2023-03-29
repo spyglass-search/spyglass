@@ -1,10 +1,18 @@
-use std::{convert::Infallible, io::Write, path::PathBuf};
+use std::{convert::Infallible, path::PathBuf};
+use tokio::sync::mpsc;
 
 use llama_rs::{
     InferenceParameters, InferenceSessionParameters, LoadError, LoadProgress, ModelKVMemoryType,
-    TokenBias,
+    OutputToken, TokenBias,
 };
 use rand::SeedableRng;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TokenResult {
+    EndOfText,
+    Error(String),
+    Token(String),
+}
 
 fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
     // Begin the template in the form alpaca expects
@@ -36,8 +44,33 @@ fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
     start
 }
 
-pub async fn unleash_clippy(
+pub fn unleash_clippy(
     model: PathBuf,
+    stream: mpsc::UnboundedSender<TokenResult>,
+    prompt: &str,
+    doc_context: Option<Vec<String>>,
+) -> Result<(), LoadError> {
+    let handle = tokio::runtime::Handle::current();
+    let prompt = prompt.to_string();
+    // Spawns a new thread for inference so we don't block the ui/other tasks
+    std::thread::spawn(move || {
+        let model = model.clone();
+        let stream = stream.clone();
+        let prompt = prompt.to_string();
+        let doc_context = doc_context.clone();
+        // Now we spawn using tokio so that async sends using the channel are handled
+        // correctly.
+        handle.spawn_blocking(move || {
+            run_model(model, stream.clone(), &prompt, doc_context).expect("unable to prompt")
+        });
+    });
+
+    Ok(())
+}
+
+fn run_model(
+    model: PathBuf,
+    stream: mpsc::UnboundedSender<TokenResult>,
     prompt: &str,
     doc_context: Option<Vec<String>>,
 ) -> Result<(), LoadError> {
@@ -94,6 +127,7 @@ pub async fn unleash_clippy(
     let mut rng = rand::rngs::StdRng::from_entropy();
     let mut session = model.start_session(inference_session_params);
 
+    let tx = stream.clone();
     let res = session.inference_with_prompt::<Infallible>(
         &model,
         &vocab,
@@ -101,9 +135,22 @@ pub async fn unleash_clippy(
         &prompt,
         Some(2048),
         &mut rng,
-        |t| {
-            print!("{t}");
-            std::io::stdout().flush().unwrap();
+        move |t| {
+            match t {
+                OutputToken::Token(c) => {
+                    let c = c.to_string();
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        let _ = tx.send(TokenResult::Token(c.to_string()));
+                    });
+                }
+                OutputToken::EndOfText => {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        let _ = tx.send(TokenResult::EndOfText);
+                    });
+                }
+            }
             Ok(())
         },
     );
@@ -111,44 +158,92 @@ pub async fn unleash_clippy(
     match res {
         Ok(_) => (),
         Err(llama_rs::InferenceError::ContextFull) => {
-            println!("Context window full, stopping inference.")
+            let _ = stream.send(TokenResult::Error(
+                "Context window full, stopping inference.".into(),
+            ));
         }
         Err(llama_rs::InferenceError::TokenizationFailed) => {
-            println!("Failed to tokenize initial prompt.");
+            let _ = stream.send(TokenResult::Error(
+                "Failed to tokenize initial prompt.".into(),
+            ));
         }
         Err(llama_rs::InferenceError::UserCallback(_)) => unreachable!("cannot fail"),
     }
 
+    tokio::spawn(async move {
+        stream.closed().await;
+    });
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
+    use std::io::Write;
+
+    use crate::TokenResult;
+    use tokio::sync::mpsc;
+
     const MODEL_PATH: &str = "../../assets/models/alpaca-native.7b.bin";
+
+    #[tokio::test]
+    pub async fn test_basic_prompt() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        let recv_task = tokio::spawn(async move {
+            println!("WAITING FOR CONTENT");
+            let mut generated = String::new();
+            while let Some(msg) = rx.recv().await {
+                match msg {
+                    TokenResult::Token(c) => {
+                        print!("{}", c.clone());
+                        std::io::stdout().flush().unwrap();
+                        generated.push_str(&c)
+                    }
+                    TokenResult::Error(msg) => {
+                        eprintln!("Received an error: {}", msg);
+                        break;
+                    }
+                    TokenResult::EndOfText => break,
+                }
+            }
+        });
+
+        tokio::spawn(async move {
+            super::unleash_clippy(
+                MODEL_PATH.into(),
+                tx.clone(),
+                "what is the difference between an alpaca & llama?",
+                None,
+            )
+            .expect("unable to prompt");
+        });
+
+        let _ = recv_task.await;
+    }
 
     #[ignore]
     #[tokio::test]
-    pub async fn test_basic_prompt() {
+    pub async fn test_prompt_with_data() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        let data: Vec<String> = vec![
+            r#"Background Cuno is a foul-mouthed, speed-addicted youth first encountered throwing rocks at the hanged man's corpse. In response to his father's violence - who he lives with in the Capeside apartments up until just before the events of the game - Cuno developed a respect for brutality and power, as well as an infatuation with the RCM, seeking their validation[3] It may have also inspired him to abandon his "lame" legal name for his nickname "Cuno", a name reminiscent of a "primal" force or "rabid dog".[4][5] Having dropped out of school two years prior, Cuno now spends his days exploring the derelict city, vandalizing public property,[6] building up his shack, and selling FALN gear on the side. He also steals goods from the lorries.[7] Although he denies it repeatedly, Cuno enjoys reading the Man from Hjelmdall series.[8][9] He also listens to various radio stations,[10] including snuff radio.[11] Cuno knows a great deal about Martinaise and its inhabitants, and they know and dislike him, too. He has a crush on Lilienne.[12] Cuno addresses himself in third-person as a defense mechanism.[13]"#.into()
+        ];
         super::unleash_clippy(
             MODEL_PATH.into(),
-            "what is the difference between an alpaca & llama?",
-            None,
+            tx.clone(),
+            "where does cuno live?",
+            Some(data),
         )
-        .await
         .expect("Unable to prompt");
-    }
 
-    #[tokio::test]
-    pub async fn test_prompt_with_data() {
-        let data: Vec<String> = vec![
-            "Instruction-following models such as GPT-3.5 (text-davinci-003), ChatGPT, Claude, and Bing Chat have become increasingly powerful. Many users now interact with these models regularly and even use them for work. However, despite their widespread deployment, instruction-following models still have many deficiencies: they can generate false information, propagate social stereotypes, and produce toxic language.".into(),
-            "To make maximum progress on addressing these pressing problems, it is important for the academic community to engage. Unfortunately, doing research on instruction-following models in academia has been difficult, as there is no easily accessible model that comes close in capabilities to closed-source models such as OpenAI’s text-davinci-003.".into(),
-            "We are releasing our findings about an instruction-following language model, dubbed Alpaca, which is fine-tuned from Meta’s LLaMA 7B model. We train the Alpaca model on 52K instruction-following demonstrations generated in the style of self-instruct using text-davinci-003. On the self-instruct evaluation set, Alpaca shows many behaviors similar to OpenAI’s text-davinci-003, but is also surprisingly small and easy/cheap to reproduce.".into(),
-            "We are releasing our training recipe and data, and intend to release the model weights in the future. We are also hosting an interactive demo to enable the research community to better understand the behavior of Alpaca. Interaction can expose unexpected capabilities and failures, which will guide us for the future evaluation of these models. We also encourage users to report any concerning behaviors in our web demo so that we can better understand and mitigate these behaviors. As any release carries risks, we discuss our thought process for this open release later in this blog post.".into(),
-            "We emphasize that Alpaca is intended only for academic research and any commercial use is prohibited. There are three factors in this decision: First, Alpaca is based on LLaMA, which has a non-commercial license, so we necessarily inherit this decision. Second, the instruction data is based on OpenAI’s text-davinci-003, whose terms of use prohibit developing models that compete with OpenAI. Finally, we have not designed adequate safety measures, so Alpaca is not ready to be deployed for general use.".into(),
-        ];
-        super::unleash_clippy(MODEL_PATH.into(), "what is alpaca?", Some(data))
-            .await
-            .expect("Unable to prompt");
+        let mut generated = String::new();
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                TokenResult::Token(c) => generated.push_str(&c),
+                TokenResult::Error(msg) => eprintln!("Received an error: {}", msg),
+                TokenResult::EndOfText => {}
+            }
+        }
     }
 }
