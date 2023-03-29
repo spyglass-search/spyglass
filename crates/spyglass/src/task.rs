@@ -1,5 +1,7 @@
 use anyhow::anyhow;
-use entities::models::{bootstrap_queue, connection};
+use entities::models::crawl_queue::CrawlStatus;
+use entities::models::{bootstrap_queue, connection, crawl_queue};
+use entities::sea_orm::{sea_query::Expr, ColumnTrait, Condition, EntityTrait, QueryFilter};
 use futures::StreamExt;
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -8,14 +10,16 @@ use spyglass_rpc::{ModelDownloadStatusPayload, RpcEvent, RpcEventType};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
-use std::sync::{atomic::AtomicI32, Arc};
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
+use strum::IntoEnumIterator;
 use tokio::sync::{broadcast, mpsc};
 
 use crate::connection::{api_id_to_label, load_connection};
 use crate::crawler::bootstrap;
 use crate::filesystem;
+use crate::filesystem::extensions::AudioExt;
 use crate::search::lens::{load_lenses, read_lenses};
 use crate::search::Searcher;
 use crate::state::AppState;
@@ -199,6 +203,18 @@ pub async fn config_task(mut state: AppState) {
                                 let state_clone = state.clone();
                                 tokio::spawn(async move {
                                     let _ = download_model(&state_clone, "Whisper Audio", model_path).await;
+                                    // Once we're done downloading the model, recrawl any audio files
+                                    let audio_exts = AudioExt::iter().map(|x| x.to_string()).collect::<Vec<String>>();
+                                    let mut condition = Condition::any();
+                                    for ext in audio_exts {
+                                        condition = condition.add(crawl_queue::Column::Url.ends_with(&format!(".{}", ext)));
+                                    }
+
+                                    let _ = crawl_queue::Entity::update_many()
+                                        .col_expr(crawl_queue::Column::Status, Expr::value(CrawlStatus::Queued))
+                                        .filter(condition)
+                                        .exec(&state_clone.db)
+                                        .await;
                                 });
                             }
                         }

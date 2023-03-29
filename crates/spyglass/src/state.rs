@@ -19,6 +19,12 @@ use crate::{
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 use shared::metrics::Metrics;
 
+/// Used to track inflight requests and limit things
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum FetchLimitType {
+    Audio,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
@@ -43,6 +49,8 @@ pub struct AppState {
     // Pipeline command/control
     pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
     pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
+    // Keep track of in-flight tasks
+    pub fetch_limits: Arc<DashMap<FetchLimitType, usize>>,
 }
 
 impl AppState {
@@ -164,6 +172,7 @@ impl AppStateBuilder {
             config_cmd_tx: Arc::new(Mutex::new(config_tx)),
             file_watcher: Arc::new(Mutex::new(None)),
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
+            fetch_limits: Arc::new(DashMap::new()),
         }
     }
 
