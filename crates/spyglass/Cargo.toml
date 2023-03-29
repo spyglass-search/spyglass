@@ -22,7 +22,7 @@ entities = { path = "../entities" }
 flate2 = "1.0.24"
 futures = "0.3"
 glob = "0.3.1"
-governor = "0.5"
+governor = "0.5.1"
 hex = "0.4"
 http = "0.2"
 ignore = "0.4"
