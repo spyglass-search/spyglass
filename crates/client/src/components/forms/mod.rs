@@ -173,7 +173,7 @@ impl Component for FormElement {
         };
 
         let classes = if props.class.is_empty() {
-            classes!("px-8", "mb-8", "flex", self.alignment())
+            classes!("mb-8", "flex", self.alignment())
         } else {
             props.class.clone()
         };
@@ -181,7 +181,7 @@ impl Component for FormElement {
         html! {
             <div class={classes}>
                 <div class="mb-2">
-                    <label class="text-yellow-500">{label}</label>
+                    <label class="text-white text-base font-semibold">{label}</label>
                     {
                         if let Some(help_text) = props.opts.help_text.clone() {
                             html! {

@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
 use entities::models::tag::TagPair;
+use entities::models::tag::TagType;
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use governor::clock::QuantaClock;
@@ -29,7 +30,7 @@ use crate::filesystem;
 use crate::filesystem::audio;
 use crate::filesystem::extensions::SupportedExt;
 use crate::parser;
-use crate::state::AppState;
+use crate::state::{AppState, FetchLimitType};
 
 pub mod archive;
 pub mod bootstrap;
@@ -43,6 +44,9 @@ type RateLimit = RateLimiter<String, DashMapStateStore<String>, QuantaClock>;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
+
+// TODO: Detect num of cpus & determine from there?
+const AUDIO_TRANSCRIPTION_LIMIT: usize = 2;
 
 #[derive(Debug, Error)]
 pub enum CrawlError {
@@ -497,19 +501,45 @@ impl Crawler {
     }
 }
 
-fn _process_file(
-    _state: &AppState,
+async fn _process_file(
+    state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
     // Attempt to read file
     let ext = path.extension();
+
     let mut content = None;
+    let mut title = Some(file_name.clone());
+    let mut tags = Vec::new();
 
     if let Some(ext) = ext {
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
             SupportedExt::Audio(_) => {
+                if !state.fetch_limits.contains_key(&FetchLimitType::Audio) {
+                    state.fetch_limits.insert(FetchLimitType::Audio, 0);
+                }
+
+                // Loop until audio transcription is finished
+                while let Some(inflight) =
+                    state.fetch_limits.view(&FetchLimitType::Audio, |_, v| *v)
+                {
+                    if inflight >= AUDIO_TRANSCRIPTION_LIMIT {
+                        log::debug!(
+                            "`{}``: at transcription limit, waiting til finished!",
+                            file_name
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                    } else {
+                        state
+                            .fetch_limits
+                            .alter(&FetchLimitType::Audio, |_, v| v + 1);
+                        break;
+                    }
+                }
+
+                log::debug!("starting transcription for `{}`", file_name);
                 // Attempt to transcribe audio, assumes the model has been downloaded
                 // and ready to go
                 #[cfg(debug_assertions)]
@@ -522,9 +552,25 @@ fn _process_file(
                     content = None;
                 } else {
                     match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
-                        Ok(segments) => {
+                        Ok(result) => {
+                            // Update crawl result with appropriate title/stuff
+                            if let Some(metadata) = result.metadata {
+                                // Update title for audio file, if available
+                                if let Some(track_title) = metadata.title {
+                                    title = Some(track_title);
+                                }
+
+                                // Update author for audio file, if available
+                                if let Some(artist) = metadata.artist {
+                                    tags.push((TagType::Owner, artist));
+                                } else if let Some(artist) = metadata.album {
+                                    tags.push((TagType::Owner, artist));
+                                }
+                            }
+
                             // Combine segments into one large string.
-                            let combined = segments
+                            let combined = result
+                                .segments
                                 .iter()
                                 .map(|x| x.segment.to_string())
                                 .collect::<Vec<String>>()
@@ -540,6 +586,11 @@ fn _process_file(
                         }
                     }
                 }
+
+                // Say that we're finished
+                state
+                    .fetch_limits
+                    .alter(&FetchLimitType::Audio, |_, v| v - 1);
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
                 Ok(parsed) => {
@@ -575,13 +626,13 @@ fn _process_file(
             .join(" ")
     });
 
-    let tags = filesystem::build_file_tags(path);
+    tags.extend(filesystem::build_file_tags(path));
     Ok(CrawlResult {
         content_hash,
         content,
         // Does a file have a description? Pull the first part of the file
         description,
-        title: Some(file_name),
+        title,
         url: url.to_string(),
         open_url: Some(url.to_string()),
         links: Default::default(),
@@ -596,9 +647,10 @@ async fn _process_path(
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
     if path.is_file() {
-        return _process_file(state, path, file_name, url);
+        _process_file(state, path, file_name, url).await
+    } else {
+        Err(CrawlError::NotFound)
     }
-    Err(CrawlError::NotFound)
 }
 
 fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {

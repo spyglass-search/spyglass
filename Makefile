@@ -17,6 +17,13 @@ build-backend:
 	mkdir -p crates/tauri/binaries
 	cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
 	cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-$(TARGET_ARCH)
+ifneq ($(strip $(findstring windows,$(TARGET_ARCH))),)
+	cp utils/win/pdftotext.exe crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH)).exe
+else ifneq ($(strip $(findstring mac,$(TARGET_ARCH))),)
+	cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
+else
+	cp utils/linux/pdftotext crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
+endif
 
 build-client:
 	cargo build -p spyglass-client -p spyglass-app

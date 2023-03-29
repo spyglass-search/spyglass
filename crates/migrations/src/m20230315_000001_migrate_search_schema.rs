@@ -6,11 +6,10 @@ use std::time::UNIX_EPOCH;
 use entities::models::schema::v3::SchemaReader;
 use entities::schema::DocFields;
 use sea_orm_migration::prelude::*;
-use tantivy::directory::MmapDirectory;
 use tantivy::DateTime;
-use tantivy::{schema::*, Index, IndexWriter};
+use tantivy::{schema::*, IndexWriter};
 
-use entities::schema::{mapping_to_schema, SchemaMapping, SearchDocument};
+use entities::schema::{self, mapping_to_schema, SchemaMapping, SearchDocument};
 use entities::sea_orm::{ConnectionTrait, Statement};
 use shared::config::Config;
 
@@ -22,10 +21,7 @@ impl Migration {
     }
 
     pub fn after_writer(&self, path: &PathBuf) -> IndexWriter {
-        let dir = MmapDirectory::open(path).expect("Unable to mmap search index");
-        let index = Index::open_or_create(dir, mapping_to_schema(&self.after_schema()))
-            .expect("Unable to open search index");
-
+        let index = schema::initialize_index(path).expect("Unable to open search index");
         index.writer(50_000_000).expect("Unable to create writer")
     }
 

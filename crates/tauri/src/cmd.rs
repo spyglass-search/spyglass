@@ -14,12 +14,7 @@ use shared::config::{Config, UserSettings};
 use shared::{event::ClientEvent, request, response};
 use spyglass_rpc::RpcClient;
 
-#[cfg(target_os = "linux")]
-use super::platform::linux::os_open;
-#[cfg(target_os = "macos")]
-use super::platform::mac::os_open;
-#[cfg(target_os = "windows")]
-use super::platform::windows::os_open;
+use super::platform::os_open;
 
 mod settings;
 pub use settings::*;

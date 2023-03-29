@@ -1,6 +1,7 @@
+use crate::constants::SETTINGS_WIN_NAME;
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
-use shared::event::ClientEvent;
+use shared::event::{ClientEvent, ModelStatusPayload};
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{
     AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
@@ -50,14 +51,7 @@ pub fn center_search_bar(window: &Window) {
 }
 
 pub fn show_search_bar(window: &Window) {
-    #[cfg(target_os = "linux")]
-    platform::linux::show_search_bar(window);
-
-    #[cfg(target_os = "macos")]
-    platform::mac::show_search_bar(window);
-
-    #[cfg(target_os = "windows")]
-    platform::windows::show_search_bar(window);
+    platform::show_search_bar(window);
 
     // Wait a little bit for the window to show being focusing on it.
     let window = window.clone();
@@ -68,14 +62,15 @@ pub fn show_search_bar(window: &Window) {
 }
 
 pub fn hide_search_bar(window: &Window) {
-    #[cfg(target_os = "linux")]
-    platform::linux::hide_search_bar(window);
+    let handle = window.app_handle();
+    // don't hide if the settings window is open
+    if let Some(settings_window) = handle.get_window(SETTINGS_WIN_NAME) {
+        if settings_window.is_visible().unwrap_or_default() {
+            return;
+        }
+    }
 
-    #[cfg(target_os = "macos")]
-    platform::mac::hide_search_bar(window);
-
-    #[cfg(target_os = "windows")]
-    platform::windows::hide_search_bar(window);
+    platform::hide_search_bar(window);
 }
 
 /// Builds or returns the main searchbar window
@@ -83,7 +78,6 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
     if let Some(window) = app.get_window(constants::SEARCH_WIN_NAME) {
         window
     } else {
-        let default_height = 101.0;
         let window =
             WindowBuilder::new(app, constants::SEARCH_WIN_NAME, WindowUrl::App("/".into()))
                 .menu(get_app_menu())
@@ -92,7 +86,7 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
                 .transparent(true)
                 .visible(false)
                 .disable_file_drop_handler()
-                .inner_size(640.0, default_height)
+                .inner_size(640.0, 108.0)
                 .build()
                 .expect("Unable to create searchbar window");
 
@@ -112,7 +106,7 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
 }
 
 pub async fn resize_window(window: &Window, height: f64) {
-    if let Some(monitor) = find_monitor(window) {
+    let new_size = if let Some(monitor) = find_monitor(window) {
         let size = monitor.size();
         let scale = monitor.scale_factor();
         let monitor_height = size.height as f64 - (constants::INPUT_Y * scale);
@@ -120,19 +114,21 @@ pub async fn resize_window(window: &Window, height: f64) {
         // If the requested height is greater than the monitor size, use the monitor
         // height so we don't go offscreen.
         let height = monitor_height.min(height);
-
-        let _ = window.set_size(Size::Physical(PhysicalSize {
+        Size::Physical(PhysicalSize {
             width: (constants::INPUT_WIDTH * scale) as u32,
             height: (height * scale) as u32,
-        }));
+        })
     } else {
         log::warn!("Unable to detect monitor size, resizing using defaults");
-        // No monitor info available so just set!
-        let _ = window.set_size(Size::Physical(PhysicalSize {
+        Size::Physical(PhysicalSize {
             width: constants::INPUT_WIDTH as u32,
             height: height as u32,
-        }));
-    }
+        })
+    };
+
+    // recenter after resize
+    let _ = window.set_size(new_size);
+    center_search_bar(window);
 }
 
 fn show_window(window: &Window) {
@@ -220,6 +216,35 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
     };
 
     show_window(&window);
+    window
+}
+
+pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Window {
+    let window = if let Some(window) = app.get_window(constants::PROGRESS_WIN_NAME) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            constants::PROGRESS_WIN_NAME,
+            WindowUrl::App("/progress".into()),
+        )
+        .title("Download Progress")
+        .menu(Menu::new())
+        .resizable(true)
+        .inner_size(300.0, 64.0)
+        .build()
+        .expect("Unable to build window for progress")
+    };
+
+    let payload = ModelStatusPayload {
+        msg: msg.to_string(),
+        percent: progress.to_string(),
+    };
+
+    log::debug!("emitting update: {:?}", payload);
+    let _ = window.emit("progress_update", payload);
+    let _ = window.show();
+    let _ = window.set_focus();
     window
 }
 

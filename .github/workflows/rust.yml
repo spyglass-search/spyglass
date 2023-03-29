@@ -26,7 +26,10 @@ jobs:
         df -h
     # Setup arch target for sidecar build
     - name: Setup arch target
-      run: echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
+      run: |
+        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV;
+        echo "target_ext=" >> $GITHUB_ENV;
+        echo "target_os_name=linux" >> $GITHUB_ENV;
     # Setup rust toolchain
     - name: Setup rust toolchain
       uses: actions-rs/toolchain@v1
@@ -52,12 +55,13 @@ jobs:
       with:
         command: build
         args: -p spyglass
-
+     # Setup arch targets - linux
     - name: Move sidecar into place
       run: |
         mkdir -p crates/tauri/binaries
-        cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${{ env.target_arch }}
-        cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}
+        cp target/debug/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/debug/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
+        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
     # Build front-end client
     - name: Build client
       env:

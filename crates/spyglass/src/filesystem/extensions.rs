@@ -52,6 +52,7 @@ pub enum AudioExt {
     Flac,
     M4a,
     Mp3,
+    Mp4,
     Ogg,
     Wav,
     Webm,
@@ -74,6 +75,7 @@ pub enum DocumentExt {
     Ods,
     Xls,
     Xlsx,
+    Pdf,
 }
 
 #[derive(Clone, Debug, Display, EnumString, PartialEq, Eq, EnumIter)]
