@@ -518,12 +518,19 @@ async fn _process_file(
                 }
 
                 // Loop until audio transcription is finished
-                while let Some(inflight) = state.fetch_limits.view(&FetchLimitType::Audio, |_, v| *v) {
+                while let Some(inflight) =
+                    state.fetch_limits.view(&FetchLimitType::Audio, |_, v| *v)
+                {
                     if inflight >= AUDIO_TRANSCRIPTION_LIMIT {
-                        log::debug!("`{}``: at transcription limit, waiting til finished!", file_name);
+                        log::debug!(
+                            "`{}``: at transcription limit, waiting til finished!",
+                            file_name
+                        );
                         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
                     } else {
-                        state.fetch_limits.alter(&FetchLimitType::Audio, |_, v| v + 1);
+                        state
+                            .fetch_limits
+                            .alter(&FetchLimitType::Audio, |_, v| v + 1);
                         break;
                     }
                 }
@@ -561,10 +568,9 @@ async fn _process_file(
                 }
 
                 // Say that we're finished
-                state.fetch_limits.alter(
-                    &FetchLimitType::Audio,
-                    |_, v| v - 1
-                );
+                state
+                    .fetch_limits
+                    .alter(&FetchLimitType::Audio, |_, v| v - 1);
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
                 Ok(parsed) => {
