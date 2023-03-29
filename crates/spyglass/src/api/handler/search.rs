@@ -197,7 +197,7 @@ pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(),
             });
 
             // Spawn the clippy LLM
-            if let Err(err) = unleash_clippy(model_path, tx, "what is an alpaca?", None) {
+            if let Err(err) = unleash_clippy(model_path, tx, "what is an alpaca?", None, false) {
                 log::warn!("Unable to complete clippy: {}", err);
             }
         });

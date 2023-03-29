@@ -1,4 +1,4 @@
-use std::{convert::Infallible, path::PathBuf};
+use std::{convert::Infallible, path::PathBuf, sync::{Arc, Mutex}};
 use tokio::sync::mpsc;
 
 use llama_rs::{
@@ -45,10 +45,16 @@ fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
 }
 
 pub fn unleash_clippy(
+    // Path to LLM model
     model: PathBuf,
+    // Channel where generated tokens will be sent
     stream: mpsc::UnboundedSender<TokenResult>,
+    // User prompt
     prompt: &str,
+    // Any additional context we want to add to the prompt template
     doc_context: Option<Vec<String>>,
+    // Whether or not the stream should include the prompt
+    output_prompt: bool,
 ) -> Result<(), LoadError> {
     let handle = tokio::runtime::Handle::current();
     let prompt = prompt.to_string();
@@ -61,7 +67,7 @@ pub fn unleash_clippy(
         // Now we spawn using tokio so that async sends using the channel are handled
         // correctly.
         handle.spawn_blocking(move || {
-            run_model(model, stream.clone(), &prompt, doc_context).expect("unable to prompt")
+            run_model(model, stream.clone(), &prompt, doc_context, output_prompt).expect("unable to prompt")
         });
     });
 
@@ -73,6 +79,7 @@ fn run_model(
     stream: mpsc::UnboundedSender<TokenResult>,
     prompt: &str,
     doc_context: Option<Vec<String>>,
+    output_prompt: bool,
 ) -> Result<(), LoadError> {
     let prompt = construct_prompt(prompt, doc_context);
 
@@ -128,6 +135,9 @@ fn run_model(
     let mut session = model.start_session(inference_session_params);
 
     let tx = stream.clone();
+
+    let prompt_check = Arc::new(Mutex::new(String::new()));
+    let og_prompt = prompt.to_string();
     let res = session.inference_with_prompt::<Infallible>(
         &model,
         &vocab,
@@ -136,13 +146,25 @@ fn run_model(
         Some(2048),
         &mut rng,
         move |t| {
+            let pcheck = prompt_check.clone();
             match t {
                 OutputToken::Token(c) => {
                     let c = c.to_string();
                     let tx = tx.clone();
-                    tokio::spawn(async move {
-                        let _ = tx.send(TokenResult::Token(c.to_string()));
-                    });
+                    if output_prompt {
+                        tokio::spawn(async move {
+                            let _ = tx.send(TokenResult::Token(c.to_string()));
+                        });
+                    } else if let Ok(mut pcheck) = pcheck.lock() {
+                        // detect whether the model has finished inputting the prompt to the model
+                        if *pcheck == og_prompt {
+                            tokio::spawn(async move {
+                                let _ = tx.send(TokenResult::Token(c.to_string()));
+                            });
+                        } else {
+                            pcheck.push_str(&c);
+                        }
+                    }
                 }
                 OutputToken::EndOfText => {
                     let tx = tx.clone();
@@ -214,6 +236,7 @@ mod test {
                 tx.clone(),
                 "what is the difference between an alpaca & llama?",
                 None,
+                true,
             )
             .expect("unable to prompt");
         });
@@ -234,6 +257,7 @@ mod test {
             tx.clone(),
             "where does cuno live?",
             Some(data),
+            true,
         )
         .expect("Unable to prompt");
 
