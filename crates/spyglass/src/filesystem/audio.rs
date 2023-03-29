@@ -10,10 +10,22 @@ use symphonia::core::{
     errors::Error,
     formats::FormatOptions,
     io::MediaSourceStream,
-    meta::MetadataOptions,
+    meta::{MetadataOptions, StandardTagKey},
     probe::Hint,
 };
 use whisper_rs::{convert_stereo_to_mono_audio, FullParams, SamplingStrategy, WhisperContext};
+
+#[derive(Default)]
+pub struct AudioMetadata {
+    pub album: Option<String>,
+    pub artist: Option<String>,
+    pub title: Option<String>,
+}
+
+pub struct AudioFile {
+    pub metadata: AudioMetadata,
+    pub samples: Vec<f32>,
+}
 
 /// Resamples from the <og_rate> to the 16khz required by whisper
 fn resample(og: &[f32], og_rate: u32) -> Result<Vec<f32>, ResamplerConstructionError> {
@@ -38,7 +50,7 @@ fn resample(og: &[f32], og_rate: u32) -> Result<Vec<f32>, ResamplerConstructionE
 }
 
 // todo: handling streaming in large files
-fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
+fn parse_audio_file(path: &PathBuf) -> anyhow::Result<AudioFile> {
     let src = std::fs::File::open(path).expect("Unable open media");
     let mss = MediaSourceStream::new(Box::new(src), Default::default());
 
@@ -53,7 +65,37 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
     let fmt_opts: FormatOptions = Default::default();
 
     // Probe the media source.
-    let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
+    let mut probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
+
+    // Grab any metadata about the file we can use to for the doc (title / author)
+    let container_metadata = probed.format.metadata();
+    let source_metadata = probed.metadata.get();
+    let tags = if let Some(metadata) = container_metadata.current() {
+        metadata.tags()
+    } else if let Some(metadata_rev) = source_metadata.as_ref().and_then(|m| m.current()) {
+        metadata_rev.tags()
+    } else {
+        &[]
+    };
+
+    log::debug!("found {} metadata tags", tags.len());
+    let mut audio_meta = AudioMetadata::default();
+    for tag in tags.iter().filter(|x| x.is_known()) {
+        if let Some(key) = tag.std_key {
+            match key {
+                StandardTagKey::Album => {
+                    audio_meta.album = Some(tag.value.to_string());
+                }
+                StandardTagKey::AlbumArtist | StandardTagKey::Artist => {
+                    audio_meta.artist = Some(tag.value.to_string());
+                }
+                StandardTagKey::TrackTitle => {
+                    audio_meta.title = Some(tag.value.to_string());
+                }
+                _ => {}
+            }
+        }
+    }
 
     // Get the instantiated format reader.
     let mut format = probed.format;
@@ -111,7 +153,7 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
                 if sample_buf.is_none() {
                     // Get the audio buffer specification.
                     let spec = *audio_buf.spec();
-                    // Get the capacity of the decoded buffer
+                    // Get t he capacity of the decoded buffer
                     let duration = audio_buf.capacity() as u64;
                     // Create the f32 sample buffer.
                     sample_buf = Some(SampleBuffer::<f32>::new(duration, spec));
@@ -150,7 +192,10 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<Vec<f32>> {
         }
     }
 
-    Ok(samples)
+    Ok(AudioFile {
+        metadata: audio_meta,
+        samples,
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -170,20 +215,29 @@ impl Segment {
     }
 }
 
+pub struct TranscriptionResult {
+    pub metadata: Option<AudioMetadata>,
+    pub segments: Vec<Segment>,
+}
+
 /// Given a path to a wav file, transcribe it using our **shhhh** models.
 pub fn transcibe_audio(
     path: PathBuf,
     model_path: PathBuf,
     segment_len: i32,
-) -> anyhow::Result<Vec<Segment>> {
+) -> anyhow::Result<TranscriptionResult> {
     let start = std::time::Instant::now();
     if !path.exists() || !path.is_file() {
         return Err(anyhow!("Invalid file path"));
     }
 
-    let mut segments = Vec::new();
+    let mut res = TranscriptionResult {
+        metadata: None,
+        segments: Vec::new(),
+    };
+
     match parse_audio_file(&path) {
-        Ok(samples) => {
+        Ok(audio_file) => {
             let mut ctx = match WhisperContext::new(&model_path.to_string_lossy()) {
                 Ok(ctx) => ctx,
                 Err(err) => {
@@ -192,12 +246,14 @@ pub fn transcibe_audio(
                 }
             };
 
+            res.metadata = Some(audio_file.metadata);
+
             let mut params = FullParams::new(SamplingStrategy::default());
             params.set_max_len(segment_len);
             params.set_print_progress(false);
             params.set_token_timestamps(true);
 
-            ctx.full(params, &samples)
+            ctx.full(params, &audio_file.samples)
                 .expect("failed to convert samples");
             let num_segments = ctx.full_n_segments();
             log::debug!("Extracted {} segments", num_segments);
@@ -205,7 +261,8 @@ pub fn transcibe_audio(
                 let segment = ctx.full_get_segment_text(i).expect("failed to get segment");
                 let start_timestamp = ctx.full_get_segment_t0(i);
                 let end_timestamp = ctx.full_get_segment_t1(i);
-                segments.push(Segment::new(start_timestamp, end_timestamp, &segment));
+                res.segments
+                    .push(Segment::new(start_timestamp, end_timestamp, &segment));
             }
         }
         Err(err) => {
@@ -215,7 +272,7 @@ pub fn transcibe_audio(
     }
 
     log::debug!("transcribed in {} secs", start.elapsed().as_secs_f32());
-    Ok(segments)
+    Ok(res)
 }
 
 #[cfg(test)]
@@ -228,7 +285,8 @@ mod test {
         // Use the sample from whisper.cpp as a baseline test.
         let expected = include_str!("../../../../fixtures/audio/jfk.txt");
         let path = "../../fixtures/audio/jfk.wav".into();
-        let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let res = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let segments = res.segments;
         assert!(segments.len() > 0);
 
         let combined = segments
@@ -243,7 +301,8 @@ mod test {
     fn test_ogg_transcription() {
         let expected = include_str!("../../../../fixtures/audio/armstrong.txt");
         let path = "../../fixtures/audio/armstrong.ogg".into();
-        let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let res = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let segments = res.segments;
         assert!(segments.len() > 0);
         let combined = segments
             .iter()
@@ -259,7 +318,8 @@ mod test {
     fn test_mp3_transcription() {
         let expected = include_str!("../../../../fixtures/audio/count_of_monte_cristo.txt");
         let path = "../../fixtures/audio/count_of_monte_cristo.mp3".into();
-        let segments = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let res = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let segments = res.segments;
         assert!(segments.len() > 0);
         let combined = segments
             .iter()

@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
 use entities::models::tag::TagPair;
+use entities::models::tag::TagType;
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use governor::clock::QuantaClock;
@@ -508,7 +509,10 @@ async fn _process_file(
 ) -> Result<CrawlResult, CrawlError> {
     // Attempt to read file
     let ext = path.extension();
+
     let mut content = None;
+    let mut title = Some(file_name.clone());
+    let mut tags = Vec::new();
 
     if let Some(ext) = ext {
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
@@ -548,9 +552,25 @@ async fn _process_file(
                     content = None;
                 } else {
                     match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
-                        Ok(segments) => {
+                        Ok(result) => {
+                            // Update crawl result with appropriate title/stuff
+                            if let Some(metadata) = result.metadata {
+                                // Update title for audio file, if available
+                                if let Some(track_title) = metadata.title {
+                                    title = Some(track_title);
+                                }
+
+                                // Update author for audio file, if available
+                                if let Some(artist) = metadata.artist {
+                                    tags.push((TagType::Owner, artist));
+                                } else if let Some(artist) = metadata.album {
+                                    tags.push((TagType::Owner, artist));
+                                }
+                            }
+
                             // Combine segments into one large string.
-                            let combined = segments
+                            let combined = result
+                                .segments
                                 .iter()
                                 .map(|x| x.segment.to_string())
                                 .collect::<Vec<String>>()
@@ -606,13 +626,13 @@ async fn _process_file(
             .join(" ")
     });
 
-    let tags = filesystem::build_file_tags(path);
+    tags.extend(filesystem::build_file_tags(path));
     Ok(CrawlResult {
         content_hash,
         content,
         // Does a file have a description? Pull the first part of the file
         description,
-        title: Some(file_name),
+        title,
         url: url.to_string(),
         open_url: Some(url.to_string()),
         links: Default::default(),
