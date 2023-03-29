@@ -20,6 +20,8 @@ pub struct IndexFilesHelpProps {
     #[prop_or_default]
     pub toggle_file_indexer: bool,
     #[prop_or_default]
+    pub toggle_audio_transcription: bool,
+    #[prop_or_default]
     pub onchange: Callback<SettingChangeEvent>,
 }
 
@@ -51,12 +53,20 @@ pub fn index_files_help(props: &IndexFilesHelpProps) -> Html {
         );
     }
 
-    let toggle = SettingOpts {
+    let toggle_fs = SettingOpts {
         label: "Enable local file searching".into(),
         value: serde_json::to_string(&props.toggle_file_indexer).unwrap_or_default(),
         form_type: FormType::Bool,
         restart_required: false,
         help_text: None,
+    };
+
+    let toggle_audio = SettingOpts {
+        label: "Enable audio search".into(),
+        value: serde_json::to_string(&props.toggle_audio_transcription).unwrap_or_default(),
+        form_type: FormType::Bool,
+        restart_required: false,
+        help_text: Some("Search the audio content of podcasts, audio books, meetings, etc.".into()),
     };
 
     let paths_rendered: VNode = paths
@@ -75,14 +85,18 @@ pub fn index_files_help(props: &IndexFilesHelpProps) -> Html {
             <div class="text-sm">
                 {"Enable local file search to index & search through markdown, word, excel, and other text based documents!"}
             </div>
-            <div class="my-4">
-                <forms::FormElement
-                    class="flex flex-row"
-                    setting_name="_.file-indexer"
-                    opts={toggle}
-                    onchange={props.onchange.clone()}
-                />
-            </div>
+            <forms::FormElement
+                class="flex flex-row"
+                setting_name="_.file-indexer"
+                opts={toggle_fs}
+                onchange={props.onchange.clone()}
+            />
+            <forms::FormElement
+                class="flex flex-row"
+                setting_name="_.audio-transcription"
+                opts={toggle_audio}
+                onchange={props.onchange.clone()}
+            />
             <div class="text-sm">
                 {"If enabled, the following folders will be automatically indexed. You can add/remove folders in your settings."}
                 <ul class="mt-4 text-sm text-cyan-500 flex flex-col gap-2 font-mono">

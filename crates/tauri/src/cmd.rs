@@ -341,13 +341,17 @@ pub async fn get_shortcut(win: tauri::Window) -> Result<String, String> {
 pub async fn wizard_finished(
     win: tauri::Window,
     config: State<'_, Config>,
+    toggle_audio_transcription: bool,
     toggle_file_indexer: bool,
 ) -> Result<(), String> {
     let mut current_settings = config.user_settings.clone();
     current_settings.run_wizard = true;
+
     current_settings
         .filesystem_settings
         .enable_filesystem_scanning = toggle_file_indexer;
+
+    current_settings.audio_settings.enable_audio_transcription = toggle_audio_transcription;
 
     if let Err(error) = update_user_settings(win.clone(), &current_settings).await {
         log::error!("Error saving initial settings {:?}", error);

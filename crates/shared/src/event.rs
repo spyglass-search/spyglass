@@ -123,6 +123,8 @@ pub struct UninstallLensParams {
 
 #[derive(Deserialize, Serialize)]
 pub struct WizardFinishedParams {
+    #[serde(rename(serialize = "toggleAudioTranscription"))]
+    pub toggle_audio_transcription: bool,
     #[serde(rename(serialize = "toggleFileIndexer"))]
     pub toggle_file_indexer: bool,
 }
