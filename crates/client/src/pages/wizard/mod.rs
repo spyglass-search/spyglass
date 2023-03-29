@@ -38,10 +38,13 @@ pub struct WizardProps {
 pub fn wizard_page(props: &WizardProps) -> Html {
     let nav = use_navigator().expect("History not available in this browser");
     let toggle_file_indexer = use_state(|| false);
+    let toggle_audio_transcription = use_state(|| false);
 
     let cur_stage = props.stage.clone();
     let nav_clone = nav.clone();
+
     let tfi_state = toggle_file_indexer.clone();
+    let tat_state = toggle_audio_transcription.clone();
     let handle_next = Callback::from(move |_| {
         let next_stage = match cur_stage {
             WizardStage::MenubarHelp => WizardStage::DisplaySearchbarHelp,
@@ -55,6 +58,7 @@ pub fn wizard_page(props: &WizardProps) -> Html {
 
         if next_stage == WizardStage::Done {
             let params = WizardFinishedParams {
+                toggle_audio_transcription: *tat_state,
                 toggle_file_indexer: *tfi_state,
             };
 
@@ -68,9 +72,16 @@ pub fn wizard_page(props: &WizardProps) -> Html {
     });
 
     let tfi_state = toggle_file_indexer.clone();
+    let tat_state = toggle_audio_transcription.clone();
     let handle_onchange = Callback::from(move |event: SettingChangeEvent| {
-        if let Ok(new_value) = serde_json::from_str::<bool>(&event.new_value) {
-            tfi_state.set(new_value);
+        if event.setting_name == "_.file-indexer" {
+            if let Ok(new_value) = serde_json::from_str::<bool>(&event.new_value) {
+                tfi_state.set(new_value);
+            }
+        } else if event.setting_name == "_.audio-transcription" {
+            if let Ok(new_value) = serde_json::from_str::<bool>(&event.new_value) {
+                tat_state.set(new_value);
+            }
         }
     });
 
@@ -85,7 +96,13 @@ pub fn wizard_page(props: &WizardProps) -> Html {
             html! { <indexing_help::IndexBookmarks /> }
         }
         WizardStage::IndexFiles => {
-            html! { <indexing_help::IndexFilesHelp toggle_file_indexer={*toggle_file_indexer} onchange={handle_onchange} /> }
+            html! {
+                <indexing_help::IndexFilesHelp
+                    toggle_file_indexer={*toggle_file_indexer}
+                    toggle_audio_transcription={*toggle_audio_transcription}
+                    onchange={handle_onchange}
+                />
+            }
         }
         WizardStage::IndexCloud => {
             html! { <indexing_help::IndexCloudHelp /> }
