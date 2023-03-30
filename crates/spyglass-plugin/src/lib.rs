@@ -3,6 +3,7 @@ mod shims;
 pub mod utils;
 
 use serde::{Deserialize, Serialize};
+use serde_json;
 pub use shims::*;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -63,6 +64,21 @@ pub trait SpyglassPlugin {
     fn update(&mut self, event: PluginEvent);
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct HttpResponse {
+    pub headers: Vec<(String, String)>,
+    pub response: Option<String>,
+}
+
+impl HttpResponse {
+    pub fn as_json(&self) -> Option<serde_json::Value> {
+        if let Some(val) = &self.response {
+            return serde_json::from_str(val.as_str()).ok();
+        }
+        None
+    }
+}
+
 /// Event providing the plugin asynchronous data
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginEvent {
@@ -75,6 +91,27 @@ pub enum PluginEvent {
     },
     // Periodic update for request for a plugin
     IntervalUpdate,
+    HttpResponse {
+        url: String,
+        result: Result<HttpResponse, String>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Authentication {
+    BASIC(String, Option<String>),
+    BEARER(String),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
+    OPTIONS,
+    PATCH,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -111,6 +148,14 @@ pub enum PluginCommandRequest {
     // (currently every 10 minutes) to allow the plugin to
     // process an new updates.
     SubscribeForUpdates,
+    // Request an http resource.
+    HttpRequest {
+        headers: Vec<(String, String)>,
+        method: HttpMethod,
+        url: String,
+        body: Option<String>,
+        auth: Option<Authentication>,
+    },
 }
 
 #[derive(Deserialize, Serialize)]

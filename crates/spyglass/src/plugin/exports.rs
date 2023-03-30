@@ -4,10 +4,18 @@ use entities::models::indexed_document;
 use entities::models::tag;
 use entities::models::tag::TagPair;
 use entities::models::tag::TagType;
+use http::header::InvalidHeaderName;
+use http::header::InvalidHeaderValue;
+use http::HeaderMap;
+use http::HeaderName;
+use http::HeaderValue;
 use serde::{Deserialize, Serialize};
+use spyglass_plugin::Authentication;
 use spyglass_plugin::DocumentUpdate;
+use spyglass_plugin::HttpMethod;
 use spyglass_plugin::{DocumentResult, PluginEvent};
 use std::path::Path;
+use std::str::FromStr;
 use tantivy::DocAddress;
 use tokio::sync::mpsc::Sender;
 use url::Url;
@@ -22,6 +30,7 @@ use entities::sea_orm::QueryFilter;
 use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
 use crate::search::{self, Searcher};
 use crate::state::AppState;
+use reqwest::header::USER_AGENT;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
 use spyglass_plugin::{DocumentQuery, PluginCommandRequest};
@@ -73,6 +82,68 @@ async fn handle_plugin_cmd_request(
                 query_documents_and_send(env, query, true).await;
             }
         }
+        PluginCommandRequest::HttpRequest {
+            headers,
+            method,
+            url,
+            body,
+            auth,
+        } => {
+            let client = reqwest::Client::new();
+            let header_map = build_headermap(headers, &env.name);
+            let method_type = convert_method(method);
+
+            let request = client.request(method_type, url).headers(header_map);
+            let request = if let Some(body) = body {
+                request.body(body.clone())
+            } else {
+                request
+            };
+
+            let request = if let Some(auth) = auth {
+                match auth {
+                    Authentication::BASIC(key, val) => request.basic_auth(key.clone(), val.clone()),
+                    Authentication::BEARER(key) => request.bearer_auth(key.clone()),
+                }
+            } else {
+                request
+            };
+
+            let result = request.send().await;
+
+            match result {
+                Ok(response) => {
+                    let headers = convert_headers(response.headers());
+                    let txt = response.text().await.ok();
+
+                    let http_response = spyglass_plugin::HttpResponse {
+                        response: txt,
+                        headers: headers,
+                    };
+
+                    env.cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id: env.id,
+                            event: PluginEvent::HttpResponse {
+                                url: url.clone(),
+                                result: Ok(http_response),
+                            },
+                        })
+                        .await?;
+                }
+                Err(error) => {
+                    env.cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id: env.id,
+                            event: PluginEvent::HttpResponse {
+                                url: url.clone(),
+                                result: Err(format!("{}", error)),
+                            },
+                        })
+                        .await?;
+                }
+            }
+        }
         PluginCommandRequest::ModifyTags {
             documents,
             tag_modifications,
@@ -111,6 +182,45 @@ async fn handle_plugin_cmd_request(
     }
 
     Ok(())
+}
+
+// Converts local method enum and http method enum
+fn convert_method(method: &HttpMethod) -> http::Method {
+    match method {
+        HttpMethod::GET => http::Method::GET,
+        HttpMethod::DELETE => http::Method::DELETE,
+        HttpMethod::POST => http::Method::POST,
+        HttpMethod::PUT => http::Method::PUT,
+        HttpMethod::PATCH => http::Method::PATCH,
+        HttpMethod::HEAD => http::Method::HEAD,
+        HttpMethod::OPTIONS => http::Method::OPTIONS,
+    }
+}
+
+// Helper method used to convert header list to header map
+fn build_headermap(headers: &Vec<(String, String)>, plugin: &str) -> HeaderMap {
+    let mut header_map = HeaderMap::new();
+
+    header_map.append(
+        USER_AGENT,
+        format!("Spyglass-Plugin-{plugin}").parse().unwrap(),
+    );
+    for (key, val) in headers {
+        let header_val: Result<HeaderValue, InvalidHeaderValue> = HeaderValue::from_str(&val);
+        let header_name: Result<HeaderName, InvalidHeaderName> = HeaderName::from_str(&key);
+        if let (Ok(header_val), Ok(header_name)) = (header_val, header_name) {
+            header_map.append(header_name, header_val);
+        }
+    }
+    header_map
+}
+
+// Converts header map to header list
+fn convert_headers(headers: &HeaderMap) -> Vec<(String, String)> {
+    headers
+        .into_iter()
+        .map(|(key, val)| (key.to_string(), val.to_str().unwrap_or("").to_owned()))
+        .collect::<Vec<(String, String)>>()
 }
 
 fn convert_docs_to_crawl(

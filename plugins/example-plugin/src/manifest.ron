@@ -1,0 +1,25 @@
+(
+    name: "example-plugin",
+    author: "spyglass-search",
+    description: "Example plugin to provide an example on how to create a plugin.",
+    version: "1",
+    plugin_type: Lens,
+    trigger: "example-plugin",
+    // User settings w/ the default value, this will be added the plugin environment
+    user_settings: {
+         "API_KEY": (
+            label: "Example Plugin API Key",
+            value: "",
+            form_type: Text,
+			restart_required: false,
+            help_text: Some("Example with custom string configuration")
+        ),
+        "ENABLE_API": (
+            label: "Example Plugin Enable API boolean",
+            value: "",
+            form_type: Bool,
+			restart_required: false,
+            help_text: Some("Example with custom boolean configuration")
+        ),
+    }
+)
