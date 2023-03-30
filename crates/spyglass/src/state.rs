@@ -24,6 +24,32 @@ use shared::metrics::Metrics;
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum FetchLimitType {
     Audio,
+    File,
+}
+
+impl FetchLimitType {
+    pub async fn check_and_wait(
+        fetch_limits: &DashMap<FetchLimitType, usize>,
+        limit_type: Self,
+        limit: usize,
+        wait_log: &str,
+    ) {
+        {
+            if !fetch_limits.contains_key(&limit_type) {
+                fetch_limits.insert(limit_type.clone(), 0);
+            }
+        }
+
+        while let Some(inflight) = fetch_limits.view(&limit_type, |_, v| *v) {
+            if inflight >= limit {
+                log::debug!("{wait_log}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            } else {
+                fetch_limits.alter(&limit_type, |_, v| v + 1);
+                break;
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
