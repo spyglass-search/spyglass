@@ -279,11 +279,18 @@ mod test {
         let mut generated = String::new();
         while let Some(msg) = rx.recv().await {
             match msg {
-                TokenResult::Token(c) => generated.push_str(&c),
-                TokenResult::Error(msg) => eprintln!("Received an error: {}", msg),
-                TokenResult::EndOfText => {}
+                TokenResult::Token(c) => {
+                    print!("{}", c.clone());
+                    std::io::stdout().flush().unwrap();
+                    generated.push_str(&c)
+                }
+                TokenResult::Error(msg) => {
+                    eprintln!("Received an error: {}", msg);
+                    break;
+                }
+                TokenResult::EndOfText => break,
                 _ => {}
             }
-        }
+    }
     }
 }
