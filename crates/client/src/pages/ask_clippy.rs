@@ -4,7 +4,7 @@ use shared::event::{self, ClientEvent, ListenPayload};
 use shared::request::{AskClippyRequest, LLMResponsePayload};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlInputElement, HtmlElement};
 use yew::html::Scope;
 use yew::platform::spawn_local;
 use yew::prelude::*;
@@ -29,6 +29,7 @@ struct HistoryItem {
 pub struct AskClippy {
     clippy_input_ref: NodeRef,
     history: Vec<HistoryItem>,
+    history_ref: NodeRef,
     in_progress: bool,
     status: Option<String>,
     tokens: Option<String>,
@@ -96,6 +97,7 @@ impl Component for AskClippy {
         Self {
             clippy_input_ref: NodeRef::default(),
             history: Vec::new(),
+            history_ref: NodeRef::default(),
             in_progress: false,
             status: None,
             tokens: None,
@@ -157,6 +159,10 @@ impl Component for AskClippy {
                 }
             }
             Msg::HandleResponse(resp) => {
+                if let Some(history_el) = self.history_ref.cast::<HtmlElement>() {
+                    history_el.set_scroll_top(history_el.scroll_height());
+                }
+
                 self.process_result(link.clone(), resp);
                 true
             }
@@ -170,21 +176,23 @@ impl Component for AskClippy {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         html! {
-            <div class="flex flex-col bg-neutral-800 h-screen">
-                <div class="flex flex-1 flex-col place-content-end bg-neutral-800 text-white">
-                    <HistoryLog history={self.history.clone()} />
-                    { if let Some(tokens) = self.tokens.clone() {
-                        html! { <HistoryLogItem source={HistorySource::Clippy} tokens={tokens} is_in_progress={self.in_progress} /> }
-                    } else if let Some(status) = self.status.clone() {
-                        html! { <HistoryLogItem source={HistorySource::System} tokens={status} /> }
-                    } else {
-                        html! {}
-                    }}
+            <div class="flex flex-col bg-neutral-800 h-screen text-white">
+                <div ref={self.history_ref.clone()} class="flex flex-col grow overflow-y-scroll place-content-end">
+                    <div class="min-h-[128px] flex flex-col">
+                        <HistoryLog history={self.history.clone()} />
+                        { if let Some(tokens) = self.tokens.clone() {
+                            html! { <HistoryLogItem source={HistorySource::Clippy} tokens={tokens} is_in_progress={self.in_progress} /> }
+                        } else if let Some(status) = self.status.clone() {
+                            html! { <HistoryLogItem source={HistorySource::System} tokens={status} /> }
+                        } else {
+                            html! {}
+                        }}
+                    </div>
                 </div>
                 <div>
                     <div class="bg-neutral-700 px-4 py-2 text-sm text-neutral-400 flex flex-row items-center gap-4">
-                        <icons::Warning width="w-6" height="h-6" classes={classes!("text-yellow-400")} />
-                        <div>{"LLMs (the tech behind this) can be wrong, please double check the answers."}</div>
+                        <icons::Warning width="w-6" height="h-6" classes={classes!("flex-none", "text-yellow-400")} />
+                        <div>{"LLMs (the tech behind this) are still experimental and some responses may be inaccurate."}</div>
                     </div>
                     <div class="p-4">
                         <div class="flex flex-row gap-8 items-center">
@@ -193,7 +201,7 @@ impl Component for AskClippy {
                                 rows="2"
                                 type="text"
                                 placeholder="ask clippy"
-                                class="bg-neutral-800 text-white text-lg flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600"
+                                class="text-base bg-neutral-800 text-white flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600"
                             ></textarea>
                             <btn::Btn
                                 disabled={self.in_progress}

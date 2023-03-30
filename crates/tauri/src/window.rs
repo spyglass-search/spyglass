@@ -284,6 +284,7 @@ pub fn show_ask_clippy(app: &AppHandle) {
         .title("Spyglass: First Mate")
         .menu(get_app_menu())
         .inner_size(480.0, 640.0)
+        .min_inner_size(240.0, 320.0)
         .build()
         .expect("Unable to build window for AskClippy")
     };

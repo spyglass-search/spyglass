@@ -1,6 +1,6 @@
 use js_sys::decode_uri_component;
-use shared::{constants::FEEDBACK_FORM, event};
 use shared::response::{LensResult, SearchResult};
+use shared::{constants::FEEDBACK_FORM, event};
 use url::Url;
 use yew::{platform::spawn_local, prelude::*};
 use yew_router::Routable;
