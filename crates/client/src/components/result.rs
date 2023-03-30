@@ -431,7 +431,8 @@ impl Component for LLMResult {
         // }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let link = ctx.link();
         match msg {
             LLMResultMsg::AddListener(listener) => {
                 self.listeners.push(listener);
@@ -439,18 +440,25 @@ impl Component for LLMResult {
             }
             LLMResultMsg::AskClippy => {
                 self.in_progress = true;
+                self.tokens = None;
+                self.status = None;
+
                 if let Some(el) = self.clippy_input_ref.cast::<HtmlInputElement>() {
                     let question = el.value();
+                    let link = link.clone();
+                    gloo::console::log!("ask_clippy: {question}");
                     spawn_local(async move {
-                        let res = tauri_invoke::<AskClippyRequest, ()>(
+                        if let Err(err) = tauri_invoke::<AskClippyRequest, ()>(
                             event::ClientInvoke::AskClippy,
                             AskClippyRequest {
                                 question,
                                 docs: [].into(),
                             },
                         )
-                        .await;
-                        console_dbg!(res);
+                        .await
+                        {
+                            link.send_message(LLMResultMsg::SetError(err));
+                        }
                     });
                     true
                 } else {
@@ -458,7 +466,7 @@ impl Component for LLMResult {
                 }
             }
             LLMResultMsg::SetError(err) => {
-                gloo::console::error!("LLM error: {}", err);
+                self.status = Some(format!("Error: {err}"));
                 false
             }
             LLMResultMsg::SetInProgress(in_progress) => {
@@ -483,14 +491,15 @@ impl Component for LLMResult {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         html! {
-            <div class="p-4">
-                <div class="flex flex-row gap-1">
-                    <input
+            <div class="border-b border-neutral-700 p-4">
+                <div class="flex flex-row gap-8 items-center pb-4">
+                    <textarea
                         ref={self.clippy_input_ref.clone()}
+                        rows="2"
                         type="text"
                         placeholder="ask clippy"
-                        class="bg-neutral-800 text-white text-2xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
-                    />
+                        class="bg-neutral-800 text-white text-lg flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600"
+                    ></textarea>
                     <btn::Btn
                         disabled={self.in_progress}
                         size={btn::BtnSize::Lg}
@@ -500,16 +509,27 @@ impl Component for LLMResult {
                             if self.in_progress {
                                 html! { <icons::RefreshIcon animate_spin={true} /> }
                             } else {
-                                html! { <div>{"Ask"}</div> }
+                                html! { <>{"Ask"}</> }
                             }
                         }
                     </btn::Btn>
                 </div>
-                <div class="text-sm">
+                <div class="text-sm text-white">
                     { if let Some(tokens) = self.tokens.clone() {
-                        html! { <div>{tokens.clone()}</div> }
+                        html! {
+                            <>
+                                {tokens.clone()}
+                                {if self.in_progress {
+                                    html! {
+                                        <div class="inline-block h-4 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div>
+                                    }
+                                } else {
+                                    html! { <>{"🤖"}</>}
+                                }}
+                            </>
+                        }
                     } else if let Some(status) = self.status.clone() {
-                        html! { <div>{status.clone()}</div> }
+                        html! { <>{status.clone()}</> }
                     } else { html! {} }}
                 </div>
             </div>

@@ -90,6 +90,7 @@ fn run_model(
     output_prompt: bool,
 ) -> Result<(), LoadError> {
     let prompt = construct_prompt(prompt, doc_context);
+    log::debug!("prompt: {prompt}");
 
     let inference_params = InferenceParameters {
         n_threads: 8,
@@ -133,7 +134,7 @@ fn run_model(
             } => {
                 if current_tensor % 20 == 0 || current_tensor == tensor_count {
                     let percent = ((current_tensor as f32 * 100f32) / tensor_count as f32) as u8;
-                    log::debug!("{}/{} ({}%)", current_tensor, tensor_count, percent);
+                    log::debug!("loading tensor: {}/{} ({}%)", current_tensor, tensor_count, percent);
                 }
             }
             _ => {}

@@ -139,14 +139,14 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
 
 /// Ask clippy about a set of documents
 #[instrument(skip(state))]
-pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(), Error> {
+pub async fn ask_clippy(state: AppState, query: AskClippyRequest) -> Result<(), Error> {
     // Assumes a valid model has been downloaded and ready to go
     #[cfg(debug_assertions)]
     let model_path: PathBuf = "assets/models/alpaca-native.7b.bin".into();
     #[cfg(not(debug_assertions))]
     let model_path: PathBuf = state.config.model_dir().join("alpaca-native.7b.bin");
 
-    log::debug!("ask_clippy: {:?}", params);
+    log::debug!("ask_clippy: {:?}", query);
     let mut request = state.llm_request.lock().await;
     if request.is_none() {
         let s2 = state.clone();
@@ -189,13 +189,15 @@ pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(),
                     .await;
 
                     if finished {
+                        let mut req = s2.llm_request.lock().await;
+                        *req = None;
                         break;
                     }
                 }
             });
 
             // Spawn the clippy LLM
-            if let Err(err) = unleash_clippy(model_path, tx, &params.question, None, false) {
+            if let Err(err) = unleash_clippy(model_path, tx, &query.question, None, false) {
                 log::warn!("Unable to complete clippy: {}", err);
             }
         });
