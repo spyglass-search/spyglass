@@ -92,13 +92,14 @@ fn run_model(
     let prompt = construct_prompt(prompt, doc_context);
     log::debug!("prompt: {prompt}");
 
+    // todo: load from model configuration files
     let inference_params = InferenceParameters {
         n_threads: 8,
         n_batch: 8,
         top_k: 40,
         top_p: 0.5,
         repeat_penalty: 1.17647,
-        temp: 0.7,
+        temp: 0.5,
         bias_tokens: TokenBias::default(),
         play_back_previous_tokens: false,
         ..Default::default()
@@ -134,7 +135,12 @@ fn run_model(
             } => {
                 if current_tensor % 20 == 0 || current_tensor == tensor_count {
                     let percent = ((current_tensor as f32 * 100f32) / tensor_count as f32) as u8;
-                    log::debug!("loading tensor: {}/{} ({}%)", current_tensor, tensor_count, percent);
+                    log::debug!(
+                        "loading tensor: {}/{} ({}%)",
+                        current_tensor,
+                        tensor_count,
+                        percent
+                    );
                 }
             }
             _ => {}
@@ -291,6 +297,6 @@ mod test {
                 TokenResult::EndOfText => break,
                 _ => {}
             }
-    }
+        }
     }
 }

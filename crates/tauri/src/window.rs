@@ -1,4 +1,4 @@
-use crate::constants::SETTINGS_WIN_NAME;
+use crate::constants::Windows;
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
 use shared::event::{ClientEvent, ModelStatusPayload};
@@ -63,8 +63,9 @@ pub fn show_search_bar(window: &Window) {
 
 pub fn hide_search_bar(window: &Window) {
     let handle = window.app_handle();
+
     // don't hide if the settings window is open
-    if let Some(settings_window) = handle.get_window(SETTINGS_WIN_NAME) {
+    if let Some(settings_window) = handle.get_window(Windows::Settings.as_ref()) {
         if settings_window.is_visible().unwrap_or_default() {
             return;
         }
@@ -75,20 +76,23 @@ pub fn hide_search_bar(window: &Window) {
 
 /// Builds or returns the main searchbar window
 pub fn get_searchbar(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window(constants::SEARCH_WIN_NAME) {
+    if let Some(window) = app.get_window(Windows::SearchBar.as_ref()) {
         window
     } else {
-        let window =
-            WindowBuilder::new(app, constants::SEARCH_WIN_NAME, WindowUrl::App("/".into()))
-                .menu(get_app_menu())
-                .title("Spyglass")
-                .decorations(false)
-                .transparent(true)
-                .visible(false)
-                .disable_file_drop_handler()
-                .inner_size(640.0, 108.0)
-                .build()
-                .expect("Unable to create searchbar window");
+        let window = WindowBuilder::new(
+            app,
+            Windows::SearchBar.to_string(),
+            WindowUrl::App("/".into()),
+        )
+        .menu(get_app_menu())
+        .title("Spyglass")
+        .decorations(false)
+        .transparent(true)
+        .visible(false)
+        .disable_file_drop_handler()
+        .inner_size(640.0, 108.0)
+        .build()
+        .expect("Unable to create searchbar window");
 
         // macOS: Handle multiple spaces correctly
         #[cfg(target_os = "macos")]
@@ -138,12 +142,12 @@ fn show_window(window: &Window) {
 }
 
 pub fn _show_tab(app: &AppHandle, tab_url: &str) {
-    let window = if let Some(window) = app.get_window(constants::SETTINGS_WIN_NAME) {
+    let window = if let Some(window) = app.get_window(Windows::Settings.as_ref()) {
         window
     } else {
         WindowBuilder::new(
             app,
-            constants::SETTINGS_WIN_NAME,
+            Windows::Settings.to_string(),
             WindowUrl::App(tab_url.into()),
         )
         .title("Spyglass - Personal Search Engine")
@@ -179,12 +183,12 @@ pub fn show_user_settings(app: &AppHandle) {
 }
 
 pub fn show_update_window(app: &AppHandle) {
-    let window = if let Some(window) = app.get_window(constants::UPDATE_WIN_NAME) {
+    let window = if let Some(window) = app.get_window(Windows::UpdatePopup.as_ref()) {
         window
     } else {
         WindowBuilder::new(
             app,
-            constants::UPDATE_WIN_NAME,
+            Windows::UpdatePopup.to_string(),
             WindowUrl::App("/updater".into()),
         )
         .title("Spyglass - Update Available!")
@@ -198,12 +202,12 @@ pub fn show_update_window(app: &AppHandle) {
 }
 
 pub fn show_startup_window(app: &AppHandle) -> Window {
-    let window = if let Some(window) = app.get_window(constants::STARTUP_WIN_NAME) {
+    let window = if let Some(window) = app.get_window(Windows::Startup.as_ref()) {
         window
     } else {
         WindowBuilder::new(
             app,
-            constants::STARTUP_WIN_NAME,
+            Windows::Startup.to_string(),
             WindowUrl::App("/startup".into()),
         )
         .title("Spyglass - Starting up")
@@ -220,12 +224,12 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
 }
 
 pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Window {
-    let window = if let Some(window) = app.get_window(constants::PROGRESS_WIN_NAME) {
+    let window = if let Some(window) = app.get_window(Windows::ProgressPopup.as_ref()) {
         window
     } else {
         WindowBuilder::new(
             app,
-            constants::PROGRESS_WIN_NAME,
+            Windows::ProgressPopup.to_string(),
             WindowUrl::App("/progress".into()),
         )
         .title("Download Progress")
@@ -249,12 +253,12 @@ pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Windo
 }
 
 pub fn show_wizard_window(app: &AppHandle) {
-    let window = if let Some(window) = app.get_window(constants::WIZARD_WIN_NAME) {
+    let window = if let Some(window) = app.get_window(Windows::Wizard.as_ref()) {
         window
     } else {
         WindowBuilder::new(
             app,
-            constants::WIZARD_WIN_NAME,
+            Windows::Wizard.to_string(),
             WindowUrl::App("/wizard".into()),
         )
         .title("Getting Started")
@@ -263,6 +267,25 @@ pub fn show_wizard_window(app: &AppHandle) {
         .max_inner_size(400.0, 492.0)
         .build()
         .expect("Unable to build window for wizard")
+    };
+
+    show_window(&window);
+}
+
+pub fn show_ask_clippy(app: &AppHandle) {
+    let window = if let Some(window) = app.get_window(Windows::AskClippy.as_ref()) {
+        window
+    } else {
+        WindowBuilder::new(
+            app,
+            Windows::AskClippy.to_string(),
+            WindowUrl::App("/ask".into()),
+        )
+        .title("Spyglass: First Mate")
+        .menu(get_app_menu())
+        .inner_size(480.0, 640.0)
+        .build()
+        .expect("Unable to build window for AskClippy")
     };
 
     show_window(&window);

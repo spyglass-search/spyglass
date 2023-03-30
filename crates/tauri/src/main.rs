@@ -36,8 +36,8 @@ mod plugins;
 mod rpc;
 mod window;
 use window::{
-    show_connection_manager_window, show_lens_manager_window, show_plugin_manager, show_search_bar,
-    show_update_window, show_user_settings, show_wizard_window,
+    show_ask_clippy, show_connection_manager_window, show_lens_manager_window, show_plugin_manager,
+    show_search_bar, show_update_window, show_user_settings, show_wizard_window,
 };
 
 use crate::window::get_searchbar;
@@ -199,6 +199,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 SystemTrayEvent::MenuItemClick { id, .. } => {
                     if let Ok(menu_id) = MenuID::from_str(&id) {
                         match menu_id {
+                            MenuID::ASK_CLIPPY => {
+                                show_ask_clippy(app);
+                            }
                             MenuID::CRAWL_STATUS => {
                                 // Don't block main thread when pausing the crawler.
                                 let item_handle = app.tray_handle().get_item(&id);

@@ -359,7 +359,7 @@ pub async fn wizard_finished(
     }
 
     // close wizard window
-    if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
+    if let Some(window) = win.get_window(crate::constants::Windows::Wizard.as_ref()) {
         let _ = window.close();
         show_discover_window(&window.app_handle());
     }

@@ -1,4 +1,5 @@
 mod admin;
+mod ask_clippy;
 mod connection_manager;
 mod discover;
 mod library;
@@ -11,6 +12,7 @@ mod updater;
 mod wizard;
 
 pub use admin::*;
+pub use ask_clippy::*;
 pub use connection_manager::*;
 pub use discover::*;
 pub use library::*;

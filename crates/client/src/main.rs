@@ -12,8 +12,6 @@ mod constants;
 mod pages;
 mod utils;
 
-use crate::pages::{ProgressPopup, SearchPage, SettingsPage, StartupPage, UpdaterPage, WizardPage};
-
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
 extern "C" {
@@ -95,6 +93,8 @@ extern "C" {
 
 #[derive(Clone, Routable, PartialEq, Eq)]
 pub enum Route {
+    #[at("/ask")]
+    AskClippy,
     #[at("/progress")]
     ProgressPopup,
     #[at("/")]
@@ -174,12 +174,13 @@ pub fn app() -> Html {
 
 fn switch(routes: Route) -> Html {
     match routes {
-        Route::ProgressPopup => html! { <ProgressPopup /> },
-        Route::Search => html! { <SearchPage /> },
-        Route::SettingsPage { tab } => html! { <SettingsPage tab={tab} /> },
-        Route::Startup => html! { <StartupPage /> },
-        Route::Updater => html! { <UpdaterPage /> },
-        Route::WizardRoot => html! { <WizardPage stage={WizardStage::MenubarHelp} /> },
-        Route::Wizard { stage } => html! { <WizardPage stage={stage} /> },
+        Route::AskClippy => html! { <pages::AskClippy /> },
+        Route::ProgressPopup => html! { <pages::ProgressPopup /> },
+        Route::Search => html! { <pages::SearchPage /> },
+        Route::SettingsPage { tab } => html! { <pages::SettingsPage tab={tab} /> },
+        Route::Startup => html! { <pages::StartupPage /> },
+        Route::Updater => html! { <pages::UpdaterPage /> },
+        Route::WizardRoot => html! { <pages::WizardPage stage={WizardStage::MenubarHelp} /> },
+        Route::Wizard { stage } => html! { <pages::WizardPage stage={stage} /> },
     }
 }

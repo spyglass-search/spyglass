@@ -1,3 +1,5 @@
+use strum_macros::{AsRefStr, Display};
+
 pub const INPUT_WIDTH: f64 = 640.0;
 pub const INPUT_Y: f64 = 128.0;
 
@@ -10,9 +12,20 @@ pub const VERSION_CHECK_INTERVAL_S: u64 = 60 * 60 * 6;
 // Check on start & every day for new lenses
 pub const LENS_UPDATE_CHECK_INTERVAL_S: u64 = 60 * 60 * 24;
 
-pub const SEARCH_WIN_NAME: &str = "main";
-pub const SETTINGS_WIN_NAME: &str = "settings_window";
-pub const STARTUP_WIN_NAME: &str = "startup_window";
-pub const UPDATE_WIN_NAME: &str = "update_window";
-pub const WIZARD_WIN_NAME: &str = "wizard_window";
-pub const PROGRESS_WIN_NAME: &str = "progress_window";
+#[derive(AsRefStr, Display)]
+pub enum Windows {
+    #[strum(serialize = "ask_clippy_window")]
+    AskClippy,
+    #[strum(serialize = "progress_window")]
+    ProgressPopup,
+    #[strum(serialize = "main")]
+    SearchBar,
+    #[strum(serialize = "settings_window")]
+    Settings,
+    #[strum(serialize = "startup_window")]
+    Startup,
+    #[strum(serialize = "update_window")]
+    UpdatePopup,
+    #[strum(serialize = "wizard_window")]
+    Wizard,
+}

@@ -9,6 +9,7 @@ use tauri::{MenuItem, Submenu};
 #[derive(Display, Debug, EnumString)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 pub enum MenuID {
+    ASK_CLIPPY,
     CRAWL_STATUS,
     DEV_SHOW_CONSOLE,
     DISCOVER,
@@ -61,6 +62,10 @@ pub fn get_tray_menu(package_info: &PackageInfo, user_settings: &UserSettings) -
 
     tray = tray
         .add_item(show)
+        .add_item(CustomMenuItem::new(
+            MenuID::ASK_CLIPPY.to_string(),
+            "Ask Clippy",
+        ))
         .add_item(pause)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
