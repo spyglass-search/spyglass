@@ -23,3 +23,10 @@ opt-level = "s"
 [profile.sentry]
 inherits = "dev"
 debug = true
+
+# NOTE: Fixes an issue running ggml in debug mode on windows
+[profile.dev.package.ggml-raw]
+opt-level = 3
+
+[profile.dev.package.llama-rs]
+opt-level = 3
