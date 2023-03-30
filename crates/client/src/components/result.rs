@@ -10,6 +10,7 @@ use shared::{
 };
 use url::Url;
 use wasm_bindgen::{prelude::Closure, JsValue};
+use web_sys::HtmlInputElement;
 use yew::{platform::spawn_local, prelude::*};
 use yew_router::Routable;
 
@@ -350,9 +351,10 @@ pub fn feedback_result(props: &FeedbackProps) -> Html {
 
 pub struct LLMResult {
     clippy_input_ref: NodeRef,
-    tokens: String,
-    listeners: Vec<JsValue>,
     in_progress: bool,
+    listeners: Vec<JsValue>,
+    status: Option<String>,
+    tokens: Option<String>,
 }
 
 pub enum LLMResultMsg {
@@ -360,6 +362,7 @@ pub enum LLMResultMsg {
     AskClippy,
     SetInProgress(bool),
     SetError(String),
+    SetStatus(String),
     UpdateTokens(String),
 }
 
@@ -376,11 +379,18 @@ impl Component for LLMResult {
             spawn_local(async move {
                 let link_cb = link.clone();
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-                    console_dbg!("received payload: ", payload);
-                    if let Ok(res) = from_value::<ListenPayload<LLMResponsePayload>>(payload) {
-                        match &res.payload {
-                            LLMResponsePayload::Loading => {
-                                link_cb.send_message(LLMResultMsg::SetInProgress(true));
+                    match from_value::<ListenPayload<LLMResponsePayload>>(payload) {
+                        Ok(res) => match &res.payload {
+                            LLMResponsePayload::LoadingModel => {
+                                link_cb.send_message_batch(vec![
+                                    LLMResultMsg::SetInProgress(true),
+                                    LLMResultMsg::SetStatus("Loading model...".into()),
+                                ]);
+                            }
+                            LLMResponsePayload::LoadingPrompt => {
+                                link_cb.send_message(LLMResultMsg::SetStatus(
+                                    "Running inference...".into(),
+                                ));
                             }
                             LLMResponsePayload::Token(c) => {
                                 link_cb.send_message(LLMResultMsg::UpdateTokens(c.to_owned()));
@@ -391,9 +401,10 @@ impl Component for LLMResult {
                             LLMResponsePayload::Error(err) => {
                                 link_cb.send_message(LLMResultMsg::SetError(err.to_owned()));
                             }
+                        },
+                        Err(err) => {
+                            console_dbg!("unable to parse LLMResult: {}", err);
                         }
-                    } else {
-                        console_dbg!("danger will robnison");
                     }
                 }) as Box<dyn Fn(JsValue)>);
 
@@ -407,9 +418,10 @@ impl Component for LLMResult {
 
         Self {
             clippy_input_ref: NodeRef::default(),
-            tokens: String::new(),
-            listeners: Vec::new(),
             in_progress: false,
+            listeners: Vec::new(),
+            tokens: None,
+            status: None,
         }
     }
 
@@ -427,18 +439,23 @@ impl Component for LLMResult {
             }
             LLMResultMsg::AskClippy => {
                 self.in_progress = true;
-                spawn_local(async move {
-                    let res = tauri_invoke::<AskClippyRequest, ()>(
-                        event::ClientInvoke::AskClippy,
-                        AskClippyRequest {
-                            question: "what is an alpaca?".into(),
-                            docs: [].into(),
-                        },
-                    )
-                    .await;
-                    console_dbg!(res);
-                });
-                true
+                if let Some(el) = self.clippy_input_ref.cast::<HtmlInputElement>() {
+                    let question = el.value();
+                    spawn_local(async move {
+                        let res = tauri_invoke::<AskClippyRequest, ()>(
+                            event::ClientInvoke::AskClippy,
+                            AskClippyRequest {
+                                question,
+                                docs: [].into(),
+                            },
+                        )
+                        .await;
+                        console_dbg!(res);
+                    });
+                    true
+                } else {
+                    false
+                }
             }
             LLMResultMsg::SetError(err) => {
                 gloo::console::error!("LLM error: {}", err);
@@ -448,8 +465,16 @@ impl Component for LLMResult {
                 self.in_progress = in_progress;
                 true
             }
+            LLMResultMsg::SetStatus(status) => {
+                self.status = Some(status);
+                true
+            }
             LLMResultMsg::UpdateTokens(token) => {
-                self.tokens += &token;
+                if let Some(tokens) = self.tokens.as_mut() {
+                    tokens.push_str(&token);
+                } else {
+                    self.tokens = Some(token);
+                }
                 true
             }
         }
@@ -471,12 +496,20 @@ impl Component for LLMResult {
                         size={btn::BtnSize::Lg}
                         onclick={link.callback(|_| LLMResultMsg::AskClippy)}
                     >
-                        { if self.in_progress { "..." } else { "Ask"} }
+                        {
+                            if self.in_progress {
+                                html! { <icons::RefreshIcon animate_spin={true} /> }
+                            } else {
+                                html! { <div>{"Ask"}</div> }
+                            }
+                        }
                     </btn::Btn>
                 </div>
-                <div>
-                    { if !self.tokens.is_empty() {
-                        html! { <div>{self.tokens.clone()}</div> }
+                <div class="text-sm">
+                    { if let Some(tokens) = self.tokens.clone() {
+                        html! { <div>{tokens.clone()}</div> }
+                    } else if let Some(status) = self.status.clone() {
+                        html! { <div>{status.clone()}</div> }
                     } else { html! {} }}
                 </div>
             </div>

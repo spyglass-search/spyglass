@@ -6701,6 +6701,7 @@ name = "spyglass-clippy"
 version = "0.1.0"
 dependencies = [
  "llama-rs",
+ "log",
  "rand 0.8.5",
  "tokio",
 ]

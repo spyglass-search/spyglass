@@ -1,4 +1,8 @@
-use std::{convert::Infallible, path::PathBuf, sync::{Arc, Mutex}};
+use std::{
+    convert::Infallible,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::mpsc;
 
 use llama_rs::{
@@ -9,6 +13,8 @@ use rand::SeedableRng;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenResult {
+    LoadingModel,
+    LoadingPrompt,
     EndOfText,
     Error(String),
     Token(String),
@@ -67,7 +73,9 @@ pub fn unleash_clippy(
         // Now we spawn using tokio so that async sends using the channel are handled
         // correctly.
         handle.spawn_blocking(move || {
-            run_model(model, stream.clone(), &prompt, doc_context, output_prompt).expect("unable to prompt")
+            let _ = stream.send(TokenResult::LoadingModel);
+            run_model(model, stream.clone(), &prompt, doc_context, output_prompt)
+                .expect("unable to prompt")
         });
     });
 
@@ -75,7 +83,7 @@ pub fn unleash_clippy(
 }
 
 fn run_model(
-    model: PathBuf,
+    model_path: PathBuf,
     stream: mpsc::UnboundedSender<TokenResult>,
     prompt: &str,
     doc_context: Option<Vec<String>>,
@@ -104,33 +112,39 @@ fn run_model(
         }
     };
 
-    let (model, vocab) = llama_rs::Model::load(model, 2048, |progress| match progress {
-        LoadProgress::HyperparametersLoaded(hparams) => {
-            println!("Loaded HyperParams {hparams:#?}")
-        }
-        LoadProgress::ContextSize { bytes } => println!(
-            "ggml ctx size = {:.2} MB\n",
-            bytes as f64 / (1024.0 * 1024.0)
-        ),
-        LoadProgress::MemorySize { bytes, n_mem } => println!(
-            "Memory size: {} MB {}",
-            bytes as f32 / 1024.0 / 1024.0,
-            n_mem
-        ),
-        LoadProgress::PartTensorLoaded {
-            file: _,
-            current_tensor,
-            tensor_count,
-        } => {
-            if current_tensor % 20 == 0 || current_tensor == tensor_count {
-                let percent = ((current_tensor as f32 * 100f32) / tensor_count as f32) as u8;
-                println!("{}/{} ({}%)", current_tensor, tensor_count, percent);
+    let (model, vocab) =
+        llama_rs::Model::load(model_path.clone(), 2048, |progress| match progress {
+            LoadProgress::HyperparametersLoaded(hparams) => {
+                log::debug!("Loaded HyperParams {hparams:#?}")
             }
-        }
-        _ => {}
-    })?;
+            LoadProgress::ContextSize { bytes } => log::debug!(
+                "ggml ctx size = {:.2} MB\n",
+                bytes as f64 / (1024.0 * 1024.0)
+            ),
+            LoadProgress::MemorySize { bytes, n_mem } => log::debug!(
+                "Memory size: {} MB {}",
+                bytes as f32 / 1024.0 / 1024.0,
+                n_mem
+            ),
+            LoadProgress::PartTensorLoaded {
+                file: _,
+                current_tensor,
+                tensor_count,
+            } => {
+                if current_tensor % 20 == 0 || current_tensor == tensor_count {
+                    let percent = ((current_tensor as f32 * 100f32) / tensor_count as f32) as u8;
+                    log::debug!("{}/{} ({}%)", current_tensor, tensor_count, percent);
+                }
+            }
+            _ => {}
+        })?;
 
-    println!("Model loaded fully");
+    log::debug!("`{:?}` model loaded", model_path.display());
+    let tx = stream.clone();
+    tokio::spawn(async move {
+        let _ = tx.send(TokenResult::LoadingPrompt);
+    });
+
     let mut rng = rand::rngs::StdRng::from_entropy();
     let mut session = model.start_session(inference_session_params);
 
@@ -212,7 +226,6 @@ mod test {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         let recv_task = tokio::spawn(async move {
-            println!("WAITING FOR CONTENT");
             let mut generated = String::new();
             while let Some(msg) = rx.recv().await {
                 match msg {
@@ -226,6 +239,7 @@ mod test {
                         break;
                     }
                     TokenResult::EndOfText => break,
+                    _ => {}
                 }
             }
         });
@@ -267,6 +281,7 @@ mod test {
                 TokenResult::Token(c) => generated.push_str(&c),
                 TokenResult::Error(msg) => eprintln!("Received an error: {}", msg),
                 TokenResult::EndOfText => {}
+                _ => {}
             }
         }
     }

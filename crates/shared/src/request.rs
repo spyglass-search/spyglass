@@ -67,6 +67,7 @@ pub struct AskClippyRequest {
 pub enum LLMResponsePayload {
     Error(String),
     Finished,
-    Loading,
+    LoadingModel,
+    LoadingPrompt,
     Token(String),
 }

@@ -155,44 +155,47 @@ pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(),
             // Spawn a task to send tokens to frontend
             tokio::spawn(async move {
                 while let Some(msg) = rx.recv().await {
-                    match msg {
+                    let mut finished = false;
+                    let payload = match msg {
+                        TokenResult::LoadingModel => {
+                            serde_json::to_string(&LLMResponsePayload::LoadingModel)
+                                .expect("Unable to serialize LLMResponse payload")
+                        }
+                        TokenResult::LoadingPrompt => {
+                            serde_json::to_string(&LLMResponsePayload::LoadingPrompt)
+                                .expect("Unable to serialize LLMResponse payload")
+                        }
                         TokenResult::Token(c) => {
-                            let payload = serde_json::to_string(&LLMResponsePayload::Token(c))
-                                .expect("Unable to serialize LLMResponse payload");
-                            s2.publish_event(&RpcEvent {
-                                event_type: RpcEventType::LLMResponse,
-                                payload,
-                            })
-                            .await;
+                            serde_json::to_string(&LLMResponsePayload::Token(c))
+                                .expect("Unable to serialize LLMResponse payload")
                         }
                         TokenResult::Error(msg) => {
                             log::warn!("Received an error: {}", msg);
-                            let payload = serde_json::to_string(&LLMResponsePayload::Error(msg))
-                                .expect("Unable to serialize LLMResponse payload");
-                            s2.publish_event(&RpcEvent {
-                                event_type: RpcEventType::LLMResponse,
-                                payload,
-                            })
-                            .await;
-
-                            break;
+                            finished = true;
+                            serde_json::to_string(&LLMResponsePayload::Error(msg))
+                                .expect("Unable to serialize LLMResponse payload")
                         }
                         TokenResult::EndOfText => {
-                            let payload = serde_json::to_string(&LLMResponsePayload::Finished)
-                                .expect("Unable to serialize LLMResponse payload");
-                            s2.publish_event(&RpcEvent {
-                                event_type: RpcEventType::LLMResponse,
-                                payload,
-                            })
-                            .await;
-                            break;
+                            finished = true;
+                            serde_json::to_string(&LLMResponsePayload::Finished)
+                                .expect("Unable to serialize LLMResponse payload")
                         }
+                    };
+
+                    s2.publish_event(&RpcEvent {
+                        event_type: RpcEventType::LLMResponse,
+                        payload,
+                    })
+                    .await;
+
+                    if finished {
+                        break;
                     }
                 }
             });
 
             // Spawn the clippy LLM
-            if let Err(err) = unleash_clippy(model_path, tx, "what is an alpaca?", None, false) {
+            if let Err(err) = unleash_clippy(model_path, tx, &params.question, None, false) {
                 log::warn!("Unable to complete clippy: {}", err);
             }
         });
