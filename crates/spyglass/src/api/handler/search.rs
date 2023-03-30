@@ -138,11 +138,6 @@ fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> S
 }
 
 /// Ask clippy about a set of documents
-<<<<<<< HEAD
-#[instrument(skip(_state))]
-pub async fn ask_clippy(_state: AppState, params: request::AskClippyRequest) -> Result<(), Error> {
-    log::debug!("ask_clippy: {:?}", params);
-=======
 #[instrument(skip(state))]
 pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(), Error> {
     // Assumes a valid model has been downloaded and ready to go
@@ -207,7 +202,6 @@ pub async fn ask_clippy(state: AppState, params: AskClippyRequest) -> Result<(),
         log::warn!("LLM request already underway");
     }
 
->>>>>>> b42f438 (add an ask_clippy API endpoint & pipe results from llm question back to frontend as they occur)
     Ok(())
 }
 
