@@ -46,7 +46,9 @@ type RateLimit = RateLimiter<String, DashMapStateStore<String>, QuantaClock>;
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
 
 // TODO: Detect num of cpus & determine from there?
+// should probably make these configurable as well
 const AUDIO_TRANSCRIPTION_LIMIT: usize = 2;
+const FILE_PROCESSING_LIMIT: usize = 4;
 
 #[derive(Debug, Error)]
 pub enum CrawlError {
@@ -515,30 +517,32 @@ async fn _process_file(
     let mut tags = Vec::new();
 
     if let Some(ext) = ext {
+        let extension = SupportedExt::from_ext(&ext.to_string_lossy());
+
+        // Limit check
+        let limit = match &extension {
+            SupportedExt::Audio(_) => Some((FetchLimitType::Audio, AUDIO_TRANSCRIPTION_LIMIT)),
+            SupportedExt::Code(_) | SupportedExt::Document(_) | SupportedExt::Text(_) => {
+                Some((FetchLimitType::File, FILE_PROCESSING_LIMIT))
+            }
+            _ => None,
+        };
+
+        if let Some((limit_type, limit)) = &limit {
+            FetchLimitType::check_and_wait(
+                &state.fetch_limits,
+                limit_type.clone(),
+                *limit,
+                &format!(
+                    "`{}``: at processing limit, waiting til finished!",
+                    file_name
+                ),
+            )
+            .await;
+        }
+
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
             SupportedExt::Audio(_) => {
-                if !state.fetch_limits.contains_key(&FetchLimitType::Audio) {
-                    state.fetch_limits.insert(FetchLimitType::Audio, 0);
-                }
-
-                // Loop until audio transcription is finished
-                while let Some(inflight) =
-                    state.fetch_limits.view(&FetchLimitType::Audio, |_, v| *v)
-                {
-                    if inflight >= AUDIO_TRANSCRIPTION_LIMIT {
-                        log::debug!(
-                            "`{}``: at transcription limit, waiting til finished!",
-                            file_name
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                    } else {
-                        state
-                            .fetch_limits
-                            .alter(&FetchLimitType::Audio, |_, v| v + 1);
-                        break;
-                    }
-                }
-
                 log::debug!("starting transcription for `{}`", file_name);
                 // Attempt to transcribe audio, assumes the model has been downloaded
                 // and ready to go
@@ -586,11 +590,6 @@ async fn _process_file(
                         }
                     }
                 }
-
-                // Say that we're finished
-                state
-                    .fetch_limits
-                    .alter(&FetchLimitType::Audio, |_, v| v - 1);
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
                 Ok(parsed) => {
@@ -609,6 +608,11 @@ async fn _process_file(
             SupportedExt::NotSupported => {
                 log::warn!("File `{:?}` unsupported returning empty content", path);
             }
+        }
+
+        if let Some((limit_type, _)) = &limit {
+            // Say that we're finished
+            state.fetch_limits.alter(limit_type, |_, v| v - 1);
         }
     }
 
