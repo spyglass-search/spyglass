@@ -377,11 +377,11 @@ pub async fn search_lenses(
     }
 
     // brute force add clippy here
-    if param.query.is_empty() || "clippy".starts_with(&param.query) {
+    if param.query.is_empty() || "ask".starts_with(&param.query) {
         results.push(LensResult {
             author: "spyglass-search".into(),
-            name: "clippy".into(),
-            label: "Clippy".into(),
+            name: "Ask".into(),
+            label: "ask".into(),
             description: "Ask questions about your data".into(),
             ..Default::default()
         });

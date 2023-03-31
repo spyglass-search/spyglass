@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{atomic::Ordering, Arc};
 
+use shared::event::SendToAskClippyPayload;
 use shared::request::AskClippyRequest;
 use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
 use tauri::{ClipboardManager, Manager};
 
-use crate::window::show_discover_window;
+use crate::window::{show_ask_clippy, show_discover_window};
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, UserSettings};
@@ -445,4 +446,28 @@ pub async fn ask_clippy(
     } else {
         Err(String::from("Unable to ask clippy"))
     }
+}
+
+// Opens the ask clippy window & immediately submits the question/docs to the model.
+#[tauri::command]
+pub async fn send_to_ask_clippy(
+    win: tauri::Window,
+    question: &str,
+    docs: Vec<String>,
+) -> Result<(), String> {
+    let window = show_ask_clippy(&win.app_handle());
+    // Give the window some time to show up
+    let question = question.to_string();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(256)).await;
+        let _ = window.emit(
+            ClientEvent::SendToAskClippy.as_ref(),
+            SendToAskClippyPayload {
+                question,
+                docs,
+            },
+        );
+    });
+
+    Ok(())
 }

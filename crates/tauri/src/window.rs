@@ -5,7 +5,7 @@ use shared::event::{ClientEvent, ModelStatusPayload};
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{
     AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
-    WindowUrl, WindowEvent,
+    WindowEvent, WindowUrl,
 };
 
 /// Try and detect which monitor the window is on so that we can determine the
@@ -290,13 +290,10 @@ pub fn show_ask_clippy(app: &AppHandle) -> Window {
 
         let handle = app.clone();
         window.on_window_event(move |event| {
-            match event {
-                WindowEvent::CloseRequested { api, .. } => {
-                    let _ = api.prevent_close();
-                    // simply hide the window instead of closing the window
-                    let _ = tauri::AppHandle::hide(&handle);
-                },
-                _ => {}
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                // simply hide the window instead of closing the window
+                let _ = tauri::AppHandle::hide(&handle);
             }
         });
 

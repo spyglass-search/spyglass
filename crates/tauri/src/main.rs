@@ -105,8 +105,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(plugins::lens_updater::init())
         .plugin(plugins::notify::init())
         .plugin(plugins::startup::init())
+        // TODO: Combine some of these into plugins so we don't have a laundry list
         .invoke_handler(tauri::generate_handler![
             cmd::ask_clippy,
+            cmd::send_to_ask_clippy,
             cmd::authorize_connection,
             cmd::choose_folder,
             cmd::copy_to_clipboard,

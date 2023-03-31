@@ -1,6 +1,6 @@
 use gloo::console::console_dbg;
 use serde_wasm_bindgen::from_value;
-use shared::event::{self, ClientEvent, ListenPayload};
+use shared::event::{self, ClientEvent, ListenPayload, SendToAskClippyPayload};
 use shared::request::{AskClippyRequest, LLMResponsePayload};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
@@ -36,7 +36,8 @@ pub struct AskClippy {
 }
 
 pub enum Msg {
-    AskClippy,
+    AskClippy { query: String, docs: Vec<String> },
+    HandleAskRequest,
     HandleResponse(LLMResponsePayload),
     SetError(String),
 }
@@ -94,6 +95,29 @@ impl Component for AskClippy {
             });
         }
 
+        // Listen for events from searchbar
+        {
+            let link = link.clone();
+            spawn_local(async move {
+                let cb = Closure::wrap(Box::new(move |payload: JsValue| {
+                    match from_value::<ListenPayload<SendToAskClippyPayload>>(payload) {
+                        Ok(res) => {
+                            link.send_message(Msg::AskClippy {
+                                query: res.payload.question,
+                                docs: res.payload.docs,
+                            });
+                        }
+                        Err(err) => {
+                            console_dbg!("unable to parse SendToAskClippy: {}", err);
+                        }
+                    }
+                }) as Box<dyn Fn(JsValue)>);
+
+                let _ = crate::listen(ClientEvent::SendToAskClippy.as_ref(), &cb).await;
+                cb.forget();
+            });
+        }
+
         Self {
             clippy_input_ref: NodeRef::default(),
             history: Vec::new(),
@@ -107,7 +131,41 @@ impl Component for AskClippy {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AskClippy => {
+            Msg::AskClippy { query, docs: _ } => {
+                self.in_progress = true;
+                // move existing result to history
+                if let Some(value) = &self.tokens {
+                    self.history.push(HistoryItem {
+                        source: HistorySource::Clippy,
+                        value: value.to_owned(),
+                    })
+                }
+                self.history.push(HistoryItem {
+                    source: HistorySource::User,
+                    value: query.to_string(),
+                });
+
+                self.tokens = None;
+                self.status = None;
+
+                let link = link.clone();
+                spawn_local(async move {
+                    if let Err(err) = tauri_invoke::<AskClippyRequest, ()>(
+                        event::ClientInvoke::AskClippy,
+                        AskClippyRequest {
+                            question: query.to_string(),
+                            docs: [].into(),
+                        },
+                    )
+                    .await
+                    {
+                        link.send_message(Msg::SetError(err));
+                    }
+                });
+
+                true
+            }
+            Msg::HandleAskRequest => {
                 // don't submit multiple requests at a time.
                 if self.in_progress {
                     return false;
@@ -122,41 +180,13 @@ impl Component for AskClippy {
                         return false;
                     }
 
-                    self.in_progress = true;
-                    // move existing result to history
-                    if let Some(value) = &self.tokens {
-                        self.history.push(HistoryItem {
-                            source: HistorySource::Clippy,
-                            value: value.to_owned(),
-                        })
-                    }
-                    self.history.push(HistoryItem {
-                        source: HistorySource::User,
-                        value: query.to_string(),
+                    link.send_message(Msg::AskClippy {
+                        query,
+                        docs: Vec::new(),
                     });
-
-                    self.tokens = None;
-                    self.status = None;
-
-                    let link = link.clone();
-                    gloo::console::log!("ask_clippy: {query}");
-                    spawn_local(async move {
-                        if let Err(err) = tauri_invoke::<AskClippyRequest, ()>(
-                            event::ClientInvoke::AskClippy,
-                            AskClippyRequest {
-                                question: query.to_string(),
-                                docs: [].into(),
-                            },
-                        )
-                        .await
-                        {
-                            link.send_message(Msg::SetError(err));
-                        }
-                    });
-                    true
-                } else {
-                    false
                 }
+
+                true
             }
             Msg::HandleResponse(resp) => {
                 if let Some(history_el) = self.history_ref.cast::<HtmlElement>() {
@@ -206,7 +236,7 @@ impl Component for AskClippy {
                             <btn::Btn
                                 disabled={self.in_progress}
                                 size={btn::BtnSize::Lg}
-                                onclick={link.callback(|_| Msg::AskClippy)}
+                                onclick={link.callback(|_| Msg::HandleAskRequest)}
                             >
                                 {
                                     if self.in_progress {

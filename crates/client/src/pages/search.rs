@@ -2,7 +2,7 @@ use gloo::timers::callback::Timeout;
 use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
 use shared::config::{UserAction, UserActionDefinition, UserActionSettings};
-use shared::event::CopyContext;
+use shared::event::{CopyContext, SendToAskClippyPayload};
 use shared::keyboard::{KeyCode, ModifiersState};
 use shared::response::SearchResultTemplate;
 use std::str::FromStr;
@@ -226,14 +226,24 @@ impl SearchPage {
     }
 
     fn handle_default_selected(&mut self, link: &Scope<Self>) {
-        // Grab the currently selected item
-        if !self.docs_results.is_empty() {
+        if self.lens.contains(&"ask".to_string()) {
+            let question = self.query.to_string();
+            link.send_message(Msg::ClearQuery);
+            spawn_local(async move {
+                let res = tauri_invoke::<SendToAskClippyPayload, ()>(ClientInvoke::SendToAskClippy, SendToAskClippyPayload {
+                    question,
+                    docs: Vec::new()
+                }).await;
+            });
+        } else if !self.docs_results.is_empty() {
+            // Grab the currently selected item
             if let Some(selected) = self.docs_results.get(self.selected_idx) {
                 link.send_message(Msg::OpenResult(selected.to_owned()));
             }
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
             self.lens.push(selected.label.to_string());
+            self.result_display = ResultDisplay::None;
             // Clear query string,
             link.send_message(Msg::ClearQuery);
         }
@@ -728,6 +738,11 @@ impl Component for SearchPage {
             }
             Msg::SearchDocs => {
                 let lenses = self.lens.clone();
+                // don't run search if we're doing a quick clippy search
+                if lenses.contains(&"ask".to_string()) {
+                    return false;
+                }
+
                 let query = self.query.clone();
                 self.is_searching = true;
                 link.send_future(async move {

@@ -20,6 +20,7 @@ pub enum ClientEvent {
     RefreshLensLibrary,
     RefreshPluginManager,
     RefreshSearchResults,
+    SendToAskClippy,
     StartupProgress,
     UpdateLensFinished,
 }
@@ -28,6 +29,8 @@ pub enum ClientEvent {
 pub enum ClientInvoke {
     #[strum(serialize = "ask_clippy")]
     AskClippy,
+    #[strum(serialize = "send_to_ask_clippy")]
+    SendToAskClippy,
     #[strum(serialize = "authorize_connection")]
     AuthorizeConnection,
     #[strum(serialize = "choose_folder")]
@@ -141,4 +144,10 @@ pub struct NavigateParams {
 pub struct ModelStatusPayload {
     pub msg: String,
     pub percent: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SendToAskClippyPayload {
+    pub question: String,
+    pub docs: Vec<String>,
 }
