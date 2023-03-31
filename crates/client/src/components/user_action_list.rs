@@ -1,7 +1,6 @@
 use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
 use crate::components::{KeyComponent, ModifierIcon};
 use crate::{tauri_invoke, utils};
-use gloo::console::log;
 use gloo::utils::window;
 use shared::accelerator;
 use shared::config::{self, UserAction, UserActionDefinition};
@@ -151,24 +150,16 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
 /// Helper used to execute the specified user action
 pub async fn execute_action(selected: SearchResult, action: UserActionDefinition) {
     let template_input = SearchResultTemplate::from(selected);
+    let mut reg = handlebars::Handlebars::new();
+    reg.register_escape_fn(handlebars::no_escape);
 
-    log!(&template_input.url_parent);
     match action.action {
         UserAction::OpenApplication(app_path, argument) => {
-            log!("OpenApplication: {} - {}", &app_path, &argument);
-            let reg = handlebars::Handlebars::new();
             let url = match reg.render_template(argument.as_str(), &template_input) {
-                Ok(val) => {
-                    log!(format!("VLAUE: {}", val));
-                    val
-                },
-                Err(err) => {
-                    log!(format!("render_error: {:?}", err));
-                    template_input.url.clone()
-                },
+                Ok(val) => val,
+                Err(_) => template_input.url.clone(),
             };
 
-            log!(format!("URL: {}", &url));
             spawn_local(async move {
                 if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
                     ClientInvoke::OpenResult,
@@ -179,12 +170,12 @@ pub async fn execute_action(selected: SearchResult, action: UserActionDefinition
                 )
                 .await
                 {
-                    log!(format!("ERROR: {}", err));
+                    let window = window();
+                    let _ = window.alert_with_message(&err);
                 }
             });
         }
         UserAction::CopyToClipboard(copy_template) => {
-            let reg = handlebars::Handlebars::new();
             let copy_txt = match reg.render_template(copy_template.as_str(), &template_input) {
                 Ok(val) => val,
                 Err(_) => template_input.url.clone(),

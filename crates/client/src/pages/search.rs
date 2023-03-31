@@ -1,4 +1,3 @@
-use gloo::console::log;
 use gloo::timers::callback::Timeout;
 use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
@@ -170,7 +169,6 @@ impl SearchPage {
 
     fn open_result(&mut self, selected: &SearchResult) {
         let url = selected.url.clone();
-        log!("open url: {}", url.clone());
         spawn_local(async move {
             if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
                 ClientInvoke::OpenResult,
