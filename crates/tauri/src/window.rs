@@ -5,7 +5,7 @@ use shared::event::{ClientEvent, ModelStatusPayload};
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{
     AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
-    WindowUrl,
+    WindowUrl, WindowEvent,
 };
 
 /// Try and detect which monitor the window is on so that we can determine the
@@ -272,11 +272,11 @@ pub fn show_wizard_window(app: &AppHandle) {
     show_window(&window);
 }
 
-pub fn show_ask_clippy(app: &AppHandle) {
+pub fn show_ask_clippy(app: &AppHandle) -> Window {
     let window = if let Some(window) = app.get_window(Windows::AskClippy.as_ref()) {
         window
     } else {
-        WindowBuilder::new(
+        let window = WindowBuilder::new(
             app,
             Windows::AskClippy.to_string(),
             WindowUrl::App("/ask".into()),
@@ -286,10 +286,25 @@ pub fn show_ask_clippy(app: &AppHandle) {
         .inner_size(480.0, 640.0)
         .min_inner_size(240.0, 320.0)
         .build()
-        .expect("Unable to build window for AskClippy")
+        .expect("Unable to build window for AskClippy");
+
+        let handle = app.clone();
+        window.on_window_event(move |event| {
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let _ = api.prevent_close();
+                    // simply hide the window instead of closing the window
+                    let _ = tauri::AppHandle::hide(&handle);
+                },
+                _ => {}
+            }
+        });
+
+        window
     };
 
     show_window(&window);
+    window
 }
 
 pub fn alert(window: &Window, title: &str, message: &str) {

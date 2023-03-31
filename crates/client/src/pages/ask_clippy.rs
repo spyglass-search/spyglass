@@ -4,7 +4,7 @@ use shared::event::{self, ClientEvent, ListenPayload};
 use shared::request::{AskClippyRequest, LLMResponsePayload};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
-use web_sys::{HtmlInputElement, HtmlElement};
+use web_sys::{HtmlElement, HtmlInputElement};
 use yew::html::Scope;
 use yew::platform::spawn_local;
 use yew::prelude::*;
