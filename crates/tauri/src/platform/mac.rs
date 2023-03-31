@@ -22,20 +22,24 @@ pub fn hide_search_bar(window: &Window) {
 pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
     let open_url = if url.scheme() == "file" {
         use shared::url_to_file_path;
-        url_to_file_path(url.path(), false)
+        let file_path = url.to_file_path().unwrap_or_else(|_| url.path().into());
+        url_to_file_path(&file_path.display().to_string(), false)
     } else {
         url.to_string()
     };
 
     if let Some(application) = application {
-        match open::with(open_url, application) {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(err.to_string())),
+        if application != "open" {
+            return match open::with(open_url, application) {
+                Ok(_) => Ok(()),
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
+            };
         }
-    } else {
-        match open::that(open_url) {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(err.to_string())),
-        }
+    }
+
+    log::debug!("open_url: {}", open_url);
+    match open::that(open_url) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(anyhow::anyhow!(err.to_string())),
     }
 }

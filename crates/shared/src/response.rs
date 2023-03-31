@@ -162,6 +162,7 @@ pub struct SearchResultTemplate {
     pub score: f32,
     pub url_schema: String,
     pub url_userinfo: String,
+    pub url_parent: String,
     pub url_port: u16,
     pub url_path: Vec<String>,
     pub url_path_length: u32,
@@ -184,14 +185,20 @@ impl From<SearchResult> for SearchResultTemplate {
             url_userinfo: String::from(""),
             url_port: 0,
             url_path: Vec::new(),
+            url_parent: String::from(""),
             url_path_length: 0,
             url_query: String::from(""),
         };
+
+        if let Some((parent, _)) = value.url.rsplit_once('/') {
+            result.url_parent = parent.to_string();
+        }
 
         if let Ok(mut url) = Url::parse(&value.url) {
             result.url_schema = url.scheme().to_owned();
             result.url_userinfo = url.username().to_owned();
             result.url_port = url.port().unwrap_or(0);
+
             if let Some(segments) = url.path_segments().map(|c| c.collect::<Vec<_>>()) {
                 result.url_path = segments
                     .iter()

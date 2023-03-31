@@ -1,10 +1,9 @@
+use gloo::console::log;
 use gloo::timers::callback::Timeout;
 use gloo::{events::EventListener, utils::window};
 use num_format::{Buffer, Locale};
-use shared::config::{UserAction, UserActionDefinition, UserActionSettings};
-use shared::event::CopyContext;
+use shared::config::{UserActionDefinition, UserActionSettings};
 use shared::keyboard::{KeyCode, ModifiersState};
-use shared::response::SearchResultTemplate;
 use std::str::FromStr;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
@@ -16,13 +15,15 @@ use shared::{
     response::{self, SearchMeta, SearchResult, SearchResults},
 };
 
-use crate::components::user_action_list::{self, ActionsList, DEFAULT_ACTION_LABEL};
+use crate::components::user_action_list::{self, ActionListBtn, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
     icons,
     result::{FeedbackResult, LensResultItem, SearchResultItem},
     KeyComponent, SelectedLens,
 };
-use crate::{invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils};
+use crate::{
+    components, invoke, listen, resize_window, search_docs, search_lenses, tauri_invoke, utils,
+};
 
 #[wasm_bindgen]
 extern "C" {
@@ -84,33 +85,26 @@ pub struct SearchPage {
 }
 
 impl SearchPage {
-    // Helper to access the currently configured user actions
+    /// Helper to access the currently configured user actions
     async fn fetch_user_actions() -> UserActionSettings {
-        match invoke(ClientInvoke::LoadUserActions.as_ref(), JsValue::NULL).await {
-            Ok(results) => match serde_wasm_bindgen::from_value(results) {
-                Ok(parsed) => parsed,
-                Err(e) => {
-                    log::error!("Unable to deserialize results: {}", e.to_string());
-                    UserActionSettings::default()
-                }
-            },
+        match tauri_invoke::<(), UserActionSettings>(ClientInvoke::LoadUserActions, ()).await {
+            Ok(parsed) => parsed,
             Err(e) => {
-                log::error!("Error fetching user settings: {:?}", e);
+                log::error!("Unable to fetch user actions: {e}");
                 UserActionSettings::default()
             }
         }
     }
 
+    /// Get list of actions applicable to the current set of results
     fn get_action_list(&self) -> Vec<UserActionDefinition> {
         let mut actions = Vec::new();
         if let Some(settings) = &self.action_settings {
-            if !self.docs_results.is_empty() {
-                if let Some(context) = self.docs_results.get(self.selected_idx) {
-                    for ctx_action in &settings.context_actions {
-                        if ctx_action.is_applicable(context) {
-                            for act in &ctx_action.actions {
-                                actions.push(act.clone());
-                            }
+            if let Some(context) = self.docs_results.get(self.selected_idx) {
+                for ctx_action in &settings.context_actions {
+                    if ctx_action.is_applicable(context) {
+                        for act in &ctx_action.actions {
+                            actions.push(act.clone());
                         }
                     }
                 }
@@ -123,106 +117,41 @@ impl SearchPage {
         actions
     }
 
-    // Helper used to execute the specified user action
-    async fn execute_action(
-        action: UserActionDefinition,
-        selected: SearchResult,
-        link: Scope<Self>,
-    ) {
-        let template_input = SearchResultTemplate::from(selected);
-        match action.action {
-            UserAction::OpenApplication(app_path, argument) => {
-                let reg = handlebars::Handlebars::new();
-                let url = match reg.render_template(argument.as_str(), &template_input) {
-                    Ok(val) => val,
-                    Err(_) => template_input.url.clone(),
-                };
-                Timeout::new(350, move || {
-                    spawn_local(async move {
-                        link.send_message(Msg::UserActionComplete(action.label.clone()));
-                    });
-                })
-                .forget();
-                spawn_local(async move {
-                    if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
-                        ClientInvoke::OpenResult,
-                        OpenResultParams {
-                            url,
-                            application: Some(app_path.clone()),
-                        },
-                    )
-                    .await
-                    {
-                        let window = window();
-                        let _ = window.alert_with_message(&err);
-                    }
-                });
-            }
-            UserAction::CopyToClipboard(copy_template) => {
-                let reg = handlebars::Handlebars::new();
-                let copy_txt = match reg.render_template(copy_template.as_str(), &template_input) {
-                    Ok(val) => val,
-                    Err(_) => template_input.url.clone(),
-                };
-                Timeout::new(350, move || {
-                    spawn_local(async move {
-                        link.send_message(Msg::UserActionComplete(action.label.clone()));
-                    });
-                })
-                .forget();
-
-                spawn_local(async move {
-                    if let Err(err) = tauri_invoke::<CopyContext, ()>(
-                        ClientInvoke::CopyToClipboard,
-                        CopyContext { txt: copy_txt },
-                    )
-                    .await
-                    {
-                        let window = window();
-                        let _ = window.alert_with_message(&err);
-                    }
-                });
-            }
-        }
-    }
-
     fn handle_selection(&mut self, link: &Scope<Self>) -> bool {
-        if self.show_actions {
-            if self.selected_action_idx == 0 {
-                self.handle_default_selected(link);
+        if self.show_actions && self.selected_action_idx != 0 {
+            let actions = self.get_action_list();
+            if let Some(action) = actions.get(self.selected_action_idx.max(1) - 1) {
+                self.handle_selected_action(action, link);
+                return true;
             } else {
-                let actions = self.get_action_list();
-                if let Some(action) = actions.get(self.selected_action_idx.max(1) - 1) {
-                    self.handle_selected_action(action, link);
-                    return true;
-                } else {
-                    self.handle_default_selected(link);
-                }
+                self.handle_default_selected(link);
             }
         } else {
             self.handle_default_selected(link);
         }
+
         false
     }
 
     fn handle_selected_action(&mut self, action: &UserActionDefinition, link: &Scope<Self>) {
-        let context = self.docs_results.get(self.selected_idx);
-        let exec_context = context.cloned();
-        match &action.status_msg {
-            Some(status) => {
-                self.executed_action = Some(status.clone());
-            }
-            None => {
-                self.executed_action = Some(format!("Executing {}", action.label));
-            }
+        if let Some(selected) = self.docs_results.get(self.selected_idx) {
+            self.executed_action = match &action.status_msg {
+                Some(status) => Some(status.clone()),
+                None => Some(format!("Executing {}", action.label)),
+            };
+
+            let action_def = action.clone();
+            let link = link.clone();
+            let selected = selected.clone();
+            spawn_local(async move {
+                let label = &action_def.label.clone();
+                components::user_action_list::execute_action(selected, action_def).await;
+                link.send_message(Msg::UserActionComplete(label.to_owned()));
+            });
+
+            self.show_actions = false;
+            self.selected_action_idx = 0;
         }
-        let action_def = action.clone();
-        let link = link.clone();
-        spawn_local(async move {
-            SearchPage::execute_action(action_def, exec_context.unwrap(), link).await;
-        });
-        self.show_actions = false;
-        self.selected_action_idx = 0;
     }
 
     fn handle_default_selected(&mut self, link: &Scope<Self>) {
@@ -241,7 +170,7 @@ impl SearchPage {
 
     fn open_result(&mut self, selected: &SearchResult) {
         let url = selected.url.clone();
-        log::info!("open url: {}", url);
+        log!("open url: {}", url.clone());
         spawn_local(async move {
             if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
                 ClientInvoke::OpenResult,
@@ -320,13 +249,7 @@ impl Component for SearchPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link();
-
-        // Setup user actions
-        {
-            link.send_future(async {
-                Msg::SetCurrentActions(SearchPage::fetch_user_actions().await)
-            });
-        }
+        link.send_future(async { Msg::SetCurrentActions(SearchPage::fetch_user_actions().await) });
 
         // Listen to onblur events so we can hide the search bar
         {
@@ -448,20 +371,19 @@ impl Component for SearchPage {
                 false
             }
             Msg::Blur => {
-                let link = link.clone();
-                self.show_actions = false;
-                self.selected_action_idx = 0;
-                // Handle the hide as a timeout since there's a brief moment when
-                // alt-tabbing / clicking on the task will yield a blur event & then a
-                // focus event.
-                let handle = Timeout::new(100, move || {
-                    spawn_local(async move {
-                        let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
-                        link.send_message(Msg::ClearQuery);
-                    });
-                });
-
-                self.blur_timeout = Some(handle.forget());
+                // let link = link.clone();
+                // self.show_actions = false;
+                // self.selected_action_idx = 0;
+                // // Handle the hide as a timeout since there's a brief moment when
+                // // alt-tabbing / clicking on the task will yield a blur event & then a
+                // // focus event.
+                // let handle = Timeout::new(100, move || {
+                //     spawn_local(async move {
+                //         let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
+                //         link.send_message(Msg::ClearQuery);
+                //     });
+                // });
+                // self.blur_timeout = Some(handle.forget());
                 false
             }
             Msg::Focus => {
@@ -908,50 +830,6 @@ impl Component for SearchPage {
             }
         };
 
-        let action_button = if self.search_meta.is_some() {
-            let classes = classes!(
-                "flex",
-                "flex-row",
-                "items-center",
-                "border-l",
-                "text-sm",
-                "text-neutral-500",
-                "border-neutral-700",
-                "px-3",
-                "ml-3",
-                "h-8",
-                if self.action_menu_button_selected || self.show_actions {
-                    "bg-stone-800"
-                } else {
-                    "bg-neutral-900"
-                },
-                "hover:bg-stone-800",
-            );
-
-            html! {
-                <button class={classes}
-                  onclick={link.callback(|_| Msg::ToggleShowActions)}>
-                  <KeyComponent>{"ENTER"}</KeyComponent>
-                  <span class="ml-1">{"to open."}</span>
-                </button>
-            }
-        } else {
-            html! {}
-        };
-
-        let action_details = if self.show_actions
-            && (!self.docs_results.is_empty() || !self.lens_results.is_empty())
-        {
-            let action_list = self.get_action_list();
-            html! {
-               <ActionsList actions={action_list}
-                selected_action={self.selected_action_idx}
-                onclick={link.callback(Msg::UserActionSelected)} />
-            }
-        } else {
-            html! {}
-        };
-
         html! {
             <div ref={self.search_wrapper_ref.clone()}
                 class="relative overflow-hidden rounded-xl border-neutral-600 border"
@@ -984,12 +862,21 @@ impl Component for SearchPage {
                     }
                 }
                 <div class="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
-                  <div class="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
-                      {search_meta}
-                  </div>
-                  {action_button}
-                </div>
-               {action_details}
+                    <div class="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
+                        {search_meta}
+                    </div>
+                    <ActionListBtn
+                        show={self.search_meta.is_some()}
+                        is_active={self.action_menu_button_selected || self.show_actions}
+                        onclick={link.callback(|_| Msg::ToggleShowActions)}
+                    />
+               </div>
+               <ActionsList
+                    show={self.show_actions}
+                    actions={self.get_action_list()}
+                    selected_action={self.selected_action_idx}
+                    onclick={link.callback(Msg::UserActionSelected)}
+                />
             </div>
         }
     }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
@@ -7,7 +8,8 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
 use tauri::{ClipboardManager, Manager};
 
-use crate::window::show_discover_window;
+use crate::constants::TabLocation;
+use crate::window::navigate_to_tab;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, UserSettings};
@@ -87,6 +89,7 @@ pub async fn open_result(
                 let _ = url.set_host(None);
             }
 
+            log::debug!("{:?} - {:?}", url, application);
             if let Err(err) = os_open(&url, application) {
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
                 return Err(err.to_string());
@@ -360,7 +363,10 @@ pub async fn wizard_finished(
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
         let _ = window.close();
-        show_discover_window(&window.app_handle());
+        navigate_to_tab(
+            &window.app_handle(),
+            &crate::constants::TabLocation::Discover,
+        );
     }
 
     Ok(())
@@ -419,6 +425,9 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
 
 #[tauri::command]
 pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
-    super::window::_show_tab(&win.app_handle(), &page);
+    if let Ok(tab_loc) = TabLocation::from_str(&page) {
+        super::window::navigate_to_tab(&win.app_handle(), &tab_loc);
+    }
+
     Ok(())
 }
