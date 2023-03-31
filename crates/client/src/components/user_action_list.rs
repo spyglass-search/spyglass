@@ -1,4 +1,4 @@
-use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
+use crate::components::icons::{self, ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
 use crate::components::{KeyComponent, ModifierIcon};
 use crate::{tauri_invoke, utils};
 use gloo::utils::window;
@@ -81,9 +81,14 @@ pub struct ActionIconProps {
 #[function_component(ActionIcon)]
 pub fn action_icon(props: &ActionIconProps) -> Html {
     match props.actiontype {
-        UserAction::OpenUrl(_) | UserAction::OpenApplication(_, _) => {
+        UserAction::OpenApplication(_, _) => {
             html! {
               <ArrowTopRightOnSquare height="h-4" width="w-4"/>
+            }
+        }
+        UserAction::OpenUrl(_) => {
+            html! {
+                <icons::FolderIcon height="h-4" width="w-4" />
             }
         }
         UserAction::CopyToClipboard(_) => {
