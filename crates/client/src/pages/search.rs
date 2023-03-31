@@ -369,19 +369,19 @@ impl Component for SearchPage {
                 false
             }
             Msg::Blur => {
-                // let link = link.clone();
-                // self.show_actions = false;
-                // self.selected_action_idx = 0;
-                // // Handle the hide as a timeout since there's a brief moment when
-                // // alt-tabbing / clicking on the task will yield a blur event & then a
-                // // focus event.
-                // let handle = Timeout::new(100, move || {
-                //     spawn_local(async move {
-                //         let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
-                //         link.send_message(Msg::ClearQuery);
-                //     });
-                // });
-                // self.blur_timeout = Some(handle.forget());
+                let link = link.clone();
+                self.show_actions = false;
+                self.selected_action_idx = 0;
+                // Handle the hide as a timeout since there's a brief moment when
+                // alt-tabbing / clicking on the task will yield a blur event & then a
+                // focus event.
+                let handle = Timeout::new(100, move || {
+                    spawn_local(async move {
+                        let _ = invoke(ClientInvoke::Escape.as_ref(), JsValue::NULL).await;
+                        link.send_message(Msg::ClearQuery);
+                    });
+                });
+                self.blur_timeout = Some(handle.forget());
                 false
             }
             Msg::Focus => {
