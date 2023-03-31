@@ -1,4 +1,4 @@
-use crate::constants::Windows;
+use crate::constants::{TabLocation, Windows};
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
 use shared::event::{ClientEvent, ModelStatusPayload};
@@ -141,14 +141,16 @@ fn show_window(window: &Window) {
     let _ = window.center();
 }
 
-pub fn _show_tab(app: &AppHandle, tab_url: &str) {
+pub fn navigate_to_tab(app: &AppHandle, tab_url: &TabLocation) {
+    let tab_url = tab_url.to_string();
+
     let window = if let Some(window) = app.get_window(Windows::Settings.as_ref()) {
         window
     } else {
         WindowBuilder::new(
             app,
             Windows::Settings.to_string(),
-            WindowUrl::App(tab_url.into()),
+            WindowUrl::App(tab_url.clone().into()),
         )
         .title("Spyglass - Personal Search Engine")
         // Create an empty menu so now menubar shows up on Windows
@@ -160,26 +162,6 @@ pub fn _show_tab(app: &AppHandle, tab_url: &str) {
 
     let _ = window.emit(ClientEvent::Navigate.as_ref(), tab_url);
     show_window(&window);
-}
-
-pub fn show_connection_manager_window(app: &AppHandle) {
-    _show_tab(app, "/settings/connections");
-}
-
-pub fn show_discover_window(app: &AppHandle) {
-    _show_tab(app, "/settings/discover");
-}
-
-pub fn show_lens_manager_window(app: &AppHandle) {
-    _show_tab(app, "/settings/library");
-}
-
-pub fn show_plugin_manager(app: &AppHandle) {
-    _show_tab(app, "/settings/plugins");
-}
-
-pub fn show_user_settings(app: &AppHandle) {
-    _show_tab(app, "/settings/user");
 }
 
 pub fn show_update_window(app: &AppHandle) {

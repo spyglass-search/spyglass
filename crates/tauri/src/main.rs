@@ -36,8 +36,7 @@ mod plugins;
 mod rpc;
 mod window;
 use window::{
-    show_ask_clippy, show_connection_manager_window, show_lens_manager_window, show_plugin_manager,
-    show_search_bar, show_update_window, show_user_settings, show_wizard_window,
+    navigate_to_tab, show_ask_clippy, show_search_bar, show_update_window, show_wizard_window,
 };
 
 use crate::window::get_searchbar;
@@ -212,19 +211,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                             }
                             MenuID::DISCOVER => {
-                                window::show_discover_window(app);
+                                navigate_to_tab(app, &crate::constants::TabLocation::Discover);
                             }
                             MenuID::OPEN_CONNECTION_MANAGER => {
-                                show_connection_manager_window(app);
+                                navigate_to_tab(app, &crate::constants::TabLocation::Connections);
                             }
                             MenuID::OPEN_LENS_MANAGER => {
-                                show_lens_manager_window(app);
+                                navigate_to_tab(app, &crate::constants::TabLocation::Library);
                             }
                             MenuID::OPEN_PLUGIN_MANAGER => {
-                                show_plugin_manager(app);
+                                navigate_to_tab(
+                                    app,
+                                    &crate::constants::TabLocation::PluginSettings,
+                                );
                             }
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
-                            MenuID::OPEN_SETTINGS_MANAGER => show_user_settings(app),
+                            MenuID::OPEN_SETTINGS_MANAGER => {
+                                navigate_to_tab(app, &crate::constants::TabLocation::UserSettings);
+                            }
                             MenuID::OPEN_WIZARD => {
                                 show_wizard_window(app);
                             }

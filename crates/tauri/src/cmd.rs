@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::event::SendToAskClippyPayload;
@@ -9,7 +10,8 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
 use tauri::{ClipboardManager, Manager};
 
-use crate::window::{show_ask_clippy, show_discover_window};
+use crate::constants::TabLocation;
+use crate::window::{navigate_to_tab, show_ask_clippy};
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, UserSettings};
@@ -89,6 +91,7 @@ pub async fn open_result(
                 let _ = url.set_host(None);
             }
 
+            log::debug!("{:?} - {:?}", url, application);
             if let Err(err) = os_open(&url, application) {
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
                 return Err(err.to_string());
@@ -362,7 +365,10 @@ pub async fn wizard_finished(
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::Windows::Wizard.as_ref()) {
         let _ = window.close();
-        show_discover_window(&window.app_handle());
+        navigate_to_tab(
+            &window.app_handle(),
+            &crate::constants::TabLocation::Discover,
+        );
     }
 
     Ok(())
@@ -420,7 +426,10 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
 
 #[tauri::command]
 pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
-    super::window::_show_tab(&win.app_handle(), &page);
+    if let Ok(tab_loc) = TabLocation::from_str(&page) {
+        super::window::navigate_to_tab(&win.app_handle(), &tab_loc);
+    }
+
     Ok(())
 }
 
@@ -462,10 +471,7 @@ pub async fn send_to_ask_clippy(
         tokio::time::sleep(tokio::time::Duration::from_millis(256)).await;
         let _ = window.emit(
             ClientEvent::SendToAskClippy.as_ref(),
-            SendToAskClippyPayload {
-                question,
-                docs,
-            },
+            SendToAskClippyPayload { question, docs },
         );
     });
 
