@@ -81,7 +81,7 @@ pub struct ActionIconProps {
 #[function_component(ActionIcon)]
 pub fn action_icon(props: &ActionIconProps) -> Html {
     match props.actiontype {
-        UserAction::OpenApplication(_, _) => {
+        UserAction::OpenUrl(_) | UserAction::OpenApplication(_, _) => {
             html! {
               <ArrowTopRightOnSquare height="h-4" width="w-4"/>
             }
@@ -166,6 +166,27 @@ pub async fn execute_action(selected: SearchResult, action: UserActionDefinition
                     OpenResultParams {
                         url,
                         application: Some(app_path.clone()),
+                    },
+                )
+                .await
+                {
+                    let window = window();
+                    let _ = window.alert_with_message(&err);
+                }
+            });
+        }
+        UserAction::OpenUrl(url) => {
+            let url = match reg.render_template(url.as_str(), &template_input) {
+                Ok(val) => val,
+                Err(_) => template_input.url.clone(),
+            };
+
+            spawn_local(async move {
+                if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
+                    ClientInvoke::OpenResult,
+                    OpenResultParams {
+                        url,
+                        application: None,
                     },
                 )
                 .await

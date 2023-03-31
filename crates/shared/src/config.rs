@@ -76,7 +76,9 @@ impl Limit {
 // Enum of actions the user can take when a document is selected
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub enum UserAction {
+    /// OpenApplication(application, args)
     OpenApplication(String, String),
+    OpenUrl(String),
     CopyToClipboard(String),
 }
 

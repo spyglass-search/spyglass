@@ -248,7 +248,7 @@ impl Default for UserActionSettings {
                 actions: vec![UserActionDefinition {
                     label: "Open parent folder".into(),
                     status_msg: None,
-                    action: UserAction::OpenApplication("open".into(), "{{url_parent}}".into()),
+                    action: UserAction::OpenUrl("{{url_parent}}".into()),
                     key_binding: "Shift+Enter".into(),
                 }],
             }],
