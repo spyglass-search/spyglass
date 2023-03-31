@@ -3,7 +3,6 @@ mod shims;
 pub mod utils;
 
 use serde::{Deserialize, Serialize};
-use serde_json;
 pub use shims::*;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

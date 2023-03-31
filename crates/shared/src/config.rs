@@ -364,11 +364,10 @@ impl Config {
                     Ok(plugin_config) => {
                         let mut config = plugin_config.clone();
                         config.path = Some(path.join("main.wasm"));
-    
+
                         settings.insert(plugin_config.name.clone(), config.clone());
                     }
-                    Err(error) => log::error!("Error loading plugin config {:?}", error)
-                    
+                    Err(error) => log::error!("Error loading plugin config {:?}", error),
                 }
             }
         }

@@ -28,8 +28,8 @@ impl SpyglassPlugin for Plugin {
         // the plugin to check for updates on a poll interval.
         let _ = subscribe_for_updates();
 
-        // Configuration properties defined in the manifest file are provide to the plugin 
-        // via environmental variables. Here we access a string configuration and boolean 
+        // Configuration properties defined in the manifest file are provide to the plugin
+        // via environmental variables. Here we access a string configuration and boolean
         // configuration
         if let Ok(api_key) = std::env::var("API_KEY") {
             log(format!("API Key {api_key}").as_str());
@@ -43,21 +43,23 @@ impl SpyglassPlugin for Plugin {
     fn update(&mut self, event: PluginEvent) {
         match event {
             PluginEvent::IntervalUpdate => {
-                // The log function is used for debug logging. Since the plugin is loaded in as a 
+                // The log function is used for debug logging. Since the plugin is loaded in as a
                 // wasm module normal println! and log::error! will not work. The log statement can
                 // be found in the spyglass server log.
-                // Note avoid any direct calls to stdout since that is what is used to communicate 
-                // between spyglass and the wasm module. 
+                // Note avoid any direct calls to stdout since that is what is used to communicate
+                // between spyglass and the wasm module.
                 log("Got Interval Update");
 
-                // Creates an http request to the following url. The wasm runtime used does not 
+                // Creates an http request to the following url. The wasm runtime used does not
                 // support direct http access at the moment so common libraries like reqwest
                 // will not work. We provide a very minimal set of methods to allow for requesting
                 // http resources.
-                Http::request("https://azuresearch-usnc.nuget.org/query").get().run();
+                Http::request("https://azuresearch-usnc.nuget.org/query")
+                    .get()
+                    .run();
             }
             PluginEvent::HttpResponse { url: _, result } => {
-                // When a response is received from an http call it will be received asynchronously 
+                // When a response is received from an http call it will be received asynchronously
                 if let Ok(rslt) = result {
                     if let Some(json) = rslt.as_json() {
                         let packages = json["data"].as_array().unwrap();
@@ -91,7 +93,7 @@ impl SpyglassPlugin for Plugin {
                         }
 
                         // adds the set of documents to the index. If the url already exists the document
-                        // will be updated instead of created. The tags specified in the add call will 
+                        // will be updated instead of created. The tags specified in the add call will
                         // apply to all documents
                         let _ =
                             add_document(docs, vec![(String::from("lens"), String::from("nuget"))]);
@@ -104,9 +106,9 @@ impl SpyglassPlugin for Plugin {
                 page: _,
                 documents,
             } => {
-                // Response to a request for documents, there are also methods used to modify the tags on 
+                // Response to a request for documents, there are also methods used to modify the tags on
                 // documents without modifying the full document. This can be useful for conditionally adding
-                // tags to documents that already exist. 
+                // tags to documents that already exist.
                 let urls = documents
                     .iter()
                     .map(|doc| doc.url.clone())

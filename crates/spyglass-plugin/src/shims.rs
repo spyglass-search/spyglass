@@ -7,7 +7,7 @@ use std::io;
 
 pub struct Http {}
 
-/// Provides the ability to build http requests 
+/// Provides the ability to build http requests
 #[derive(Clone)]
 pub struct HttpRequestBuilder {
     request: PluginCommandRequest,

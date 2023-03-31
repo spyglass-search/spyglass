@@ -118,7 +118,7 @@ async fn handle_plugin_cmd_request(
 
                     let http_response = spyglass_plugin::HttpResponse {
                         response: txt,
-                        headers: headers,
+                        headers,
                     };
 
                     env.cmd_writer
@@ -206,8 +206,8 @@ fn build_headermap(headers: &Vec<(String, String)>, plugin: &str) -> HeaderMap {
         format!("Spyglass-Plugin-{plugin}").parse().unwrap(),
     );
     for (key, val) in headers {
-        let header_val: Result<HeaderValue, InvalidHeaderValue> = HeaderValue::from_str(&val);
-        let header_name: Result<HeaderName, InvalidHeaderName> = HeaderName::from_str(&key);
+        let header_val: Result<HeaderValue, InvalidHeaderValue> = HeaderValue::from_str(val);
+        let header_name: Result<HeaderName, InvalidHeaderName> = HeaderName::from_str(key);
         if let (Ok(header_val), Ok(header_name)) = (header_val, header_name) {
             header_map.append(header_name, header_val);
         }
