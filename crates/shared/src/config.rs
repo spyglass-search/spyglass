@@ -360,11 +360,14 @@ impl Config {
             }
 
             if let Ok(file_contents) = std::fs::read_to_string(plugin_config) {
-                if let Ok(plugin_config) = ron::from_str::<PluginConfig>(&file_contents) {
-                    let mut config = plugin_config.clone();
-                    config.path = Some(path.join("main.wasm"));
+                match ron::from_str::<PluginConfig>(&file_contents) {
+                    Ok(plugin_config) => {
+                        let mut config = plugin_config.clone();
+                        config.path = Some(path.join("main.wasm"));
 
-                    settings.insert(plugin_config.name.clone(), config.clone());
+                        settings.insert(plugin_config.name.clone(), config.clone());
+                    }
+                    Err(error) => log::error!("Error loading plugin config {:?}", error),
                 }
             }
         }

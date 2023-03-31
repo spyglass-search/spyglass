@@ -63,6 +63,21 @@ pub trait SpyglassPlugin {
     fn update(&mut self, event: PluginEvent);
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct HttpResponse {
+    pub headers: Vec<(String, String)>,
+    pub response: Option<String>,
+}
+
+impl HttpResponse {
+    pub fn as_json(&self) -> Option<serde_json::Value> {
+        if let Some(val) = &self.response {
+            return serde_json::from_str(val.as_str()).ok();
+        }
+        None
+    }
+}
+
 /// Event providing the plugin asynchronous data
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PluginEvent {
@@ -73,6 +88,29 @@ pub enum PluginEvent {
         page: u32,
         documents: Vec<DocumentResult>,
     },
+    // Periodic update for request for a plugin
+    IntervalUpdate,
+    HttpResponse {
+        url: String,
+        result: Result<HttpResponse, String>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Authentication {
+    BASIC(String, Option<String>),
+    BEARER(String),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
+    OPTIONS,
+    PATCH,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -98,6 +136,24 @@ pub enum PluginCommandRequest {
     ModifyTags {
         documents: DocumentQuery,
         tag_modifications: TagModification,
+    },
+    // Request to add one or more documents to the index.
+    AddDocuments {
+        documents: Vec<DocumentUpdate>,
+        // Tags to apply to all documents in this set
+        tags: Vec<Tag>,
+    },
+    // Requests that the plugin be called at a regular interval
+    // (currently every 10 minutes) to allow the plugin to
+    // process an new updates.
+    SubscribeForUpdates,
+    // Request an http resource.
+    HttpRequest {
+        headers: Vec<(String, String)>,
+        method: HttpMethod,
+        url: String,
+        body: Option<String>,
+        auth: Option<Authentication>,
     },
 }
 
@@ -132,4 +188,25 @@ pub struct DocumentQuery {
     /// Matches only documents that do not have the specified tags. These
     /// entries are and'd together
     pub exclude_tags: Option<Vec<Tag>>,
+}
+
+/// Defines a document update.
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct DocumentUpdate {
+    /// Text content from page after stripping content that should not be
+    /// indexed. For HTML this is HTML tags & semantically unimportant sections
+    /// (header/footer/etc.)
+    pub content: Option<String>,
+    /// Short description of the content. Terms found in the description are
+    /// boosted above terms found in content
+    pub description: Option<String>,
+    /// The title of the document. Terms found in the title are boosted above description
+    /// terms and content terms
+    pub title: Option<String>,
+    /// Uniquely identifying URL for this document.
+    pub url: String,
+    /// URL used to open the document in finder/web browser/etc.
+    pub open_url: Option<String>,
+    /// Tags to apply to this document
+    pub tags: Vec<Tag>,
 }

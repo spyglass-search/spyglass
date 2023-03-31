@@ -50,6 +50,12 @@ pub enum TagType {
     Other(String),
 }
 
+impl TagType {
+    pub fn string_to_tag_type(v: &str) -> Self {
+        string_to_tag_type(v)
+    }
+}
+
 // Helper method used to convert a string into the
 // associate TagType
 fn string_to_tag_type(v: &str) -> TagType {

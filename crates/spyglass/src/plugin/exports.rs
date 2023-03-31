@@ -1,11 +1,24 @@
+use crate::crawler::CrawlResult;
 use crate::documents;
 use entities::models::indexed_document;
 use entities::models::tag;
+use entities::models::tag::TagPair;
+use entities::models::tag::TagType;
+use http::header::InvalidHeaderName;
+use http::header::InvalidHeaderValue;
+use http::HeaderMap;
+use http::HeaderName;
+use http::HeaderValue;
 use serde::{Deserialize, Serialize};
+use spyglass_plugin::Authentication;
+use spyglass_plugin::DocumentUpdate;
+use spyglass_plugin::HttpMethod;
 use spyglass_plugin::{DocumentResult, PluginEvent};
 use std::path::Path;
+use std::str::FromStr;
 use tantivy::DocAddress;
 use tokio::sync::mpsc::Sender;
+use url::Url;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
@@ -17,6 +30,7 @@ use entities::sea_orm::QueryFilter;
 use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
 use crate::search::{self, Searcher};
 use crate::state::AppState;
+use reqwest::header::USER_AGENT;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
 use spyglass_plugin::{DocumentQuery, PluginCommandRequest};
@@ -68,6 +82,68 @@ async fn handle_plugin_cmd_request(
                 query_documents_and_send(env, query, true).await;
             }
         }
+        PluginCommandRequest::HttpRequest {
+            headers,
+            method,
+            url,
+            body,
+            auth,
+        } => {
+            let client = reqwest::Client::new();
+            let header_map = build_headermap(headers, &env.name);
+            let method_type = convert_method(method);
+
+            let request = client.request(method_type, url).headers(header_map);
+            let request = if let Some(body) = body {
+                request.body(body.clone())
+            } else {
+                request
+            };
+
+            let request = if let Some(auth) = auth {
+                match auth {
+                    Authentication::BASIC(key, val) => request.basic_auth(key.clone(), val.clone()),
+                    Authentication::BEARER(key) => request.bearer_auth(key.clone()),
+                }
+            } else {
+                request
+            };
+
+            let result = request.send().await;
+
+            match result {
+                Ok(response) => {
+                    let headers = convert_headers(response.headers());
+                    let txt = response.text().await.ok();
+
+                    let http_response = spyglass_plugin::HttpResponse {
+                        response: txt,
+                        headers,
+                    };
+
+                    env.cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id: env.id,
+                            event: PluginEvent::HttpResponse {
+                                url: url.clone(),
+                                result: Ok(http_response),
+                            },
+                        })
+                        .await?;
+                }
+                Err(error) => {
+                    env.cmd_writer
+                        .send(PluginCommand::HandleUpdate {
+                            plugin_id: env.id,
+                            event: PluginEvent::HttpResponse {
+                                url: url.clone(),
+                                result: Err(format!("{}", error)),
+                            },
+                        })
+                        .await?;
+                }
+            }
+        }
         PluginCommandRequest::ModifyTags {
             documents,
             tag_modifications,
@@ -87,9 +163,105 @@ async fn handle_plugin_cmd_request(
                 }
             }
         }
+        PluginCommandRequest::AddDocuments { documents, tags } => {
+            if !documents.is_empty() {
+                let (crawl_results, tags) = convert_docs_to_crawl(documents, tags);
+
+                if let Err(error) =
+                    documents::process_crawl_results(&env.app_state, &crawl_results, &tags).await
+                {
+                    log::error!("Error updating documents {:?}", error);
+                }
+            }
+        }
+        PluginCommandRequest::SubscribeForUpdates => {
+            env.cmd_writer
+                .send(PluginCommand::SubscribeForUpdates(env.id))
+                .await?;
+        }
     }
 
     Ok(())
+}
+
+// Converts local method enum and http method enum
+fn convert_method(method: &HttpMethod) -> http::Method {
+    match method {
+        HttpMethod::GET => http::Method::GET,
+        HttpMethod::DELETE => http::Method::DELETE,
+        HttpMethod::POST => http::Method::POST,
+        HttpMethod::PUT => http::Method::PUT,
+        HttpMethod::PATCH => http::Method::PATCH,
+        HttpMethod::HEAD => http::Method::HEAD,
+        HttpMethod::OPTIONS => http::Method::OPTIONS,
+    }
+}
+
+// Helper method used to convert header list to header map
+fn build_headermap(headers: &Vec<(String, String)>, plugin: &str) -> HeaderMap {
+    let mut header_map = HeaderMap::new();
+
+    header_map.append(
+        USER_AGENT,
+        format!("Spyglass-Plugin-{plugin}").parse().unwrap(),
+    );
+    for (key, val) in headers {
+        let header_val: Result<HeaderValue, InvalidHeaderValue> = HeaderValue::from_str(val);
+        let header_name: Result<HeaderName, InvalidHeaderName> = HeaderName::from_str(key);
+        if let (Ok(header_val), Ok(header_name)) = (header_val, header_name) {
+            header_map.append(header_name, header_val);
+        }
+    }
+    header_map
+}
+
+// Converts header map to header list
+fn convert_headers(headers: &HeaderMap) -> Vec<(String, String)> {
+    headers
+        .into_iter()
+        .map(|(key, val)| (key.to_string(), val.to_str().unwrap_or("").to_owned()))
+        .collect::<Vec<(String, String)>>()
+}
+
+fn convert_docs_to_crawl(
+    documents: &[DocumentUpdate],
+    tags: &[(String, String)],
+) -> (Vec<CrawlResult>, Vec<TagPair>) {
+    let crawls = documents
+        .iter()
+        .filter_map(|doc| {
+            let tags = convert_tags(&doc.tags);
+            match Url::parse(doc.url.as_str()) {
+                Ok(url) => {
+                    let mut crawl = CrawlResult::new(
+                        &url,
+                        doc.open_url.clone(),
+                        doc.content.clone().unwrap_or(String::from("")).as_str(),
+                        doc.title.clone().unwrap_or(String::from("")).as_str(),
+                        doc.description.clone(),
+                    );
+                    crawl.tags = tags;
+                    Some(crawl)
+                }
+                Err(error) => {
+                    log::error!("Invalid url specified for document {:?}", error);
+                    None
+                }
+            }
+        })
+        .collect::<Vec<CrawlResult>>();
+
+    let converted_tags = convert_tags(tags);
+    (crawls, converted_tags)
+}
+
+fn convert_tags(tags: &[(String, String)]) -> Vec<TagPair> {
+    tags.iter()
+        .map(|(key, val)| {
+            let tag_type = TagType::string_to_tag_type(key);
+            (tag_type, val.clone())
+        })
+        .collect::<Vec<TagPair>>()
 }
 
 async fn query_document_and_send_loop(env: PluginEnv, query: DocumentQuery) {
