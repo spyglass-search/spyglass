@@ -8,6 +8,7 @@ use jsonrpsee::core::Error;
 use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
+use regex::Regex;
 use shared::metrics;
 use shared::request::{
     AskClippyRequest, ClippyContext, LLMResponsePayload, SearchLensesParam, SearchParam,
@@ -199,20 +200,35 @@ pub async fn ask_clippy(state: AppState, query: AskClippyRequest) -> Result<(), 
             });
 
             // Convert the context into strings
-            let context = query
-                .context
-                .iter()
-                .map(|x| match x {
-                    ClippyContext::History(i) => i,
-                    // todo: grab doc from datastore
-                    ClippyContext::DocId(x) => x,
-                })
-                .cloned()
-                .collect::<Vec<String>>();
+            let context = if query.context.is_empty() {
+                None
+            } else {
+                let re = Regex::new(r"\s+").expect("Valid regex");
+                let ctxt = query
+                    .context
+                    .iter()
+                    .flat_map(|x| match x {
+                        ClippyContext::History(i) => Some(i.to_owned()),
+                        // todo: grab doc from datastore
+                        ClippyContext::DocId(doc_id) => {
+                            Searcher::get_by_id(&state.index.reader, doc_id)
+                                .and_then(|doc| document_to_struct(&doc).ok())
+                                .map(|doc| {
+                                    // clean up content
+                                    let doc_content = re.replace_all(&doc.content, " ");
+                                    let mut content =
+                                        format!("title: {}, content: {}", doc.title, doc_content);
+                                    content.truncate(1_000);
+                                    content
+                                })
+                        }
+                    })
+                    .collect::<Vec<String>>();
+                Some(ctxt)
+            };
 
             // Spawn the clippy LLM
-            if let Err(err) = unleash_clippy(model_path, tx, &query.question, Some(context), false)
-            {
+            if let Err(err) = unleash_clippy(model_path, tx, &query.question, context, false) {
                 log::warn!("Unable to complete clippy: {}", err);
             }
         });

@@ -292,7 +292,6 @@ pub struct DefaultIndices {
     pub extensions: Vec<String>,
 }
 
-
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DocMetadata {
     pub doc_id: String,

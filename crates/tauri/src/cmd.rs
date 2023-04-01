@@ -437,6 +437,7 @@ pub async fn ask_clippy(
     question: &str,
     context: Vec<ClippyContext>,
 ) -> Result<(), String> {
+    log::debug!("ask_clippy: {} - {:?}", question, context);
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
         if let Err(err) = rpc
@@ -471,7 +472,7 @@ pub async fn send_to_ask_clippy(
         for id in docs {
             match rpc.client.get_metadata(id.to_string()).await {
                 Ok(doc) => doc_md.push(doc),
-                Err(err) => log::error!("err: {err}")
+                Err(err) => log::error!("err: {err}"),
             }
         }
         doc_md

@@ -246,7 +246,7 @@ impl Default for UserActionSettings {
                     key_binding: String::from("CmdOrCtrl+Enter"),
                     label: String::from("Ask Clippy"),
                     status_msg: None,
-                }
+                },
             ],
             context_actions: vec![ContextActions {
                 context: ContextFilter {

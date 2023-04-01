@@ -5,8 +5,8 @@ use shared::request::{
     AskClippyRequest, BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam,
 };
 use shared::response::{
-    AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
-    SearchLensesResp, SearchResults, DocMetadata
+    AppStatus, DefaultIndices, DocMetadata, LensResult, LibraryStats, ListConnectionResult,
+    PluginResult, SearchLensesResp, SearchResults,
 };
 use std::collections::HashMap;
 

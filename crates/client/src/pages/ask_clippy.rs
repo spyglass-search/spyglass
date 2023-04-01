@@ -14,6 +14,11 @@ use yew::NodeRef;
 use crate::components::{btn, icons};
 use crate::tauri_invoke;
 
+/// Number of messages to use as context
+/// Currently, more messages may confuse the model, so we'll only send the previous
+/// question & answer.
+const CHAT_CONTEXT_WINDOW: usize = 2;
+
 #[derive(Clone, PartialEq, Eq)]
 enum HistorySource {
     Clippy,
@@ -155,20 +160,30 @@ impl Component for AskClippy {
                     })
                 }
 
-                // capture some context to send to the model
-                let mut context = self
-                    .history
-                    .iter()
-                    // Ignore system messages
-                    .filter(|x| x.source != HistorySource::System)
-                    // For now, only keep the last q/a for context.
-                    .rev()
-                    .take(2)
-                    // Map into a chat log-esque format.
-                    .map(|x| ClippyContext::History(x.as_log()))
-                    .collect::<Vec<_>>();
-                // Reverse again so they're in order from oldest to newest.
-                context.reverse();
+                // Build context to send to model
+                // If we have docs attached, send those otherwise send the chat
+                // history as context
+                let context = if let Some(ctxt) = &self.current_context {
+                    ctxt.iter()
+                        .map(|doc| ClippyContext::DocId(doc.doc_id.clone()))
+                        .collect::<Vec<_>>()
+                } else {
+                    // Use history as context if we don't have any docs
+                    let mut context = self
+                        .history
+                        .iter()
+                        // Ignore system messages
+                        .filter(|x| x.source != HistorySource::System)
+                        // For now, only keep the last q/a for context.
+                        .rev()
+                        .take(CHAT_CONTEXT_WINDOW)
+                        // Map into a chat log-esque format.
+                        .map(|x| ClippyContext::History(x.as_log()))
+                        .collect::<Vec<_>>();
+                    // Reverse again so they're in order from oldest to newest.
+                    context.reverse();
+                    context
+                };
 
                 // push the user's question to the stack & clear the current context
                 // (if any).
@@ -304,7 +319,7 @@ impl Component for AskClippy {
 
 #[derive(Properties, PartialEq)]
 struct AttachmentListProps {
-    pub docs: Vec<DocMetadata>
+    pub docs: Vec<DocMetadata>,
 }
 
 #[function_component(AttachmentList)]
