@@ -77,6 +77,7 @@ impl Limit {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
 pub enum UserAction {
     OpenApplication(String, String),
+    OpenUrl(String),
     CopyToClipboard(String),
 }
 

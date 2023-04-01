@@ -126,7 +126,7 @@ impl ContextActions {
 
 // Filter definition used to define what documents should match
 // against the context.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Diff)]
 pub struct ContextFilter {
     // Includes documents that match any of the defined tags
     pub has_tag: Option<Vec<Tag>>,
@@ -240,7 +240,18 @@ impl Default for UserActionSettings {
                 label: String::from("Copy URL to Clipboard"),
                 status_msg: Some(String::from("Copying...")),
             }],
-            context_actions: vec![],
+            context_actions: vec![ContextActions {
+                context: ContextFilter {
+                    has_tag: Some(vec![("type".into(), "file".into())]),
+                    ..Default::default()
+                },
+                actions: vec![UserActionDefinition {
+                    label: "Open parent folder".into(),
+                    status_msg: None,
+                    action: UserAction::OpenUrl("{{url_parent}}".into()),
+                    key_binding: "Shift+Enter".into(),
+                }],
+            }],
         }
     }
 }
