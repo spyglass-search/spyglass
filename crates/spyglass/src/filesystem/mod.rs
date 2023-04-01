@@ -547,12 +547,14 @@ impl SpyglassFileWatcher {
         );
 
         if !to_delete.is_empty() {
-            if let Err(error) = processed_files::Entity::delete_many()
-                .filter(processed_files::Column::Id.is_in(to_delete))
-                .exec(&self.db)
-                .await
-            {
-                log::error!("Error deleting processed files {:?}", error);
+            for chunk in to_delete.chunks(BATCH_SIZE) {
+                if let Err(error) = processed_files::Entity::delete_many()
+                    .filter(processed_files::Column::Id.is_in(chunk.to_vec()))
+                    .exec(&self.db)
+                    .await
+                {
+                    log::error!("Error deleting processed files {:?}", error);
+                }
             }
         }
 
@@ -600,16 +602,18 @@ impl SpyglassFileWatcher {
                 })
                 .collect::<Vec<processed_files::ActiveModel>>();
 
-            if let Err(error) = processed_files::Entity::insert_many(updates)
-                .on_conflict(
-                    OnConflict::column(processed_files::Column::FilePath)
-                        .update_column(processed_files::Column::LastModified)
-                        .to_owned(),
-                )
-                .exec(&self.db)
-                .await
-            {
-                log::error!("Error updated recrawls {:?}", error);
+            for chunk in updates.chunks(BATCH_SIZE) {
+                if let Err(error) = processed_files::Entity::insert_many(chunk.to_vec())
+                    .on_conflict(
+                        OnConflict::column(processed_files::Column::FilePath)
+                            .update_column(processed_files::Column::LastModified)
+                            .to_owned(),
+                    )
+                    .exec(&self.db)
+                    .await
+                {
+                    log::error!("Error updated recrawls {:?}", error);
+                }
             }
         }
         log::info!("Returning {:?} updates", files.len());
