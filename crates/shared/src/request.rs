@@ -58,9 +58,17 @@ pub struct BatchDocumentRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub enum ClippyContext {
+    /// Document the user is asking about
+    DocId(String),
+    /// Previous log of questions/answers
+    History(String),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AskClippyRequest {
     pub question: String,
-    pub docs: Vec<String>,
+    pub context: Vec<ClippyContext>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

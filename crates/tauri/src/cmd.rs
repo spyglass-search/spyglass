@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::event::SendToAskClippyPayload;
-use shared::request::AskClippyRequest;
+use shared::request::{AskClippyRequest, ClippyContext};
 use shared::response::{DefaultIndices, SearchResults};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
@@ -437,7 +437,7 @@ pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
 pub async fn ask_clippy(
     win: tauri::Window,
     question: &str,
-    docs: Vec<String>,
+    context: Vec<ClippyContext>,
 ) -> Result<(), String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
@@ -445,7 +445,7 @@ pub async fn ask_clippy(
             .client
             .ask_clippy(AskClippyRequest {
                 question: question.to_string(),
-                docs,
+                context,
             })
             .await
         {

@@ -1,7 +1,7 @@
 use gloo::console::console_dbg;
 use serde_wasm_bindgen::from_value;
 use shared::event::{self, ClientEvent, ListenPayload, SendToAskClippyPayload};
-use shared::request::{AskClippyRequest, LLMResponsePayload};
+use shared::request::{AskClippyRequest, LLMResponsePayload, ClippyContext};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
 use web_sys::{HtmlElement, HtmlInputElement};
@@ -24,6 +24,12 @@ enum HistorySource {
 struct HistoryItem {
     source: HistorySource,
     value: String,
+}
+
+impl HistoryItem {
+    pub fn as_log(&self) -> String {
+        self.value.clone()
+    }
 }
 
 pub struct AskClippy {
@@ -140,6 +146,21 @@ impl Component for AskClippy {
                         value: value.to_owned(),
                     })
                 }
+
+                // capture some context to send to the model
+                let mut context = self.history
+                    .iter()
+                    // Ignore system messages
+                    .filter(|x| x.source != HistorySource::System)
+                    // Take the last 10 as context
+                    .rev().take(10)
+                    // Map into a chat log-esque format.
+                    .map(|x| ClippyContext::History(x.as_log()))
+                    .collect::<Vec<_>>();
+                // Reverse again so they're in order from oldest to newest.
+                context.reverse();
+
+                // push the user's question to the stack.
                 self.history.push(HistoryItem {
                     source: HistorySource::User,
                     value: query.to_string(),
@@ -154,7 +175,7 @@ impl Component for AskClippy {
                         event::ClientInvoke::AskClippy,
                         AskClippyRequest {
                             question: query.to_string(),
-                            docs: [].into(),
+                            context,
                         },
                     )
                     .await
@@ -222,7 +243,18 @@ impl Component for AskClippy {
                 <div>
                     <div class="bg-neutral-700 px-4 py-2 text-sm text-neutral-400 flex flex-row items-center gap-4">
                         <icons::Warning width="w-6" height="h-6" classes={classes!("flex-none", "text-yellow-400")} />
-                        <div>{"LLMs (the tech behind this) are still experimental and some responses may be inaccurate."}</div>
+                        <div>
+                            <span
+                                class="cursor-help underline font-semibold text-cyan-500"
+                                onclick={link.callback(|_| Msg::AskClippy {
+                                    query: "what is a language model?".into(),
+                                    docs: Vec::new()
+                                })}
+                            >
+                                {"LLMs"}
+                            </span>
+                            {" (the tech behind this) are still experimental and responses may be inaccurate."}
+                        </div>
                     </div>
                     <div class="p-4">
                         <div class="flex flex-row gap-8 items-center">
@@ -230,7 +262,7 @@ impl Component for AskClippy {
                                 ref={self.clippy_input_ref.clone()}
                                 rows="2"
                                 type="text"
-                                placeholder="ask clippy"
+                                placeholder="what is the difference between an alpaca & llama?"
                                 class="text-base bg-neutral-800 text-white flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600"
                             ></textarea>
                             <btn::Btn

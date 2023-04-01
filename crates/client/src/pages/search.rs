@@ -159,7 +159,7 @@ impl SearchPage {
             let question = self.query.to_string();
             link.send_message(Msg::ClearQuery);
             spawn_local(async move {
-                let res = tauri_invoke::<SendToAskClippyPayload, ()>(
+                let _ = tauri_invoke::<SendToAskClippyPayload, ()>(
                     ClientInvoke::SendToAskClippy,
                     SendToAskClippyPayload {
                         question,
