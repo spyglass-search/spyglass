@@ -9,7 +9,9 @@ use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
-use shared::request::{AskClippyRequest, LLMResponsePayload, SearchLensesParam, SearchParam, ClippyContext};
+use shared::request::{
+    AskClippyRequest, ClippyContext, LLMResponsePayload, SearchLensesParam, SearchParam,
+};
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 use spyglass_clippy::{unleash_clippy, TokenResult};
 use spyglass_rpc::{RpcEvent, RpcEventType};
@@ -197,7 +199,9 @@ pub async fn ask_clippy(state: AppState, query: AskClippyRequest) -> Result<(), 
             });
 
             // Convert the context into strings
-            let context = query.context.iter()
+            let context = query
+                .context
+                .iter()
                 .map(|x| match x {
                     ClippyContext::History(i) => i,
                     // todo: grab doc from datastore
@@ -207,7 +211,8 @@ pub async fn ask_clippy(state: AppState, query: AskClippyRequest) -> Result<(), 
                 .collect::<Vec<String>>();
 
             // Spawn the clippy LLM
-            if let Err(err) = unleash_clippy(model_path, tx, &query.question, Some(context), false) {
+            if let Err(err) = unleash_clippy(model_path, tx, &query.question, Some(context), false)
+            {
                 log::warn!("Unable to complete clippy: {}", err);
             }
         });
@@ -382,17 +387,6 @@ pub async fn search_lenses(
             name: label.clone(),
             label,
             description: lens.description.unwrap_or_default(),
-            ..Default::default()
-        });
-    }
-
-    // brute force add clippy here
-    if param.query.is_empty() || "ask".starts_with(&param.query) {
-        results.push(LensResult {
-            author: "spyglass-search".into(),
-            name: "Ask".into(),
-            label: "ask".into(),
-            description: "Ask questions about your data".into(),
             ..Default::default()
         });
     }

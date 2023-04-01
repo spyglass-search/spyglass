@@ -1,4 +1,4 @@
-use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
+use crate::components::icons;
 use crate::components::{KeyComponent, ModifierIcon};
 use crate::{tauri_invoke, utils};
 use gloo::utils::window;
@@ -7,7 +7,7 @@ use handlebars::{
 };
 use shared::accelerator;
 use shared::config::{self, UserAction, UserActionDefinition};
-use shared::event::{ClientInvoke, CopyContext, OpenResultParams};
+use shared::event::{ClientInvoke, CopyContext, OpenResultParams, SendToAskClippyPayload};
 use shared::response::{SearchResult, SearchResultTemplate};
 use yew::function_component;
 use yew::platform::spawn_local;
@@ -68,7 +68,7 @@ fn user_action(props: &UserActionProps) -> Html {
         html! {
             <div class={component_styles}>
               <div class="flex flex-row px-2">
-                <BookOpen/>
+                <icons::BookOpen/>
                 <span class="grow">{txt}</span>
               </div>
             </div>
@@ -84,15 +84,14 @@ pub struct ActionIconProps {
 #[function_component(ActionIcon)]
 pub fn action_icon(props: &ActionIconProps) -> Html {
     match props.actiontype {
+        UserAction::AskClippy(_) => {
+            html! { <icons::ChatBubbleIcon height="h-4" width="w-4"/> }
+        }
         UserAction::OpenApplication(_, _) | UserAction::OpenUrl(_) => {
-            html! {
-              <ArrowTopRightOnSquare height="h-4" width="w-4"/>
-            }
+            html! { <icons::ArrowTopRightOnSquare height="h-4" width="w-4"/> }
         }
         UserAction::CopyToClipboard(_) => {
-            html! {
-              <ClipboardDocumentIcon height="h-4" width="w-4"/>
-            }
+            html! { <icons::ClipboardDocumentIcon height="h-4" width="w-4"/> }
         }
     }
 }

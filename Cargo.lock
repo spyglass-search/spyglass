@@ -6680,6 +6680,7 @@ dependencies = [
  "handlebars",
  "js-sys",
  "log",
+ "markdown",
  "num-format",
  "serde",
  "serde-wasm-bindgen",

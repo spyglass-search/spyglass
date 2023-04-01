@@ -1,7 +1,7 @@
 use gloo::console::console_dbg;
 use serde_wasm_bindgen::from_value;
 use shared::event::{self, ClientEvent, ListenPayload, SendToAskClippyPayload};
-use shared::request::{AskClippyRequest, LLMResponsePayload, ClippyContext};
+use shared::request::{AskClippyRequest, ClippyContext, LLMResponsePayload};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
 use web_sys::{HtmlElement, HtmlInputElement};
@@ -148,12 +148,14 @@ impl Component for AskClippy {
                 }
 
                 // capture some context to send to the model
-                let mut context = self.history
+                let mut context = self
+                    .history
                     .iter()
                     // Ignore system messages
                     .filter(|x| x.source != HistorySource::System)
-                    // Take the last 10 as context
-                    .rev().take(10)
+                    // For now, only keep the last q/a for context.
+                    .rev()
+                    .take(2)
                     // Map into a chat log-esque format.
                     .map(|x| ClippyContext::History(x.as_log()))
                     .collect::<Vec<_>>();
@@ -317,10 +319,19 @@ struct HistoryLogItemProps {
 #[function_component(HistoryLogItem)]
 fn history_log_item(props: &HistoryLogItemProps) -> Html {
     let (user_icon, icon_pos, text_pos) = match props.source {
-        HistorySource::Clippy => ("🤖", None, Some("text-left")),
-        HistorySource::User => ("🧙‍♂️", Some("order-1"), Some("text-right")),
-        HistorySource::System => ("⚙️", None, Some("text-left")),
+        HistorySource::Clippy => (html! {<>{"🤖"}</>}, None, Some("text-left")),
+        HistorySource::User => (html! {<>{"🧙‍♂️"}</>}, Some("order-1"), Some("text-right")),
+        HistorySource::System => (
+            html! { <><img src="/icons/system-logo.png" class="h-[48px] w-[48px] rounded-full animate-pulse" /></>},
+            None,
+            Some("text-left"),
+        ),
     };
+
+    let html = markdown::to_html(&props.tokens.clone());
+    let html = html.trim_start_matches("<p>").to_string();
+    let html = html.trim_end_matches("</p>").to_string();
+    let html = format!("<p class=\"inline\">{}</p>", html);
 
     html! {
         <div class="border-t border-t-neutral-700 p-4 text-sm text-white items-center flex flex-row gap-4 animate-fade-in">
@@ -328,7 +339,7 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
                 <div class="text-xl mx-auto">{user_icon}</div>
             </div>
             <div class={classes!("grow", text_pos)}>
-                {props.tokens.clone()}
+                {Html::from_html_unchecked(AttrValue::from(html))}
                 { if props.is_in_progress {
                     html! { <div class="inline-block h-4 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
                 } else {

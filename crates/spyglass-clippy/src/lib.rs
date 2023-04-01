@@ -38,11 +38,7 @@ fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
     // Add any additional context for the LLM to use.
     if let Some(ctxt) = doc_context {
         start.push_str("\n### Input:\n");
-        start.push_str(&ctxt.iter()
-            .map(|x| x.trim())
-            .collect::<Vec<_>>()
-            .join(" ")
-        );
+        start.push_str(&ctxt.iter().map(|x| x.trim()).collect::<Vec<_>>().join(" "));
         start.push('\n');
     }
 
