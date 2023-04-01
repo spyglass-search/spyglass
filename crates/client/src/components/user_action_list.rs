@@ -84,7 +84,7 @@ pub struct ActionIconProps {
 #[function_component(ActionIcon)]
 pub fn action_icon(props: &ActionIconProps) -> Html {
     match props.actiontype {
-        UserAction::OpenApplication(_, _) | UserAction::Open(_) => {
+        UserAction::OpenApplication(_, _) | UserAction::OpenUrl(_) => {
             html! {
               <ArrowTopRightOnSquare height="h-4" width="w-4"/>
             }
@@ -158,7 +158,7 @@ pub async fn execute_action(selected: SearchResult, action: UserActionDefinition
     reg.register_escape_fn(handlebars::no_escape);
 
     match action.action {
-        UserAction::Open(argument) => {
+        UserAction::OpenUrl(argument) => {
             let url = match reg.render_template(argument.as_str(), &template_input) {
                 Ok(val) => val,
                 Err(_) => template_input.url.clone(),
