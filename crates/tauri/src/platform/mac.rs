@@ -29,15 +29,12 @@ pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
     };
 
     if let Some(application) = application {
-        if application != "open" {
-            return match open::with(open_url, application) {
-                Ok(_) => Ok(()),
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
-            };
-        }
+        return match open::with(open_url, application) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(err.to_string())),
+        };
     }
 
-    log::debug!("open_url: {}", open_url);
     match open::that(open_url) {
         Ok(_) => Ok(()),
         Err(err) => Err(anyhow::anyhow!(err.to_string())),
