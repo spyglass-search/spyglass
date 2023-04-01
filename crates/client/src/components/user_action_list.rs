@@ -1,7 +1,10 @@
-use crate::components::icons::{self, ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
+use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
 use crate::components::{KeyComponent, ModifierIcon};
 use crate::{tauri_invoke, utils};
 use gloo::utils::window;
+use handlebars::{
+    Context, Handlebars, Helper, HelperResult, Output, PathAndJson, RenderContext, RenderError,
+};
 use shared::accelerator;
 use shared::config::{self, UserAction, UserActionDefinition};
 use shared::event::{ClientInvoke, CopyContext, OpenResultParams};
@@ -81,14 +84,9 @@ pub struct ActionIconProps {
 #[function_component(ActionIcon)]
 pub fn action_icon(props: &ActionIconProps) -> Html {
     match props.actiontype {
-        UserAction::OpenApplication(_, _) => {
+        UserAction::OpenApplication(_, _) | UserAction::OpenUrl(_) => {
             html! {
               <ArrowTopRightOnSquare height="h-4" width="w-4"/>
-            }
-        }
-        UserAction::OpenUrl(_) => {
-            html! {
-                <icons::FolderIcon height="h-4" width="w-4" />
             }
         }
         UserAction::CopyToClipboard(_) => {
@@ -156,6 +154,7 @@ pub fn user_actions_list(props: &ActionsListProps) -> Html {
 pub async fn execute_action(selected: SearchResult, action: UserActionDefinition) {
     let template_input = SearchResultTemplate::from(selected);
     let mut reg = handlebars::Handlebars::new();
+    reg.register_helper("slice_path", Box::new(slice_path));
     reg.register_escape_fn(handlebars::no_escape);
 
     match action.action {
@@ -256,4 +255,101 @@ pub fn action_button(props: &ActionListBtnProps) -> Html {
           <span class="ml-1">{"to open."}</span>
         </button>
     }
+}
+
+// Helper used to take slices of a path
+fn slice_path(
+    helper: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _rc: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let path = helper.param(0);
+    let start = helper.param(1);
+    let end = helper.param(2);
+    let count = helper.hash_get("count");
+    let full_uri = helper.hash_get("full_uri");
+
+    log::debug!(
+        "Path: {path:?} Start: {start:?} End: {end:?} Count: {count:?} Full URI: {full_uri:?}"
+    );
+    if let (Some(path), Some(start)) = (path, start) {
+        let url = url::Url::parse(path.render().as_str());
+        match url {
+            Ok(mut url) => {
+                let start_val = start.value();
+                if let Some(start_i64) = start_val.as_i64() {
+                    if let Some(segments) = url.path_segments().map(|c| c.collect::<Vec<_>>()) {
+                        let start = get_start(segments.len(), start_i64);
+                        let start_usize = start as usize;
+                        let end = get_end(segments.len(), start, end, count) as usize;
+                        log::debug!("Start: {start:?} End: {end:?} Segments {segments:?}");
+                        if let Some(segment) = segments.get(start_usize..end) {
+                            match full_uri.map(|uri| uri.value().as_bool().unwrap_or(false)) {
+                                Some(true) => {
+                                    url.set_path(segment.join("/").as_str());
+                                    out.write(url.as_str())?;
+                                }
+                                _ => {
+                                    out.write(segment.join("/").as_str())?;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("Invalid url {:?}", err);
+                return Err(RenderError::new("Path is an invalid url"));
+            }
+        }
+    } else {
+        return Err(RenderError::new("A path and start are required"));
+    }
+    Ok(())
+}
+
+// Helper method used to calculate the start of a range based on the size of the array and the
+// start index. Note the index can be negative
+fn get_start(size: usize, start: i64) -> u64 {
+    if start < 0 {
+        if let Some(added) = size.checked_add_signed(start as isize) {
+            return added.max(0).min(size) as u64;
+        }
+    }
+    start as u64
+}
+
+// Helper method used to get the end of a sequence from the start, size, end and count. The end and
+// count are both optional.
+fn get_end(size: usize, start: u64, end: Option<&PathAndJson>, count: Option<&PathAndJson>) -> u64 {
+    let size = size as i64;
+    let max_size = size as u64;
+    if let Some(end) = end {
+        let value = end.value();
+        if value.is_i64() {
+            if let Some(val_i64) = value.as_i64() {
+                if val_i64 < 0 {
+                    let end_size = (size + val_i64).max(0) as u64;
+                    return end_size.min(max_size);
+                } else {
+                    return val_i64 as u64;
+                }
+            }
+        } else if value.is_u64() {
+            return value.as_u64().unwrap();
+        }
+    }
+
+    if let Some(count) = count {
+        let count_val = count.value();
+        if let Some(count_u64) = count_val.as_u64() {
+            return start
+                .checked_add(count_u64)
+                .unwrap_or(max_size)
+                .min(max_size);
+        }
+    }
+    max_size
 }
