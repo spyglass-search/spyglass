@@ -89,7 +89,6 @@ pub async fn open_result(
                 let _ = url.set_host(None);
             }
 
-            log::debug!("{:?} - {:?}", url, application);
             if let Err(err) = os_open(&url, application) {
                 log::warn!("Unable to open {} due to: {}", url.to_string(), err);
                 return Err(err.to_string());
@@ -107,7 +106,7 @@ pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), Stri
         .clipboard_manager()
         .write_text(String::from(txt))
     {
-        log::error!("Error copying content to clipboard {:?}", error);
+        log::warn!("Error copying content to clipboard {:?}", error);
         return Err(error.to_string());
     }
     Ok(())
