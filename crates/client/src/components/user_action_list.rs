@@ -1,4 +1,4 @@
-use crate::components::icons::{self, ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
+use crate::components::icons::{ArrowTopRightOnSquare, BookOpen, ClipboardDocumentIcon};
 use crate::components::{KeyComponent, ModifierIcon};
 use crate::{tauri_invoke, utils};
 use gloo::utils::window;
@@ -89,11 +89,6 @@ pub fn action_icon(props: &ActionIconProps) -> Html {
               <ArrowTopRightOnSquare height="h-4" width="w-4"/>
             }
         }
-        UserAction::OpenUrl(_) => {
-            html! {
-                <icons::FolderIcon height="h-4" width="w-4" />
-            }
-        }
         UserAction::CopyToClipboard(_) => {
             html! {
               <ClipboardDocumentIcon height="h-4" width="w-4"/>
@@ -163,27 +158,6 @@ pub async fn execute_action(selected: SearchResult, action: UserActionDefinition
     reg.register_escape_fn(handlebars::no_escape);
 
     match action.action {
-        UserAction::OpenUrl(argument) => {
-            let url = match reg.render_template(argument.as_str(), &template_input) {
-                Ok(val) => val,
-                Err(_) => template_input.url.clone(),
-            };
-
-            spawn_local(async move {
-                if let Err(err) = tauri_invoke::<OpenResultParams, ()>(
-                    ClientInvoke::OpenResult,
-                    OpenResultParams {
-                        url,
-                        application: None,
-                    },
-                )
-                .await
-                {
-                    let window = window();
-                    let _ = window.alert_with_message(&err);
-                }
-            });
-        }
         UserAction::OpenApplication(app_path, argument) => {
             let url = match reg.render_template(argument.as_str(), &template_input) {
                 Ok(val) => val,
