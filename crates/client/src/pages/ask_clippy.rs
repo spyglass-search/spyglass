@@ -13,6 +13,16 @@ use yew::NodeRef;
 use crate::components::{btn, icons};
 use crate::tauri_invoke;
 
+#[allow(dead_code)]
+#[derive(Clone, PartialEq, Eq)]
+enum Attachment {
+    Document {
+        doc_id: String,
+        title: String,
+        open_url: String,
+    },
+}
+
 #[derive(Clone, PartialEq, Eq)]
 enum HistorySource {
     Clippy,
@@ -22,6 +32,8 @@ enum HistorySource {
 
 #[derive(Clone, PartialEq, Eq)]
 struct HistoryItem {
+    attachment: Option<Attachment>,
+    /// Who "wrote" this response
     source: HistorySource,
     value: String,
 }
@@ -34,6 +46,7 @@ impl HistoryItem {
 
 pub struct AskClippy {
     clippy_input_ref: NodeRef,
+    current_context: Option<Vec<String>>,
     history: Vec<HistoryItem>,
     history_ref: NodeRef,
     in_progress: bool,
@@ -45,6 +58,7 @@ pub enum Msg {
     AskClippy { query: String, docs: Vec<String> },
     HandleAskRequest,
     HandleResponse(LLMResponsePayload),
+    SetContext(Vec<String>),
     SetError(String),
 }
 
@@ -108,10 +122,14 @@ impl Component for AskClippy {
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
                     match from_value::<ListenPayload<SendToAskClippyPayload>>(payload) {
                         Ok(res) => {
-                            link.send_message(Msg::AskClippy {
-                                query: res.payload.question,
-                                docs: res.payload.docs,
-                            });
+                            if let Some(query) = res.payload.question {
+                                link.send_message(Msg::AskClippy {
+                                    query,
+                                    docs: res.payload.docs,
+                                });
+                            } else if !res.payload.docs.is_empty() {
+                                link.send_message(Msg::SetContext(res.payload.docs))
+                            }
                         }
                         Err(err) => {
                             console_dbg!("unable to parse SendToAskClippy: {}", err);
@@ -126,6 +144,7 @@ impl Component for AskClippy {
 
         Self {
             clippy_input_ref: NodeRef::default(),
+            current_context: None,
             history: Vec::new(),
             history_ref: NodeRef::default(),
             in_progress: false,
@@ -142,6 +161,7 @@ impl Component for AskClippy {
                 // move existing result to history
                 if let Some(value) = &self.tokens {
                     self.history.push(HistoryItem {
+                        attachment: None,
                         source: HistorySource::Clippy,
                         value: value.to_owned(),
                     })
@@ -164,6 +184,7 @@ impl Component for AskClippy {
 
                 // push the user's question to the stack.
                 self.history.push(HistoryItem {
+                    attachment: None,
                     source: HistorySource::User,
                     value: query.to_string(),
                 });
@@ -219,6 +240,10 @@ impl Component for AskClippy {
                 self.process_result(link.clone(), resp);
                 true
             }
+            Msg::SetContext(docs) => {
+                self.current_context = Some(docs);
+                true
+            }
             Msg::SetError(err) => {
                 self.status = Some(format!("Error: {err}"));
                 false
@@ -259,6 +284,9 @@ impl Component for AskClippy {
                         </div>
                     </div>
                     <div class="p-4">
+                        {if let Some(context) = &self.current_context {
+                                html! { <AttachmentList docs={context.clone()} /> }
+                        } else { html! {} }}
                         <div class="flex flex-row gap-8 items-center">
                             <textarea
                                 ref={self.clippy_input_ref.clone()}
@@ -285,6 +313,31 @@ impl Component for AskClippy {
                 </div>
             </div>
         }
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct AttachmentListProps {
+    pub docs: Vec<String>
+}
+
+#[function_component(AttachmentList)]
+fn attachment_comp(props: &AttachmentListProps) -> Html {
+
+    let list = props.docs.iter()
+        .map(|x| html! {
+            <div class="flex flex-row border-2 border-cyan-600 rounded-full px-4 py-1 bg-cyan-900 cursor-pointer hover:bg-cyan-600 items-center gap-2">
+                <icons::LinkIcon classes={classes!("inline")} height="h-4" width="w-4" />
+                {x}
+            </div>
+        })
+        .collect::<Html>();
+
+    html! {
+        <div class="mb-2 flex flex-row place-content-end items-center gap-2 text-xs">
+            <span class="text-neutral-500">{"Asking about:"}</span>
+            {list}
+        </div>
     }
 }
 

@@ -460,14 +460,14 @@ pub async fn ask_clippy(
 #[tauri::command]
 pub async fn send_to_ask_clippy(
     win: tauri::Window,
-    question: &str,
+    question: Option<String>,
     docs: Vec<String>,
 ) -> Result<(), String> {
+    log::debug!("{:?} - {:?}", question, docs);
     let window = show_ask_clippy(&win.app_handle());
-    // Give the window some time to show up
-    let question = question.to_string();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_millis(256)).await;
+        // Give the window some time to show up
+        tokio::time::sleep(tokio::time::Duration::from_millis(512)).await;
         let _ = window.emit(
             ClientEvent::SendToAskClippy.as_ref(),
             SendToAskClippyPayload { question, docs },

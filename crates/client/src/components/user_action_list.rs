@@ -157,6 +157,20 @@ pub async fn execute_action(selected: SearchResult, action: UserActionDefinition
     reg.register_escape_fn(handlebars::no_escape);
 
     match action.action {
+        UserAction::AskClippy(template) => {
+            if let Ok(doc_id) = reg.render_template(&template, &template_input) {
+                spawn_local(async move {
+                    let _ = tauri_invoke::<SendToAskClippyPayload, ()>(
+                        ClientInvoke::SendToAskClippy,
+                        SendToAskClippyPayload {
+                            docs: vec![doc_id],
+                            question: None,
+                        },
+                    )
+                    .await;
+                });
+            }
+        }
         UserAction::OpenApplication(app_path, argument) => {
             let url = match reg.render_template(argument.as_str(), &template_input) {
                 Ok(val) => val,

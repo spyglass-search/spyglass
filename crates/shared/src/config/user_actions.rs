@@ -234,12 +234,20 @@ impl Default for UserActionSettings {
     // List of default actions when no other actions are configured
     fn default() -> Self {
         Self {
-            actions: vec![UserActionDefinition {
-                action: UserAction::CopyToClipboard(String::from("{{ open_url }}")),
-                key_binding: String::from("CmdOrCtrl+C"),
-                label: String::from("Copy URL to Clipboard"),
-                status_msg: Some(String::from("Copying...")),
-            }],
+            actions: vec![
+                UserActionDefinition {
+                    action: UserAction::CopyToClipboard(String::from("{{ open_url }}")),
+                    key_binding: String::from("CmdOrCtrl+C"),
+                    label: String::from("Copy URL to Clipboard"),
+                    status_msg: Some(String::from("Copying...")),
+                },
+                UserActionDefinition {
+                    action: UserAction::AskClippy("{{ doc_id }}".into()),
+                    key_binding: String::from("CmdOrCtrl+Enter"),
+                    label: String::from("Ask Clippy"),
+                    status_msg: None,
+                }
+            ],
             context_actions: vec![ContextActions {
                 context: ContextFilter {
                     has_tag: Some(vec![("type".into(), "file".into())]),

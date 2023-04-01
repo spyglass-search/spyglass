@@ -147,7 +147,13 @@ pub struct ModelStatusPayload {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SendToAskClippyParams {
+    pub question: Option<String>,
+    pub docs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SendToAskClippyPayload {
-    pub question: String,
+    pub question: Option<String>,
     pub docs: Vec<String>,
 }
