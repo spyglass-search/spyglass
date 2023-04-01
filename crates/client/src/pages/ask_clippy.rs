@@ -1,7 +1,8 @@
 use gloo::console::console_dbg;
 use serde_wasm_bindgen::from_value;
-use shared::event::{self, ClientEvent, ListenPayload, SendToAskClippyPayload};
+use shared::event::{self, ClientEvent, ListenPayload};
 use shared::request::{AskClippyRequest, ClippyContext, LLMResponsePayload};
+use shared::response::{DocMetadata, SendToAskClippyPayload};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
 use web_sys::{HtmlElement, HtmlInputElement};
@@ -13,16 +14,6 @@ use yew::NodeRef;
 use crate::components::{btn, icons};
 use crate::tauri_invoke;
 
-#[allow(dead_code)]
-#[derive(Clone, PartialEq, Eq)]
-enum Attachment {
-    Document {
-        doc_id: String,
-        title: String,
-        open_url: String,
-    },
-}
-
 #[derive(Clone, PartialEq, Eq)]
 enum HistorySource {
     Clippy,
@@ -32,7 +23,7 @@ enum HistorySource {
 
 #[derive(Clone, PartialEq, Eq)]
 struct HistoryItem {
-    attachment: Option<Attachment>,
+    attachments: Option<Vec<DocMetadata>>,
     /// Who "wrote" this response
     source: HistorySource,
     value: String,
@@ -46,7 +37,7 @@ impl HistoryItem {
 
 pub struct AskClippy {
     clippy_input_ref: NodeRef,
-    current_context: Option<Vec<String>>,
+    current_context: Option<Vec<DocMetadata>>,
     history: Vec<HistoryItem>,
     history_ref: NodeRef,
     in_progress: bool,
@@ -55,10 +46,10 @@ pub struct AskClippy {
 }
 
 pub enum Msg {
-    AskClippy { query: String, docs: Vec<String> },
+    AskClippy { query: String },
     HandleAskRequest,
     HandleResponse(LLMResponsePayload),
-    SetContext(Vec<String>),
+    SetContext(Vec<DocMetadata>),
     SetError(String),
 }
 
@@ -123,10 +114,7 @@ impl Component for AskClippy {
                     match from_value::<ListenPayload<SendToAskClippyPayload>>(payload) {
                         Ok(res) => {
                             if let Some(query) = res.payload.question {
-                                link.send_message(Msg::AskClippy {
-                                    query,
-                                    docs: res.payload.docs,
-                                });
+                                link.send_message(Msg::AskClippy { query });
                             } else if !res.payload.docs.is_empty() {
                                 link.send_message(Msg::SetContext(res.payload.docs))
                             }
@@ -156,12 +144,12 @@ impl Component for AskClippy {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AskClippy { query, docs: _ } => {
+            Msg::AskClippy { query } => {
                 self.in_progress = true;
                 // move existing result to history
                 if let Some(value) = &self.tokens {
                     self.history.push(HistoryItem {
-                        attachment: None,
+                        attachments: None,
                         source: HistorySource::Clippy,
                         value: value.to_owned(),
                     })
@@ -182,13 +170,15 @@ impl Component for AskClippy {
                 // Reverse again so they're in order from oldest to newest.
                 context.reverse();
 
-                // push the user's question to the stack.
+                // push the user's question to the stack & clear the current context
+                // (if any).
                 self.history.push(HistoryItem {
-                    attachment: None,
+                    attachments: self.current_context.clone(),
                     source: HistorySource::User,
                     value: query.to_string(),
                 });
-
+                // reset input
+                self.current_context = None;
                 self.tokens = None;
                 self.status = None;
 
@@ -224,10 +214,7 @@ impl Component for AskClippy {
                         return false;
                     }
 
-                    link.send_message(Msg::AskClippy {
-                        query,
-                        docs: Vec::new(),
-                    });
+                    link.send_message(Msg::AskClippy { query });
                 }
 
                 true
@@ -274,8 +261,7 @@ impl Component for AskClippy {
                             <span
                                 class="cursor-help underline font-semibold text-cyan-500"
                                 onclick={link.callback(|_| Msg::AskClippy {
-                                    query: "what is a language model?".into(),
-                                    docs: Vec::new()
+                                    query: "what is a language model?".into()
                                 })}
                             >
                                 {"LLMs"}
@@ -318,18 +304,21 @@ impl Component for AskClippy {
 
 #[derive(Properties, PartialEq)]
 struct AttachmentListProps {
-    pub docs: Vec<String>
+    pub docs: Vec<DocMetadata>
 }
 
 #[function_component(AttachmentList)]
 fn attachment_comp(props: &AttachmentListProps) -> Html {
-
     let list = props.docs.iter()
         .map(|x| html! {
-            <div class="flex flex-row border-2 border-cyan-600 rounded-full px-4 py-1 bg-cyan-900 cursor-pointer hover:bg-cyan-600 items-center gap-2">
+            <a
+                class="flex flex-row border-2 border-cyan-600 rounded-full px-4 py-1 bg-cyan-900 cursor-pointer hover:bg-cyan-600 items-center gap-2"
+                href={x.open_url.clone()}
+                target="_blank"
+            >
                 <icons::LinkIcon classes={classes!("inline")} height="h-4" width="w-4" />
-                {x}
-            </div>
+                {x.title.clone()}
+            </a>
         })
         .collect::<Html>();
 
@@ -353,7 +342,11 @@ fn history_log(props: &HistoryLogProps) -> Html {
         .iter()
         .map(|item| {
             html! {
-                <HistoryLogItem source={item.source.clone()} tokens={item.value.clone()} />
+                <HistoryLogItem
+                    attachments={item.attachments.clone()}
+                    source={item.source.clone()}
+                    tokens={item.value.clone()}
+                />
             }
         })
         .collect::<Html>();
@@ -362,6 +355,7 @@ fn history_log(props: &HistoryLogProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 struct HistoryLogItemProps {
+    pub attachments: Option<Vec<DocMetadata>>,
     pub source: HistorySource,
     pub tokens: String,
     // Is this a item currently generating tokens?
@@ -386,18 +380,27 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
     let html = html.trim_end_matches("</p>").to_string();
     let html = format!("<p class=\"inline\">{}</p>", html);
 
+    let attachments = if let Some(docs) = &props.attachments {
+        html! { <AttachmentList docs={docs.clone()} /> }
+    } else {
+        html! {}
+    };
+
     html! {
         <div class="border-t border-t-neutral-700 p-4 text-sm text-white items-center flex flex-row gap-4 animate-fade-in">
             <div class={classes!("flex", "flex-none", "border", "border-cyan-600", "w-[48px]", "h-[48px]", "rounded-full", "items-center", icon_pos)}>
                 <div class="text-xl mx-auto">{user_icon}</div>
             </div>
             <div class={classes!("grow", text_pos)}>
-                {Html::from_html_unchecked(AttrValue::from(html))}
-                { if props.is_in_progress {
-                    html! { <div class="inline-block h-4 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
-                } else {
-                    html! {}
-                }}
+                {attachments}
+                <div>
+                    {Html::from_html_unchecked(AttrValue::from(html))}
+                    { if props.is_in_progress {
+                        html! { <div class="inline-block h-4 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
+                    } else {
+                        html! {}
+                    }}
+                </div>
             </div>
         </div>
     }

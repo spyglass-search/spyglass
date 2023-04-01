@@ -5,14 +5,14 @@ use jsonrpsee::core::{async_trait, Error};
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use jsonrpsee::types::{SubscriptionEmptyError, SubscriptionResult};
 use jsonrpsee::SubscriptionSink;
-use libspyglass::search::{self, Searcher};
+use libspyglass::search::{self, Searcher, document_to_struct};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
 use shared::request::{
     AskClippyRequest, BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam,
 };
-use shared::response::{self as resp, DefaultIndices, LibraryStats};
+use shared::response::{self as resp, DefaultIndices, LibraryStats, DocMetadata};
 use spyglass_rpc::{RpcEventType, RpcServer};
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -107,6 +107,27 @@ impl RpcServer for SpyglassRpc {
             }
         } else {
             Ok(false)
+        }
+    }
+
+    async fn get_metadata(&self, id: String) -> Result<resp::DocMetadata, Error> {
+        if let Some(doc) = Searcher::get_by_id(&self.state.index.reader, &id).and_then(|d| document_to_struct(&d).ok()) {
+            let indexed = indexed_document::Entity::find()
+                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
+                .one(&self.state.db)
+                .await;
+
+            let open_url = indexed.ok()
+                .and_then(|d| d)
+                .and_then(|d| d.open_url);
+
+            Ok(DocMetadata {
+                doc_id: id,
+                title: doc.title,
+                open_url: open_url.unwrap_or(doc.url),
+            })
+        } else {
+            Err(Error::Custom("Unable to find document".into()))
         }
     }
 

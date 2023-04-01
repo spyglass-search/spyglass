@@ -3,9 +3,8 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
-use shared::event::SendToAskClippyPayload;
 use shared::request::{AskClippyRequest, ClippyContext};
-use shared::response::{DefaultIndices, SearchResults};
+use shared::response::{DefaultIndices, SearchResults, SendToAskClippyPayload};
 use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
 use tauri::{ClipboardManager, Manager};
@@ -463,8 +462,25 @@ pub async fn send_to_ask_clippy(
     question: Option<String>,
     docs: Vec<String>,
 ) -> Result<(), String> {
-    log::debug!("{:?} - {:?}", question, docs);
     let window = show_ask_clippy(&win.app_handle());
+
+    // Grab doc metadata from backend
+    let docs = if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        let mut doc_md = Vec::new();
+        for id in docs {
+            match rpc.client.get_metadata(id.to_string()).await {
+                Ok(doc) => doc_md.push(doc),
+                Err(err) => log::error!("err: {err}")
+            }
+        }
+        doc_md
+    } else {
+        Vec::new()
+    };
+
+    // Send to ask clippy window
+    log::debug!("{:?} - {:?}", question, docs);
     tauri::async_runtime::spawn(async move {
         // Give the window some time to show up
         tokio::time::sleep(tokio::time::Duration::from_millis(512)).await;

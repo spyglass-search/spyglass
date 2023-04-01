@@ -6,7 +6,7 @@ use shared::request::{
 };
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
-    SearchLensesResp, SearchResults,
+    SearchLensesResp, SearchResults, DocMetadata
 };
 use std::collections::HashMap;
 
@@ -43,6 +43,10 @@ pub trait Rpc {
     /// Ask clippy, LLM magic
     #[method(name = "clippy.ask")]
     async fn ask_clippy(&self, query: AskClippyRequest) -> Result<(), Error>;
+
+    /// Get document metadata
+    #[method(name = "index.get_metadata")]
+    async fn get_metadata(&self, id: String) -> Result<DocMetadata, Error>;
 
     #[method(name = "authorize_connection")]
     async fn authorize_connection(&self, id: String) -> Result<(), Error>;

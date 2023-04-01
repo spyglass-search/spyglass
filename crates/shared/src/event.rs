@@ -146,14 +146,9 @@ pub struct ModelStatusPayload {
     pub percent: String,
 }
 
+/// Sent from client -> backend
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SendToAskClippyParams {
-    pub question: Option<String>,
-    pub docs: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SendToAskClippyPayload {
     pub question: Option<String>,
     pub docs: Vec<String>,
 }

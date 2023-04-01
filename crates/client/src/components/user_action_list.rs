@@ -7,7 +7,7 @@ use handlebars::{
 };
 use shared::accelerator;
 use shared::config::{self, UserAction, UserActionDefinition};
-use shared::event::{ClientInvoke, CopyContext, OpenResultParams, SendToAskClippyPayload};
+use shared::event::{ClientInvoke, CopyContext, OpenResultParams, SendToAskClippyParams};
 use shared::response::{SearchResult, SearchResultTemplate};
 use yew::function_component;
 use yew::platform::spawn_local;
@@ -160,9 +160,9 @@ pub async fn execute_action(selected: SearchResult, action: UserActionDefinition
         UserAction::AskClippy(template) => {
             if let Ok(doc_id) = reg.render_template(&template, &template_input) {
                 spawn_local(async move {
-                    let _ = tauri_invoke::<SendToAskClippyPayload, ()>(
+                    let _ = tauri_invoke::<SendToAskClippyParams, ()>(
                         ClientInvoke::SendToAskClippy,
-                        SendToAskClippyPayload {
+                        SendToAskClippyParams {
                             docs: vec![doc_id],
                             question: None,
                         },
