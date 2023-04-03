@@ -67,7 +67,7 @@ jobs:
       run: |
         echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
         echo "target_ext=.exe" >> $env:GITHUB_ENV
-        echo "target_os_name=win" >> $env:GITHUB_ENV 
+        echo "target_os_name=win" >> $env:GITHUB_ENV
     - name: Setup arch target (mac only)
       if: matrix.platform == 'macos-latest'
       run: |
@@ -94,8 +94,7 @@ jobs:
         cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
         cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
 
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-x86_64-apple-darwin;
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-aarch64-apple-darwin;
+        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-universal-apple-darwin;
 
         lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass \
@@ -105,8 +104,6 @@ jobs:
           target/x86_64-apple-darwin/release/spyglass-debug \
           target/aarch64-apple-darwin/release/spyglass-debug;
 
-        lipo -create -output crates/tauri/binaries/pdftotext-universal-apple-darwin \
-          utils/mac/pdftotext;
     - name: build default plugins
       run: make build-plugins-release
     - name: import windows certificate
