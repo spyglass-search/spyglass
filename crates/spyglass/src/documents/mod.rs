@@ -27,10 +27,9 @@ use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionT
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
 pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
-    log::debug!("Deleting {:?} documents", uri.len());
+    log::info!("Deleting {} documents", uri.len());
 
     // Delete from crawl queue
-
     if let Err(error) = crawl_queue::delete_many_by_url(&state.db, &uri).await {
         log::error!("Error delete items from crawl queue {:?}", error);
     }
@@ -65,8 +64,10 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
 
         // now that the documents are deleted delete from the queue
         if let Err(error) = indexed_document::delete_many_by_url(&state.db, chunk).await {
-            log::error!("Error deleting for indexed document store {:?}", error);
+            log::warn!("Error deleting for indexed document store {:?}", error);
         }
+
+        log::info!("chunk: deleted {} ({}) docs from index", chunk.len(), existing.len());
     }
 }
 
