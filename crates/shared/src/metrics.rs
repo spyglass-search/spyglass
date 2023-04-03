@@ -25,6 +25,8 @@ pub enum Event {
     AuthorizeConnection { api_id: String },
     #[strum(serialize = "install_lens")]
     InstallLens { lens: String },
+    #[strum(serialize = "install_lens_from_url")]
+    InstallLensFromUrl { lens: String },
     #[strum(serialize = "spyglass_started")]
     SpyglassStarted,
     #[strum(serialize = "local_file_scanning_enabled")]
@@ -106,6 +108,10 @@ impl Metrics {
                     .insert("api_id".into(), api_id.to_owned().into());
             }
             Event::InstallLens { lens } => {
+                data.properties
+                    .insert("lens".into(), lens.to_owned().into());
+            }
+            Event::InstallLensFromUrl { lens } => {
                 data.properties
                     .insert("lens".into(), lens.to_owned().into());
             }

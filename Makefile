@@ -17,6 +17,13 @@ build-backend:
 	mkdir -p crates/tauri/binaries
 	cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
 	cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-$(TARGET_ARCH)
+ifneq ($(strip $(findstring windows,$(TARGET_ARCH))),)
+	cp utils/win/pdftotext.exe crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH)).exe
+else ifneq ($(strip $(findstring mac,$(TARGET_ARCH))),)
+	cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
+else
+	cp utils/linux/pdftotext crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
+endif
 
 build-client:
 	cargo build -p spyglass-client -p spyglass-app
@@ -76,6 +83,10 @@ setup-dev:
 	cargo install --locked trunk
 # Install tailwind
 	cd ./crates/client && npm install
+# Download whisper model used in development
+	mkdir -p assets/models;
+	curl -L --output whisper.base.en.bin https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
+	mv whisper.base.en.bin assets/models;
 
 # Specifically for debian based distros
 setup-dev-linux:
@@ -86,7 +97,9 @@ setup-dev-linux:
 		libssl-dev \
 		libgtk-3-dev \
 		libayatana-appindicator3-dev \
-		librsvg2-dev
+		librsvg2-dev \
+		cmake \
+		libsdl2-dev
 
 run-client-dev:
 	cargo tauri dev

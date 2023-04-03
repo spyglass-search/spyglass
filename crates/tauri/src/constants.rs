@@ -1,3 +1,5 @@
+use strum_macros::{AsRefStr, Display, EnumString};
+
 pub const INPUT_WIDTH: f64 = 640.0;
 pub const INPUT_Y: f64 = 128.0;
 
@@ -15,3 +17,18 @@ pub const SETTINGS_WIN_NAME: &str = "settings_window";
 pub const STARTUP_WIN_NAME: &str = "startup_window";
 pub const UPDATE_WIN_NAME: &str = "update_window";
 pub const WIZARD_WIN_NAME: &str = "wizard_window";
+pub const PROGRESS_WIN_NAME: &str = "progress_window";
+
+#[derive(Display, EnumString, AsRefStr)]
+pub enum TabLocation {
+    #[strum(serialize = "/settings/connections")]
+    Connections,
+    #[strum(serialize = "/settings/discover")]
+    Discover,
+    #[strum(serialize = "/settings/library")]
+    Library,
+    #[strum(serialize = "/settings/plugins")]
+    PluginSettings,
+    #[strum(serialize = "/settings/user")]
+    UserSettings,
+}

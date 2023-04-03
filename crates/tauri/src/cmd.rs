@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
@@ -7,19 +8,15 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
 use tauri::{ClipboardManager, Manager};
 
-use crate::window::show_discover_window;
+use crate::constants::TabLocation;
+use crate::window::navigate_to_tab;
 use crate::PauseState;
 use crate::{open_folder, rpc, window};
 use shared::config::{Config, UserSettings};
 use shared::{event::ClientEvent, request, response};
 use spyglass_rpc::RpcClient;
 
-#[cfg(target_os = "linux")]
-use super::platform::linux::os_open;
-#[cfg(target_os = "macos")]
-use super::platform::mac::os_open;
-#[cfg(target_os = "windows")]
-use super::platform::windows::os_open;
+use super::platform::os_open;
 
 mod settings;
 pub use settings::*;
@@ -109,7 +106,7 @@ pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), Stri
         .clipboard_manager()
         .write_text(String::from(txt))
     {
-        log::error!("Error copying content to clipboard {:?}", error);
+        log::warn!("Error copying content to clipboard {:?}", error);
         return Err(error.to_string());
     }
     Ok(())
@@ -346,13 +343,17 @@ pub async fn get_shortcut(win: tauri::Window) -> Result<String, String> {
 pub async fn wizard_finished(
     win: tauri::Window,
     config: State<'_, Config>,
+    toggle_audio_transcription: bool,
     toggle_file_indexer: bool,
 ) -> Result<(), String> {
     let mut current_settings = config.user_settings.clone();
     current_settings.run_wizard = true;
+
     current_settings
         .filesystem_settings
         .enable_filesystem_scanning = toggle_file_indexer;
+
+    current_settings.audio_settings.enable_audio_transcription = toggle_audio_transcription;
 
     if let Err(error) = update_user_settings(win.clone(), &current_settings).await {
         log::error!("Error saving initial settings {:?}", error);
@@ -361,7 +362,10 @@ pub async fn wizard_finished(
     // close wizard window
     if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
         let _ = window.close();
-        show_discover_window(&window.app_handle());
+        navigate_to_tab(
+            &window.app_handle(),
+            &crate::constants::TabLocation::Discover,
+        );
     }
 
     Ok(())
@@ -420,6 +424,9 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
 
 #[tauri::command]
 pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
-    super::window::_show_tab(&win.app_handle(), &page);
+    if let Ok(tab_loc) = TabLocation::from_str(&page) {
+        super::window::navigate_to_tab(&win.app_handle(), &tab_loc);
+    }
+
     Ok(())
 }

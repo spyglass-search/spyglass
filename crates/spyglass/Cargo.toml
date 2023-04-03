@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "23.3.2"
+version = "23.4.1"
 edition = "2021"
 default-run = "spyglass"
 
@@ -22,7 +22,7 @@ entities = { path = "../entities" }
 flate2 = "1.0.24"
 futures = "0.3"
 glob = "0.3.1"
-governor = "0.5"
+governor = "0.5.1"
 hex = "0.4"
 http = "0.2"
 ignore = "0.4"
@@ -38,17 +38,19 @@ num-format = "0.4"
 open = "3.0"
 percent-encoding = "2.2"
 regex = "1"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["stream", "json"] }
 ron = "0.8"
+rubato = "0.12.0"
 rusqlite = { version = "*", features = ["bundled"] }
-sentry = "0.29.0"
-sentry-tracing = "0.29.0"
+sentry = "0.30.0"
+sentry-tracing = "0.30.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 strum = "0.24"
 strum_macros = "0.24"
-tantivy = "0.18"
+symphonia = { version = "0.5.2", features = ["aac", "isomp4", "mp3", "mpa"] }
+tantivy = "0.19"
 tendril = "0.4.2"
 thiserror = "1.0.37"
 tokio = { version = "1", features = ["full"] }
@@ -63,6 +65,7 @@ warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
+whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "cf278027eeb5aa849360f664de2c34287418c625" }
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
@@ -75,6 +78,9 @@ shared = { path = "../shared", features = ["metrics"] }
 spyglass-netrunner = "0.2.10"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
+
+[dev-dependencies]
+tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
 
 [features]
 tokio-console = ["tokio/tracing", "console-subscriber"]

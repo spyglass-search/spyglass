@@ -34,6 +34,7 @@ spyglass-rpc = { path = "../spyglass-rpc" }
 strum = "0.24"
 strum_macros = "0.24"
 tauri = { version = "1.2.4", features = ["api-all", "clipboard", "devtools", "macos-private-api", "notification", "system-tray", "updater"] }
+tauri-plugin-deep-link = { git = "https://github.com/FabianLars/tauri-plugin-deep-link.git", rev = "644046bc08e1066d00fa9be60b46cc6de8f2a901" }
 tokio = "1"
 tokio-retry = "0.3"
 tracing = "0.1"
@@ -50,6 +51,9 @@ rev = "6c63c49e29e670343b71fee455e1a6c9145f4a8e"
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24"
 objc = "0.2.7"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.39.0", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
 default = [ "custom-protocol" ]

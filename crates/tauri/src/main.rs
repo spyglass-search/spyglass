@@ -2,8 +2,7 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
-#[allow(unused_imports)]
-use std::borrow::Cow;
+use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -23,16 +22,10 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use diff::Diff;
+use platform::os_open;
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use spyglass_rpc::RpcClient;
-
-#[cfg(target_os = "linux")]
-use platform::linux::os_open;
-#[cfg(target_os = "macos")]
-use platform::mac::os_open;
-#[cfg(target_os = "windows")]
-use platform::windows::os_open;
 
 mod cmd;
 mod constants;
@@ -42,10 +35,7 @@ mod platform;
 mod plugins;
 mod rpc;
 mod window;
-use window::{
-    show_connection_manager_window, show_lens_manager_window, show_plugin_manager, show_search_bar,
-    show_update_window, show_user_settings, show_wizard_window,
-};
+use window::{navigate_to_tab, show_search_bar, show_update_window, show_wizard_window};
 
 use crate::window::get_searchbar;
 
@@ -63,6 +53,7 @@ pub enum AppEvent {
 type PauseState = AtomicBool;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tauri_plugin_deep_link::prepare("com.athlabs.spyglass");
     let ctx = tauri::generate_context!();
     let current_version = format!("v20{}", &ctx.package_info().version);
     let config = Config::new();
@@ -74,7 +65,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(sentry::init((
             "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
             sentry::ClientOptions {
-                release: Some(Cow::from(ctx.package_info().version.to_string())),
+                release: Some(std::borrow::Cow::from(
+                    ctx.package_info().version.to_string(),
+                )),
                 traces_sample_rate: 0.1,
                 ..Default::default()
             },
@@ -177,6 +170,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ));
 
             register_global_shortcut(&startup_win, &app_handle, &config.user_settings);
+            let app_handle_clone = app_handle.clone();
+            if let Err(err) = tauri_plugin_deep_link::register("spyglass", move |request| {
+                app_handle_clone.trigger_global("scheme-request-received", Some(request));
+            }) {
+                log::warn!("Unable to register custom scheme: {}", err);
+            } else {
+                // Otherwise register a handler for the scheme evetn
+                let ah = app_handle.clone();
+                app_handle.listen_global("scheme-request-received", move |event| {
+                    tauri::async_runtime::spawn(on_custom_scheme_request(ah.clone(), event));
+                });
+            }
 
             Ok(())
         })
@@ -198,19 +203,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 tauri::async_runtime::spawn(pause_crawler(app.clone(), id.clone()));
                             }
                             MenuID::DISCOVER => {
-                                window::show_discover_window(app);
+                                navigate_to_tab(app, &crate::constants::TabLocation::Discover);
                             }
                             MenuID::OPEN_CONNECTION_MANAGER => {
-                                show_connection_manager_window(app);
+                                navigate_to_tab(app, &crate::constants::TabLocation::Connections);
                             }
                             MenuID::OPEN_LENS_MANAGER => {
-                                show_lens_manager_window(app);
+                                navigate_to_tab(app, &crate::constants::TabLocation::Library);
                             }
                             MenuID::OPEN_PLUGIN_MANAGER => {
-                                show_plugin_manager(app);
+                                navigate_to_tab(
+                                    app,
+                                    &crate::constants::TabLocation::PluginSettings,
+                                );
                             }
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
-                            MenuID::OPEN_SETTINGS_MANAGER => show_user_settings(app),
+                            MenuID::OPEN_SETTINGS_MANAGER => {
+                                navigate_to_tab(app, &crate::constants::TabLocation::UserSettings);
+                            }
                             MenuID::OPEN_WIZARD => {
                                 show_wizard_window(app);
                             }
@@ -270,6 +280,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Handle custom scheme requests (spyglass:// urls).
+async fn on_custom_scheme_request(app_handle: AppHandle, event: tauri::Event) {
+    if let Some(request) = event.payload().and_then(|s| url::Url::parse(s).ok()) {
+        log::debug!("Received custom uri request: {}", &request);
+        // Parse the command from the request
+        let event = request.domain().unwrap_or_default();
+        let command = request.path();
+        let args = request
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<String, String>>();
+
+        // Only really one event right now but gives us room to grow.
+        if event == "command" && command == "/install-lens" {
+            if let Some(lens_name) = args.get("name") {
+                log::info!("installing lens from app url: {}", lens_name);
+                let _ = window::notify(&app_handle, "Spyglass", "Installing lens...");
+
+                // track stuff if metrics is enabled
+                if let Some(metrics) = app_handle.try_state::<Metrics>() {
+                    metrics
+                        .track(Event::InstallLensFromUrl {
+                            lens: lens_name.clone(),
+                        })
+                        .await;
+                }
+
+                let _ = crate::plugins::lens_updater::handle_install_lens(
+                    &app_handle,
+                    lens_name,
+                    false,
+                )
+                .await;
+            }
+        }
+
+        log::debug!("parsed: {} - {} - {:?}", event, command, args);
+    }
+}
+
 // Applies updated configuration to the client
 pub fn configuration_updated(
     window: Window,
@@ -302,7 +352,7 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
     // Register global shortcut
     let mut shortcuts = app_handle.global_shortcut_manager();
     if let Err(error) = shortcuts.unregister_all() {
-        log::info!("Unable to unregister all shortcuts {:?}", error);
+        log::warn!("Unable to unregister all shortcuts {:?}", error);
     }
 
     match shortcuts.is_registered(&settings.shortcut) {
@@ -312,7 +362,11 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
                 let app_hand = app_handle.clone();
                 if let Err(e) = shortcuts.register(&settings.shortcut, move || {
                     let window = window::get_searchbar(&app_hand);
-                    window::show_search_bar(&window);
+                    if platform::is_visible(&window) {
+                        window::hide_search_bar(&window)
+                    } else {
+                        window::show_search_bar(&window);
+                    }
                 }) {
                     window::alert(window, "Error registering global shortcut", &format!("{e}"));
                 }

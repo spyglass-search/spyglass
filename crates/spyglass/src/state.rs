@@ -19,6 +19,38 @@ use crate::{
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 use shared::metrics::Metrics;
 
+/// Used to track inflight requests and limit things
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum FetchLimitType {
+    Audio,
+    File,
+}
+
+impl FetchLimitType {
+    pub async fn check_and_wait(
+        fetch_limits: &DashMap<FetchLimitType, usize>,
+        limit_type: Self,
+        limit: usize,
+        wait_log: &str,
+    ) {
+        {
+            if !fetch_limits.contains_key(&limit_type) {
+                fetch_limits.insert(limit_type.clone(), 0);
+            }
+        }
+
+        while let Some(inflight) = fetch_limits.view(&limit_type, |_, v| *v) {
+            if inflight >= limit {
+                log::debug!("{wait_log}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            } else {
+                fetch_limits.alter(&limit_type, |_, v| v + 1);
+                break;
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
@@ -43,6 +75,8 @@ pub struct AppState {
     // Pipeline command/control
     pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
     pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
+    // Keep track of in-flight tasks
+    pub fetch_limits: Arc<DashMap<FetchLimitType, usize>>,
 }
 
 impl AppState {
@@ -92,10 +126,12 @@ impl AppState {
 
     pub async fn publish_event(&self, event: &RpcEvent) {
         log::debug!("publishing event: {:?}", event);
-
         let rpc_sub = self.rpc_events.lock().unwrap();
-        if let Err(err) = rpc_sub.send(event.clone()) {
-            log::error!("error sending event: {:?}", err);
+        // no use sending if no one is listening.
+        if rpc_sub.receiver_count() > 0 {
+            if let Err(err) = rpc_sub.send(event.clone()) {
+                log::warn!("error sending event: {:?}", err);
+            }
         }
     }
 }
@@ -162,6 +198,7 @@ impl AppStateBuilder {
             config_cmd_tx: Arc::new(Mutex::new(config_tx)),
             file_watcher: Arc::new(Mutex::new(None)),
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
+            fetch_limits: Arc::new(DashMap::new()),
         }
     }
 

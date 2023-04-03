@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::prelude::*;
 use chrono::Duration;
 use entities::models::tag::TagPair;
+use entities::models::tag::TagType;
 use entities::models::{crawl_queue, fetch_history};
 use entities::sea_orm::prelude::*;
 use governor::clock::QuantaClock;
@@ -18,6 +19,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::num::NonZeroU32;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use url::{Host, Url};
@@ -25,8 +27,10 @@ use url::{Host, Url};
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
+use crate::filesystem::audio;
+use crate::filesystem::extensions::SupportedExt;
 use crate::parser;
-use crate::state::AppState;
+use crate::state::{AppState, FetchLimitType};
 
 pub mod archive;
 pub mod bootstrap;
@@ -40,6 +44,11 @@ type RateLimit = RateLimiter<String, DashMapStateStore<String>, QuantaClock>;
 
 // TODO: Make this configurable by domain
 const FETCH_DELAY_MS: i64 = 1000 * 60 * 60 * 24;
+
+// TODO: Detect num of cpus & determine from there?
+// should probably make these configurable as well
+const AUDIO_TRANSCRIPTION_LIMIT: usize = 2;
+const FILE_PROCESSING_LIMIT: usize = 4;
 
 #[derive(Debug, Error)]
 pub enum CrawlError {
@@ -494,59 +503,140 @@ impl Crawler {
     }
 }
 
-fn _process_file(
+async fn _process_file(
     state: &AppState,
     path: &Path,
     file_name: String,
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
-    let supported_ext = crate::filesystem::utils::get_supported_file_extensions(state);
     // Attempt to read file
-    let contents = match path.extension() {
-        Some(ext) if parser::supports_filetype(ext) => match parser::parse_file(ext, path) {
-            Err(err) => return Err(CrawlError::ParseError(err.to_string())),
-            Ok(contents) => contents,
-        },
-        Some(ext) if supported_ext.contains(ext.to_str().unwrap_or_default()) => {
-            match std::fs::read_to_string(path) {
-                Ok(x) => x,
-                Err(err) => {
-                    return Err(CrawlError::FetchError(err.to_string()));
+    let ext = path.extension();
+
+    let mut content = None;
+    let mut title = Some(file_name.clone());
+    let mut tags = Vec::new();
+
+    if let Some(ext) = ext {
+        let extension = SupportedExt::from_ext(&ext.to_string_lossy());
+
+        // Limit check
+        let limit = match &extension {
+            SupportedExt::Audio(_) => Some((FetchLimitType::Audio, AUDIO_TRANSCRIPTION_LIMIT)),
+            SupportedExt::Code(_) | SupportedExt::Document(_) | SupportedExt::Text(_) => {
+                Some((FetchLimitType::File, FILE_PROCESSING_LIMIT))
+            }
+            _ => None,
+        };
+
+        if let Some((limit_type, limit)) = &limit {
+            FetchLimitType::check_and_wait(
+                &state.fetch_limits,
+                limit_type.clone(),
+                *limit,
+                &format!(
+                    "`{}``: at processing limit, waiting til finished!",
+                    file_name
+                ),
+            )
+            .await;
+        }
+
+        match SupportedExt::from_ext(&ext.to_string_lossy()) {
+            SupportedExt::Audio(_) => {
+                log::debug!("starting transcription for `{}`", file_name);
+                // Attempt to transcribe audio, assumes the model has been downloaded
+                // and ready to go
+                #[cfg(debug_assertions)]
+                let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
+                #[cfg(not(debug_assertions))]
+                let model_path: PathBuf = _state.config.model_dir().join("whisper.base.en.bin");
+
+                if !model_path.exists() {
+                    log::warn!("whisper model not installed, skipping transcription");
+                    content = None;
+                } else {
+                    match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
+                        Ok(result) => {
+                            // Update crawl result with appropriate title/stuff
+                            if let Some(metadata) = result.metadata {
+                                // Update title for audio file, if available
+                                if let Some(track_title) = metadata.title {
+                                    title = Some(track_title);
+                                }
+
+                                // Update author for audio file, if available
+                                if let Some(artist) = metadata.artist {
+                                    tags.push((TagType::Owner, artist));
+                                } else if let Some(artist) = metadata.album {
+                                    tags.push((TagType::Owner, artist));
+                                }
+                            }
+
+                            // Combine segments into one large string.
+                            let combined = result
+                                .segments
+                                .iter()
+                                .map(|x| x.segment.to_string())
+                                .collect::<Vec<String>>()
+                                .join("");
+                            content = Some(combined);
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Skipping transcription: unable to transcribe: `{}`: {}",
+                                path.display(),
+                                err
+                            );
+                        }
+                    }
                 }
             }
+            SupportedExt::Document(_) => match parser::parse_file(ext, path) {
+                Ok(parsed) => {
+                    content = Some(parsed);
+                }
+                Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
+            },
+            // todo: also parse symbols from code files.
+            SupportedExt::Code(_) | SupportedExt::Text(_) => match std::fs::read_to_string(path) {
+                Ok(x) => {
+                    content = Some(x);
+                }
+                Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
+            },
+            // Do nothing for these
+            SupportedExt::NotSupported => {
+                log::warn!("File `{:?}` unsupported returning empty content", path);
+            }
         }
-        _ => {
-            log::warn!(
-                "File type for path {:?} unsupported returning empty content",
-                path
-            );
-            "".to_string()
-        }
-    };
 
-    let mut hasher = Sha256::new();
-    hasher.update(contents.as_bytes());
-    let content_hash = Some(hex::encode(&hasher.finalize()[..]));
+        if let Some((limit_type, _)) = &limit {
+            // Say that we're finished
+            state.fetch_limits.alter(limit_type, |_, v| v - 1);
+        }
+    }
+
+    let content_hash = content.as_ref().map(|x| {
+        let mut hasher = Sha256::new();
+        hasher.update(x.as_bytes());
+        hex::encode(&hasher.finalize()[..])
+    });
 
     // TODO: Better description building for text files?
-    let description = if !contents.is_empty() {
-        let desc = contents
-            .split(' ')
+    let description = content.as_ref().map(|x| {
+        x.split(' ')
             .take(DEFAULT_DESC_LENGTH)
             .collect::<Vec<&str>>()
-            .join(" ");
-        Some(desc)
-    } else {
-        None
-    };
+            .join(" ")
+    });
 
-    let tags = filesystem::build_file_tags(path);
+    tags.extend(filesystem::build_file_tags(path));
     Ok(CrawlResult {
         content_hash,
-        content: Some(contents.clone()),
+        content,
         // Does a file have a description? Pull the first part of the file
         description,
-        title: Some(file_name),
+        title,
         url: url.to_string(),
         open_url: Some(url.to_string()),
         links: Default::default(),
@@ -561,9 +651,10 @@ async fn _process_path(
     url: &Url,
 ) -> Result<CrawlResult, CrawlError> {
     if path.is_file() {
-        return _process_file(state, path, file_name, url);
+        _process_file(state, path, file_name, url).await
+    } else {
+        Err(CrawlError::NotFound)
     }
-    Err(CrawlError::NotFound)
 }
 
 fn _matches_ext(path: &Path, extension: &HashSet<String>) -> bool {

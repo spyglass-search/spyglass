@@ -86,6 +86,10 @@ pub async fn save_user_settings(
                                             .enable_filesystem_scanning =
                                             serde_json::from_str(value).unwrap_or_default()
                                     }
+                                    "audio_settings.enable_audio_transcription" => {
+                                        current_settings.audio_settings.enable_audio_transcription =
+                                            serde_json::from_str(value).unwrap_or_default()
+                                    }
                                     _ => {}
                                 }
                             }
@@ -187,6 +191,5 @@ pub async fn load_user_settings(
         }
     }
 
-    list.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(list)
 }

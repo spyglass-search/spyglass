@@ -12,7 +12,7 @@ mod constants;
 mod pages;
 mod utils;
 
-use crate::pages::{SearchPage, SettingsPage, StartupPage, UpdaterPage, WizardPage};
+use crate::pages::{ProgressPopup, SearchPage, SettingsPage, StartupPage, UpdaterPage, WizardPage};
 
 #[cfg(headless)]
 #[wasm_bindgen(module = "/public/fixtures.js")]
@@ -95,6 +95,8 @@ extern "C" {
 
 #[derive(Clone, Routable, PartialEq, Eq)]
 pub enum Route {
+    #[at("/progress")]
+    ProgressPopup,
     #[at("/")]
     Search,
     #[at("/settings/:tab")]
@@ -172,6 +174,7 @@ pub fn app() -> Html {
 
 fn switch(routes: Route) -> Html {
     match routes {
+        Route::ProgressPopup => html! { <ProgressPopup /> },
         Route::Search => html! { <SearchPage /> },
         Route::SettingsPage { tab } => html! { <SettingsPage tab={tab} /> },
         Route::Startup => html! { <StartupPage /> },

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ListenPayload {
     pub payload: String,
 }
@@ -123,6 +123,8 @@ pub struct UninstallLensParams {
 
 #[derive(Deserialize, Serialize)]
 pub struct WizardFinishedParams {
+    #[serde(rename(serialize = "toggleAudioTranscription"))]
+    pub toggle_audio_transcription: bool,
     #[serde(rename(serialize = "toggleFileIndexer"))]
     pub toggle_file_indexer: bool,
 }
@@ -130,4 +132,15 @@ pub struct WizardFinishedParams {
 #[derive(Deserialize, Serialize)]
 pub struct NavigateParams {
     pub page: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ModelStatusPayload {
+    pub msg: String,
+    pub percent: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ModelStatusPayloadWrapper {
+    pub payload: ModelStatusPayload,
 }
