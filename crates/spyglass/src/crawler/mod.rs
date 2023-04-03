@@ -549,7 +549,7 @@ async fn _process_file(
                 #[cfg(debug_assertions)]
                 let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
                 #[cfg(not(debug_assertions))]
-                let model_path: PathBuf = _state.config.model_dir().join("whisper.base.en.bin");
+                let model_path: PathBuf = state.config.model_dir().join("whisper.base.en.bin");
 
                 if !model_path.exists() {
                     log::warn!("whisper model not installed, skipping transcription");
