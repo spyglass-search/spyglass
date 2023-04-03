@@ -52,6 +52,7 @@ pub struct AskClippy {
 
 pub enum Msg {
     AskClippy { query: String },
+    ClearHistory,
     HandleAskRequest,
     HandleResponse(LLMResponsePayload),
     SetContext(Vec<DocMetadata>),
@@ -214,6 +215,11 @@ impl Component for AskClippy {
 
                 true
             }
+            Msg::ClearHistory => {
+                self.current_context = None;
+                self.history.clear();
+                true
+            }
             Msg::HandleAskRequest => {
                 // don't submit multiple requests at a time.
                 if self.in_progress {
@@ -296,19 +302,27 @@ impl Component for AskClippy {
                                 placeholder="what is the difference between an alpaca & llama?"
                                 class="text-base bg-neutral-800 text-white flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600"
                             ></textarea>
-                            <btn::Btn
-                                disabled={self.in_progress}
-                                size={btn::BtnSize::Lg}
-                                onclick={link.callback(|_| Msg::HandleAskRequest)}
-                            >
-                                {
-                                    if self.in_progress {
-                                        html! { <icons::RefreshIcon animate_spin={true} /> }
-                                    } else {
-                                        html! { <>{"Ask"}</> }
+                            <div class="flex flex-col">
+                                <btn::Btn
+                                    disabled={self.in_progress}
+                                    size={btn::BtnSize::Lg}
+                                    onclick={link.callback(|_| Msg::HandleAskRequest)}
+                                >
+                                    {
+                                        if self.in_progress {
+                                            html! { <icons::RefreshIcon animate_spin={true} /> }
+                                        } else {
+                                            html! { <>{"Ask"}</> }
+                                        }
                                     }
-                                }
-                            </btn::Btn>
+                                </btn::Btn>
+                                <btn::Btn
+                                    size={btn::BtnSize::Lg}
+                                    onclick={link.callback(|_| Msg::ClearHistory)}
+                                >
+                                    {"Clear"}
+                                </btn::Btn>
+                            </div>
                         </div>
                     </div>
                 </div>
