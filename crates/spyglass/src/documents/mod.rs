@@ -6,6 +6,7 @@ use entities::{
         tag::{self, TagPair},
     },
     sea_orm::{ActiveModelTrait, DatabaseConnection},
+    BATCH_SIZE,
 };
 use shared::config::LensConfig;
 use spyglass_plugin::TagModification;
@@ -35,30 +36,37 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
     }
 
     // find all documents that already exist with that url
-    let existing: Vec<indexed_document::Model> = indexed_document::Entity::find()
-        .filter(indexed_document::Column::Url.is_in(uri.clone()))
-        .all(&state.db)
-        .await
-        .unwrap_or_default();
+    for chunk in uri.chunks(BATCH_SIZE) {
+        let existing: Vec<indexed_document::Model> = indexed_document::Entity::find()
+            .filter(indexed_document::Column::Url.is_in(chunk.to_vec()))
+            .all(&state.db)
+            .await
+            .unwrap_or_default();
 
-    // build a hash map of Url to the doc id
-    let mut id_map = HashMap::new();
-    for model in &existing {
-        id_map.insert(model.url.to_string(), model.doc_id.clone());
-    }
+        // build a hash map of Url to the doc id
+        let mut id_map = HashMap::new();
+        for model in &existing {
+            id_map.insert(model.url.to_string(), model.doc_id.clone());
+        }
 
-    // build a list of doc ids to delete from the index
-    let doc_id_list = id_map
-        .values()
-        .map(|x| x.to_owned())
-        .collect::<Vec<String>>();
+        // build a list of doc ids to delete from the index
+        let doc_id_list = id_map
+            .values()
+            .map(|x| x.to_owned())
+            .collect::<Vec<String>>();
 
-    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
-    let _ = Searcher::save(state).await;
+        if let Err(err) = Searcher::delete_many_by_id(state, &doc_id_list, false).await {
+            log::warn!("Unable to delete_many_by_id: {err}")
+        }
 
-    // now that the documents are deleted delete from the queue
-    if let Err(error) = indexed_document::delete_many_by_url(&state.db, uri).await {
-        log::error!("Error deleting for indexed document store {:?}", error);
+        if let Err(err) = Searcher::save(state).await {
+            log::warn!("Unable to save searcher: {err}")
+        }
+
+        // now that the documents are deleted delete from the queue
+        if let Err(error) = indexed_document::delete_many_by_url(&state.db, chunk).await {
+            log::error!("Error deleting for indexed document store {:?}", error);
+        }
     }
 }
 

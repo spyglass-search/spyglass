@@ -344,7 +344,7 @@ pub async fn delete_many_by_id(
 /// delete all related tag references before deleting the documents
 pub async fn delete_many_by_url(
     db: &DatabaseConnection,
-    urls: Vec<String>,
+    urls: &[String],
 ) -> Result<u64, sea_orm::DbErr> {
     let mut num_deleted = 0;
     for chunk in urls.chunks(BATCH_SIZE) {
