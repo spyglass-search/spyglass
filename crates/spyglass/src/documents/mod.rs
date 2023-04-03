@@ -31,7 +31,7 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
 
     // Delete from crawl queue
     if let Err(error) = crawl_queue::delete_many_by_url(&state.db, &uri).await {
-        log::error!("Error delete items from crawl queue {:?}", error);
+        log::warn!("Unable to delete from crawl_queue: {:?}", error);
     }
 
     // find all documents that already exist with that url
@@ -67,7 +67,11 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
             log::warn!("Error deleting for indexed document store {:?}", error);
         }
 
-        log::info!("chunk: deleted {} ({}) docs from index", chunk.len(), existing.len());
+        log::info!(
+            "chunk: deleted {} ({}) docs from index",
+            chunk.len(),
+            existing.len()
+        );
     }
 }
 
