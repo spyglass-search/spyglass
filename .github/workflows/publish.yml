@@ -85,11 +85,13 @@ jobs:
       if: matrix.platform == 'macos-latest'
       run: |
         cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
-        cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
+        # For now only build the spyglass-debug on ARM, we'll provide
+        # the ARM build ourselves as part of the repo.
+        cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
 
         mkdir -p crates/tauri/binaries;
         cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
-        cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+        # cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
 
         cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
         cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
