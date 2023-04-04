@@ -202,7 +202,7 @@ pub async fn config_task(mut state: AppState) {
                                 // any listening clients
                                 let state_clone = state.clone();
                                 tokio::spawn(async move {
-                                    let _ = download_model(&state_clone, "Whisper Audio", model_path).await;
+                                    let _ = download_model(&state_clone, "Audio Transcription Model", model_path).await;
                                     // Once we're done downloading the model, recrawl any audio files
                                     let audio_exts = AudioExt::iter().map(|x| x.to_string()).collect::<Vec<String>>();
                                     let mut condition = Condition::any();
