@@ -81,12 +81,22 @@ pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn open_result(
-    _: tauri::Window,
+    win: tauri::Window,
     url: &str,
     application: Option<String>,
 ) -> Result<(), String> {
-    match url::Url::parse(url) {
+    let mut schema = String::from("unknown");
+    let mut is_default_action = false;
+    let action = if application.is_some() {
+        "open_application"
+    } else {
+        is_default_action = true;
+        "open_url"
+    };
+
+    let result = match url::Url::parse(url) {
         Ok(mut url) => {
+            schema = String::from(url.scheme());
             if url.scheme() == "file" {
                 let _ = url.set_host(None);
             }
@@ -98,7 +108,19 @@ pub async fn open_result(
             Ok(())
         }
         Err(err) => Err(err.to_string()),
+    };
+
+    if let Some(metrics) = win.try_state::<Metrics>() {
+        metrics
+            .track(Event::ResultActionTriggered {
+                action: String::from(action),
+                is_default_action,
+                schema,
+            })
+            .await;
     }
+
+    result
 }
 
 #[tauri::command]
@@ -110,6 +132,16 @@ pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), Stri
     {
         log::warn!("Error copying content to clipboard {:?}", error);
         return Err(error.to_string());
+    }
+
+    if let Some(metrics) = win.try_state::<Metrics>() {
+        metrics
+            .track(Event::ResultActionTriggered {
+                action: String::from("copy_to_clipboard"),
+                is_default_action: false,
+                schema: String::from("unknown"),
+            })
+            .await;
     }
     Ok(())
 }
