@@ -161,11 +161,11 @@ pub async fn handle_install_lens(
         Ok(_) => {
             if let Some(metrics) = app_handle.try_state::<Metrics>() {
                 let event = if is_update {
-                    Event::InstallLens {
+                    Event::UpdateLens {
                         lens: name.to_owned(),
                     }
                 } else {
-                    Event::UpdateLens {
+                    Event::InstallLens {
                         lens: name.to_owned(),
                     }
                 };
