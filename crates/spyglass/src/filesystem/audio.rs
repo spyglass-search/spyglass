@@ -114,6 +114,9 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<AudioFile> {
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
     let sample_rate = track.codec_params.sample_rate.unwrap_or_default();
+    // NOTE: Having 0 channels doesn't necessarily mean there's no audio.
+    let channels = track.codec_params.channels.unwrap_or_default();
+
     if sample_rate == 0 {
         return Err(anyhow!("Invalid sample rate"));
     }
