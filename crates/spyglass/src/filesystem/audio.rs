@@ -168,7 +168,6 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<AudioFile> {
     }
 
     // NOTE: Having 0 channels doesn't necessarily mean there's no audio.
-    let channels = track.codec_params.channels.unwrap_or_default();
     log::debug!("Detected {} audio channels", channels.count());
     if channels.count() > 1 {
         // convert stereo audio to mono for whisper.
