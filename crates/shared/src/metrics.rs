@@ -47,6 +47,10 @@ pub enum Event {
     },
     #[strum(serialize = "update_check")]
     UpdateCheck { current_version: String },
+    #[strum(serialize = "wizard_finished")]
+    WizardFinished { current_version: String },
+    #[strum(serialize = "wizard_closed")]
+    WizardClosed { current_version: String },
 }
 
 #[derive(Serialize)]
@@ -141,7 +145,9 @@ impl Metrics {
                 data.properties
                     .insert("wall_time_ms".into(), wall_time_ms.to_owned().into());
             }
-            Event::UpdateCheck { current_version } => {
+            Event::WizardFinished { current_version }
+            | Event::UpdateCheck { current_version }
+            | Event::WizardClosed { current_version } => {
                 data.properties
                     .insert("current_version".into(), current_version.as_str().into());
             }
