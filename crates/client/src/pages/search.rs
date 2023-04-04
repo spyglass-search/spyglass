@@ -150,9 +150,7 @@ impl SearchPage {
                 // the execute_action is set. To allow the user to see a status change that indicates
                 // something actually happened we need to delay it for a little bit.
                 Timeout::new(250, move || {
-                    spawn_local(async move {
-                        link.send_message(Msg::UserActionComplete(label));
-                    });
+                    link.send_message(Msg::UserActionComplete(label));
                 })
                 .forget();
             });
