@@ -114,12 +114,6 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<AudioFile> {
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
     let sample_rate = track.codec_params.sample_rate.unwrap_or_default();
-    let channels = track.codec_params.channels.unwrap_or_default();
-
-    if channels.count() == 0 {
-        return Err(anyhow!("No audio detected!"));
-    }
-
     if sample_rate == 0 {
         return Err(anyhow!("Invalid sample rate"));
     }
@@ -170,6 +164,8 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<AudioFile> {
         }
     }
 
+    // NOTE: Having 0 channels doesn't necessarily mean there's no audio.
+    let channels = track.codec_params.channels.unwrap_or_default();
     log::debug!("Detected {} audio channels", channels.count());
     if channels.count() > 1 {
         // convert stereo audio to mono for whisper.
