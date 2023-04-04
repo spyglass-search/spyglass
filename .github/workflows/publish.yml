@@ -99,7 +99,7 @@ jobs:
 
         lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass \
-          target/aarch64-apple-darwin/release/spyglass;
+          crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
 
         lipo -create -output crates/tauri/binaries/spyglass-debug-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass-debug \
