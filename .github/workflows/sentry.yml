@@ -57,19 +57,19 @@ jobs:
       run: |
         echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
         echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=linux" >> $GITHUB_ENV 
+        echo "target_os_name=linux" >> $GITHUB_ENV
     - name: setup arch target - macos
       if: ${{startsWith(matrix.platform, 'macos')}}
       run: |
         echo "target_arch=x86_64-apple-darwin" >> $GITHUB_ENV
         echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=mac" >> $GITHUB_ENV 
+        echo "target_os_name=mac" >> $GITHUB_ENV
     - name: Setup arch target (windows only)
       if: ${{startsWith(matrix.platform, 'windows')}}
       run: |
         echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
         echo "target_ext=.exe" >> $env:GITHUB_ENV
-        echo "target_os_name=win" >> $env:GITHUB_ENV 
+        echo "target_os_name=win" >> $env:GITHUB_ENV
     # search backend
     - name: build search backend
       run: |
@@ -84,7 +84,6 @@ jobs:
     # build front & tauri app
     - name: copy sidebar
       run: |
-        mkdir -p crates/tauri/binaries
         cp target/sentry/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
         cp target/sentry/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
         cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}

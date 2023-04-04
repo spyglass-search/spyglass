@@ -95,7 +95,9 @@ jobs:
         cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
         cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
 
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-universal-apple-darwin;
+        # There's no build specifically for ARM macs, so lets use the same one for both.
+        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-aarch64-apple-darwin;
+        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-x86_64-apple-darwin;
 
         lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass \
