@@ -77,7 +77,7 @@ jobs:
       if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
       run: |
         cargo build -p spyglass --verbose --release
-        mkdir -p crates/tauri/binaries
+
         cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
         cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
         cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
@@ -89,7 +89,6 @@ jobs:
         # the ARM build ourselves as part of the repo.
         cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
 
-        mkdir -p crates/tauri/binaries;
         cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
         # cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
 
