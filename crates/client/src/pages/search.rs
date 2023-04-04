@@ -165,6 +165,11 @@ impl SearchPage {
         if !self.docs_results.is_empty() {
             if let Some(selected) = self.docs_results.get(self.selected_idx) {
                 link.send_message(Msg::OpenResult(selected.to_owned()));
+                link.send_message_batch(vec![
+                    Msg::ClearResults,
+                    Msg::ClearFilters,
+                    Msg::ClearQuery,
+                ]);
             }
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list
