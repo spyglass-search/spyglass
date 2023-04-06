@@ -472,12 +472,12 @@ impl Config {
 
         // Gracefully handle issues loading user settings/lenses
         let user_settings = Self::load_user_settings().unwrap_or_else(|err| {
-            log::error!("Invalid user settings file! Reason: {}", err);
+            log::warn!("Invalid user settings file! Reason: {}", err);
             Default::default()
         });
 
         let user_settings = Self::migrate_user_settings(user_settings).unwrap_or_else(|err| {
-            log::error!("Invalid user settings file! Reason: {}", err);
+            log::warn!("Unable to migrate user settings file! Reason: {}", err);
             Default::default()
         });
 

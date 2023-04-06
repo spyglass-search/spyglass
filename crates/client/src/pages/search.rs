@@ -143,9 +143,16 @@ impl SearchPage {
             let link = link.clone();
             let selected = selected.clone();
             spawn_local(async move {
-                let label = &action_def.label.clone();
+                let label = action_def.label.clone();
                 components::user_action_list::execute_action(selected, action_def).await;
-                link.send_message(Msg::UserActionComplete(label.to_owned()));
+
+                // The action is asynchronous making the firing of UserActionComplete instantly after
+                // the execute_action is set. To allow the user to see a status change that indicates
+                // something actually happened we need to delay it for a little bit.
+                Timeout::new(250, move || {
+                    link.send_message(Msg::UserActionComplete(label));
+                })
+                .forget();
             });
 
             self.show_actions = false;
@@ -158,6 +165,11 @@ impl SearchPage {
             // Grab the currently selected item
             if let Some(selected) = self.docs_results.get(self.selected_idx) {
                 link.send_message(Msg::OpenResult(selected.to_owned()));
+                link.send_message_batch(vec![
+                    Msg::ClearResults,
+                    Msg::ClearFilters,
+                    Msg::ClearQuery,
+                ]);
             }
         } else if let Some(selected) = self.lens_results.get(self.selected_idx) {
             // Add lens to list

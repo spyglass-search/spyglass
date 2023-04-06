@@ -2,6 +2,7 @@ use crate::constants::{TabLocation, Windows};
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
 use shared::event::{ClientEvent, ModelStatusPayload};
+use shared::metrics::Metrics;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
 use tauri::{
     AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
@@ -238,7 +239,7 @@ pub fn show_wizard_window(app: &AppHandle) {
     let window = if let Some(window) = app.get_window(Windows::Wizard.as_ref()) {
         window
     } else {
-        WindowBuilder::new(
+        let wizard_window = WindowBuilder::new(
             app,
             Windows::Wizard.to_string(),
             WindowUrl::App("/wizard".into()),
@@ -248,7 +249,15 @@ pub fn show_wizard_window(app: &AppHandle) {
         .min_inner_size(400.0, 492.0)
         .max_inner_size(400.0, 492.0)
         .build()
-        .expect("Unable to build window for wizard")
+        .expect("Unable to build window for wizard");
+
+        let window_copy = wizard_window.clone();
+        wizard_window.on_window_event(move |evt| {
+            if let WindowEvent::CloseRequested { api: _, .. } = evt {
+                tauri::async_runtime::spawn(wizard_closed_event(window_copy.clone()));
+            }
+        });
+        wizard_window
     };
 
     show_window(&window);
@@ -322,4 +331,14 @@ pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// Helper method used to send the wizard closed event metric
+async fn wizard_closed_event(window: tauri::Window) {
+    if let Some(metrics) = window.app_handle().try_state::<Metrics>() {
+        let current_version = crate::current_version(window.app_handle().package_info());
+        metrics
+            .track(shared::metrics::Event::WizardClosed { current_version })
+            .await;
+    }
 }

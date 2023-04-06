@@ -13,8 +13,8 @@ use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
 use tauri::api::process::current_binary;
 use tauri::{
-    AppHandle, Env, GlobalShortcutManager, Manager, PathResolver, RunEvent, SystemTray,
-    SystemTrayEvent, Window,
+    AppHandle, Env, GlobalShortcutManager, Manager, PackageInfo, PathResolver, RunEvent,
+    SystemTray, SystemTrayEvent, Window,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -57,7 +57,7 @@ type PauseState = AtomicBool;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tauri_plugin_deep_link::prepare("com.athlabs.spyglass");
     let ctx = tauri::generate_context!();
-    let current_version = format!("v20{}", &ctx.package_info().version);
+    let current_version = current_version(ctx.package_info());
     let config = Config::new();
 
     #[cfg(not(debug_assertions))]
@@ -353,6 +353,11 @@ pub fn configuration_updated(
             log::error!("Error updating system tray {:?}", error);
         }
     }
+}
+
+// Helper method used to access the current application version
+pub fn current_version(pkg_info: &PackageInfo) -> String {
+    format!("v20{}", pkg_info.version)
 }
 
 // Helper used to update the global shortcut
