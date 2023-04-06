@@ -368,7 +368,7 @@ impl Config {
 
                         settings.insert(plugin_config.name.clone(), config.clone());
                     }
-                    Err(error) => log::error!("Error loading plugin config {:?}", error),
+                    Err(error) => log::warn!("Error loading plugin config {:?}", error),
                 }
             }
         }
