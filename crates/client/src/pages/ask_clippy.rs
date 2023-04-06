@@ -217,6 +217,8 @@ impl Component for AskClippy {
             }
             Msg::ClearHistory => {
                 self.current_context = None;
+                self.tokens = None;
+                self.status = None;
                 self.history.clear();
                 true
             }
