@@ -53,6 +53,7 @@ async fn main() -> anyhow::Result<ExitCode> {
         .with(
             EnvFilter::from_default_env()
                 .add_directive(LOG_LEVEL.into())
+                .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
                 .add_directive(LIB_LOG_LEVEL.parse().expect("invalid log filter")),
         )
         .with(fmt::Layer::new().with_writer(std::io::stdout));
