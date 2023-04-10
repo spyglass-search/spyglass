@@ -72,7 +72,7 @@ impl Debug for Searcher {
 
 impl Debug for ReadonlySearcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("Searcher")
+        f.debug_struct("ReadonlySearcher")
             .field("index", &self.index)
             .finish()
     }
