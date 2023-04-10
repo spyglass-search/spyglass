@@ -258,7 +258,7 @@ pub async fn plugin_event_loop(
                             },
                         );
                     }
-                    Err(e) => log::error!("Unable to init plugin <{}>: {}", plugin.name, e),
+                    Err(e) => log::warn!("Unable to init plugin <{}>: {}", plugin.name, e),
                 }
             }
             Some(PluginCommand::QueueIntervalCheck) => {
