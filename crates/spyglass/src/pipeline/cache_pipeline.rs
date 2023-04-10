@@ -115,7 +115,11 @@ pub async fn process_update(
         let _ = cache::delete_cache(&cache_path);
     }
 
-    log::debug!("Processed {} records in {:?}ms", total_processed, now.elapsed().as_millis());
+    log::debug!(
+        "Processed {} records in {:?}ms",
+        total_processed,
+        now.elapsed().as_millis()
+    );
     state
         .publish_event(&spyglass_rpc::RpcEvent {
             event_type: spyglass_rpc::RpcEventType::LensInstalled,
