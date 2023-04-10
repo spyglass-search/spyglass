@@ -4,7 +4,7 @@ use libspyglass::state::AppState;
 use ron::ser::PrettyConfig;
 use shared::config::Config;
 use spyglass_plugin::DocumentQuery;
-use std::{process::ExitCode, path::PathBuf};
+use std::{path::PathBuf, process::ExitCode};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
@@ -29,15 +29,22 @@ pub struct CdxCli {
 #[derive(Subcommand)]
 enum Command {
     /// Outputs crawl details for a crawl ID
-    CrawlDetails { crawl_task_id: i64 },
+    CrawlDetails {
+        crawl_task_id: i64,
+    },
     /// Outputs document metadata & content for a document ID
-    GetDocumentDetails { id_or_url: String },
-    GetDocumentQueryExplanation { id_or_url: String, query: String },
+    GetDocumentDetails {
+        id_or_url: String,
+    },
+    GetDocumentQueryExplanation {
+        id_or_url: String,
+        query: String,
+    },
     /// Load a local lens archive into the index
     LoadArchive {
         name: String,
-        archive_path: PathBuf
-    }
+        archive_path: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -69,13 +76,11 @@ async fn main() -> anyhow::Result<ExitCode> {
                 Ok(Some((task, tags))) => {
                     println!(
                         "Crawl Task: {}",
-                        ron::ser::to_string_pretty(&task, PrettyConfig::new())
-                            .unwrap_or_default()
+                        ron::ser::to_string_pretty(&task, PrettyConfig::new()).unwrap_or_default()
                     );
                     println!(
                         "Tags: {}",
-                        ron::ser::to_string_pretty(&tags, PrettyConfig::new())
-                            .unwrap_or_default()
+                        ron::ser::to_string_pretty(&tags, PrettyConfig::new()).unwrap_or_default()
                     );
                 }
                 Ok(None) => {
@@ -103,13 +108,11 @@ async fn main() -> anyhow::Result<ExitCode> {
                 Some((doc, tags)) => {
                     println!(
                         "Document: {}",
-                        ron::ser::to_string_pretty(&doc, PrettyConfig::new())
-                            .unwrap_or_default()
+                        ron::ser::to_string_pretty(&doc, PrettyConfig::new()).unwrap_or_default()
                     );
                     println!(
                         "Tags: {}",
-                        ron::ser::to_string_pretty(&tags, PrettyConfig::new())
-                            .unwrap_or_default()
+                        ron::ser::to_string_pretty(&tags, PrettyConfig::new()).unwrap_or_default()
                     );
                     let index =
                         ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
