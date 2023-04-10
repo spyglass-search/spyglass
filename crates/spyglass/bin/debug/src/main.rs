@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 use entities::models::{self, indexed_document::DocumentIdentifier};
 use libspyglass::state::AppState;
@@ -9,15 +10,17 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use libspyglass::search::{self, IndexPath, QueryStats, ReadonlySearcher};
-
-const LOG_LEVEL: tracing::Level = tracing::Level::INFO;
+use libspyglass::search::{self, IndexPath, QueryStats, ReadonlySearcher, Searcher};
 
 #[cfg(debug_assertions)]
-const LIB_LOG_LEVEL: &str = "spyglassdebug=DEBUG";
+const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
+#[cfg(debug_assertions)]
+const LIBSPYGLASS_LEVEL: &str = "libspyglass=DEBUG";
 
 #[cfg(not(debug_assertions))]
-const LIB_LOG_LEVEL: &str = "spyglassdebug=INFO";
+const LOG_LEVEL: &str = "spyglassdebug=INFO";
+#[cfg(not(debug_assertions))]
+const LIBSPYGLASS_LEVEL: &str = "libspyglass=INFO";
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -52,9 +55,9 @@ async fn main() -> anyhow::Result<ExitCode> {
     let subscriber = tracing_subscriber::registry()
         .with(
             EnvFilter::from_default_env()
-                .add_directive(LOG_LEVEL.into())
+                .add_directive(LOG_LEVEL.parse().expect("Invalid log filter"))
                 .add_directive("tantivy=WARN".parse().expect("Invalid EnvFilter"))
-                .add_directive(LIB_LOG_LEVEL.parse().expect("invalid log filter")),
+                .add_directive(LIBSPYGLASS_LEVEL.parse().expect("invalid log filter")),
         )
         .with(fmt::Layer::new().with_writer(std::io::stdout));
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
@@ -202,6 +205,11 @@ async fn main() -> anyhow::Result<ExitCode> {
             }
         }
         Command::LoadArchive { name, archive_path } => {
+            if !archive_path.exists() {
+                eprintln!("{} does not exist!", archive_path.display());
+                return Err(anyhow!("ARCHIVE_PATH does not exist"));
+            }
+
             let config = Config::new();
             let state = AppState::new(&config).await;
 
@@ -211,7 +219,9 @@ async fn main() -> anyhow::Result<ExitCode> {
                 label: name,
                 ..Default::default()
             };
-            process_update(state, &lens, archive_path).await;
+
+            process_update(state.clone(), &lens, archive_path, true).await;
+            let _ = Searcher::save(&state).await;
         }
     }
 

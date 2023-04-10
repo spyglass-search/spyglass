@@ -129,8 +129,13 @@ pub async fn initialize_pipelines(
                 }
                 PipelineCommand::ProcessCache(lens, cache_file) => {
                     if let Some(lens_config) = app_state.lenses.get(&lens) {
-                        cache_pipeline::process_update(app_state.clone(), &lens_config, cache_file)
-                            .await;
+                        cache_pipeline::process_update(
+                            app_state.clone(),
+                            &lens_config,
+                            cache_file,
+                            false,
+                        )
+                        .await;
                     }
                 }
             }

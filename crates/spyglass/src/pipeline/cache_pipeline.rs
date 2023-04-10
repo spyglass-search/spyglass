@@ -79,12 +79,21 @@ pub async fn process_update_warc(state: AppState, cache_path: PathBuf) {
 
 /// processes the cache for a lens. The cache is streamed in from the provided path
 /// and processed. After the process is complete the cache is deleted
-pub async fn process_update(state: AppState, lens: &LensConfig, cache_path: PathBuf) {
+pub async fn process_update(
+    state: AppState,
+    lens: &LensConfig,
+    cache_path: PathBuf,
+    keep_archive: bool,
+) {
     let now = Instant::now();
+    let mut total_processed = 0;
+
     let records = archive::read_parsed(&cache_path);
     if let Ok(mut record_iter) = records {
         let mut record_list: Vec<ParseResult> = Vec::new();
         for record in record_iter.by_ref() {
+            total_processed += 1;
+
             record_list.push(record);
             if record_list.len() >= 5000 {
                 if let Err(err) = documents::process_records(&state, lens, &mut record_list).await {
@@ -102,8 +111,11 @@ pub async fn process_update(state: AppState, lens: &LensConfig, cache_path: Path
     }
 
     // attempt to remove processed cache file
-    let _ = cache::delete_cache(&cache_path);
-    log::debug!("Processing Cache Took: {:?}", now.elapsed().as_millis());
+    if !keep_archive {
+        let _ = cache::delete_cache(&cache_path);
+    }
+
+    log::debug!("Processed {} records in {:?}ms", total_processed, now.elapsed().as_millis());
     state
         .publish_event(&spyglass_rpc::RpcEvent {
             event_type: spyglass_rpc::RpcEventType::LensInstalled,
