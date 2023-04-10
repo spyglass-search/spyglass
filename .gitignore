@@ -8,4 +8,4 @@ target
 **/target
 node_modules
 dist
-crates/tauri/binaries
+binaries
