@@ -199,7 +199,7 @@ where
                 .to_owned(),
         )
         .exec_with_returning(db)
-        .await;
+        .await?;
 
     let tag = Entity::find()
         .filter(Column::Label.eq(label.to_string()))
@@ -318,6 +318,30 @@ pub async fn get_tags_by_value(
     }
 
     find.all(db).await
+}
+
+// Helper method to copy the table from one database to another
+pub async fn copy_table(
+    from: &DatabaseConnection,
+    to: &DatabaseConnection,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let mut pages = Entity::find().paginate(from, 1000);
+    Entity::delete_many().exec(to).await?;
+    while let Ok(Some(pages)) = pages.fetch_and_next().await {
+        let active_model = pages
+            .into_iter()
+            .map(|model| model.into())
+            .collect::<Vec<ActiveModel>>();
+        Entity::insert_many(active_model)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![Column::Id])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(to)
+            .await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

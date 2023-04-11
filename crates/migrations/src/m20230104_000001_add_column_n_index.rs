@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE INDEX `tmp-idx-indexed_document-url` ON `indexed_document` (`url`);"
+                "CREATE INDEX \"tmp-idx-indexed_document-url\" ON \"indexed_document\" (\"url\");"
                     .to_string(),
             ))
             .await?;
@@ -98,7 +98,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "DROP INDEX `tmp-idx-indexed_document-url`;".to_string(),
+                "DROP INDEX \"tmp-idx-indexed_document-url\";".to_string(),
             ))
             .await?;
 
@@ -109,7 +109,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE UNIQUE INDEX `idx-indexed_document-url` ON `indexed_document` (`url`);"
+                "CREATE UNIQUE INDEX \"idx-indexed_document-url\" ON \"indexed_document\" (\"url\");"
                     .to_string(),
             ))
             .await;

@@ -2,7 +2,7 @@ use regex::{RegexSet, RegexSetBuilder};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
-    sea_query, ConnectionTrait, DatabaseBackend, DbBackend, FromQueryResult, InsertResult,
+    sea_query, ConnectionTrait, FromQueryResult, InsertResult,
     QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
@@ -215,9 +215,9 @@ pub async fn num_queued(
     Ok(res)
 }
 
-fn gen_dequeue_sql(user_settings: &UserSettings) -> Statement {
+fn gen_dequeue_sql(db: &DatabaseConnection, user_settings: &UserSettings) -> Statement {
     Statement::from_sql_and_values(
-        DbBackend::Sqlite,
+        db.get_database_backend(),
         include_str!("sql/dequeue.sqlx"),
         vec![
             user_settings.domain_crawl_limit.value().into(),
@@ -313,7 +313,7 @@ pub async fn dequeue(
         } else {
             // Otherwise, grab a URL off the stack & send it back.
             Entity::find()
-                .from_raw_sql(gen_dequeue_sql(user_settings))
+                .from_raw_sql(gen_dequeue_sql(db, user_settings))
                 .one(db)
                 .await?
         }
@@ -647,7 +647,7 @@ pub async fn enqueue_all<C: ConnectionTrait>(
             .build(SqliteQueryBuilder);
 
         let values: Vec<Value> = values.iter().map(|x| x.to_owned()).collect();
-        let statement = Statement::from_sql_and_values(DbBackend::Sqlite, &sql, values);
+        let statement = Statement::from_sql_and_values(db.get_database_backend(), &sql, values);
         if let Err(err) = db.execute(statement).await {
             log::warn!("insert_many error: {err}");
         } else if !overrides.tags.is_empty() {
@@ -920,7 +920,7 @@ pub async fn find_by_lens(
     name: &str,
 ) -> Result<Vec<CrawlTaskId>, sea_orm::DbErr> {
     CrawlTaskId::find_by_statement(Statement::from_sql_and_values(
-        DatabaseBackend::Sqlite,
+        db.get_database_backend(),
         r#"
         SELECT
             crawl_queue.id
@@ -956,6 +956,30 @@ pub async fn get_task_details(
     }
 
     Ok(None)
+}
+
+// Helper method to copy the table from one database to another
+pub async fn copy_table(
+    from: &DatabaseConnection,
+    to: &DatabaseConnection,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let mut pages = Entity::find().paginate(from, 1000);
+    Entity::delete_many().exec(to).await?;
+    while let Ok(Some(pages)) = pages.fetch_and_next().await {
+        let active_model = pages
+            .into_iter()
+            .map(|model| model.into())
+            .collect::<Vec<ActiveModel>>();
+        Entity::insert_many(active_model)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![Column::Id])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(to)
+            .await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -997,10 +1021,12 @@ mod test {
         assert_eq!(res.url, url);
     }
 
-    #[test]
-    fn test_priority_sql() {
+    #[tokio::test]
+    async fn test_priority_sql() {
+        let db = setup_test_db().await;
+
         let settings = UserSettings::default();
-        let sql = gen_dequeue_sql(&settings);
+        let sql = gen_dequeue_sql(&db, &settings);
         assert_eq!(
             sql.to_string(),
             "WITH\nindexed AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM indexed_document\n    GROUP BY domain\n),\ninflight AS (\n    SELECT\n        domain,\n        count(*) as count\n    FROM crawl_queue\n    WHERE status = \"Processing\"\n    GROUP BY domain\n)\nSELECT\n    cq.*\nFROM crawl_queue cq\nLEFT JOIN indexed ON indexed.domain = cq.domain\nLEFT JOIN inflight ON inflight.domain = cq.domain\nWHERE\n    COALESCE(indexed.count, 0) < 500000 AND\n    COALESCE(inflight.count, 0) < 2 AND\n    status = \"Queued\" and\n    url not like \"file%\"\nORDER BY\n    cq.updated_at ASC"

@@ -1,7 +1,9 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
 use sea_orm::DeleteResult;
+use sea_orm::FromQueryResult;
 use sea_orm::Set;
+use sea_orm::{ConnectionTrait, Statement};
 use serde::Serialize;
 use shared::config::LensConfig;
 
@@ -229,6 +231,49 @@ pub async fn install_or_update(
     let new_db_entry = new_lens.insert(db).await?;
 
     Ok((true, new_db_entry))
+}
+
+/// Represents the tag id that is associated with a document
+#[derive(Debug, FromQueryResult)]
+pub struct LensName {
+    pub name: String,
+}
+
+/// Helper method used to get all of the lens names
+pub async fn get_lens_names<C>(db: &C) -> Result<Vec<LensName>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    LensName::find_by_statement(Statement::from_string(
+        db.get_database_backend(),
+        String::from(r#"SELECT name FROM lens"#),
+    ))
+    .all(db)
+    .await
+}
+
+// Helper method to copy the table from one database to another
+pub async fn copy_table(
+    from: &DatabaseConnection,
+    to: &DatabaseConnection,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let mut pages = Entity::find().paginate(from, 1000);
+    Entity::delete_many().exec(to).await?;
+    while let Ok(Some(pages)) = pages.fetch_and_next().await {
+        let active_model = pages
+            .into_iter()
+            .map(|model| model.into())
+            .collect::<Vec<ActiveModel>>();
+        Entity::insert_many(active_model)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![Column::Id])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(to)
+            .await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

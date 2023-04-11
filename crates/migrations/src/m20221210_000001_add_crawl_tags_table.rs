@@ -1,12 +1,12 @@
 use entities::{
     models::{
         crawl_queue, crawl_tag,
-        lens::{self, LensType},
+        lens,
         tag::{get_or_create, TagType},
     },
     sea_orm::{
-        ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set,
-        Statement, TransactionTrait,
+        ColumnTrait, ConnectionTrait, DatabaseTransaction, DbBackend, EntityTrait, QueryFilter,
+        Set, Statement, TransactionTrait,
     },
     BATCH_SIZE,
 };
@@ -103,12 +103,13 @@ async fn add_tags_for_lens(db: &DatabaseTransaction, conf: &LensConfig) {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Add crawl_tag table & idx
-        manager
-            .get_connection()
-            .execute(Statement::from_string(
-                manager.get_database_backend(),
-                r#"CREATE TABLE IF NOT EXISTS "crawl_tag" (
+        if manager.get_database_backend() == DbBackend::Sqlite {
+            // Add crawl_tag table & idx
+            manager
+                .get_connection()
+                .execute(Statement::from_string(
+                    manager.get_database_backend(),
+                    r#"CREATE TABLE IF NOT EXISTS "crawl_tag" (
                     "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
                     "crawl_queue_id" integer NOT NULL,
                     "tag_id" integer NOT NULL,
@@ -117,15 +118,38 @@ impl MigrationTrait for Migration {
                     FOREIGN KEY(crawl_queue_id) REFERENCES crawl_queue(id),
                     FOREIGN KEY(tag_id)         REFERENCES tags(id)
                 );"#
-                .to_string(),
-            ))
-            .await?;
+                    .to_string(),
+                ))
+                .await?;
+        } else if manager.get_database_backend() == DbBackend::Postgres {
+            // Add crawl_tag table & idx
+            manager
+                .get_connection()
+                .execute(Statement::from_string(
+                    manager.get_database_backend(),
+                    r#"CREATE TABLE IF NOT EXISTS "crawl_tag" (
+                    "id" BIGSERIAL PRIMARY KEY,
+                    "crawl_queue_id" integer NOT NULL,
+                    "tag_id" integer NOT NULL,
+                    "created_at" TIMESTAMPTZ NOT NULL,
+                    "updated_at" TIMESTAMPTZ NOT NULL,
+                    CONSTRAINT fk_crawl_queue_id
+                            FOREIGN KEY(crawl_queue_id)
+                                REFERENCES crawl_queue(id),
+                    CONSTRAINT fk_tag_id
+                            FOREIGN KEY(tag_id)
+                                REFERENCES tags(id)
+                );"#
+                    .to_string(),
+                ))
+                .await?;
+        }
 
         manager
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE UNIQUE INDEX IF NOT EXISTS `idx-crawl-tag-doc-id-tag-id` ON `crawl_tag` (`crawl_queue_id`, `tag_id`);"
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"idx-crawl-tag-doc-id-tag-id\" ON \"crawl_tag\" (\"crawl_queue_id\", \"tag_id\");"
                     .to_string(),
             ))
             .await?;
@@ -134,12 +158,7 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         // Loop through lenses
-        let lenses = lens::Entity::find()
-            .filter(lens::Column::IsEnabled.eq(true))
-            .filter(lens::Column::LensType.eq(LensType::Simple))
-            .all(db)
-            .await
-            .unwrap_or_default();
+        let lenses = lens::get_lens_names(db).await?;
 
         let lens_dir = config.lenses_dir();
 

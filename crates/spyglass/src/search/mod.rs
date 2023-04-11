@@ -538,6 +538,66 @@ impl ReadonlySearcher {
         }
         None
     }
+
+    pub async fn search_with_lens(
+        db: &DatabaseConnection,
+        applied_lenses: &Vec<u64>,
+        searcher: &ReadonlySearcher,
+        query_string: &str,
+        stats: &mut QueryStats,
+    ) -> Vec<SearchResult> {
+        let start_timer = Instant::now();
+
+        let mut tag_boosts = HashSet::new();
+        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
+            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
+            .one(db)
+            .await
+        {
+            Some(favorited.id)
+        } else {
+            None
+        };
+
+        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
+        tag_boosts.extend(tag_checks);
+
+        let index = &searcher.index;
+        let reader = &searcher.reader;
+        let fields = DocFields::as_fields();
+        let searcher = reader.searcher();
+        let tokenizers = index.tokenizers().clone();
+        let query = build_query(
+            index.schema(),
+            tokenizers,
+            fields,
+            query_string,
+            applied_lenses,
+            tag_boosts.into_iter(),
+            favorite_boost,
+            stats,
+        );
+
+        let collector = TopDocs::with_limit(5);
+
+        let top_docs = searcher
+            .search(&query, &collector)
+            .expect("Unable to execute query");
+
+        log::debug!(
+            "query `{}` returned {} results from {} docs in {} ms",
+            query_string,
+            top_docs.len(),
+            searcher.num_docs(),
+            Instant::now().duration_since(start_timer).as_millis()
+        );
+
+        top_docs
+            .into_iter()
+            // Filter out negative scores
+            .filter(|(score, _)| *score > 0.0)
+            .collect()
+    }
 }
 
 // Helper method used to get the list of tag ids that should be included in the search
