@@ -4,7 +4,7 @@ pub mod schema;
 pub mod test;
 
 pub use sea_orm;
-use sea_orm::{DatabaseConnection, DbBackend, DbErr, FromQueryResult, Statement};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, FromQueryResult, Statement};
 use shared::response::LibraryStats;
 
 pub const BATCH_SIZE: usize = 3000;
@@ -20,7 +20,7 @@ pub async fn get_library_stats(
     db: &DatabaseConnection,
 ) -> Result<HashMap<String, LibraryStats>, DbErr> {
     let counts = CountByStatus::find_by_statement(Statement::from_string(
-        DbBackend::Sqlite,
+        db.get_database_backend(),
         r#"
             SELECT
                 count(*) as "count", tags.value as "name", status

@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE UNIQUE INDEX IF NOT EXISTS `idx-document-tag-doc-id-tag-id` ON `document_tag` (`indexed_document_id`, `tag_id`);"
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"idx-document-tag-doc-id-tag-id\" ON \"document_tag\" (\"indexed_document_id\", \"tag_id\");"
                     .to_string(),
             ))
             .await?;

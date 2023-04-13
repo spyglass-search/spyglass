@@ -6,8 +6,7 @@ use crate::BATCH_SIZE;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ConnectionTrait, DatabaseBackend, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set,
-    Statement,
+    ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set, Statement,
 };
 use serde::Serialize;
 
@@ -244,7 +243,7 @@ pub async fn insert_tags_for_docs_by_id<C: ConnectionTrait>(
                 .do_nothing()
                 .to_owned(),
             )
-            .build(DatabaseBackend::Sqlite);
+            .build(db.get_database_backend());
 
         if let Err(err) = db.execute(query.clone()).await {
             log::error!("Unable to execute: {} due to {}", query.to_string(), err);
@@ -372,7 +371,7 @@ pub async fn find_by_lens(
     name: &str,
 ) -> Result<Vec<IndexedDocumentId>, sea_orm::DbErr> {
     IndexedDocumentId::find_by_statement(Statement::from_sql_and_values(
-        DatabaseBackend::Sqlite,
+        db.get_database_backend(),
         r#"
         SELECT
             indexed_document.id,
@@ -400,7 +399,7 @@ pub async fn find_by_doc_ids(
         .join(",");
 
     IndexedDocumentId::find_by_statement(Statement::from_string(
-        DatabaseBackend::Sqlite,
+        db.get_database_backend(),
         format!(
             r#"
         SELECT
@@ -428,7 +427,7 @@ pub async fn get_tag_ids_by_doc_id(
     id: &str,
 ) -> Result<Vec<IndexedDocumentTagId>, sea_orm::DbErr> {
     IndexedDocumentTagId::find_by_statement(Statement::from_sql_and_values(
-        DatabaseBackend::Sqlite,
+        db.get_database_backend(),
         r#"
         SELECT
             document_tag.tag_id as id
@@ -465,6 +464,30 @@ pub async fn get_document_details(
         return Ok(Some((doc, tags)));
     }
     Ok(None)
+}
+
+// Helper method to copy the table from one database to another
+pub async fn copy_table(
+    from: &DatabaseConnection,
+    to: &DatabaseConnection,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let mut pages = Entity::find().paginate(from, 1000);
+    Entity::delete_many().exec(to).await?;
+    while let Ok(Some(pages)) = pages.fetch_and_next().await {
+        let active_model = pages
+            .into_iter()
+            .map(|model| model.into())
+            .collect::<Vec<ActiveModel>>();
+        Entity::insert_many(active_model)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![Column::Id])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(to)
+            .await?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

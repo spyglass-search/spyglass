@@ -19,7 +19,7 @@ impl MigrationTrait for Migration {
             .get_connection()
             .execute(Statement::from_string(
                 manager.get_database_backend(),
-                "CREATE UNIQUE INDEX IF NOT EXISTS `idx-connections-api-id-account` ON `connections` (`api_id`, `account`);"
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"idx-connections-api-id-account\" ON \"connections\" (\"api_id\", \"account\");"
                     .to_string(),
             ))
             .await?;
