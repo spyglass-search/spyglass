@@ -12,6 +12,8 @@ use yew::platform::spawn_local;
 use yew::prelude::*;
 use yew::NodeRef;
 
+pub mod search;
+
 /// Number of messages to use as context
 /// Currently, more messages may confuse the model, so we'll only send the previous
 /// question & answer.
