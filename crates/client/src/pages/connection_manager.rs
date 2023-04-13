@@ -5,6 +5,7 @@ use gloo::timers::callback::Interval;
 use shared::event::{AuthorizeConnectionParams, ClientEvent, ClientInvoke, ResyncConnectionParams};
 use shared::response::{ListConnectionResult, SupportedConnection, UserConnection};
 
+use ui_components::icons;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -12,7 +13,7 @@ use yew::prelude::*;
 use crate::components::{
     btn,
     btn::{BtnSize, BtnType},
-    icons, Header,
+    Header,
 };
 use crate::utils::RequestState;
 use crate::{listen, tauri_invoke};

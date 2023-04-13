@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ListenPayload {
-    pub payload: String,
+pub struct ListenPayload<T> {
+    pub payload: T,
 }
 
 #[derive(AsRefStr, Display)]

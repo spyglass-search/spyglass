@@ -3,9 +3,10 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::components::{btn, forms::SettingChangeEvent, icons};
+use crate::components::{btn, forms::SettingChangeEvent};
 use crate::{tauri_invoke, Route};
 use shared::event::{ClientInvoke, WizardFinishedParams};
+use ui_components::icons;
 
 mod display_searchbar;
 mod indexing_help;

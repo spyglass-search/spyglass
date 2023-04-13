@@ -45,7 +45,9 @@ impl Component for PathField {
             let link = link.clone();
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-                    if let Ok(res) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
+                    if let Ok(res) =
+                        serde_wasm_bindgen::from_value::<ListenPayload<String>>(payload)
+                    {
                         link.send_message(PathMsg::UpdatePath(
                             Path::new(&res.payload).to_path_buf(),
                         ));
@@ -176,7 +178,9 @@ impl Component for PathList {
             let link = link.clone();
             spawn_local(async move {
                 let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-                    if let Ok(res) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
+                    if let Ok(res) =
+                        serde_wasm_bindgen::from_value::<ListenPayload<String>>(payload)
+                    {
                         link.send_message(Msg::AddPath(Path::new(&res.payload).to_path_buf()));
                     }
                 }) as Box<dyn Fn(JsValue)>);

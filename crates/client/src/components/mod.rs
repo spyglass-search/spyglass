@@ -1,12 +1,12 @@
 pub mod btn;
 pub mod forms;
-pub mod icons;
 pub mod lens;
 pub mod result;
 pub mod tag;
 pub mod tooltip;
 pub mod user_action_list;
 use shared::keyboard::ModifiersState;
+use ui_components::icons;
 use yew::{prelude::*, virtual_dom::AttrValue};
 
 use crate::utils::{self, OsName};

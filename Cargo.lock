@@ -2431,7 +2431,7 @@ dependencies = [
  "gloo-events",
  "gloo-utils",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.4.5",
  "serde_urlencoded",
  "thiserror",
  "wasm-bindgen",
@@ -6163,6 +6163,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6652,11 +6663,12 @@ dependencies = [
  "log",
  "num-format",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.5.0",
  "serde_json",
  "shared",
  "strum 0.24.1",
  "strum_macros 0.24.3",
+ "ui-components",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -8292,6 +8304,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e79c4d996edb816c91e4308506774452e55e95c3c9de07b6729e17e15a5ef81"
 
 [[package]]
+name = "ui-components"
+version = "0.1.0"
+dependencies = [
+ "wasm-bindgen-futures",
+ "yew",
+]
+
+[[package]]
 name = "uname"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8962,6 +8982,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af2b53f4da14db05d32e70e9c617abdf6620c575bd5dd972b7400037b4df2091"
 dependencies = [
  "wast",
+]
+
+[[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "gloo",
+ "log",
+ "markdown",
+ "serde-wasm-bindgen 0.5.0",
+ "serde_json",
+ "shared",
+ "ui-components",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-logger",
+ "web-sys",
+ "yew",
+ "yew-router",
 ]
 
 [[package]]
