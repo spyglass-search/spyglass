@@ -8994,6 +8994,8 @@ dependencies = [
  "serde-wasm-bindgen 0.5.0",
  "serde_json",
  "shared",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
  "ui-components",
  "wasm-bindgen",
  "wasm-bindgen-futures",

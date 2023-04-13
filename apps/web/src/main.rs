@@ -3,23 +3,28 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 mod pages;
+use pages::AppPage;
 
 #[derive(Clone, Routable, PartialEq)]
-enum Route {
+pub enum Route {
     #[at("/")]
-    Home,
-    #[at("/secure")]
-    Secure,
+    Start,
+    #[at("/result")]
+    Result,
+    #[at("/library")]
+    MyLibrary,
     #[not_found]
     #[at("/404")]
     NotFound,
 }
 
 fn switch(routes: Route) -> Html {
-    match routes {
-        Route::Home => html! { <pages::AskClippy /> },
-        Route::Secure => html! {},
-        Route::NotFound => html! {},
+    if routes == Route::NotFound {
+        html! { <div>{"Not Found!"}</div> }
+    } else {
+        html! {
+            <AppPage tab={routes} />
+        }
     }
 }
 
