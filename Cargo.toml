@@ -8,6 +8,8 @@ members = [
     "crates/tauri",
     "crates/ui-components",
 
+    # Clients
+    "apps/web",
 
     # Public published crates
     "crates/spyglass-plugin",
