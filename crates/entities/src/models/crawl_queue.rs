@@ -2,8 +2,7 @@ use regex::{RegexSet, RegexSetBuilder};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
-    sea_query, ConnectionTrait, FromQueryResult, InsertResult,
-    QueryTrait, Set, Statement,
+    sea_query, ConnectionTrait, FromQueryResult, InsertResult, QueryTrait, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

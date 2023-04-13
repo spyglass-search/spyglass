@@ -1,7 +1,6 @@
 use entities::{
     models::{
-        crawl_queue, crawl_tag,
-        lens,
+        crawl_queue, crawl_tag, lens,
         tag::{get_or_create, TagType},
     },
     sea_orm::{

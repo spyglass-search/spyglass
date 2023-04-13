@@ -6,8 +6,7 @@ use crate::BATCH_SIZE;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set,
-    Statement,
+    ConnectionTrait, FromQueryResult, InsertResult, QuerySelect, QueryTrait, Set, Statement,
 };
 use serde::Serialize;
 
