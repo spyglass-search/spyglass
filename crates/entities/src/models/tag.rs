@@ -198,7 +198,7 @@ where
                 .do_nothing()
                 .to_owned(),
         )
-        .exec_with_returning(db)
+        .exec_without_returning(db)
         .await?;
 
     let tag = Entity::find()
