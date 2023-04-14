@@ -1,11 +1,11 @@
 use strum_macros::{Display, EnumString};
+use ui_components::icons;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::{classes, prelude::*, Children};
 use yew_router::components::Link;
 use yew_router::hooks::use_navigator;
 
-use crate::components::icons;
 use crate::{listen, pages, Route};
 use shared::event::{ClientEvent, ListenPayload};
 
@@ -68,7 +68,7 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
-            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload>(payload) {
+            if let Ok(payload) = serde_wasm_bindgen::from_value::<ListenPayload<String>>(payload) {
                 match payload.payload.as_str() {
                     "/settings/discover" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::Discover,

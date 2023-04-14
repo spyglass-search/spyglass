@@ -1,9 +1,9 @@
 use super::btn;
+use crate::components::forms;
 use crate::components::{
     btn::{BtnAlign, BtnSize},
     forms::SettingChangeEvent,
 };
-use crate::components::{forms, icons};
 use crate::tauri_invoke;
 use shared::{
     constants::{CHROME_EXT_LINK, FIREFOX_EXT_LINK},
@@ -11,6 +11,7 @@ use shared::{
     form::{FormType, SettingOpts},
     response::DefaultIndices,
 };
+use ui_components::icons;
 use yew::platform::spawn_local;
 use yew::prelude::*;
 use yew::virtual_dom::VNode;

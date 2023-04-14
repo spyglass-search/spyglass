@@ -6,7 +6,12 @@ members = [
     "crates/shared",
     "crates/spyglass",
     "crates/tauri",
-    # Publically published crates
+    "crates/ui-components",
+
+    # Clients
+    "apps/web",
+
+    # Public published crates
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",

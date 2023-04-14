@@ -7,9 +7,10 @@ use yew::prelude::*;
 
 use shared::event::ClientInvoke;
 use shared::response::PluginResult;
+use ui_components::icons;
 
 use crate::components::forms::Toggle;
-use crate::components::{icons, Header};
+use crate::components::Header;
 use crate::utils::RequestState;
 use crate::{invoke, listen, tauri_invoke};
 

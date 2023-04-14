@@ -6,7 +6,6 @@ use yew::prelude::*;
 
 use crate::components::{
     btn::Btn,
-    icons,
     lens::{LensEvent, LibraryLens},
     Header,
 };
@@ -15,6 +14,7 @@ use crate::{invoke, listen, tauri_invoke};
 use shared::event::ClientInvoke;
 use shared::event::{ClientEvent, UninstallLensParams};
 use shared::response::LensResult;
+use ui_components::icons;
 
 async fn fetch_user_installed_lenses() -> Option<Vec<LensResult>> {
     match invoke(ClientInvoke::ListInstalledLenses.as_ref(), JsValue::NULL).await {

@@ -1,8 +1,4 @@
-use shared::event::OpenResultParams;
-use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-
-use crate::tauri_invoke;
 
 #[allow(dead_code)]
 #[derive(Clone, PartialEq, Eq)]
@@ -23,6 +19,7 @@ pub enum BtnType {
     Default,
     Danger,
     Success,
+    Primary,
 }
 
 impl Default for BtnType {
@@ -85,6 +82,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
             "hover:text-white"
         ),
         BtnType::Success => classes!("bg-green-700", "hover:bg-green-900"),
+        BtnType::Primary => classes!("bg-cyan-600", "hover:bg-cyan-800"),
     };
 
     if props.disabled {
@@ -118,7 +116,6 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
     let prop_onclick = props.onclick.clone();
     let btn_type = props._type.clone();
 
-    let href_prop = props.href.clone();
     let handle_onclick = Callback::from(move |evt| {
         // Handle confirmation for danger buttons
         if btn_type == BtnType::Danger {
@@ -128,20 +125,6 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
                 confirmed_state.set(true);
             }
         } else {
-            if let Some(href) = &href_prop {
-                let href = href.clone();
-                spawn_local(async move {
-                    let _ = tauri_invoke::<OpenResultParams, ()>(
-                        shared::event::ClientInvoke::OpenResult,
-                        OpenResultParams {
-                            url: href.to_string(),
-                            application: None,
-                        },
-                    )
-                    .await;
-                });
-            }
-
             prop_onclick.emit(evt);
         }
     });
@@ -170,7 +153,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         }
     } else {
         html! {
-            <a onclick={handle_onclick} class={styles}>
+            <a onclick={handle_onclick} class={styles} href={props.href.clone()} target="blank">
                 <div class={label_styles}>
                     {label}
                 </div>

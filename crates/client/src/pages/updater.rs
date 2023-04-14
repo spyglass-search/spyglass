@@ -3,9 +3,10 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::components::{btn::Btn, icons, Header};
+use crate::components::{btn::Btn, Header};
 use crate::invoke;
 use shared::event::ClientInvoke;
+use ui_components::icons;
 
 // Random gif for your viewing pleasure.
 const UPDATE_GIFS: [&str; 5] = [

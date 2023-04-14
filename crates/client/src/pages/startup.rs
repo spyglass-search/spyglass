@@ -4,8 +4,8 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use shared::event::ClientInvoke;
+use ui_components::icons;
 
-use crate::components::icons;
 use crate::invoke;
 
 pub struct StartupPage {
