@@ -2,7 +2,6 @@ pub mod btn;
 pub mod forms;
 pub mod lens;
 pub mod result;
-pub mod tag;
 pub mod user_action_list;
 use shared::keyboard::ModifiersState;
 use ui_components::icons;
