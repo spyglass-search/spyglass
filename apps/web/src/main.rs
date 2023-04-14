@@ -42,5 +42,6 @@ fn App() -> Html {
 }
 
 fn main() {
+    let _ = console_log::init_with_level(log::Level::Debug);
     yew::Renderer::<App>::new().render();
 }

@@ -1,6 +1,6 @@
 use ui_components::icons;
-use yew_router::prelude::Link;
 use yew::prelude::*;
+use yew_router::prelude::Link;
 
 use crate::Route;
 pub mod search;
@@ -34,7 +34,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct AppPageProps {
-    pub tab: Route
+    pub tab: Route,
 }
 
 #[function_component]

@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+console_log = "1.0"
 "shared" = { path = "../../crates/shared" }
 gloo = "0.8.0"
 log = "0.4"
@@ -16,7 +17,6 @@ strum_macros = "0.24"
 ui-components = { path = "../../crates/ui-components" }
 wasm-bindgen = "0.2.83"
 wasm-bindgen-futures = "0.4.33"
-wasm-logger = "0.2.0"
 web-sys = { version = "0.3.60", features = ["Navigator", "VisibilityState"] }
 yew = { version = "0.20.0", features = ["csr"] }
 yew-router = "0.17"

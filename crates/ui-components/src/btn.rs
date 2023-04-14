@@ -19,6 +19,7 @@ pub enum BtnType {
     Default,
     Danger,
     Success,
+    Primary,
 }
 
 impl Default for BtnType {
@@ -81,6 +82,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
             "hover:text-white"
         ),
         BtnType::Success => classes!("bg-green-700", "hover:bg-green-900"),
+        BtnType::Primary => classes!("bg-cyan-600", "hover:bg-cyan-800"),
     };
 
     if props.disabled {
