@@ -9141,8 +9141,8 @@ dependencies = [
 
 [[package]]
 name = "whisper-rs"
-version = "0.4.0"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=cf278027eeb5aa849360f664de2c34287418c625#cf278027eeb5aa849360f664de2c34287418c625"
+version = "0.5.0"
+source = "git+https://github.com/a5huynh/whisper-rs?rev=ccf2dcc10902754ac77764a6e39ee8b98dd280c9#ccf2dcc10902754ac77764a6e39ee8b98dd280c9"
 dependencies = [
  "whisper-rs-sys",
 ]
@@ -9150,7 +9150,7 @@ dependencies = [
 [[package]]
 name = "whisper-rs-sys"
 version = "0.3.1"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=cf278027eeb5aa849360f664de2c34287418c625#cf278027eeb5aa849360f664de2c34287418c625"
+source = "git+https://github.com/a5huynh/whisper-rs?rev=ccf2dcc10902754ac77764a6e39ee8b98dd280c9#ccf2dcc10902754ac77764a6e39ee8b98dd280c9"
 dependencies = [
  "bindgen",
 ]
