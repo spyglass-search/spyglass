@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 serde = "1.0"
-jsonrpsee = { version = "0.16.2", features = ["macros", "client-core", "server-core"] }
+jsonrpsee = { version = "0.16.2", features = ["full"] }
 shared = { path = "../shared" }
 
 [lib]
