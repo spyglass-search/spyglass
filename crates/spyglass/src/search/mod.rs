@@ -24,7 +24,7 @@ use entities::sea_orm::{prelude::*, DatabaseConnection};
 pub mod grouping;
 pub mod lens;
 mod query;
-mod utils;
+pub mod utils;
 
 pub use query::QueryStats;
 
