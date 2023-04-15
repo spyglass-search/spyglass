@@ -34,6 +34,7 @@ struct CliArgs {
     #[arg(short, long)]
     check: bool,
     /// Only enabled readonly functionality (right now, just search)
+    #[arg(long)]
     api_read_only: bool,
 }
 
@@ -167,8 +168,17 @@ async fn main() -> Result<(), ()> {
     }
 
     // Initialize/Load user preferences
-    let state = AppState::new(&config).await;
-    if !args.check {
+    let state = AppState::new(&config, args.api_read_only).await;
+    // Only startup API server if we're in readonly mode.
+    if args.api_read_only {
+        match api::start_api_server(state, config).await {
+            Ok((_, handle)) => handle.stopped().await,
+            Err(err) => {
+                log::error!("Unable to start API server: {err}");
+                return Err(());
+            }
+        }
+    } else if !args.check {
         let indexer_handle = start_backend(state.clone(), config.clone());
         // API server
         let api_handle = api::start_api_server(state, config);

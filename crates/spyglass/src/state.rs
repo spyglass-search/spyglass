@@ -77,17 +77,18 @@ pub struct AppState {
     pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
     // Keep track of in-flight tasks
     pub fetch_limits: Arc<DashMap<FetchLimitType, usize>>,
+    pub readonly_mode: bool,
 }
 
 impl AppState {
-    pub async fn new(config: &Config) -> Self {
+    pub async fn new(config: &Config, readonly_mode: bool) -> Self {
         let db = create_connection(config, false)
             .await
             .expect("Unable to connect to database");
 
         AppStateBuilder::new()
             .with_db(db)
-            .with_index(&IndexPath::LocalPath(config.index_dir()), false)
+            .with_index(&IndexPath::LocalPath(config.index_dir()), readonly_mode)
             .with_lenses(&config.lenses.values().cloned().collect())
             .with_pipelines(
                 &config
@@ -143,6 +144,7 @@ pub struct AppStateBuilder {
     lenses: Option<Vec<LensConfig>>,
     pipelines: Option<Vec<PipelineConfiguration>>,
     user_settings: Option<UserSettings>,
+    readonly_mode: Option<bool>,
 }
 
 impl AppStateBuilder {
@@ -199,6 +201,7 @@ impl AppStateBuilder {
             file_watcher: Arc::new(Mutex::new(None)),
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
+            readonly_mode: self.readonly_mode.unwrap_or_default(),
         }
     }
 
