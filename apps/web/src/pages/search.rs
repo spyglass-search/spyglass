@@ -1,4 +1,9 @@
-use std::str::FromStr;
+use jsonrpsee_wasm_client::{Client, WasmClientBuilder};
+
+use std::{
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 use shared::{keyboard::KeyCode, response::SearchResult};
 use ui_components::{
@@ -9,18 +14,22 @@ use ui_components::{
 use web_sys::HtmlInputElement;
 use yew::{platform::spawn_local, prelude::*};
 
-use crate::constants::SEARCH_ENDPOINT;
+use crate::constants::{RPC_ENDPOINT, SEARCH_ENDPOINT};
 const RESULT_PREFIX: &str = "result";
+
+pub type RpcMutex = Arc<Mutex<Client>>;
 
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
     HandleSearch,
+    SetClient(RpcMutex),
     SetSearchResults(Vec<SearchResult>),
     OpenResult(SearchResult),
 }
 
 pub struct SearchPage {
+    rpc_client: Option<RpcMutex>,
     client: reqwest::Client,
     results: Vec<SearchResult>,
     search_wrapper_ref: NodeRef,
@@ -33,20 +42,35 @@ impl Component for SearchPage {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_ctx: &yew::Context<Self>) -> Self {
+    fn create(ctx: &yew::Context<Self>) -> Self {
+        let link = ctx.link();
+        link.send_future(async move {
+            let client = WasmClientBuilder::default()
+                .request_timeout(std::time::Duration::from_secs(10))
+                .build(RPC_ENDPOINT)
+                .await
+                .expect("Unable to create WsClient");
+            Msg::SetClient(Arc::new(Mutex::new(client)))
+        });
+
         Self {
             client: reqwest::Client::new(),
+            rpc_client: None,
             results: Vec::new(),
             search_input_ref: Default::default(),
             search_wrapper_ref: Default::default(),
             status_msg: None,
-            in_progress: false
+            in_progress: false,
         }
     }
 
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::SetClient(client) => {
+                self.rpc_client = Some(client);
+                false
+            }
             Msg::HandleKeyboardEvent(event) => {
                 let key = event.key();
                 if let Ok(code) = KeyCode::from_str(&key.to_uppercase()) {
