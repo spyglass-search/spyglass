@@ -1,11 +1,14 @@
+use jsonrpsee_core::{client::ClientT, rpc_params};
 use jsonrpsee_wasm_client::{Client, WasmClientBuilder};
-
+use shared::request::SearchParam;
+use shared::{
+    keyboard::KeyCode,
+    response::{SearchResult, SearchResults},
+};
 use std::{
     str::FromStr,
     sync::{Arc, Mutex},
 };
-
-use shared::{keyboard::KeyCode, response::SearchResult};
 use ui_components::{
     btn::{Btn, BtnType},
     icons::RefreshIcon,
@@ -14,7 +17,7 @@ use ui_components::{
 use web_sys::HtmlInputElement;
 use yew::{platform::spawn_local, prelude::*};
 
-use crate::constants::{RPC_ENDPOINT, SEARCH_ENDPOINT};
+use crate::constants::RPC_ENDPOINT;
 const RESULT_PREFIX: &str = "result";
 
 pub type RpcMutex = Arc<Mutex<Client>>;
@@ -30,7 +33,6 @@ pub enum Msg {
 
 pub struct SearchPage {
     rpc_client: Option<RpcMutex>,
-    client: reqwest::Client,
     results: Vec<SearchResult>,
     search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
@@ -54,7 +56,6 @@ impl Component for SearchPage {
         });
 
         Self {
-            client: reqwest::Client::new(),
             rpc_client: None,
             results: Vec::new(),
             search_input_ref: Default::default(),
@@ -83,6 +84,7 @@ impl Component for SearchPage {
             }
             Msg::HandleSearch => {
                 self.in_progress = true;
+                self.results = Vec::new();
 
                 let query = self
                     .search_input_ref
@@ -92,26 +94,32 @@ impl Component for SearchPage {
                 log::info!("handling search! {:?}", query);
                 if let Some(query) = query {
                     self.status_msg = Some(format!("searching: {query}"));
-                    let client = self.client.clone();
                     let link = link.clone();
-                    spawn_local(async move {
-                        match client
-                            .get(SEARCH_ENDPOINT)
-                            .query(&[("query", query)])
-                            .send()
-                            .await
-                        {
-                            Ok(result) => match result.json::<Vec<SearchResult>>().await {
-                                Ok(res) => link.send_message(Msg::SetSearchResults(res)),
-                                Err(err) => {
-                                    log::error!("err: {}", err);
+                    if let Some(client) = &self.rpc_client {
+                        let client = client.clone();
+                        spawn_local(async move {
+                            if let Ok(client) = client.lock() {
+                                let params = SearchParam {
+                                    lenses: Vec::new(),
+                                    query: query,
+                                };
+                                match client
+                                    .request::<SearchResults, _>(
+                                        "spyglass_search_docs",
+                                        rpc_params![params],
+                                    )
+                                    .await
+                                {
+                                    Ok(res) => {
+                                        link.send_message(Msg::SetSearchResults(res.results));
+                                    }
+                                    Err(err) => {
+                                        log::error!("error rpc: {}", err);
+                                    }
                                 }
-                            },
-                            Err(err) => {
-                                log::error!("err: {}", err);
                             }
-                        }
-                    });
+                        });
+                    }
                 }
                 true
             }
@@ -148,7 +156,7 @@ impl Component for SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
-                <div class="flex flex-nowrap w-full bg-neutral-800 p-4">
+                <div class="flex flex-nowrap w-full bg-neutral-800 p-4 border-b-2 border-neutral-900">
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
@@ -171,10 +179,7 @@ impl Component for SearchPage {
                         }}
                     </Btn>
                 </div>
-                <div class="w-full flex flex-col">{results}</div>
-                <div class="border-t-2 border-neutral-900 p-4">
-                    {self.status_msg.clone().unwrap_or_else(|| "how to guide?".into())}
-               </div>
+                <div class="w-full flex flex-col animate-fade-in">{results}</div>
             </div>
         }
     }
