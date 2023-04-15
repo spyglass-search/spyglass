@@ -87,7 +87,7 @@ impl AppState {
 
         AppStateBuilder::new()
             .with_db(db)
-            .with_index(&IndexPath::LocalPath(config.index_dir()))
+            .with_index(&IndexPath::LocalPath(config.index_dir()), false)
             .with_lenses(&config.lenses.values().cloned().collect())
             .with_pipelines(
                 &config
@@ -164,7 +164,7 @@ impl AppStateBuilder {
         let index = if let Some(index) = &self.index {
             index.to_owned()
         } else {
-            Searcher::with_index(&IndexPath::Memory).expect("Unable to open search index")
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open search index")
         };
 
         let user_settings = if let Some(settings) = &self.user_settings {
@@ -226,14 +226,14 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn with_index(&mut self, index: &IndexPath) -> &mut Self {
+    pub fn with_index(&mut self, index: &IndexPath, readonly: bool) -> &mut Self {
         if let IndexPath::LocalPath(path) = &index {
             if !path.exists() {
                 let _ = std::fs::create_dir_all(path);
             }
         }
 
-        self.index = Some(Searcher::with_index(index).expect("Unable to open index"));
+        self.index = Some(Searcher::with_index(index, readonly).expect("Unable to open index"));
         self
     }
 }

@@ -33,6 +33,8 @@ struct CliArgs {
     /// Run migrations & basic checks.
     #[arg(short, long)]
     check: bool,
+    /// Only enabled readonly functionality (right now, just search)
+    api_read_only: bool,
 }
 
 #[cfg(feature = "tokio-console")]
