@@ -21,4 +21,5 @@ RUN apt update \
 
 COPY --from=builder /usr/src/target/release/spyglass ./
 
+EXPOSE 4664
 CMD ["./spyglass", "--api-only", "--read-only", "--addr", "0.0.0.0"]
