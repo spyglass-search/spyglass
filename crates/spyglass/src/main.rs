@@ -8,6 +8,7 @@ use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
 use sentry::ClientInitGuard;
 use shared::config::{self, Config};
 use std::io;
+use std::net::IpAddr;
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
 use tracing_appender::non_blocking::WorkerGuard;
@@ -33,9 +34,13 @@ struct CliArgs {
     /// Run migrations & basic checks.
     #[arg(short, long)]
     check: bool,
-    /// Only enabled readonly functionality (right now, just search)
+    /// IP address to host on, defaults to "127.0.0.1".
+    #[arg(short, long)]
+    addr: Option<IpAddr>,
+    /// Only enable API server (no indexing, lens install, etc.)
     #[arg(long)]
     api_only: bool,
+    /// Only enable readonly functionality
     #[arg(long)]
     read_only: bool,
 }
@@ -176,7 +181,7 @@ async fn main() -> Result<(), ()> {
         // config check mode, nothing to do.
         return Ok(());
     } else if args.api_only {
-        match api::start_api_server(state, config).await {
+        match api::start_api_server(args.addr, state, config).await {
             Ok((_, handle)) => handle.stopped().await,
             Err(err) => {
                 log::error!("Unable to start API server: {err}");
@@ -186,7 +191,7 @@ async fn main() -> Result<(), ()> {
     } else {
         let indexer_handle = start_backend(state.clone(), config.clone());
         // API server
-        let api_handle = api::start_api_server(state, config);
+        let api_handle = api::start_api_server(args.addr, state, config);
         let _ = tokio::join!(indexer_handle, api_handle);
     }
 

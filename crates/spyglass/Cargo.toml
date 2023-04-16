@@ -55,6 +55,7 @@ tendril = "0.4.2"
 thiserror = "1.0.37"
 tokio = { version = "1", features = ["full"] }
 tokio-retry = "0.3"
+tower = { version = "0.4", features = ["full"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-log = "0.1.3"
