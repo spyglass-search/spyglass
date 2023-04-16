@@ -293,15 +293,15 @@ pub struct DefaultIndices {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct VectorResultPayload {
+pub struct SimilarityResultPayload {
     pub title: String,
     pub url: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct VectorSearchResult {
+pub struct SimilaritySearchResult {
     pub id: usize,
     pub version: usize,
     pub score: f32,
-    pub payload: VectorResultPayload,
+    pub payload: SimilarityResultPayload,
 }

@@ -12,7 +12,7 @@ use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{
-    LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, VectorSearchResult,
+    LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, SimilaritySearchResult,
 };
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
@@ -54,7 +54,7 @@ pub async fn search_docs(
 
     // for now, map based on URL until we get the doc ids into the payload
     let vector_results = similarity_search(&query).await;
-    let vector_result_map: HashMap<String, VectorSearchResult> = vector_results
+    let vector_result_map: HashMap<String, SimilaritySearchResult> = vector_results
         .iter()
         .map(|x| (x.payload.url.clone(), x.clone()))
         .collect();
