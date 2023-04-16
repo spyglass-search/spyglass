@@ -12,7 +12,13 @@ RUN apt install build-essential -y \
 COPY . .
 RUN cargo build -p spyglass --bin spyglass --release
 
-FROM scratch
-COPY --from=builder /usr/src/target/release/spyglass .
+FROM debian:stable-slim
+WORKDIR /app
+RUN apt update \
+    && apt install -y openssl ca-certificates \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-CMD ["spyglass", "--api-only", "--read-only"]
+COPY --from=builder /usr/src/target/release/spyglass ./
+
+CMD ["./spyglass", "--api-only", "--read-only", "--addr", "0.0.0.0"]
