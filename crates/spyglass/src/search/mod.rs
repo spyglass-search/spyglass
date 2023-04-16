@@ -21,6 +21,7 @@ use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{self, DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
+pub mod similarity;
 pub mod grouping;
 pub mod lens;
 mod query;

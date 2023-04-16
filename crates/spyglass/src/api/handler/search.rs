@@ -6,6 +6,7 @@ use entities::sea_orm::{
 };
 use jsonrpsee::core::Error;
 use libspyglass::search::{document_to_struct, QueryStats, Searcher};
+use libspyglass::search::similarity::similarity_search;
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
@@ -51,20 +52,8 @@ pub async fn search_docs(
     let docs =
         Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &query, &mut stats).await;
 
-    // search vector db, todo: if enabled/available
-    let client = reqwest::Client::builder().build().unwrap();
-    // todo: pull endpoint from environment / configuration
-    let vector_results: Vec<VectorSearchResult> = client
-        .post("http://44.214.183.114:8000/search")
-        .json(&serde_json::json!({ "query": query }))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-
     // for now, map based on URL until we get the doc ids into the payload
+    let vector_results = similarity_search(&query).await;
     let vector_result_map: HashMap<String, VectorSearchResult> = vector_results
         .iter()
         .map(|x| (x.payload.url.clone(), x.clone()))
