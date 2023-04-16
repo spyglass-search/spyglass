@@ -691,7 +691,7 @@ mod test {
     use shared::config::{Config, LensConfig};
 
     fn _build_test_index(searcher: &mut Searcher) {
-        let writer = &mut searcher.writer.lock().unwrap();
+        let writer = &mut searcher.lock_writer().unwrap();
         Searcher::upsert_document(
             writer,
             DocumentUpdate {
@@ -792,7 +792,8 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let mut stats = QueryStats::new();
@@ -814,7 +815,8 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
 
         let mut stats = QueryStats::new();
         _build_test_index(&mut searcher);
@@ -836,7 +838,8 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let mut stats = QueryStats::new();
