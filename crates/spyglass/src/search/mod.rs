@@ -3,7 +3,7 @@ use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::anyhow;
@@ -42,7 +42,7 @@ pub enum IndexPath {
 pub struct Searcher {
     pub index: Index,
     pub reader: IndexReader,
-    pub writer: Arc<Mutex<IndexWriter>>,
+    pub writer: Option<Arc<Mutex<IndexWriter>>>,
 }
 
 #[derive(Clone)]
@@ -79,8 +79,19 @@ impl Debug for ReadonlySearcher {
 }
 
 impl Searcher {
+    pub fn lock_writer(&self) -> anyhow::Result<MutexGuard<IndexWriter>> {
+        if let Some(index) = &self.writer {
+            match index.lock() {
+                Ok(lock) => Ok(lock),
+                Err(_) => Err(anyhow!("writer already locked!")),
+            }
+        } else {
+            Err(anyhow!("readonly only mode enabled"))
+        }
+    }
+
     pub async fn save(state: &AppState) -> anyhow::Result<()> {
-        if let Ok(mut writer) = state.index.writer.lock() {
+        if let Ok(mut writer) = state.index.lock_writer() {
             match writer.commit() {
                 Ok(_) => Ok(()),
                 Err(err) => Err(anyhow::anyhow!(err.to_string())),
@@ -105,7 +116,7 @@ impl Searcher {
         remove_documents: bool,
     ) -> anyhow::Result<()> {
         // Remove from search index, immediately.
-        if let Ok(mut writer) = state.index.writer.lock() {
+        if let Ok(mut writer) = state.index.lock_writer() {
             Searcher::remove_many_from_index(&mut writer, doc_ids)?;
         };
 
@@ -198,7 +209,7 @@ impl Searcher {
     }
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
-    pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
+    pub fn with_index(index_path: &IndexPath, readonly: bool) -> anyhow::Result<Self> {
         let index = match index_path {
             IndexPath::LocalPath(path) => schema::initialize_index(path)?,
             IndexPath::Memory => schema::initialize_in_memory_index(),
@@ -206,9 +217,15 @@ impl Searcher {
 
         // Should only be one writer at a time. This single IndexWriter is already
         // multithreaded.
-        let writer = index
-            .writer(50_000_000)
-            .expect("Unable to create index_writer");
+        let writer = if readonly {
+            None
+        } else {
+            Some(Arc::new(Mutex::new(
+                index
+                    .writer(50_000_000)
+                    .expect("Unable to create index_writer"),
+            )))
+        };
 
         // For a search server you will typically create on reader for the entire
         // lifetime of your program.
@@ -221,7 +238,7 @@ impl Searcher {
         Ok(Searcher {
             index,
             reader,
-            writer: Arc::new(Mutex::new(writer)),
+            writer,
         })
     }
 
@@ -674,7 +691,7 @@ mod test {
     use shared::config::{Config, LensConfig};
 
     fn _build_test_index(searcher: &mut Searcher) {
-        let writer = &mut searcher.writer.lock().unwrap();
+        let writer = &mut searcher.lock_writer().unwrap();
         Searcher::upsert_document(
             writer,
             DocumentUpdate {
@@ -775,7 +792,8 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let mut stats = QueryStats::new();
@@ -797,7 +815,8 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
 
         let mut stats = QueryStats::new();
         _build_test_index(&mut searcher);
@@ -819,7 +838,8 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let mut stats = QueryStats::new();

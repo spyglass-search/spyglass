@@ -670,7 +670,7 @@ mod test {
             ..Default::default()
         };
 
-        if let Ok(mut writer) = state.index.writer.lock() {
+        if let Ok(mut writer) = state.index.lock_writer() {
             Searcher::upsert_document(
                 &mut writer,
                 DocumentUpdate {

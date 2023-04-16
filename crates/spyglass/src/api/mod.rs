@@ -1,7 +1,8 @@
 use entities::get_library_stats;
 use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
-use jsonrpsee::core::{async_trait, Error};
+use jsonrpsee::core::{async_trait, Error, JsonValue};
+use jsonrpsee::server::middleware::proxy_get_request::ProxyGetRequestLayer;
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use jsonrpsee::types::{SubscriptionEmptyError, SubscriptionResult};
 use jsonrpsee::SubscriptionSink;
@@ -27,6 +28,10 @@ pub struct SpyglassRpc {
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
         Ok("0.1.2".into())
+    }
+
+    fn system_health(&self) -> Result<JsonValue, Error> {
+        Ok(serde_json::json!({ "health": true }))
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
@@ -247,18 +252,28 @@ impl RpcServer for SpyglassRpc {
 }
 
 pub async fn start_api_server(
+    addr: Option<IpAddr>,
     state: AppState,
     config: Config,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
-    let server_addr = SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::LOCALHOST),
-        state.user_settings.load_full().port,
+    let middleware = tower::ServiceBuilder::new().layer(
+        ProxyGetRequestLayer::new("/health", "spyglass_system_health")
+            .expect("Unable to create middleware"),
     );
-    let server = ServerBuilder::default().build(server_addr).await?;
+
+    let ip = addr.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    let server_addr = SocketAddr::new(ip, state.user_settings.load_full().port);
+
+    let server = ServerBuilder::default()
+        .set_middleware(middleware)
+        .build(server_addr)
+        .await?;
+
     let rpc_module = SpyglassRpc {
         state: state.clone(),
         config: config.clone(),
     };
+
     let addr = server.local_addr()?;
     let server_handle = server.start(rpc_module.into_rpc())?;
 

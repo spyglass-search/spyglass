@@ -170,7 +170,9 @@ fn parse_audio_file(path: &PathBuf) -> anyhow::Result<AudioFile> {
     log::debug!("Detected {} audio channels", channels.count());
     if channels.count() > 1 {
         // convert stereo audio to mono for whisper.
-        samples = convert_stereo_to_mono_audio(&samples);
+        if let Ok(converted) = convert_stereo_to_mono_audio(&samples) {
+            samples = converted;
+        }
     }
 
     log::debug!(
