@@ -1850,6 +1850,7 @@ dependencies = [
  "shared",
  "strum",
  "strum_macros",
+ "thiserror",
  "ui-components",
  "wasm-bindgen",
  "wasm-bindgen-futures",

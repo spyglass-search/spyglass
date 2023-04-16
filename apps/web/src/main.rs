@@ -2,6 +2,7 @@ use wasm_bindgen::{prelude::Closure, JsValue};
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+mod client;
 mod constants;
 mod pages;
 use pages::AppPage;

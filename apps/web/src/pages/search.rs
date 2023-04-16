@@ -1,39 +1,33 @@
-use jsonrpsee_core::{client::ClientT, rpc_params};
-use jsonrpsee_wasm_client::{Client, WasmClientBuilder};
-use shared::request::SearchParam;
-use shared::{
-    keyboard::KeyCode,
-    response::{SearchResult, SearchResults},
-};
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use crate::client::SpyglassClient;
+use futures::lock::Mutex;
+use shared::{keyboard::KeyCode, response::SearchResult};
+use std::str::FromStr;
+use std::sync::Arc;
 use ui_components::{
     btn::{Btn, BtnType},
     icons::RefreshIcon,
     results::SearchResultItem,
 };
 use web_sys::HtmlInputElement;
-use yew::{platform::spawn_local, prelude::*};
+use yew::prelude::*;
 
-use crate::constants::RPC_ENDPOINT;
+// make sure we only have one connection per client
+type Client = Arc<Mutex<SpyglassClient>>;
+
 const RESULT_PREFIX: &str = "result";
-
-pub type RpcMutex = Arc<Mutex<Client>>;
 
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
     HandleSearch,
-    SetClient(RpcMutex),
+    SetClient(Client),
     SetSearchResults(Vec<SearchResult>),
     SetError(String),
     OpenResult(SearchResult),
 }
 
 pub struct SearchPage {
-    rpc_client: Option<RpcMutex>,
+    client: Option<Client>,
     results: Vec<SearchResult>,
     search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
@@ -48,16 +42,17 @@ impl Component for SearchPage {
     fn create(ctx: &yew::Context<Self>) -> Self {
         let link = ctx.link();
         link.send_future(async move {
-            let client = WasmClientBuilder::default()
-                .request_timeout(std::time::Duration::from_secs(10))
-                .build(RPC_ENDPOINT)
-                .await
-                .expect("Unable to create WsClient");
+            // load ws client if we're local dev
+            // #[cfg(debug_assertions)]
+            // let client = SpyglassClient::ws_client().await;
+            // #[cfg(not(debug_assertions))]
+            let client = SpyglassClient::http_client().await;
+
             Msg::SetClient(Arc::new(Mutex::new(client)))
         });
 
         Self {
-            rpc_client: None,
+            client: None,
             results: Vec::new(),
             search_input_ref: Default::default(),
             search_wrapper_ref: Default::default(),
@@ -70,7 +65,7 @@ impl Component for SearchPage {
         let link = ctx.link();
         match msg {
             Msg::SetClient(client) => {
-                self.rpc_client = Some(client);
+                self.client = Some(client);
                 false
             }
             Msg::HandleKeyboardEvent(event) => {
@@ -96,29 +91,13 @@ impl Component for SearchPage {
                 if let Some(query) = query {
                     self.status_msg = Some(format!("searching: {query}"));
                     let link = link.clone();
-                    if let Some(client) = &self.rpc_client {
+                    if let Some(client) = &self.client {
                         let client = client.clone();
-                        spawn_local(async move {
-                            if let Ok(client) = client.lock() {
-                                let params = SearchParam {
-                                    lenses: Vec::new(),
-                                    query: query,
-                                };
-                                match client
-                                    .request::<SearchResults, _>(
-                                        "spyglass_search_docs",
-                                        rpc_params![params],
-                                    )
-                                    .await
-                                {
-                                    Ok(res) => {
-                                        link.send_message(Msg::SetSearchResults(res.results));
-                                    }
-                                    Err(err) => {
-                                        log::error!("error rpc: {}", err);
-                                        link.send_message(Msg::SetError(err.to_string()));
-                                    }
-                                }
+                        link.send_future(async move {
+                            let mut client = client.lock().await;
+                            match client.search(&query).await {
+                                Ok(res) => Msg::SetSearchResults(res),
+                                Err(err) => Msg::SetError(err.to_string()),
                             }
                         });
                     }
@@ -133,16 +112,6 @@ impl Component for SearchPage {
             Msg::SetError(err) => {
                 self.in_progress = false;
                 self.status_msg = Some(err);
-
-                link.send_future(async move {
-                    let client = WasmClientBuilder::default()
-                        .request_timeout(std::time::Duration::from_secs(10))
-                        .build(RPC_ENDPOINT)
-                        .await
-                        .expect("Unable to create WsClient");
-                    Msg::SetClient(Arc::new(Mutex::new(client)))
-                });
-
                 true
             }
             Msg::OpenResult(result) => {
