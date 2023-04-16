@@ -35,7 +35,9 @@ struct CliArgs {
     check: bool,
     /// Only enabled readonly functionality (right now, just search)
     #[arg(long)]
-    api_read_only: bool,
+    api_only: bool,
+    #[arg(long)]
+    read_only: bool,
 }
 
 #[cfg(feature = "tokio-console")]
@@ -168,9 +170,12 @@ async fn main() -> Result<(), ()> {
     }
 
     // Initialize/Load user preferences
-    let state = AppState::new(&config, args.api_read_only).await;
+    let state = AppState::new(&config, args.read_only).await;
     // Only startup API server if we're in readonly mode.
-    if args.api_read_only {
+    if args.check {
+        // config check mode, nothing to do.
+        return Ok(());
+    } else if args.api_only {
         match api::start_api_server(state, config).await {
             Ok((_, handle)) => handle.stopped().await,
             Err(err) => {
@@ -178,7 +183,7 @@ async fn main() -> Result<(), ()> {
                 return Err(());
             }
         }
-    } else if !args.check {
+    } else {
         let indexer_handle = start_backend(state.clone(), config.clone());
         // API server
         let api_handle = api::start_api_server(state, config);
