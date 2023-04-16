@@ -1,0 +1,7 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/web.Dockerfile
+    ports:
+      - 8080:8080
