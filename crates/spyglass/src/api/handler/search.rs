@@ -10,8 +10,10 @@ use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
-use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
-use std::collections::HashSet;
+use shared::response::{
+    LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, VectorSearchResult,
+};
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use tracing::instrument;
 
@@ -31,6 +33,7 @@ pub async fn search_docs(
     let start = SystemTime::now();
     let index = &state.index;
     let searcher = index.reader.searcher();
+    let query = search_req.query.clone();
 
     let tags = tag::Entity::find()
         .filter(tag::Column::Label.eq(tag::TagType::Lens.to_string()))
@@ -44,20 +47,33 @@ pub async fn search_docs(
         .collect::<Vec<u64>>();
 
     let mut stats = QueryStats::new();
-    let docs = Searcher::search_with_lens(
-        state.db.clone(),
-        &tag_ids,
-        index,
-        &search_req.query,
-        &mut stats,
-    )
-    .await;
+
+    let docs =
+        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &query, &mut stats).await;
+
+    // search vector db, todo: if enabled/available
+    let client = reqwest::Client::builder().build().unwrap();
+    // todo: pull endpoint from environment / configuration
+    let vector_results: Vec<VectorSearchResult> = client
+        .post("http://44.214.183.114:8000/search")
+        .json(&serde_json::json!({ "query": query }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    // for now, map based on URL until we get the doc ids into the payload
+    let vector_result_map: HashMap<String, VectorSearchResult> = vector_results
+        .iter()
+        .map(|x| (x.payload.url.clone(), x.clone()))
+        .collect();
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
 
-    let query = search_req.query.clone();
-    for (score, doc_addr) in docs {
+    for (mut score, doc_addr) in docs {
         if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
             let indexed = indexed_document::Entity::find()
@@ -82,11 +98,20 @@ pub async fn search_docs(
                         .index
                         .tokenizer_for_field(fields.content)
                         .expect("Unable to get tokenizer for content field");
+
                     let description = libspyglass::search::utils::generate_highlight_preview(
                         &tokenizer,
                         &query,
                         &doc.content,
                     );
+
+                    let tmp = crawl_uri.clone();
+                    if let Some(data) = vector_result_map.get(&tmp) {
+                        // rescore
+                        score += data.score * 10.0;
+                        dbg!(data);
+                    }
+
                     let result = SearchResult {
                         doc_id: doc.doc_id.clone(),
                         domain: doc.domain,

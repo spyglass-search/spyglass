@@ -28,6 +28,7 @@ pub enum Msg {
     HandleSearch,
     SetClient(RpcMutex),
     SetSearchResults(Vec<SearchResult>),
+    SetError(String),
     OpenResult(SearchResult),
 }
 
@@ -115,6 +116,7 @@ impl Component for SearchPage {
                                     }
                                     Err(err) => {
                                         log::error!("error rpc: {}", err);
+                                        link.send_message(Msg::SetError(err.to_string()));
                                     }
                                 }
                             }
@@ -126,6 +128,21 @@ impl Component for SearchPage {
             Msg::SetSearchResults(results) => {
                 self.in_progress = false;
                 self.results = results;
+                true
+            }
+            Msg::SetError(err) => {
+                self.in_progress = false;
+                self.status_msg = Some(err);
+
+                link.send_future(async move {
+                    let client = WasmClientBuilder::default()
+                        .request_timeout(std::time::Duration::from_secs(10))
+                        .build(RPC_ENDPOINT)
+                        .await
+                        .expect("Unable to create WsClient");
+                    Msg::SetClient(Arc::new(Mutex::new(client)))
+                });
+
                 true
             }
             Msg::OpenResult(result) => {

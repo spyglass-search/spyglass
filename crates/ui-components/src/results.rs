@@ -193,6 +193,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                     {Html::from_html_unchecked(result.description.clone().into())}
                 </div>
                 {metadata}
+                <div>{result.score}</div>
             </div>
         </a>
     }

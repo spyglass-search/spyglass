@@ -291,3 +291,17 @@ pub struct DefaultIndices {
     pub file_paths: Vec<PathBuf>,
     pub extensions: Vec<String>,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct VectorResultPayload {
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct VectorSearchResult {
+    pub id: usize,
+    pub version: usize,
+    pub score: f32,
+    pub payload: VectorResultPayload,
+}

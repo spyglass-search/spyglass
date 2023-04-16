@@ -355,7 +355,7 @@ impl Searcher {
             stats,
         );
 
-        let collector = TopDocs::with_limit(5);
+        let collector = TopDocs::with_limit(10);
 
         let top_docs = searcher
             .search(&query, &collector)
