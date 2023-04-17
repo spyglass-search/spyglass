@@ -8,7 +8,7 @@ use ui_components::{
     icons::RefreshIcon,
     results::SearchResultItem,
 };
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlInputElement, window};
 use yew::prelude::*;
 
 // make sure we only have one connection per client
@@ -116,6 +116,10 @@ impl Component for SearchPage {
             }
             Msg::OpenResult(result) => {
                 log::info!("opening result: {}", result.url);
+                if let Some(window) = window() {
+                    let _ = window.open_with_url_and_target(&result.url, "blank");
+                }
+
                 false
             }
         }
