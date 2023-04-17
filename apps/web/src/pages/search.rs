@@ -47,7 +47,6 @@ impl Component for SearchPage {
             // let client = SpyglassClient::ws_client().await;
             // #[cfg(not(debug_assertions))]
             let client = SpyglassClient::http_client().await;
-
             Msg::SetClient(Arc::new(Mutex::new(client)))
         });
 
