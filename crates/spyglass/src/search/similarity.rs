@@ -1,13 +1,11 @@
-use std::env;
 use shared::response::SimilaritySearchResult;
+use std::env;
 use std::time::SystemTime;
 
 pub async fn similarity_search(query: &str) -> Vec<SimilaritySearchResult> {
     let bench_start = SystemTime::now();
-    let endpoint = env::var("SIMILARITY_SEARCH_ENDPOINT")
-        .unwrap_or("localhost".into());
-    let port = env::var("SIMILARITY_SEARCH_PORT")
-        .unwrap_or("8000".into());
+    let endpoint = env::var("SIMILARITY_SEARCH_ENDPOINT").unwrap_or("localhost".into());
+    let port = env::var("SIMILARITY_SEARCH_PORT").unwrap_or("8000".into());
     log::info!("using {}:{}", endpoint, port);
     log::info!(
         "env_check: {}ms",
