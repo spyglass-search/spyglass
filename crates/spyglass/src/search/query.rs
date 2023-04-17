@@ -46,23 +46,29 @@ fn _boosted_phrase(terms: Vec<(usize, Term)>, boost: Score) -> Box<BoostQuery> {
     ))
 }
 
+#[derive(Clone, Default)]
+pub struct QueryBoosts {
+    /// Boosts based on implicit/explicit tag detection
+    pub tags: Vec<i64>,
+    /// Id of favorited boost
+    pub favorite: Option<i64>,
+    /// Urls to boost
+    pub urls: Vec<String>,
+    /// Specific doc ids to boost
+    pub doc_ids: Vec<String>,
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn build_query<I>(
+pub fn build_query(
     schema: Schema,
     tokenizers: TokenizerManager,
     fields: DocFields,
     query_string: &str,
     // Applied filters
     applied_lenses: &Vec<u64>,
-    // Boosts based on implicit/explicit tag detection
-    tag_boosts: I,
-    // Id of favorited boost
-    favorite_boost: Option<i64>,
     stats: &mut QueryStats,
-) -> BooleanQuery
-where
-    I: Iterator<Item = i64>,
-{
+    boosts: &QueryBoosts,
+) -> BooleanQuery {
     let content_terms = terms_for_field(&schema, &tokenizers, query_string, fields.content);
     let title_terms = terms_for_field(&schema, &tokenizers, query_string, fields.title);
 
@@ -96,15 +102,31 @@ where
     }
 
     // Tags that might be represented by search terms (e.g. "repository" or "file")
-    for tag_id in tag_boosts {
+    for tag_id in &boosts.tags {
         term_query.push((
             Occur::Should,
-            _boosted_term(Term::from_field_u64(fields.tags, tag_id as u64), 1.5),
+            _boosted_term(Term::from_field_u64(fields.tags, *tag_id as u64), 1.5),
         ))
     }
 
-    let mut combined: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
+    // Greatly boost selected urls
+    // todo: handle regex/prefixes?
+    for url in &boosts.urls {
+        term_query.push((
+            Occur::Should,
+            _boosted_term(Term::from_field_text(fields.url, url), 3.0),
+        ));
+    }
 
+    // Greatly boost selected docs
+    for doc_id in &boosts.doc_ids {
+        term_query.push((
+            Occur::Should,
+            _boosted_term(Term::from_field_text(fields.id, doc_id), 3.0),
+        ));
+    }
+
+    let mut combined: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
     for id in applied_lenses {
         combined.push((
             Occur::Must,
@@ -113,7 +135,7 @@ where
     }
 
     // Greatly boost content that have our terms + a favorite.
-    if let Some(favorite_boost) = favorite_boost {
+    if let Some(favorite_boost) = boosts.favorite {
         combined.push((
             Occur::Should,
             _boosted_term(

@@ -5,8 +5,8 @@ use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
 use jsonrpsee::core::Error;
-use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::search::similarity::similarity_search;
+use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;

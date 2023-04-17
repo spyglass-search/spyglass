@@ -15,16 +15,16 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use crate::search::query::{build_document_query, build_query};
+use crate::search::query::{build_document_query, build_query, QueryBoosts};
 use crate::state::AppState;
 use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{self, DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
-pub mod similarity;
 pub mod grouping;
 pub mod lens;
 mod query;
+pub mod similarity;
 pub mod utils;
 
 pub use query::QueryStats;
@@ -61,6 +61,12 @@ pub struct DocumentUpdate<'a> {
     pub url: &'a str,
     pub content: &'a str,
     pub tags: &'a [i64],
+}
+
+#[derive(Clone)]
+pub enum QueryBoost {
+    Url(String),
+    DocId(String),
 }
 
 impl Debug for Searcher {
@@ -345,15 +351,20 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+        let boosts = QueryBoosts {
+            tags: tag_boosts.into_iter().collect(),
+            favorite: favorite_boost,
+            ..Default::default()
+        };
+
         let query = build_query(
             index.schema(),
             tokenizers,
             fields,
             query_string,
             applied_lenses,
-            tag_boosts.into_iter(),
-            favorite_boost,
             stats,
+            &boosts,
         );
 
         let collector = TopDocs::with_limit(10);
@@ -502,15 +513,20 @@ impl ReadonlySearcher {
         let fields = DocFields::as_fields();
         let tantivy_searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+        let boosts = QueryBoosts {
+            tags: tag_boosts.into_iter().collect(),
+            favorite: favorite_boost,
+            ..Default::default()
+        };
+
         let query = build_query(
             index.schema(),
             tokenizers.clone(),
             fields.clone(),
             query_string,
             applied_lenses,
-            tag_boosts.into_iter(),
-            favorite_boost,
             stats,
+            &boosts,
         );
 
         let mut combined: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Should, Box::new(query))];
@@ -562,6 +578,7 @@ impl ReadonlySearcher {
         applied_lenses: &Vec<u64>,
         searcher: &ReadonlySearcher,
         query_string: &str,
+        boosts: &[QueryBoost],
         stats: &mut QueryStats,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
@@ -585,15 +602,31 @@ impl ReadonlySearcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+
+        let mut docid_boosts = Vec::new();
+        let mut url_boosts = Vec::new();
+        for boost in boosts {
+            match boost {
+                QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
+                QueryBoost::Url(url) => url_boosts.push(url.clone()),
+            }
+        }
+
+        let boosts = QueryBoosts {
+            tags: tag_boosts.into_iter().collect(),
+            favorite: favorite_boost,
+            urls: url_boosts,
+            doc_ids: docid_boosts,
+        };
+
         let query = build_query(
             index.schema(),
             tokenizers,
             fields,
             query_string,
             applied_lenses,
-            tag_boosts.into_iter(),
-            favorite_boost,
             stats,
+            &boosts,
         );
 
         let collector = TopDocs::with_limit(5);
