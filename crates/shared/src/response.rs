@@ -305,3 +305,17 @@ pub struct SimilaritySearchResult {
     pub score: f32,
     pub payload: SimilarityResultPayload,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct DocMetadata {
+    pub doc_id: String,
+    pub title: String,
+    pub open_url: String,
+}
+
+/// From backend -> client for display
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SendToAskClippyPayload {
+    pub question: Option<String>,
+    pub docs: Vec<DocMetadata>,
+}
