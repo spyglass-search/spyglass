@@ -56,3 +56,29 @@ pub struct BatchDocumentRequest {
     pub source: RawDocSource,
     pub tags: Vec<(String, String)>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ClippyContext {
+    /// Document the user is asking about
+    DocId(String),
+    /// Previous log of questions/answers
+    History(String, String),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AskClippyRequest {
+    pub question: String,
+    pub context: Vec<ClippyContext>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum LLMResponsePayload {
+    Error(String),
+    Finished,
+    SearchingDocuments,
+    DocumentContextAdded(Vec<DocMetadata>),
+    GeneratingContext,
+    LoadingModel,
+    LoadingPrompt,
+    Token(String),
+}
