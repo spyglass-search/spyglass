@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
+use crate::response::DocMetadata;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchParam {
