@@ -228,7 +228,7 @@ pub async fn process_records(
     state: &AppState,
     lens: &LensConfig,
     results: &mut Vec<ParseResult>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<indexed_document::Model>> {
     // get a list of all urls
     let parsed_urls = results
         .iter()
@@ -356,7 +356,7 @@ pub async fn process_records(
         }
     }
 
-    Ok(())
+    Ok(added_entries)
 }
 
 /// Processes an update tags request for the specified documents
