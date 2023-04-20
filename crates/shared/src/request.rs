@@ -1,6 +1,6 @@
+use crate::response::DocMetadata;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
-use crate::response::DocMetadata;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SearchParam {
@@ -58,7 +58,7 @@ pub struct BatchDocumentRequest {
     pub tags: Vec<(String, String)>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum ClippyContext {
     /// Document the user is asking about
     DocId(String),
@@ -66,10 +66,12 @@ pub enum ClippyContext {
     History(String, String),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AskClippyRequest {
-    pub question: String,
+    pub query: String,
     pub context: Vec<ClippyContext>,
+    pub _type: Option<String>,
+    pub lens: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

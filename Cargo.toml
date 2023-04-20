@@ -12,6 +12,7 @@ members = [
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",
+    "crates/spyglass-clippy",
 ]
 
 exclude = [

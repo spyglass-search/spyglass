@@ -324,10 +324,11 @@ impl Searcher {
     }
 
     pub async fn search_with_lens(
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
         applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
+        boosts: &[QueryBoost],
         stats: &mut QueryStats,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
@@ -335,7 +336,7 @@ impl Searcher {
         let mut tag_boosts = HashSet::new();
         let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
             .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
-            .one(&db)
+            .one(db)
             .await
         {
             Some(favorited.id)
@@ -351,10 +352,21 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+
+        let mut docid_boosts = Vec::new();
+        let mut url_boosts = Vec::new();
+        for boost in boosts {
+            match boost {
+                QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
+                QueryBoost::Url(url) => url_boosts.push(url.clone()),
+            }
+        }
+
         let boosts = QueryBoosts {
             tags: tag_boosts.into_iter().collect(),
             favorite: favorite_boost,
-            ..Default::default()
+            urls: url_boosts,
+            doc_ids: docid_boosts,
         };
 
         let query = build_query(
@@ -833,7 +845,7 @@ mod test {
         let mut stats = QueryStats::new();
         let query = "salinas";
         let results =
-            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -856,7 +868,7 @@ mod test {
         _build_test_index(&mut searcher);
         let query = "salinas";
         let results =
-            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -879,7 +891,7 @@ mod test {
         let mut stats = QueryStats::new();
         let query = "salinasd";
         let results =
-            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
         assert_eq!(results.len(), 0);
     }
 }

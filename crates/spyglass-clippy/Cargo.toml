@@ -1,0 +1,25 @@
+[package]
+name = "spyglass-clippy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrew Huynh <andrew@spyglass.fyi>"]
+description = "A library that uses LLMs to answer questions."
+homepage = "https://github.com/spyglass-search/spyglass/tree/main/crates/spyglass-clippy"
+repository = "https://github.com/spyglass-search/spyglass/tree/main/crates/spyglass-clippy"
+readme = "README.md"
+keywords = ["spyglass"]
+license = "AGPL"
+
+[dependencies]
+llama-rs = { git = "https://github.com/rustformers/llama-rs", rev = "a067431773ba0194d6bc352faf40a770c1eac81c" }
+log = "0.4"
+rand = "0.8.5"
+reqwest = { version = "0.11", features = ["stream", "json"] }
+serde = "1.0"
+shared = { path = "../shared" }
+tokio = { version = "1", features = ["full"] }
+
+[lib]
+name = "spyglass_clippy"
+path = "src/lib.rs"
+crate-type = ["lib"]

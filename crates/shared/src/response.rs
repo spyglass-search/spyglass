@@ -319,3 +319,15 @@ pub struct SendToAskClippyPayload {
     pub question: Option<String>,
     pub docs: Vec<DocMetadata>,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ChatUpdate {
+    LoadingModel,
+    LoadingPrompt,
+    SearchingDocuments,
+    DocumentContextAdded(Vec<DocMetadata>),
+    GeneratingContext,
+    EndOfText,
+    Error(String),
+    Token(String),
+}

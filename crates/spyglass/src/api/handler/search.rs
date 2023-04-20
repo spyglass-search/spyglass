@@ -50,7 +50,7 @@ pub async fn search_docs(
     let mut stats = QueryStats::new();
 
     let docs =
-        Searcher::search_with_lens(state.db.clone(), &tag_ids, index, &query, &mut stats).await;
+        Searcher::search_with_lens(&state.db, &tag_ids, index, &query, &[], &mut stats).await;
 
     // for now, map based on URL until we get the doc ids into the payload
     let vector_results = similarity_search(&query).await;

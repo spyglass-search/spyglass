@@ -1,15 +1,27 @@
 use jsonrpsee::core::{Error, JsonValue};
 use jsonrpsee::proc_macros::rpc;
 use shared::config::UserSettings;
-use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
+use shared::request::{
+    AskClippyRequest, BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam,
+};
 use shared::response::{
-    AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
-    SearchLensesResp, SearchResults,
+    AppStatus, ChatUpdate, DefaultIndices, LensResult, LibraryStats, ListConnectionResult,
+    PluginResult, SearchLensesResp, SearchResults,
 };
 use std::collections::HashMap;
 
 mod events;
 pub use events::*;
+
+#[rpc(server, client, namespace = "spyglass")]
+pub trait ChatAPI {
+    /// Ask clippy, LLM magic
+    #[method(name = "clippy.ask")]
+    async fn ask_clippy(&self, query: AskClippyRequest) -> Result<String, Error>;
+
+    #[subscription(name = "subscribe_chat_events", item = ChatUpdate)]
+    fn subscribe_events(&self, chat_session: String);
+}
 
 /// Rpc trait
 #[rpc(server, client, namespace = "spyglass")]

@@ -5,6 +5,7 @@ pub enum RpcEventType {
     ConnectionSyncFinished,
     LensUninstalled,
     LensInstalled,
+    LLMResponse,
     ModelDownloadStatus,
 }
 
