@@ -1,6 +1,7 @@
 use crate::client::SpyglassClient;
 use futures::lock::Mutex;
-use shared::{keyboard::KeyCode, response::SearchResult};
+use shared::keyboard::KeyCode;
+use shared::response::SearchResult;
 use std::str::FromStr;
 use std::sync::Arc;
 use ui_components::{
@@ -8,7 +9,8 @@ use ui_components::{
     icons::RefreshIcon,
     results::SearchResultItem,
 };
-use web_sys::{HtmlInputElement, window};
+use wasm_bindgen_futures::spawn_local;
+use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 
 // make sure we only have one connection per client
@@ -16,22 +18,30 @@ type Client = Arc<Mutex<SpyglassClient>>;
 
 const RESULT_PREFIX: &str = "result";
 
+pub enum SearchStatus {
+    InProgress,
+
+}
+
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
     HandleSearch,
-    SetClient(Client),
     SetSearchResults(Vec<SearchResult>),
     SetError(String),
+    SetStatus(String),
+    TokenReceived(String),
+    SetFinished,
     OpenResult(SearchResult),
 }
 
 pub struct SearchPage {
-    client: Option<Client>,
+    client: Client,
     results: Vec<SearchResult>,
     search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
     status_msg: Option<String>,
+    tokens: Option<String>,
     in_progress: bool,
 }
 
@@ -39,34 +49,21 @@ impl Component for SearchPage {
     type Message = Msg;
     type Properties = ();
 
-    fn create(ctx: &yew::Context<Self>) -> Self {
-        let link = ctx.link();
-        link.send_future(async move {
-            // load ws client if we're local dev
-            // #[cfg(debug_assertions)]
-            // let client = SpyglassClient::ws_client().await;
-            // #[cfg(not(debug_assertions))]
-            let client = SpyglassClient::http_client().await;
-            Msg::SetClient(Arc::new(Mutex::new(client)))
-        });
-
+    fn create(_: &yew::Context<Self>) -> Self {
         Self {
-            client: None,
+            client: Arc::new(Mutex::new(SpyglassClient::new())),
             results: Vec::new(),
             search_input_ref: Default::default(),
             search_wrapper_ref: Default::default(),
             status_msg: None,
             in_progress: false,
+            tokens: None,
         }
     }
 
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::SetClient(client) => {
-                self.client = Some(client);
-                false
-            }
             Msg::HandleKeyboardEvent(event) => {
                 let key = event.key();
                 if let Ok(code) = KeyCode::from_str(&key.to_uppercase()) {
@@ -90,16 +87,14 @@ impl Component for SearchPage {
                 if let Some(query) = query {
                     self.status_msg = Some(format!("searching: {query}"));
                     let link = link.clone();
-                    if let Some(client) = &self.client {
-                        let client = client.clone();
-                        link.send_future(async move {
-                            let mut client = client.lock().await;
-                            match client.search(&query).await {
-                                Ok(res) => Msg::SetSearchResults(res),
-                                Err(err) => Msg::SetError(err.to_string()),
-                            }
-                        });
-                    }
+                    let client = self.client.clone();
+                    spawn_local(async move {
+                        let mut client = client.lock().await;
+                        if let Err(err) = client.search(&query, link.clone()).await {
+                            log::error!("{}", err.to_string());
+                            link.send_message(Msg::SetError(err.to_string()));
+                        }
+                    });
                 }
                 true
             }
@@ -111,6 +106,22 @@ impl Component for SearchPage {
             Msg::SetError(err) => {
                 self.in_progress = false;
                 self.status_msg = Some(err);
+                true
+            }
+            Msg::SetFinished => {
+                self.in_progress = false;
+                true
+            }
+            Msg::SetStatus(msg) => {
+                self.status_msg = Some(msg);
+                true
+            }
+            Msg::TokenReceived(token) => {
+                if let Some(tokens) = self.tokens.as_mut() {
+                    tokens.push_str(&token);
+                } else {
+                    self.tokens = Some(token.to_owned());
+                }
                 true
             }
             Msg::OpenResult(result) => {

@@ -320,16 +320,23 @@ pub struct SendToAskClippyPayload {
     pub docs: Vec<DocMetadata>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+// Rougly in order of occurrence
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum ChatUpdate {
+    /// Searching our document index for relevant documents
+    SearchingDocuments,
+    /// Documents returned from search
+    DocumentContextAdded(Vec<SearchResult>),
+    /// Generating context from documents
+    GeneratingContext,
+    /// Loading model / sending to API endpoint
     LoadingModel,
     LoadingPrompt,
-    SearchingDocuments,
-    DocumentContextAdded(Vec<DocMetadata>),
-    GeneratingContext,
+    /// Tokens being received from model
+    Token(String),
+    /// Done!
     EndOfText,
     Error(ChatErrorType),
-    Token(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
