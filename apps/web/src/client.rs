@@ -6,7 +6,7 @@ use futures::{AsyncBufReadExt, TryStreamExt};
 use gloo::timers::future::sleep;
 use reqwest::Client;
 use shared::request::AskClippyRequest;
-use shared::response::ChatUpdate;
+use shared::response::{ChatErrorType, ChatUpdate};
 use thiserror::Error;
 use yew::html::Scope;
 
@@ -88,13 +88,18 @@ impl SpyglassClient {
                     link.send_message(Msg::SetStatus("Generating answer...".into()))
                 }
                 ChatUpdate::Token(token) => link.send_message(Msg::TokenReceived(token)),
-                ChatUpdate::EndOfText | ChatUpdate::Done => {
+                ChatUpdate::EndOfText => {
                     link.send_message(Msg::SetFinished);
                     break;
                 }
                 ChatUpdate::Error(err) => {
-                    log::error!("ChatUpdate::Error: {err}");
-                    link.send_message(Msg::SetError(err));
+                    log::error!("ChatUpdate::Error: {err:?}");
+                    let msg = match err {
+                        ChatErrorType::ContextLengthExceeded(msg) => msg,
+                        ChatErrorType::APIKeyMissing => "No API key".into(),
+                        ChatErrorType::UnknownError(msg) => msg,
+                    };
+                    link.send_message(Msg::SetError(msg));
                     break;
                 }
             }
