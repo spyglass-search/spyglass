@@ -10,7 +10,7 @@ use yew::html::Scope;
 
 use crate::{
     constants,
-    pages::search::SearchPage,
+    pages::search::{SearchPage, Msg},
 };
 
 #[derive(Error, Debug)]
@@ -36,7 +36,7 @@ impl SpyglassClient {
     pub async fn search(
         &mut self,
         query: &str,
-        _link: Scope<SearchPage>,
+        link: Scope<SearchPage>,
     ) -> Result<(), ClientError> {
         let url = format!("{}/chat", constants::HTTP_ENDPOINT);
         let body = AskClippyRequest {
@@ -69,12 +69,29 @@ impl SpyglassClient {
 
             let update = serde_json::from_str::<ChatUpdate>(&line)?;
             log::info!("update: {:?}", update);
-            // match serde_json::from_str::<ChatUpdate>(token)? {
-            //     ChatUpdate::SearchingDocuments => {
-
-            //     },
-            //     _ => {}
-            // }
+            match update {
+                ChatUpdate::SearchingDocuments => {
+                    link.send_message(Msg::SetStatus("Searching...".into()))
+                },
+                ChatUpdate::DocumentContextAdded(docs) => {
+                    link.send_message(Msg::SetSearchResults(docs))
+                }
+                ChatUpdate::GeneratingContext => {
+                    link.send_message(Msg::SetStatus("Analyzing documents...".into()))
+                }
+                ChatUpdate::LoadingModel | ChatUpdate::LoadingPrompt => {
+                    link.send_message(Msg::SetStatus("Generating answer...".into()))
+                }
+                ChatUpdate::Token(token) => {
+                    link.send_message(Msg::TokenReceived(token))
+                }
+                ChatUpdate::EndOfText | ChatUpdate::Done => {
+                    link.send_message(Msg::SetFinished)
+                }
+                ChatUpdate::Error(err) => {
+                    link.send_message(Msg::SetError(err))
+                }
+            }
             buf.clear();
         }
 

@@ -18,12 +18,20 @@ type Client = Arc<Mutex<SpyglassClient>>;
 
 const RESULT_PREFIX: &str = "result";
 
+pub enum SearchStatus {
+    InProgress,
+
+}
+
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
     HandleSearch,
     SetSearchResults(Vec<SearchResult>),
     SetError(String),
+    SetStatus(String),
+    TokenReceived(String),
+    SetFinished,
     OpenResult(SearchResult),
 }
 
@@ -33,6 +41,7 @@ pub struct SearchPage {
     search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
     status_msg: Option<String>,
+    tokens: Option<String>,
     in_progress: bool,
 }
 
@@ -48,6 +57,7 @@ impl Component for SearchPage {
             search_wrapper_ref: Default::default(),
             status_msg: None,
             in_progress: false,
+            tokens: None,
         }
     }
 
@@ -96,6 +106,22 @@ impl Component for SearchPage {
             Msg::SetError(err) => {
                 self.in_progress = false;
                 self.status_msg = Some(err);
+                true
+            }
+            Msg::SetFinished => {
+                self.in_progress = false;
+                true
+            }
+            Msg::SetStatus(msg) => {
+                self.status_msg = Some(msg);
+                true
+            }
+            Msg::TokenReceived(token) => {
+                if let Some(tokens) = self.tokens.as_mut() {
+                    tokens.push_str(&token);
+                } else {
+                    self.tokens = Some(token.to_owned());
+                }
                 true
             }
             Msg::OpenResult(result) => {
