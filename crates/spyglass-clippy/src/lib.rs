@@ -1,6 +1,6 @@
 pub mod openai;
 
-use shared::response::{DocMetadata, ChatUpdate};
+use shared::response::ChatUpdate;
 use std::{
     convert::Infallible,
     path::PathBuf,

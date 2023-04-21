@@ -1,11 +1,6 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use shared::request::{AskClippyRequest, ClippyContext};
-use std::{
-    convert::Infallible,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
 use tokio::sync::mpsc;
 
 use crate::ChatUpdate;
@@ -67,7 +62,7 @@ pub async fn process_question(
 ) -> Result<(), reqwest::Error> {
     let chat = build_chat(context, &query);
     let _ = stream.send(ChatUpdate::LoadingModel);
-    log::debug!("Chat {:?}", chat);
+    log::info!("Chat {:?}", chat);
     let request_body = CompletionRequest {
         max_tokens: 100,
         n: 1,
@@ -81,7 +76,7 @@ pub async fn process_question(
     };
     let client = Client::new();
     let response = client
-        .post(&format!("https://api.openai.com/v1/chat/completions"))
+        .post(&"https://api.openai.com/v1/chat/completions".to_string())
         .header("Content-Type", "application/json")
         .header("Authorization", &format!("Bearer {}", api_key))
         .json(&request_body)
@@ -94,10 +89,10 @@ pub async fn process_question(
     for choice in response.choices {
         log::debug!("Answer {:?}", choice);
         let answer = choice.message.content.trim().to_string();
-        stream.send(ChatUpdate::Token(answer));
+        let _ = stream.send(ChatUpdate::Token(answer));
     }
 
-    stream.send(ChatUpdate::EndOfText);
+    let _ = stream.send(ChatUpdate::EndOfText);
     Ok(())
 }
 
