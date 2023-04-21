@@ -1,7 +1,9 @@
 use std::str::Utf8Error;
+use std::time::Duration;
 
 use futures::io::BufReader;
 use futures::{AsyncBufReadExt, TryStreamExt};
+use gloo::timers::future::sleep;
 use reqwest::Client;
 use shared::request::AskClippyRequest;
 use shared::response::ChatUpdate;
@@ -69,15 +71,17 @@ impl SpyglassClient {
             }
 
             let update = serde_json::from_str::<ChatUpdate>(line)?;
-            log::info!("update: {:?}", update);
             match update {
                 ChatUpdate::SearchingDocuments => {
+                    log::info!("ChatUpdate::SearchingDocuments");
                     link.send_message(Msg::SetStatus("Searching...".into()))
                 }
                 ChatUpdate::DocumentContextAdded(docs) => {
+                    log::info!("ChatUpdate::DocumentContextAdded");
                     link.send_message(Msg::SetSearchResults(docs))
                 }
                 ChatUpdate::GeneratingContext => {
+                    log::info!("ChatUpdate::SearchingDocuments");
                     link.send_message(Msg::SetStatus("Analyzing documents...".into()))
                 }
                 ChatUpdate::LoadingModel | ChatUpdate::LoadingPrompt => {
@@ -87,13 +91,16 @@ impl SpyglassClient {
                 ChatUpdate::EndOfText | ChatUpdate::Done => {
                     link.send_message(Msg::SetFinished);
                     break;
-                },
+                }
                 ChatUpdate::Error(err) => {
+                    log::error!("ChatUpdate::Error: {err}");
                     link.send_message(Msg::SetError(err));
                     break;
-                },
+                }
             }
             buf.clear();
+            // give ui thread a chance to do something
+            sleep(Duration::from_millis(50)).await;
         }
 
         Ok(())

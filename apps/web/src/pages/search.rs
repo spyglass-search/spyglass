@@ -73,6 +73,8 @@ impl Component for SearchPage {
             }
             Msg::HandleSearch => {
                 self.in_progress = true;
+                self.tokens = None;
+                self.status_msg = None;
                 self.results = Vec::new();
 
                 let query = self
@@ -108,6 +110,7 @@ impl Component for SearchPage {
             }
             Msg::SetFinished => {
                 self.in_progress = false;
+                self.status_msg = None;
                 true
             }
             Msg::SetStatus(msg) => {
@@ -190,8 +193,16 @@ impl Component for SearchPage {
                         html! {}
                     }}
                     <div class="py-4 px-6">
-                        <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">Sources</div>
-                        {html}
+                        {if !self.results.is_empty() {
+                            html! {
+                                <>
+                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
+                                    {html}
+                                </>
+                            }
+                        } else {
+                            html! {}
+                        }}
                     </div>
                 </div>
             </div>
