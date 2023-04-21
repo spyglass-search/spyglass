@@ -328,6 +328,14 @@ pub enum ChatUpdate {
     DocumentContextAdded(Vec<DocMetadata>),
     GeneratingContext,
     EndOfText,
-    Error(String),
+    Error(ChatErrorType),
     Token(String),
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ChatErrorType {
+    ContextLengthExceeded(String),
+    APIKeyMissing,
+    UnknownError(String),
+}
+
