@@ -1,6 +1,6 @@
 pub mod openai;
 
-use shared::response::DocMetadata;
+use shared::response::{DocMetadata, ChatUpdate};
 use std::{
     convert::Infallible,
     path::PathBuf,
@@ -13,18 +13,6 @@ use llama_rs::{
     OutputToken, TokenBias,
 };
 use rand::SeedableRng;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ChatUpdate {
-    LoadingModel,
-    LoadingPrompt,
-    SearchingDocuments,
-    DocumentContextAdded(Vec<DocMetadata>),
-    GeneratingContext,
-    EndOfText,
-    Error(String),
-    Token(String),
-}
 
 fn construct_prompt(prompt: &str, doc_context: Option<Vec<String>>) -> String {
     // Begin the template in the form alpaca expects

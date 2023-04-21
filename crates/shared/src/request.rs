@@ -70,7 +70,6 @@ pub enum ClippyContext {
 pub struct AskClippyRequest {
     pub query: String,
     pub context: Vec<ClippyContext>,
-    pub _type: Option<String>,
     pub lens: Option<Vec<String>>,
 }
 
