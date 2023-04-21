@@ -8,16 +8,13 @@ members = [
     "crates/tauri",
     "crates/ui-components",
 
+    "apps/web",
+
     # Public published crates
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",
     "crates/spyglass-clippy",
-]
-
-exclude = [
-    # Excluded due to strict wasm32-unknown-unknown requirement for jsonrpsee-wasm-client
-    "apps/web"
 ]
 
 [profile.release]

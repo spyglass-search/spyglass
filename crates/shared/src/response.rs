@@ -322,6 +322,7 @@ pub struct SendToAskClippyPayload {
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum ChatUpdate {
+    Done,
     LoadingModel,
     LoadingPrompt,
     SearchingDocuments,
