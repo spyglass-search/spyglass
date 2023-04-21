@@ -18,11 +18,6 @@ type Client = Arc<Mutex<SpyglassClient>>;
 
 const RESULT_PREFIX: &str = "result";
 
-pub enum SearchStatus {
-    InProgress,
-
-}
-
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
@@ -42,6 +37,7 @@ pub struct SearchPage {
     search_input_ref: NodeRef,
     status_msg: Option<String>,
     tokens: Option<String>,
+    current_query: Option<String>,
     in_progress: bool,
 }
 
@@ -58,6 +54,7 @@ impl Component for SearchPage {
             status_msg: None,
             in_progress: false,
             tokens: None,
+            current_query: None,
         }
     }
 
@@ -85,6 +82,7 @@ impl Component for SearchPage {
 
                 log::info!("handling search! {:?}", query);
                 if let Some(query) = query {
+                    self.current_query = Some(query.clone());
                     self.status_msg = Some(format!("searching: {query}"));
                     let link = link.clone();
                     let client = self.client.clone();
@@ -152,7 +150,6 @@ impl Component for SearchPage {
                 }
             })
             .collect::<Html>();
-        let results = html! { <div class="pb-2">{html}</div> };
 
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
@@ -179,8 +176,56 @@ impl Component for SearchPage {
                         }}
                     </Btn>
                 </div>
-                <div class="w-full flex flex-col animate-fade-in">{results}</div>
+                <div class="flex p-2">{self.status_msg.clone().unwrap_or_default()}</div>
+                <div class="w-full flex flex-row animate-fade-in">
+                    {if let (Some(query), Some(tokens)) = (&self.current_query, &self.tokens) {
+                        html! {
+                            <AnswerSection
+                                query={query.clone()}
+                                tokens={tokens.clone()}
+                                in_progress={self.in_progress}
+                            />
+                        }
+                    } else {
+                        html! {}
+                    }}
+                    <div class="py-4 px-6">
+                        <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">Sources</div>
+                        {html}
+                    </div>
+                </div>
             </div>
         }
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct AnswerSectionProps {
+    pub query: String,
+    pub tokens: String,
+    #[prop_or_default]
+    pub in_progress: bool,
+}
+
+#[function_component(AnswerSection)]
+fn answer_section(props: &AnswerSectionProps) -> Html {
+    let html = markdown::to_html(&props.tokens.clone());
+    let html = html.trim_start_matches("<p>").to_string();
+    let html = html.trim_end_matches("</p>").to_string();
+    let html = format!("<p class=\"inline\">{}</p>", html);
+
+    html! {
+        <div class="py-4 px-6">
+            <div class="mb-2 text-lg font-semibold text-gray-400">{props.query.clone()}</div>
+            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
+            <div>
+                {Html::from_html_unchecked(AttrValue::from(html))}
+                { if props.in_progress {
+                    html! { <div class="inline-block h-4 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
+                } else {
+                    html! {}
+                }}
+            </div>
+        </div>
     }
 }

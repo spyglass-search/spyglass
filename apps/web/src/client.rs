@@ -10,9 +10,10 @@ use yew::html::Scope;
 
 use crate::{
     constants,
-    pages::search::{SearchPage, Msg},
+    pages::search::{Msg, SearchPage},
 };
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
 pub enum ClientError {
     #[error("HTTP request error: {0}")]
@@ -59,20 +60,20 @@ impl SpyglassClient {
 
         let mut reader = BufReader::new(res);
         let mut buf = String::new();
-        while let Ok(_) = reader.read_line(&mut buf).await {
+        while reader.read_line(&mut buf).await.is_ok() {
             let line = buf.trim_end_matches(|c| c == '\r' || c == '\n');
             let line = line.strip_prefix("data:").unwrap_or(line);
-            if line.len() == 0 {
+            if line.is_empty() {
                 buf.clear();
-                continue
+                continue;
             }
 
-            let update = serde_json::from_str::<ChatUpdate>(&line)?;
+            let update = serde_json::from_str::<ChatUpdate>(line)?;
             log::info!("update: {:?}", update);
             match update {
                 ChatUpdate::SearchingDocuments => {
                     link.send_message(Msg::SetStatus("Searching...".into()))
-                },
+                }
                 ChatUpdate::DocumentContextAdded(docs) => {
                     link.send_message(Msg::SetSearchResults(docs))
                 }
@@ -82,15 +83,15 @@ impl SpyglassClient {
                 ChatUpdate::LoadingModel | ChatUpdate::LoadingPrompt => {
                     link.send_message(Msg::SetStatus("Generating answer...".into()))
                 }
-                ChatUpdate::Token(token) => {
-                    link.send_message(Msg::TokenReceived(token))
-                }
+                ChatUpdate::Token(token) => link.send_message(Msg::TokenReceived(token)),
                 ChatUpdate::EndOfText | ChatUpdate::Done => {
-                    link.send_message(Msg::SetFinished)
-                }
+                    link.send_message(Msg::SetFinished);
+                    break;
+                },
                 ChatUpdate::Error(err) => {
-                    link.send_message(Msg::SetError(err))
-                }
+                    link.send_message(Msg::SetError(err));
+                    break;
+                },
             }
             buf.clear();
         }
