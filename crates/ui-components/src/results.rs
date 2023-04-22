@@ -12,6 +12,8 @@ pub struct SearchResultProps {
     pub onclick: Callback<MouseEvent>,
     pub result: SearchResult,
     #[prop_or_default]
+    pub responsive: bool,
+    #[prop_or_default]
     pub is_selected: bool,
 }
 
@@ -177,18 +179,27 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         html! {}
     };
 
+    let mut icon_classes = classes!("mt-1","flex", "flex-none", "pr-2");
+    if !props.responsive {
+        icon_classes.push("pl-6");
+    }
+
+    let title_classes = if props.responsive {
+        classes!("text-base", "font-semibold")
+    } else {
+        classes!("text-base", "truncate", "font-semibold", "w-[30rem]")
+    };
+
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
-            <div class="mt-1 flex flex-none pl-6 pr-2">
+            <div class={icon_classes}>
                 <div class="relative flex-none bg-neutral-700 rounded h-12 w-12 items-center">
                     {icon}
                 </div>
             </div>
             <div class="grow">
                 <div class="text-xs text-cyan-500">{domain}</div>
-                <h2 class="text-base truncate font-semibold w-[30rem]">
-                    {title}
-                </h2>
+                <h2 class={title_classes}>{title}</h2>
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
                     {Html::from_html_unchecked(result.description.clone().into())}
                 </div>

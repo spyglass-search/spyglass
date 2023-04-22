@@ -77,15 +77,14 @@ impl Component for SearchPage {
                 self.status_msg = None;
                 self.results = Vec::new();
 
-                let query = self
-                    .search_input_ref
-                    .cast::<HtmlInputElement>()
-                    .map(|x| x.value());
+                if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
+                    let query = search_input.value();
+                    log::info!("handling search! {:?}", query);
 
-                log::info!("handling search! {:?}", query);
-                if let Some(query) = query {
                     self.current_query = Some(query.clone());
+                    search_input.set_value("");
                     self.status_msg = Some(format!("searching: {query}"));
+
                     let link = link.clone();
                     let client = self.client.clone();
                     spawn_local(async move {
@@ -99,7 +98,6 @@ impl Component for SearchPage {
                 true
             }
             Msg::SetSearchResults(results) => {
-                self.in_progress = false;
                 self.results = results;
                 true
             }
@@ -149,6 +147,7 @@ impl Component for SearchPage {
                         id={format!("{RESULT_PREFIX}{idx}")}
                         onclick={link.callback(move |_| open_msg.clone())}
                         result={res.clone()}
+                        responsive={true}
                     />
                 }
             })
@@ -180,11 +179,13 @@ impl Component for SearchPage {
                     </Btn>
                 </div>
                 <div class="flex p-2">{self.status_msg.clone().unwrap_or_default()}</div>
-                <div class="w-full flex flex-row animate-fade-in">
-                    {if let (Some(query), Some(tokens)) = (&self.current_query, &self.tokens) {
+                {if let Some(query) = &self.current_query {
+                    html! { <div class="mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
+                } else { html! {}}}
+                <div class="grid w-full grid-cols-2 gap-8 px-6 py-4">
+                    {if let Some(tokens) = &self.tokens {
                         html! {
                             <AnswerSection
-                                query={query.clone()}
                                 tokens={tokens.clone()}
                                 in_progress={self.in_progress}
                             />
@@ -192,7 +193,7 @@ impl Component for SearchPage {
                     } else {
                         html! {}
                     }}
-                    <div class="py-4 px-6">
+                    <div class="animate-fade-in col-span-1">
                         {if !self.results.is_empty() {
                             html! {
                                 <>
@@ -212,7 +213,6 @@ impl Component for SearchPage {
 
 #[derive(Properties, PartialEq)]
 struct AnswerSectionProps {
-    pub query: String,
     pub tokens: String,
     #[prop_or_default]
     pub in_progress: bool,
@@ -223,18 +223,17 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
     let html = markdown::to_html(&props.tokens.clone());
     let html = html.trim_start_matches("<p>").to_string();
     let html = html.trim_end_matches("</p>").to_string();
-    let html = format!("<p class=\"inline\">{}</p>", html);
+    let html = format!("<span>{}</span>", html);
 
     html! {
-        <div class="py-4 px-6">
-            <div class="mb-2 text-lg font-semibold text-gray-400">{props.query.clone()}</div>
+        <div class="animate-fade-in col-span-1">
             <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
             <div>
-                {Html::from_html_unchecked(AttrValue::from(html))}
+                <p class="inline leading-relaxed">{Html::from_html_unchecked(AttrValue::from(html))}</p>
                 { if props.in_progress {
-                    html! { <div class="inline-block h-4 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
+                    html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
                 } else {
-                    html! {}
+                    html! { <span>{"🔭"}</span>}
                 }}
             </div>
         </div>
