@@ -18,6 +18,20 @@ type Client = Arc<Mutex<SpyglassClient>>;
 
 const RESULT_PREFIX: &str = "result";
 
+#[derive(Clone, PartialEq, Eq)]
+enum HistorySource {
+    Clippy,
+    User,
+    System,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct HistoryItem {
+    /// who "wrote" this response
+    source: HistorySource,
+    value: String,
+}
+
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
@@ -32,13 +46,14 @@ pub enum Msg {
 
 pub struct SearchPage {
     client: Client,
+    current_query: Option<String>,
+    history: Vec<HistoryItem>,
+    in_progress: bool,
     results: Vec<SearchResult>,
-    search_wrapper_ref: NodeRef,
     search_input_ref: NodeRef,
+    search_wrapper_ref: NodeRef,
     status_msg: Option<String>,
     tokens: Option<String>,
-    current_query: Option<String>,
-    in_progress: bool,
 }
 
 impl Component for SearchPage {
@@ -48,13 +63,14 @@ impl Component for SearchPage {
     fn create(_: &yew::Context<Self>) -> Self {
         Self {
             client: Arc::new(Mutex::new(SpyglassClient::new())),
+            current_query: None,
+            history: Vec::new(),
+            in_progress: false,
             results: Vec::new(),
             search_input_ref: Default::default(),
             search_wrapper_ref: Default::default(),
             status_msg: None,
-            in_progress: false,
             tokens: None,
-            current_query: None,
         }
     }
 
@@ -161,7 +177,7 @@ impl Component for SearchPage {
                         id="searchbox"
                         type="text"
                         class="bg-neutral-800 text-white text-2xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white placeholder-neutral-600"
-                        placeholder="how do i resize a window in tauri?"
+                        placeholder={self.current_query.clone().unwrap_or("how do i resize a window?".into())}
                         spellcheck="false"
                         tabindex="-1"
                         onkeyup={link.callback(Msg::HandleKeyboardEvent)}
@@ -178,21 +194,23 @@ impl Component for SearchPage {
                         }}
                     </Btn>
                 </div>
-                <div class="flex p-2">{self.status_msg.clone().unwrap_or_default()}</div>
                 {if let Some(query) = &self.current_query {
-                    html! { <div class="mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
+                    html! { <div class="mt-4 mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
-                <div class="grid w-full grid-cols-2 gap-8 px-6 py-4">
-                    {if let Some(tokens) = &self.tokens {
+                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 px-6 py-4">
+                    { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
                         html! {
                             <AnswerSection
-                                tokens={tokens.clone()}
+                                history={self.history.clone()}
+                                tokens={self.tokens.clone()}
+                                status={self.status_msg.clone()}
                                 in_progress={self.in_progress}
                             />
                         }
                     } else {
                         html! {}
                     }}
+
                     <div class="animate-fade-in col-span-1">
                         {if !self.results.is_empty() {
                             html! {
@@ -213,31 +231,90 @@ impl Component for SearchPage {
 
 #[derive(Properties, PartialEq)]
 struct AnswerSectionProps {
-    pub tokens: String,
+    pub history: Vec<HistoryItem>,
+    pub tokens: Option<String>,
+    pub status: Option<String>,
     #[prop_or_default]
     pub in_progress: bool,
 }
 
 #[function_component(AnswerSection)]
 fn answer_section(props: &AnswerSectionProps) -> Html {
+    html! {
+        <div class="animate-fade-in col-span-1">
+            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
+            <div class="flex flex-col">
+                <HistoryLog history={props.history.clone()} />
+                { if let Some(tokens) = &props.tokens {
+                    html!{ <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
+                } else if let Some(msg) = &props.status {
+                    html!{ <HistoryLogItem source={HistorySource::System} tokens={msg.clone()}  /> }
+                } else {
+                    html! {}
+                }}
+            </div>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct HistoryLogProps {
+    pub history: Vec<HistoryItem>,
+}
+
+#[function_component(HistoryLog)]
+fn history_log(props: &HistoryLogProps) -> Html {
+    let html = props
+        .history
+        .iter()
+        .map(|item| {
+            html! {
+                <HistoryLogItem
+                    source={item.source.clone()}
+                    tokens={item.value.clone()}
+                />
+            }
+        })
+        .collect::<Html>();
+    html! { <>{html}</> }
+}
+
+#[derive(Properties, PartialEq)]
+struct HistoryLogItemProps {
+    pub source: HistorySource,
+    pub tokens: String,
+    // Is this a item currently generating tokens?
+    #[prop_or_default]
+    pub in_progress: bool,
+}
+
+#[function_component(HistoryLogItem)]
+fn history_log_item(props: &HistoryLogItemProps) -> Html {
+    let (_user_icon, _icon_pos, _text_pos) = match props.source {
+        HistorySource::Clippy => (html! {<>{"🤖"}</>}, None, Some("text-left")),
+        HistorySource::User => (html! {<>{"🧙‍♂️"}</>}, Some("order-1"), Some("text-right")),
+        HistorySource::System => (
+            html! { <><img src="/icons/system-logo.png" class="h-[48px] w-[48px] rounded-full animate-pulse" /></>},
+            None,
+            Some("text-left"),
+        ),
+    };
+
     let html = markdown::to_html(&props.tokens.clone());
     let html = html.trim_start_matches("<p>").to_string();
     let html = html.trim_end_matches("</p>").to_string();
     let html = format!("<span>{}</span>", html);
 
     html! {
-        <div class="animate-fade-in col-span-1">
-            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
-            <div>
-                <p class="prose prose-invert inline">
-                    {Html::from_html_unchecked(AttrValue::from(html))}
-                    { if props.in_progress {
-                        html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
-                    } else {
-                        html! { <span>{"🔭"}</span>}
-                    }}
-                </p>
-            </div>
+        <div>
+            <p class="prose prose-invert inline">
+                {Html::from_html_unchecked(AttrValue::from(html))}
+                { if props.in_progress {
+                    html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
+                } else {
+                    html! { <span>{"🔭"}</span>}
+                }}
+            </p>
         </div>
     }
 }
