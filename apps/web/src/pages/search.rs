@@ -229,12 +229,14 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
         <div class="animate-fade-in col-span-1">
             <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
             <div>
-                <p class="inline leading-relaxed">{Html::from_html_unchecked(AttrValue::from(html))}</p>
-                { if props.in_progress {
-                    html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
-                } else {
-                    html! { <span>{"🔭"}</span>}
-                }}
+                <p class="prose prose-invert inline">
+                    {Html::from_html_unchecked(AttrValue::from(html))}
+                    { if props.in_progress {
+                        html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
+                    } else {
+                        html! { <span>{"🔭"}</span>}
+                    }}
+                </p>
             </div>
         </div>
     }
