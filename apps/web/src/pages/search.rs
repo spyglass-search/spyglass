@@ -7,7 +7,7 @@ use std::sync::Arc;
 use ui_components::{
     btn::{Btn, BtnType},
     icons::RefreshIcon,
-    results::SearchResultItem,
+    results::{ResultPaginator, SearchResultItem},
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, HtmlInputElement};
@@ -15,8 +15,6 @@ use yew::prelude::*;
 
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
-
-const RESULT_PREFIX: &str = "result";
 
 #[derive(Clone, PartialEq, Eq)]
 enum HistorySource {
@@ -142,7 +140,7 @@ impl Component for SearchPage {
             Msg::OpenResult(result) => {
                 log::info!("opening result: {}", result.url);
                 if let Some(window) = window() {
-                    let _ = window.open_with_url_and_target(&result.url, "blank");
+                    let _ = window.open_with_url_and_target(&result.url, "_blank");
                 }
 
                 false
@@ -152,23 +150,22 @@ impl Component for SearchPage {
 
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         let link = ctx.link();
-        let html = self
+
+        let results = self
             .results
             .iter()
-            .enumerate()
-            .map(|(idx, res)| {
-                let open_msg = Msg::OpenResult(res.to_owned());
+            .map(|result| {
+                let open_msg = Msg::OpenResult(result.clone());
                 html! {
                     <SearchResultItem
-                        id={format!("{RESULT_PREFIX}{idx}")}
+                        id={format!("result-{}", result.doc_id)}
+                        result={result.clone()}
                         onclick={link.callback(move |_| open_msg.clone())}
-                        result={res.clone()}
                         responsive={true}
                     />
                 }
             })
-            .collect::<Html>();
-
+            .collect::<Vec<Html>>();
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
                 <div class="flex flex-nowrap w-full bg-neutral-800 p-4 border-b-2 border-neutral-900">
@@ -216,7 +213,7 @@ impl Component for SearchPage {
                             html! {
                                 <>
                                     <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
-                                    {html}
+                                    <ResultPaginator page_size={5}>{results}</ResultPaginator>
                                 </>
                             }
                         } else {

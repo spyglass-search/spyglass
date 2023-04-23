@@ -290,3 +290,91 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
 
     None
 }
+
+
+#[derive(Properties, PartialEq)]
+pub struct ResultPaginatorProps {
+    pub children: Children,
+    pub page_size: usize
+}
+
+#[function_component(ResultPaginator)]
+pub fn result_paginator(props: &ResultPaginatorProps) -> Html {
+    let page: UseStateHandle<usize> = use_state(|| 0);
+
+    let num_pages = props.children.len() / props.page_size;
+
+    let result_html = props.children.iter()
+        .skip(*page * props.page_size)
+        .take(props.page_size)
+        .collect::<Vec<Html>>();
+
+    let mut pages_html = Vec::new();
+    let component_classes = classes!(
+        "cursor-pointer",
+        "relative",
+        "block",
+        "rounded",
+        "px-3",
+        "py-1.5",
+        "text-sm",
+        "text-neutral-600",
+        "transition-all",
+        "duration-300",
+        "hover:bg-neutral-100",
+        "dark:text-white",
+        "dark:hover:bg-neutral-700",
+        "dark:hover:text-white"
+    );
+
+    for page_num in 0..num_pages {
+        // Highlight the current page
+        let mut classes = component_classes.clone();
+        if *page == page_num {
+            classes.push("bg-cyan-500");
+        }
+
+        let page_handle = page.clone();
+        pages_html.push(html! {
+            <li>
+                <a
+                    class={classes}
+                    onclick={move |_| page_handle.set(page_num)}
+                >
+                    {page_num + 1}
+                </a>
+            </li>
+        });
+    }
+
+    let page_handle = page.clone();
+    let handle_previous = move |_| {
+        if *page_handle > 0 {
+            page_handle.set(*page_handle - 1);
+        }
+    };
+
+    let page_handle = page.clone();
+    let handle_next = move |_| {
+        if *page_handle < (num_pages - 1) {
+            page_handle.set(*page_handle + 1);
+        }
+    };
+
+    html! {
+        <div>
+            <div>{result_html}</div>
+            <nav class="border-t-neutral-700 border-t py-4 mt-4">
+                <ul class="list-style-none flex flex-row gap-2 justify-around">
+                    <li>
+                        <button onclick={handle_previous} class={component_classes.clone()} disabled={*page == 0}>{"Previous"}</button>
+                    </li>
+                    {pages_html}
+                    <li>
+                        <button onclick={handle_next} class={component_classes} disabled={*page == num_pages}>{"Next"}</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    }
+}
