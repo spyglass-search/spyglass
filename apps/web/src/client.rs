@@ -6,7 +6,7 @@ use futures::{AsyncBufReadExt, TryStreamExt};
 use gloo::timers::future::sleep;
 use reqwest::Client;
 use shared::request::{AskClippyRequest, ClippyContext};
-use shared::response::{ChatErrorType, ChatUpdate};
+use shared::response::{ChatErrorType, ChatUpdate, SearchResult};
 use thiserror::Error;
 use yew::html::Scope;
 
@@ -41,13 +41,19 @@ impl SpyglassClient {
         &mut self,
         followup: &str,
         history: &[HistoryItem],
+        doc_context: &[SearchResult],
         link: Scope<SearchPage>,
     ) -> Result<(), ClientError> {
-        let context = history
+        let mut context = history
             .iter()
             .filter(|x| x.source != HistorySource::System)
             .map(|x| ClippyContext::History(x.source.to_string(), x.value.clone()))
             .collect::<Vec<_>>();
+
+        // Add urls to context
+        for result in doc_context.iter() {
+            context.push(ClippyContext::DocId(result.doc_id.clone()));
+        }
 
         let body = AskClippyRequest {
             query: followup.to_string(),

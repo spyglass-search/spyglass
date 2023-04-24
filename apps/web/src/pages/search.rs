@@ -102,10 +102,16 @@ impl Component for SearchPage {
 
                 let link = link.clone();
                 let client = self.client.clone();
+
                 let cur_history = self.history.clone();
+                let cur_doc_context = self.results.clone();
+
                 spawn_local(async move {
                     let mut client = client.lock().await;
-                    if let Err(err) = client.followup(&question, &cur_history, link.clone()).await {
+                    if let Err(err) = client
+                        .followup(&question, &cur_history, &cur_doc_context, link.clone())
+                        .await
+                    {
                         log::error!("{}", err.to_string());
                         link.send_message(Msg::SetError(err.to_string()));
                     }
