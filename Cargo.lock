@@ -6747,9 +6747,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3136ddfe60460cb35aa266d3462f397ad75c6d3aeb13e0f19e8ef4393d60519"
+checksum = "c3f491f6fe67a4bac08e6c793d744d8446e2460269c5976288276aebcb2689d9"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6774,6 +6774,7 @@ dependencies = [
  "rusoto_core",
  "rusoto_s3",
  "serde",
+ "serde_json",
  "sitemap",
  "spyglass-lens 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",

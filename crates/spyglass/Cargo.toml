@@ -76,7 +76,7 @@ reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2
 
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
-spyglass-netrunner = "0.2.10"
+spyglass-netrunner = "0.2.11"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 
