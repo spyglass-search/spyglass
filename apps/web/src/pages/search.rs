@@ -348,14 +348,9 @@ struct HistoryLogItemProps {
 
 #[function_component(HistoryLogItem)]
 fn history_log_item(props: &HistoryLogItemProps) -> Html {
-    let (_user_icon, _icon_pos, _text_pos) = match props.source {
-        HistorySource::Clippy => (html! {<>{"🤖"}</>}, None, Some("text-left")),
-        HistorySource::User => (html! {<>{"🧙‍♂️"}</>}, Some("order-1"), Some("text-right")),
-        HistorySource::System => (
-            html! { <><img src="/icons/system-logo.png" class="h-[48px] w-[48px] rounded-full animate-pulse" /></>},
-            None,
-            Some("text-left"),
-        ),
+    let user_icon = match props.source {
+        HistorySource::Clippy | HistorySource::System => html! {<>{"🔭"}</>},
+        HistorySource::User => html! {<>{"🧙‍♂️"}</>},
     };
 
     let html = markdown::to_html(&props.tokens.clone());
@@ -375,10 +370,13 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
                 {Html::from_html_unchecked(AttrValue::from(html))}
                 { if props.in_progress && props.source != HistorySource::User {
                     html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
-                } else {
-                    html! { <span>{"🔭"}</span>}
-                }}
+                } else { html! {} }}
             </p>
+            { if !props.in_progress && props.source != HistorySource::User {
+                html! { <div class="mt-2">{user_icon}</div>}
+            } else {
+                html! {}
+            }}
         </div>
     }
 }
