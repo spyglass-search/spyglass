@@ -5,11 +5,12 @@ use futures::io::BufReader;
 use futures::{AsyncBufReadExt, TryStreamExt};
 use gloo::timers::future::sleep;
 use reqwest::Client;
-use shared::request::AskClippyRequest;
+use shared::request::{AskClippyRequest, ClippyContext};
 use shared::response::{ChatErrorType, ChatUpdate};
 use thiserror::Error;
 use yew::html::Scope;
 
+use crate::pages::search::{HistoryItem, HistorySource};
 use crate::{
     constants,
     pages::search::{Msg, SearchPage},
@@ -36,17 +37,47 @@ impl SpyglassClient {
         Self { client }
     }
 
+    pub async fn followup(
+        &mut self,
+        followup: &str,
+        history: &[HistoryItem],
+        link: Scope<SearchPage>,
+    ) -> Result<(), ClientError> {
+        let context = history
+            .iter()
+            .filter(|x| x.source != HistorySource::System)
+            .map(|x| ClippyContext::History(x.source.to_string(), x.value.clone()))
+            .collect::<Vec<_>>();
+
+        let body = AskClippyRequest {
+            query: followup.to_string(),
+            lens: None,
+            context,
+        };
+
+        self.handle_request(&body, link.clone()).await
+    }
+
     pub async fn search(
         &mut self,
         query: &str,
         link: Scope<SearchPage>,
     ) -> Result<(), ClientError> {
-        let url = format!("{}/chat", constants::HTTP_ENDPOINT);
         let body = AskClippyRequest {
             query: query.to_string(),
             lens: None,
             context: Vec::new(),
         };
+
+        self.handle_request(&body, link.clone()).await
+    }
+
+    async fn handle_request(
+        &mut self,
+        body: &AskClippyRequest,
+        link: Scope<SearchPage>,
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/chat", constants::HTTP_ENDPOINT);
 
         let res = self
             .client

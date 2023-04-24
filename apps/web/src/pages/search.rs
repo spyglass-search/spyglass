@@ -4,9 +4,10 @@ use shared::keyboard::KeyCode;
 use shared::response::SearchResult;
 use std::str::FromStr;
 use std::sync::Arc;
+use strum_macros::Display;
 use ui_components::{
     btn::{Btn, BtnType},
-    icons::RefreshIcon,
+    icons::{RefreshIcon, SearchIcon},
     results::{ResultPaginator, SearchResultItem},
 };
 use wasm_bindgen_futures::spawn_local;
@@ -16,23 +17,27 @@ use yew::prelude::*;
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
 
-#[derive(Clone, PartialEq, Eq)]
-enum HistorySource {
+#[derive(Clone, PartialEq, Eq, Display)]
+pub enum HistorySource {
+    #[strum(serialize = "assistant")]
     Clippy,
+    #[strum(serialize = "user")]
     User,
+    #[strum(serialize = "system")]
     System,
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct HistoryItem {
+pub struct HistoryItem {
     /// who "wrote" this response
-    source: HistorySource,
-    value: String,
+    pub source: HistorySource,
+    pub value: String,
 }
 
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
+    HandleFollowup(String),
     HandleSearch,
     SetSearchResults(Vec<SearchResult>),
     SetError(String),
@@ -75,6 +80,39 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::HandleFollowup(question) => {
+                log::info!("handling followup: {}", question);
+
+                // Push existing answer into history
+                if let Some(value) = &self.tokens {
+                    self.history.push(HistoryItem {
+                        source: HistorySource::Clippy,
+                        value: value.to_owned(),
+                    });
+                }
+
+                // Push user's question into history
+                self.history.push(HistoryItem {
+                    source: HistorySource::User,
+                    value: question.clone(),
+                });
+
+                self.tokens = None;
+                self.status_msg = None;
+
+                let link = link.clone();
+                let client = self.client.clone();
+                let cur_history = self.history.clone();
+                spawn_local(async move {
+                    let mut client = client.lock().await;
+                    if let Err(err) = client.followup(&question, &cur_history, link.clone()).await {
+                        log::error!("{}", err.to_string());
+                        link.send_message(Msg::SetError(err.to_string()));
+                    }
+                });
+
+                true
+            }
             Msg::HandleKeyboardEvent(event) => {
                 let key = event.key();
                 if let Ok(code) = KeyCode::from_str(&key.to_uppercase()) {
@@ -202,6 +240,7 @@ impl Component for SearchPage {
                                 tokens={self.tokens.clone()}
                                 status={self.status_msg.clone()}
                                 in_progress={self.in_progress}
+                                on_followup={link.callback(Msg::HandleFollowup)}
                             />
                         }
                     } else {
@@ -233,22 +272,44 @@ struct AnswerSectionProps {
     pub status: Option<String>,
     #[prop_or_default]
     pub in_progress: bool,
+    #[prop_or_default]
+    pub on_followup: Callback<String>,
 }
 
 #[function_component(AnswerSection)]
 fn answer_section(props: &AnswerSectionProps) -> Html {
+    let ask_followup = use_node_ref();
+
+    let ask_followup_handle = ask_followup.clone();
+    let on_followup_cb = props.on_followup.clone();
+    let on_ask_followup = Callback::from(move |event: SubmitEvent| {
+        event.prevent_default();
+        if let Some(node) = ask_followup_handle.cast::<HtmlInputElement>() {
+            log::info!("ASK_FOLLOWUP: {}", node.value());
+            on_followup_cb.emit(node.value());
+        }
+    });
+
     html! {
         <div class="animate-fade-in col-span-1">
             <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
             <div class="flex flex-col">
-                <HistoryLog history={props.history.clone()} />
-                { if let Some(tokens) = &props.tokens {
-                    html!{ <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
-                } else if let Some(msg) = &props.status {
-                    html!{ <HistoryLogItem source={HistorySource::System} tokens={msg.clone()}  /> }
-                } else {
-                    html! {}
-                }}
+                <div class="flex flex-col min-h-[480px] gap-4">
+                    <HistoryLog history={props.history.clone()} />
+                    { if let Some(tokens) = &props.tokens {
+                        html!{ <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
+                    } else if let Some(msg) = &props.status {
+                        html!{ <HistoryLogItem source={HistorySource::System} tokens={msg.clone()}  /> }
+                    } else {
+                        html! {}
+                    }}
+                </div>
+                <form class="mt-8 flex flex-row px-8" onsubmit={on_ask_followup}>
+                    <textarea ref={ask_followup} rows="3" placeholder="Ask a followup question" type="text" class="w-full flex-1 border-b-2 border-neutral-600 bg-neutral-700 text-base text-white caret-white outline-none placeholder:text-gray-300 focus:outline-none active:outline-none p-4"></textarea>
+                    <button type="submit" class="cursor-pointer items-center px-3 py-2 text-base font-semibold leading-5 bg-neutral-700 hover:bg-cyan-800">
+                        <SearchIcon width="w-6" height="h-6" />
+                    </button>
+                </form>
             </div>
         </div>
     }
@@ -302,9 +363,15 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
     let html = html.trim_end_matches("</p>").to_string();
     let html = format!("<span>{}</span>", html);
 
+    let item_classes = if props.source == HistorySource::User {
+        classes!("text-white", "font-bold", "text-lg")
+    } else {
+        classes!("prose", "prose-invert", "inline")
+    };
+
     html! {
-        <div>
-            <p class="prose prose-invert inline">
+        <div class="border-b border-neutral-500 pb-4">
+            <p class={item_classes}>
                 {Html::from_html_unchecked(AttrValue::from(html))}
                 { if props.in_progress {
                     html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
