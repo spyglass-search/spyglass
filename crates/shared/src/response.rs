@@ -329,6 +329,8 @@ pub enum ChatUpdate {
     DocumentContextAdded(Vec<SearchResult>),
     /// Generating context from documents
     GeneratingContext,
+    /// Context that has been generated
+    ContextGenerated(String),
     /// Loading model / sending to API endpoint
     LoadingModel,
     LoadingPrompt,

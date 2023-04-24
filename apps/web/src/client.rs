@@ -121,6 +121,10 @@ impl SpyglassClient {
                     log::info!("ChatUpdate::SearchingDocuments");
                     link.send_message(Msg::SetStatus("Analyzing documents...".into()))
                 }
+                ChatUpdate::ContextGenerated(context) => {
+                    log::info!("ChatUpdate::ContextGenerated {}", context);
+                    link.send_message(Msg::ContextAdded(context));
+                }
                 ChatUpdate::LoadingModel | ChatUpdate::LoadingPrompt => {
                     link.send_message(Msg::SetStatus("Generating answer...".into()))
                 }

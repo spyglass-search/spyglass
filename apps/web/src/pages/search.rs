@@ -40,6 +40,7 @@ pub enum Msg {
     HandleFollowup(String),
     HandleSearch,
     SetSearchResults(Vec<SearchResult>),
+    ContextAdded(String),
     SetError(String),
     SetStatus(String),
     TokenReceived(String),
@@ -57,6 +58,7 @@ pub struct SearchPage {
     search_wrapper_ref: NodeRef,
     status_msg: Option<String>,
     tokens: Option<String>,
+    context: Option<String>,
 }
 
 impl Component for SearchPage {
@@ -74,6 +76,7 @@ impl Component for SearchPage {
             search_wrapper_ref: Default::default(),
             status_msg: None,
             tokens: None,
+            context: None,
         }
     }
 
@@ -82,6 +85,13 @@ impl Component for SearchPage {
         match msg {
             Msg::HandleFollowup(question) => {
                 log::info!("handling followup: {}", question);
+
+                if let Some(context) = &self.context {
+                    self.history.push(HistoryItem {
+                        source: HistorySource::User,
+                        value: context.to_owned(),
+                    })
+                }
 
                 // Push existing answer into history
                 if let Some(value) = &self.tokens {
@@ -99,6 +109,7 @@ impl Component for SearchPage {
 
                 self.tokens = None;
                 self.status_msg = None;
+                self.context = None;
 
                 let link = link.clone();
                 let client = self.client.clone();
@@ -158,6 +169,10 @@ impl Component for SearchPage {
             Msg::SetSearchResults(results) => {
                 self.results = results;
                 true
+            }
+            Msg::ContextAdded(context) => {
+                self.context = Some(context);
+                false
             }
             Msg::SetError(err) => {
                 self.in_progress = false;
