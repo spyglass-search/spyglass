@@ -85,12 +85,12 @@ impl Component for SearchPage {
         match msg {
             Msg::HandleFollowup(question) => {
                 log::info!("handling followup: {}", question);
-
-                if let Some(context) = &self.context {
+                // Push existing question & answer into history
+                if let Some(value) = &self.current_query {
                     self.history.push(HistoryItem {
                         source: HistorySource::User,
-                        value: context.to_owned(),
-                    })
+                        value: value.to_owned(),
+                    });
                 }
 
                 // Push existing answer into history
@@ -110,11 +110,23 @@ impl Component for SearchPage {
                 self.tokens = None;
                 self.status_msg = None;
                 self.context = None;
+                self.in_progress = true;
 
                 let link = link.clone();
                 let client = self.client.clone();
 
-                let cur_history = self.history.clone();
+                let mut cur_history = self.history.clone();
+                // Add context to the beginning
+                if let Some(context) = &self.context {
+                    cur_history.insert(
+                        0,
+                        HistoryItem {
+                            source: HistorySource::User,
+                            value: context.to_owned(),
+                        },
+                    );
+                }
+
                 let cur_doc_context = self.results.clone();
 
                 spawn_local(async move {
@@ -300,13 +312,11 @@ struct AnswerSectionProps {
 #[function_component(AnswerSection)]
 fn answer_section(props: &AnswerSectionProps) -> Html {
     let ask_followup = use_node_ref();
-
     let ask_followup_handle = ask_followup.clone();
     let on_followup_cb = props.on_followup.clone();
     let on_ask_followup = Callback::from(move |event: SubmitEvent| {
         event.prevent_default();
         if let Some(node) = ask_followup_handle.cast::<HtmlInputElement>() {
-            log::info!("ASK_FOLLOWUP: {}", node.value());
             on_followup_cb.emit(node.value());
         }
     });
@@ -326,8 +336,18 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
                     }}
                 </div>
                 <form class="mt-8 flex flex-row px-8" onsubmit={on_ask_followup}>
-                    <textarea ref={ask_followup} rows="3" placeholder="Ask a followup question" type="text" class="w-full flex-1 border-b-2 border-neutral-600 bg-neutral-700 text-base text-white caret-white outline-none placeholder:text-gray-300 focus:outline-none active:outline-none p-4"></textarea>
-                    <button type="submit" class="cursor-pointer items-center px-3 py-2 text-base font-semibold leading-5 bg-neutral-700 hover:bg-cyan-800">
+                    <textarea ref={ask_followup}
+                        disabled={props.in_progress}
+                        rows="3"
+                        placeholder="Ask a followup question"
+                        type="text"
+                        class="w-full flex-1 border-b-2 border-neutral-600 bg-neutral-700 text-base text-white caret-white outline-none placeholder:text-gray-300 focus:outline-none active:outline-none p-4"
+                    ></textarea>
+                    <button
+                        disabled={props.in_progress}
+                        type="submit"
+                        class="cursor-pointer items-center px-3 py-2 text-base font-semibold leading-5 bg-neutral-700 hover:bg-cyan-800"
+                    >
                         <SearchIcon width="w-6" height="h-6" />
                     </button>
                 </form>
@@ -346,6 +366,8 @@ fn history_log(props: &HistoryLogProps) -> Html {
     let html = props
         .history
         .iter()
+        // Skip the initial question, we already show this at the top.
+        .skip(1)
         .map(|item| {
             html! {
                 <HistoryLogItem
@@ -386,7 +408,7 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
     };
 
     html! {
-        <div class="border-b border-neutral-500 pb-4">
+        <div class="border-b border-neutral-600 pb-4">
             <p class={item_classes}>
                 {Html::from_html_unchecked(AttrValue::from(html))}
                 { if props.in_progress && props.source != HistorySource::User {
