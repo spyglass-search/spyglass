@@ -373,7 +373,7 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
         <div class="border-b border-neutral-500 pb-4">
             <p class={item_classes}>
                 {Html::from_html_unchecked(AttrValue::from(html))}
-                { if props.in_progress {
+                { if props.in_progress && props.source != HistorySource::User {
                     html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
                 } else {
                     html! { <span>{"🔭"}</span>}
