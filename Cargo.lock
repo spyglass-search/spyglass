@@ -6708,18 +6708,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spyglass-clippy"
-version = "0.1.0"
-dependencies = [
- "log",
- "rand 0.8.5",
- "reqwest",
- "serde",
- "shared",
- "tokio",
-]
-
-[[package]]
 name = "spyglass-lens"
 version = "0.1.6"
 dependencies = [
