@@ -315,6 +315,7 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
         event.prevent_default();
         if let Some(node) = ask_followup_handle.cast::<HtmlInputElement>() {
             on_followup_cb.emit(node.value());
+            node.set_value("");
         }
     });
 
