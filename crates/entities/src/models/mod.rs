@@ -59,7 +59,6 @@ pub async fn copy_all_tables(
     bootstrap_queue::copy_table(from, to).await?;
     connection::copy_table(from, to).await?;
     crawl_queue::copy_table(from, to).await?;
-    document_tag::copy_table(from, to).await?;
     fetch_history::copy_table(from, to).await?;
     indexed_document::copy_table(from, to).await?;
     lens::copy_table(from, to).await?;
@@ -67,6 +66,7 @@ pub async fn copy_all_tables(
     processed_files::copy_table(from, to).await?;
     resource_rule::copy_table(from, to).await?;
     tag::copy_table(from, to).await?;
+    document_tag::copy_table(from, to).await?;
     Ok(())
 }
 
