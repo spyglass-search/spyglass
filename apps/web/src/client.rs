@@ -29,12 +29,13 @@ pub enum ClientError {
 
 pub struct SpyglassClient {
     client: Client,
+    lens: String
 }
 
 impl SpyglassClient {
-    pub fn new() -> Self {
+    pub fn new(lens: String) -> Self {
         let client = Client::new();
-        Self { client }
+        Self { client, lens }
     }
 
     pub async fn followup(
@@ -57,7 +58,7 @@ impl SpyglassClient {
 
         let body = AskClippyRequest {
             query: followup.to_string(),
-            lens: None,
+            lens: Some(vec![self.lens.clone()]),
             context,
         };
 
@@ -71,7 +72,7 @@ impl SpyglassClient {
     ) -> Result<(), ClientError> {
         let body = AskClippyRequest {
             query: query.to_string(),
-            lens: None,
+            lens: Some(vec![self.lens.clone()]),
             context: Vec::new(),
         };
 

@@ -48,6 +48,12 @@ pub enum Msg {
     OpenResult(SearchResult),
 }
 
+#[derive(Properties, PartialEq)]
+pub struct SearchPageProps {
+    // todo: allow multiple
+    pub lens: String
+}
+
 pub struct SearchPage {
     client: Client,
     current_query: Option<String>,
@@ -63,11 +69,12 @@ pub struct SearchPage {
 
 impl Component for SearchPage {
     type Message = Msg;
-    type Properties = ();
+    type Properties = SearchPageProps;
 
-    fn create(_: &yew::Context<Self>) -> Self {
+    fn create(ctx: &yew::Context<Self>) -> Self {
+        let props = ctx.props();
         Self {
-            client: Arc::new(Mutex::new(SpyglassClient::new())),
+            client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.clone()))),
             current_query: None,
             history: Vec::new(),
             in_progress: false,

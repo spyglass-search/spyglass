@@ -11,22 +11,20 @@ use pages::AppPage;
 pub enum Route {
     #[at("/")]
     Start,
-    #[at("/result")]
-    Result,
-    #[at("/library")]
-    MyLibrary,
+    #[at("/lens/:lens")]
+    Search { lens: String },
+    // #[at("/library")]
+    // MyLibrary,
     #[not_found]
     #[at("/404")]
     NotFound,
 }
 
 fn switch(routes: Route) -> Html {
-    if routes == Route::NotFound {
-        html! { <div>{"Not Found!"}</div> }
-    } else {
-        html! {
-            <AppPage tab={routes} />
-        }
+    match &routes {
+        Route::Start => html! { <Redirect<Route> to={Route::Search { lens: "yc".into() }} /> },
+        Route::Search { lens } => html! { <AppPage lens={lens.clone()} /> },
+        Route::NotFound => html! { <div>{"Not Found!"}</div> },
     }
 }
 
