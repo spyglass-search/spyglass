@@ -845,7 +845,7 @@ mod test {
         let mut stats = QueryStats::new();
         let query = "salinas";
         let results =
-            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
