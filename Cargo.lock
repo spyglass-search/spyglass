@@ -9179,16 +9179,17 @@ dependencies = [
 
 [[package]]
 name = "whisper-rs"
-version = "0.5.0"
-source = "git+https://github.com/a5huynh/whisper-rs?rev=ccf2dcc10902754ac77764a6e39ee8b98dd280c9#ccf2dcc10902754ac77764a6e39ee8b98dd280c9"
+version = "0.6.0"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
 dependencies = [
+ "dashmap",
  "whisper-rs-sys",
 ]
 
 [[package]]
 name = "whisper-rs-sys"
-version = "0.3.1"
-source = "git+https://github.com/a5huynh/whisper-rs?rev=ccf2dcc10902754ac77764a6e39ee8b98dd280c9#ccf2dcc10902754ac77764a6e39ee8b98dd280c9"
+version = "0.4.0"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
 dependencies = [
  "bindgen",
 ]
