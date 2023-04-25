@@ -347,4 +347,3 @@ pub enum ChatErrorType {
     APIKeyMissing,
     UnknownError(String),
 }
-

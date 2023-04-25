@@ -111,7 +111,7 @@ pub async fn generate_similarity_context_for_doc(
         document: String::from(content),
     };
     let request = client
-        .post(&format!("http://{}:{}/compare", endpoint, port))
+        .post(format!("http://{}:{}/compare", endpoint, port))
         .json(&body);
 
     log::info!(

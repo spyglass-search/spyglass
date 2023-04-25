@@ -344,7 +344,7 @@ impl Searcher {
             None
         };
 
-        let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
+        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
         tag_boosts.extend(tag_checks);
 
         let index = &searcher.index;

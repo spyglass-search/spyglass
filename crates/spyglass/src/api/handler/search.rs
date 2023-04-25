@@ -5,16 +5,13 @@ use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
 use jsonrpsee::core::Error;
-use libspyglass::search::similarity::similarity_search;
 use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
-use shared::response::{
-    LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults, SimilaritySearchResult,
-};
-use std::collections::{HashMap, HashSet};
+use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
 
@@ -52,17 +49,10 @@ pub async fn search_docs(
     let docs =
         Searcher::search_with_lens(&state.db, &tag_ids, index, &query, &[], &mut stats).await;
 
-    // for now, map based on URL until we get the doc ids into the payload
-    let vector_results = similarity_search(&query).await;
-    let vector_result_map: HashMap<String, SimilaritySearchResult> = vector_results
-        .iter()
-        .map(|x| (x.payload.url.clone(), x.clone()))
-        .collect();
-
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
 
-    for (mut score, doc_addr) in docs {
+    for (score, doc_addr) in docs {
         if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
             let indexed = indexed_document::Entity::find()
@@ -93,13 +83,6 @@ pub async fn search_docs(
                         &query,
                         &doc.content,
                     );
-
-                    let tmp = crawl_uri.clone();
-                    if let Some(data) = vector_result_map.get(&tmp) {
-                        // rescore
-                        score += data.score * 10.0;
-                        dbg!(data);
-                    }
 
                     let result = SearchResult {
                         doc_id: doc.doc_id.clone(),

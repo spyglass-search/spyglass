@@ -179,7 +179,7 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         html! {}
     };
 
-    let mut icon_classes = classes!("mt-1","flex", "flex-none", "pr-2");
+    let mut icon_classes = classes!("mt-1", "flex", "flex-none", "pr-2");
     if !props.responsive {
         icon_classes.push("pl-6");
     }
@@ -291,11 +291,10 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
     None
 }
 
-
 #[derive(Properties, PartialEq)]
 pub struct ResultPaginatorProps {
     pub children: Children,
-    pub page_size: usize
+    pub page_size: usize,
 }
 
 #[function_component(ResultPaginator)]
@@ -304,7 +303,9 @@ pub fn result_paginator(props: &ResultPaginatorProps) -> Html {
 
     let num_pages = props.children.len() / props.page_size;
 
-    let result_html = props.children.iter()
+    let result_html = props
+        .children
+        .iter()
         .skip(*page * props.page_size)
         .take(props.page_size)
         .collect::<Vec<Html>>();
