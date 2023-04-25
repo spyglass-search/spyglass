@@ -316,7 +316,6 @@ pub fn web_search_result_component(props: &SearchResultProps) -> Html {
         html! {}
     };
 
-
     html! {
         <a
             id={props.id.clone()}

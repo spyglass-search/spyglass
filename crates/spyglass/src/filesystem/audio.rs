@@ -258,7 +258,9 @@ pub fn transcibe_audio(
             let num_segments = ctx.full_n_segments(&state)?;
             log::debug!("Extracted {} segments", num_segments);
             for i in 0..num_segments {
-                let segment = ctx.full_get_segment_text(&state, i).expect("failed to get segment");
+                let segment = ctx
+                    .full_get_segment_text(&state, i)
+                    .expect("failed to get segment");
                 let start_timestamp = ctx.full_get_segment_t0(&state, i)?;
                 let end_timestamp = ctx.full_get_segment_t1(&state, i)?;
                 res.segments
