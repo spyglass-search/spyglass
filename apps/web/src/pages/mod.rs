@@ -34,7 +34,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct AppPageProps {
-    pub lens: String
+    pub lens: String,
 }
 
 #[function_component]

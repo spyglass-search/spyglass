@@ -8,10 +8,10 @@ use strum_macros::Display;
 use ui_components::{
     btn::{Btn, BtnType},
     icons::{RefreshIcon, SearchIcon},
-    results::{ResultPaginator, SearchResultItem},
+    results::{ResultPaginator, WebSearchResultItem},
 };
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, HtmlInputElement};
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 // make sure we only have one connection per client
@@ -45,13 +45,12 @@ pub enum Msg {
     SetStatus(String),
     TokenReceived(String),
     SetFinished,
-    OpenResult(SearchResult),
 }
 
 #[derive(Properties, PartialEq)]
 pub struct SearchPageProps {
     // todo: allow multiple
-    pub lens: String
+    pub lens: String,
 }
 
 pub struct SearchPage {
@@ -215,31 +214,22 @@ impl Component for SearchPage {
                 }
                 true
             }
-            Msg::OpenResult(result) => {
-                log::info!("opening result: {}", result.url);
-                if let Some(window) = window() {
-                    let _ = window.open_with_url_and_target(&result.url, "_blank");
-                }
-
-                false
-            }
         }
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         let link = ctx.link();
 
+        let placeholder = format!("Ask anything related to {}", ctx.props().lens);
+
         let results = self
             .results
             .iter()
             .map(|result| {
-                let open_msg = Msg::OpenResult(result.clone());
                 html! {
-                    <SearchResultItem
+                    <WebSearchResultItem
                         id={format!("result-{}", result.doc_id)}
                         result={result.clone()}
-                        onclick={link.callback(move |_| open_msg.clone())}
-                        responsive={true}
                     />
                 }
             })
@@ -252,7 +242,7 @@ impl Component for SearchPage {
                         id="searchbox"
                         type="text"
                         class="bg-neutral-800 text-white text-2xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white placeholder-neutral-600"
-                        placeholder={self.current_query.clone().unwrap_or("how do i resize a window?".into())}
+                        placeholder={self.current_query.clone().unwrap_or(placeholder)}
                         spellcheck="false"
                         tabindex="-1"
                         onkeyup={link.callback(Msg::HandleKeyboardEvent)}

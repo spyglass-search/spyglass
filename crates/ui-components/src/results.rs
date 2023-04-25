@@ -9,10 +9,9 @@ use super::tag::{Tag, TagIcon};
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
     pub id: String,
+    #[prop_or_default]
     pub onclick: Callback<MouseEvent>,
     pub result: SearchResult,
-    #[prop_or_default]
-    pub responsive: bool,
     #[prop_or_default]
     pub is_selected: bool,
 }
@@ -179,16 +178,8 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         html! {}
     };
 
-    let mut icon_classes = classes!("mt-1", "flex", "flex-none", "pr-2");
-    if !props.responsive {
-        icon_classes.push("pl-6");
-    }
-
-    let title_classes = if props.responsive {
-        classes!("text-base", "font-semibold")
-    } else {
-        classes!("text-base", "truncate", "font-semibold", "w-[30rem]")
-    };
+    let icon_classes = classes!("mt-1", "flex", "flex-none", "pr-2", "pl-6");
+    let title_classes = classes!("text-base", "truncate", "font-semibold", "w-[30rem]");
 
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
@@ -289,6 +280,71 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
     }
 
     None
+}
+
+#[function_component(WebSearchResultItem)]
+pub fn web_search_result_component(props: &SearchResultProps) -> Html {
+    let is_selected = props.is_selected;
+    let result = &props.result;
+
+    let component_styles = classes!(
+        "flex",
+        "flex-row",
+        "gap-4",
+        "rounded",
+        "py-2",
+        "pr-2",
+        "mt-2",
+        "text-white",
+        "cursor-pointer",
+        "active:bg-cyan-900",
+        "scroll-mt-2",
+        if is_selected {
+            "bg-cyan-900"
+        } else {
+            "bg-neutral-800"
+        }
+    );
+
+    let metadata = render_metadata(result);
+
+    let score = {
+        #[cfg(debug_assertions)]
+        html! { <div class="text-neutral-600 text-xs pt-1">{result.score}</div> }
+
+        #[cfg(not(debug_assertions))]
+        html! {}
+    };
+
+
+    html! {
+        <a
+            id={props.id.clone()}
+            href={props.result.url.clone()}
+            class={component_styles}
+            target="_blank"
+        >
+            <div class={classes!("mt-1", "flex", "flex-none")}>
+                <div class="relative flex-none bg-neutral-700 rounded-sm h-6 w-6 items-center">
+                    <img class="w-4 h-4 m-auto mt-1"
+                        alt="website icon"
+                        src={format!("https://favicon.spyglass.workers.dev/{}", result.domain.clone())}
+                    />
+                </div>
+            </div>
+            <div class="grow">
+                <div class="text-xs text-cyan-500">
+                    <span>{format!("{}", result.domain.clone())}</span>
+                </div>
+                <h2 class={classes!("text-base", "font-semibold")}>{result.title.clone()}</h2>
+                <div class="text-sm leading-relaxed text-neutral-400">
+                    {Html::from_html_unchecked(result.description.clone().into())}
+                </div>
+                {metadata}
+                {score}
+            </div>
+        </a>
+    }
 }
 
 #[derive(Properties, PartialEq)]

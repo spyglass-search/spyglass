@@ -29,7 +29,7 @@ pub enum ClientError {
 
 pub struct SpyglassClient {
     client: Client,
-    lens: String
+    lens: String,
 }
 
 impl SpyglassClient {
