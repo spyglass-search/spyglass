@@ -657,8 +657,8 @@ mod test {
         models::{crawl_queue, indexed_document},
         test::setup_test_db,
     };
-    use libspyglass::search::{DocumentUpdate, Searcher};
     use libspyglass::state::AppState;
+    use spyglass_searcher::DocumentUpdate;
     use shared::config::{Config, LensConfig};
 
     #[tokio::test]
@@ -673,22 +673,19 @@ mod test {
             ..Default::default()
         };
 
-        if let Ok(mut writer) = state.index.lock_writer() {
-            Searcher::upsert_document(
-                &mut writer,
-                DocumentUpdate {
-                    doc_id: Some("test_id".into()),
-                    title: "test title",
-                    description: "test desc",
-                    domain: "example.com",
-                    url: "https://example.com/test",
-                    content: "test content",
-                    tags: &[],
-                },
-            )
-            .expect("Unable to add doc");
-        }
-        let _ = Searcher::save(&state).await;
+        state.index.upsert_document(
+            DocumentUpdate {
+                doc_id: Some("test_id".into()),
+                title: "test title",
+                description: "test desc",
+                domain: "example.com",
+                url: "https://example.com/test",
+                content: "test content",
+                tags: &[],
+            },
+        )
+        .expect("Unable to add doc");
+        let _ = state.index.save().await;
 
         let doc = indexed_document::ActiveModel {
             domain: Set("example.com".into()),

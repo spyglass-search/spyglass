@@ -545,14 +545,12 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
 
 #[cfg(test)]
 mod test {
-    use crate::search::{DocumentUpdate, IndexPath, QueryStats, Searcher};
+    use crate::{DocumentUpdate, IndexPath, QueryStats, Searcher};
     use entities::models::create_connection;
     use shared::config::{Config, LensConfig};
 
-    fn _build_test_index(searcher: &mut Searcher) {
-        let writer = &mut searcher.lock_writer().unwrap();
-        Searcher::upsert_document(
-            writer,
+    async fn _build_test_index(searcher: &mut Searcher) {
+        searcher.upsert_document(
             DocumentUpdate {
                 doc_id: None,
                 title: "Of Mice and Men",
@@ -573,8 +571,7 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        Searcher::upsert_document(
-            writer,
+        searcher.upsert_document(
             DocumentUpdate {
                 doc_id: None,
                 title: "Of Mice and Men",
@@ -595,8 +592,7 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        Searcher::upsert_document(
-            writer,
+        searcher.upsert_document(
             DocumentUpdate {
                 doc_id: None,
                 title: "Of Cheese and Crackers",
@@ -615,8 +611,7 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        Searcher::upsert_document(
-            writer,
+        searcher.upsert_document(
             DocumentUpdate {
             doc_id: None,
             title:"Frankenstein: The Modern Prometheus",
@@ -632,7 +627,7 @@ mod test {
         )
         .expect("Unable to add doc");
 
-        let res = writer.commit();
+        let res = searcher.save().await;
         if let Err(err) = res {
             println!("{err:?}");
         }
@@ -653,7 +648,7 @@ mod test {
 
         let mut searcher =
             Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
-        _build_test_index(&mut searcher);
+        _build_test_index(&mut searcher).await;
 
         let mut stats = QueryStats::new();
         let query = "salinas";
@@ -678,7 +673,7 @@ mod test {
             Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
 
         let mut stats = QueryStats::new();
-        _build_test_index(&mut searcher);
+        _build_test_index(&mut searcher).await;
         let query = "salinas";
         let results =
             Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
@@ -699,7 +694,7 @@ mod test {
 
         let mut searcher =
             Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
-        _build_test_index(&mut searcher);
+        _build_test_index(&mut searcher).await;
 
         let mut stats = QueryStats::new();
         let query = "salinasd";

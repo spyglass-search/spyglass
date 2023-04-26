@@ -547,12 +547,12 @@ pub async fn lens_to_filters(state: AppState, trigger: &str) -> Vec<SearchFilter
 
 #[cfg(test)]
 mod test {
-    use crate::IndexPath;
     use entities::models::lens;
     use entities::sea_orm::EntityTrait;
     use entities::test::setup_test_db;
     use shared::config::{LensConfig, UserSettings};
     use spyglass_plugin::SearchFilter;
+    use spyglass_searcher::IndexPath;
 
     use super::{lens_to_filters, AppState};
 

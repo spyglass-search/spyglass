@@ -139,8 +139,8 @@ pub fn generate_highlight_preview(tokenizer: &TextAnalyzer, query: &str, content
 
 #[cfg(test)]
 mod test {
-    use crate::search::utils::generate_highlight_preview;
-    use crate::search::{IndexPath, Searcher};
+    use crate::utils::generate_highlight_preview;
+    use crate::{IndexPath, Searcher};
     use entities::schema::DocFields;
     use entities::schema::SearchDocument;
 
