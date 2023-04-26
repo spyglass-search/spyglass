@@ -6,16 +6,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::anyhow;
-use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use entities::models::tag;
 use entities::schema::{self, DocFields, SearchDocument};
-use entities::sea_orm::prelude::*;
 
 mod query;
 pub mod similarity;
@@ -49,6 +46,7 @@ pub struct DocumentUpdate<'a> {
 pub enum QueryBoost {
     Url(String),
     DocId(String),
+    Tag(u64),
 }
 
 #[derive(Clone)]
@@ -221,42 +219,16 @@ impl Searcher {
     /// Helper method to execute a search based on the provided document query
     pub async fn search_by_query(
         &self,
-        db: &DatabaseConnection,
         urls: Option<Vec<String>>,
         ids: Option<Vec<String>>,
-        has_tags: Option<Vec<(String, String)>>,
-        exclude_tags: Option<Vec<(String, String)>>,
+        has_tags: &[u64],
+        exclude_tags: &[u64],
     ) -> Vec<SearchResult> {
-        let tag_ids = match &has_tags {
-            Some(include_tags) => {
-                let tags = tag::get_tags_by_value(db, include_tags)
-                    .await
-                    .unwrap_or_default();
-                tags.iter()
-                    .map(|model| model.id as u64)
-                    .collect::<Vec<u64>>()
-            }
-            None => Vec::new(),
-        };
-
-        let exclude_tag_ids = match &exclude_tags {
-            Some(excludes) => {
-                let exclude_tags = tag::get_tags_by_value(db, excludes)
-                    .await
-                    .unwrap_or_default();
-                exclude_tags
-                    .iter()
-                    .map(|model| model.id as u64)
-                    .collect::<Vec<u64>>()
-            }
-            None => Vec::new(),
-        };
-
-        let urls = urls.clone().unwrap_or_default();
-        let ids = ids.clone().unwrap_or_default();
+        let urls = urls.unwrap_or_default();
+        let ids = ids.unwrap_or_default();
 
         let fields = DocFields::as_fields();
-        let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
+        let query = build_document_query(fields, &urls, &ids, has_tags, exclude_tags);
 
         let collector = tantivy::collector::DocSetCollector;
 
@@ -271,47 +243,36 @@ impl Searcher {
     }
 
     pub async fn search_with_lens(
-        db: &DatabaseConnection,
+        &self,
         applied_lenses: &Vec<u64>,
-        searcher: &Searcher,
         query_string: &str,
+        favorite_id: Option<u64>,
         boosts: &[QueryBoost],
         stats: &mut QueryStats,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
-
-        let mut tag_boosts = HashSet::new();
-        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
-            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
-            .one(db)
-            .await
-        {
-            Some(favorited.id)
-        } else {
-            None
-        };
-
-        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
-        tag_boosts.extend(tag_checks);
-
-        let index = &searcher.index;
-        let reader = &searcher.reader;
+        let index = &self.index;
+        let reader = &self.reader;
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
 
+        let mut tag_boosts = HashSet::new();
         let mut docid_boosts = Vec::new();
         let mut url_boosts = Vec::new();
         for boost in boosts {
             match boost {
                 QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
                 QueryBoost::Url(url) => url_boosts.push(url.clone()),
+                QueryBoost::Tag(tag_id) => {
+                    tag_boosts.insert(*tag_id);
+                }
             }
         }
 
         let boosts = QueryBoosts {
             tags: tag_boosts.into_iter().collect(),
-            favorite: favorite_boost,
+            favorite: favorite_id,
             urls: url_boosts,
             doc_ids: docid_boosts,
         };
@@ -348,36 +309,38 @@ impl Searcher {
     }
 
     pub async fn explain_search_with_lens(
-        db: &DatabaseConnection,
+        &self,
         doc_address: DocAddress,
         applied_lenses: &Vec<u64>,
-        searcher: &Searcher,
         query_string: &str,
+        favorite_id: Option<u64>,
+        boosts: &[QueryBoost],
         stats: &mut QueryStats,
     ) -> Option<f32> {
         let mut tag_boosts = HashSet::new();
-        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
-            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
-            .one(db)
-            .await
-        {
-            Some(favorited.id)
-        } else {
-            None
-        };
+        let mut docid_boosts = Vec::new();
+        let mut url_boosts = Vec::new();
+        for boost in boosts {
+            match boost {
+                QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
+                QueryBoost::Url(url) => url_boosts.push(url.clone()),
+                QueryBoost::Tag(tag_id) => {
+                    tag_boosts.insert(*tag_id);
+                }
+            }
+        }
 
-        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
-        tag_boosts.extend(tag_checks);
-
-        let index = &searcher.index;
-        let reader = &searcher.reader;
+        let index = &self.index;
+        let reader = &self.reader;
         let fields = DocFields::as_fields();
+
         let tantivy_searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
         let boosts = QueryBoosts {
             tags: tag_boosts.into_iter().collect(),
-            favorite: favorite_boost,
-            ..Default::default()
+            favorite: favorite_id,
+            urls: url_boosts,
+            doc_ids: docid_boosts,
         };
 
         let query = build_query(
@@ -391,7 +354,7 @@ impl Searcher {
         );
 
         let mut combined: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Should, Box::new(query))];
-        if let Ok(Ok(doc)) = searcher
+        if let Ok(Ok(doc)) = self
             .reader
             .searcher()
             .doc(doc_address)
@@ -433,23 +396,6 @@ impl Searcher {
         }
         None
     }
-}
-
-// Helper method used to get the list of tag ids that should be included in the search
-async fn get_tag_checks(db: &DatabaseConnection, search: &str) -> Option<Vec<i64>> {
-    let lower = search.to_lowercase();
-    let tokens = lower.split(' ').collect::<Vec<&str>>();
-    let expr =
-        Expr::expr(Func::lower(Expr::col(entities::models::tag::Column::Value))).is_in(tokens);
-    let tag_rslt = entities::models::tag::Entity::find()
-        .filter(expr)
-        .all(db)
-        .await;
-
-    if let Ok(tags) = tag_rslt {
-        return Some(tags.iter().map(|tag| tag.id).collect::<Vec<i64>>());
-    }
-    None
 }
 
 #[derive(Serialize)]
@@ -505,8 +451,6 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
 #[cfg(test)]
 mod test {
     use crate::{DocumentUpdate, IndexPath, QueryStats, Searcher};
-    use entities::models::create_connection;
-    use shared::config::{Config, LensConfig};
 
     async fn _build_test_index(searcher: &mut Searcher) {
         searcher
@@ -594,68 +538,45 @@ mod test {
 
     #[tokio::test]
     pub async fn test_basic_lense_search() {
-        let db = create_connection(&Config::default(), true).await.unwrap();
-        let _lens = LensConfig {
-            name: "wiki".to_string(),
-            domains: vec!["en.wikipedia.org".to_string()],
-            urls: Vec::new(),
-            ..Default::default()
-        };
-
         let mut searcher =
             Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let mut stats = QueryStats::new();
         let query = "salinas";
-        let results: Vec<(f32, tantivy::DocAddress)> =
-            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
+        let results: Vec<(f32, tantivy::DocAddress)> = searcher
+            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats)
+            .await;
 
         assert_eq!(results.len(), 1);
     }
 
     #[tokio::test]
     pub async fn test_url_lens_search() {
-        let db = create_connection(&Config::default(), true).await.unwrap();
-
-        let _lens = LensConfig {
-            name: "wiki".to_string(),
-            domains: Vec::new(),
-            urls: vec!["https://en.wikipedia.org/mice".to_string()],
-            ..Default::default()
-        };
-
         let mut searcher =
             Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
 
         let mut stats = QueryStats::new();
         _build_test_index(&mut searcher).await;
         let query = "salinas";
-        let results =
-            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
+        let results = searcher
+            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats)
+            .await;
 
         assert_eq!(results.len(), 1);
     }
 
     #[tokio::test]
     pub async fn test_singular_url_lens_search() {
-        let db = create_connection(&Config::default(), true).await.unwrap();
-
-        let _lens = LensConfig {
-            name: "wiki".to_string(),
-            domains: Vec::new(),
-            urls: vec!["https://en.wikipedia.org/mice$".to_string()],
-            ..Default::default()
-        };
-
         let mut searcher =
             Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let mut stats = QueryStats::new();
         let query = "salinasd";
-        let results =
-            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
+        let results = searcher
+            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats)
+            .await;
         assert_eq!(results.len(), 0);
     }
 }

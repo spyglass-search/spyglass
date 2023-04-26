@@ -156,15 +156,30 @@ async fn handle_plugin_cmd_request(
             tag_modifications,
         } => {
             log::trace!("Received modify tags command {:?}", documents);
+            let tag_ids = documents.has_tags.clone().unwrap_or_default();
+            let tag_ids = tag::get_tags_by_value(&env.app_state.db, &tag_ids)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|model| model.id as u64)
+                .collect::<Vec<u64>>();
+
+            let exclude_tags = documents.exclude_tags.clone().unwrap_or_default();
+            let exclude_tags = tag::get_tags_by_value(&env.app_state.db, &exclude_tags)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|model| model.id as u64)
+                .collect::<Vec<u64>>();
+
             let docs = env
                 .app_state
                 .index
                 .search_by_query(
-                    &env.app_state.db,
                     documents.urls.clone(),
                     documents.ids.clone(),
-                    documents.has_tags.clone(),
-                    documents.exclude_tags.clone(),
+                    &tag_ids,
+                    &exclude_tags,
                 )
                 .await;
             if !docs.is_empty() {
@@ -296,15 +311,30 @@ async fn query_document_and_send_loop(env: PluginEnv, query: DocumentQuery) {
 }
 
 async fn query_documents_and_send(env: &PluginEnv, query: &DocumentQuery, send_empty: bool) {
+    let tag_ids = query.has_tags.clone().unwrap_or_default();
+    let tag_ids = tag::get_tags_by_value(&env.app_state.db, &tag_ids)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
+
+    let exclude_tags = query.exclude_tags.clone().unwrap_or_default();
+    let exclude_tags = tag::get_tags_by_value(&env.app_state.db, &exclude_tags)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
+
     let docs = env
         .app_state
         .index
         .search_by_query(
-            &env.app_state.db,
             query.urls.clone(),
             query.ids.clone(),
-            query.has_tags.clone(),
-            query.exclude_tags.clone(),
+            &tag_ids,
+            &exclude_tags,
         )
         .await;
     log::debug!("Found {:?} documents for query", docs.len());

@@ -6773,9 +6773,7 @@ name = "spyglass-searcher"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "entities",
  "log",
- "migration",
  "reqwest",
  "ron",
  "serde",

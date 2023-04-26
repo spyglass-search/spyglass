@@ -1,4 +1,8 @@
-use sea_orm::{entity::prelude::*, Condition, ConnectionTrait, Set};
+use sea_orm::{
+    entity::prelude::*,
+    sea_query::{Expr, Func},
+    Condition, ConnectionTrait, Set,
+};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumString};
 
@@ -342,6 +346,32 @@ pub async fn copy_table(
             .await?;
     }
     Ok(())
+}
+
+pub async fn get_favorite_tag(db: &DatabaseConnection) -> Option<u64> {
+    if let Ok(Some(favorited)) = Entity::find()
+        .filter(Column::Label.eq(TagType::Favorited.to_string()))
+        .one(db)
+        .await
+    {
+        Some(favorited.id as u64)
+    } else {
+        None
+    }
+}
+
+// Helper method used to get the list of tag ids that should be included in the search
+pub async fn check_query_for_tags(db: &DatabaseConnection, search: &str) -> Vec<u64> {
+    let lower: String = search.to_lowercase();
+    let tokens = lower.split(' ').collect::<Vec<&str>>();
+    let expr = Expr::expr(Func::lower(Expr::col(Column::Value))).is_in(tokens);
+    let tag_rslt = Entity::find().filter(expr).all(db).await;
+
+    if let Ok(tags) = tag_rslt {
+        return tags.iter().map(|tag| tag.id as u64).collect();
+    } else {
+        Vec::new()
+    }
 }
 
 #[cfg(test)]

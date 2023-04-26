@@ -1,4 +1,4 @@
-use entities::models::tag::TagType;
+use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
 use entities::models::{indexed_document, lens, tag};
 use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{
@@ -10,7 +10,7 @@ use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
-use spyglass_searcher::{document_to_struct, QueryStats, Searcher};
+use spyglass_searcher::{document_to_struct, QueryBoost, QueryStats};
 use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
@@ -33,21 +33,27 @@ pub async fn search_docs(
     let searcher = index.reader.searcher();
     let query = search_req.query.clone();
 
-    let tags = tag::Entity::find()
+    let lens_ids = tag::Entity::find()
         .filter(tag::Column::Label.eq(tag::TagType::Lens.to_string()))
         .filter(tag::Column::Value.is_in(search_req.lenses))
         .all(&state.db)
         .await
-        .unwrap_or_default();
-    let tag_ids = tags
+        .unwrap_or_default()
         .iter()
         .map(|model| model.id as u64)
         .collect::<Vec<u64>>();
 
+    let mut boosts = Vec::new();
+    for tag in check_query_for_tags(&state.db, &query).await {
+        boosts.push(QueryBoost::Tag(tag))
+    }
+    let favorite_boost = get_favorite_tag(&state.db).await;
     let mut stats = QueryStats::new();
 
-    let docs =
-        Searcher::search_with_lens(&state.db, &tag_ids, index, &query, &[], &mut stats).await;
+    let docs = state
+        .index
+        .search_with_lens(&lens_ids, &query, favorite_boost, &boosts, &mut stats)
+        .await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use clap::{Parser, Subcommand};
-use entities::models::{self, indexed_document::DocumentIdentifier};
+use entities::models::{self, indexed_document::DocumentIdentifier, tag::check_query_for_tags};
 use libspyglass::state::AppState;
 use ron::ser::PrettyConfig;
 use shared::config::Config;
@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use spyglass_searcher::{document_to_struct, IndexPath, QueryStats, Searcher};
+use spyglass_searcher::{document_to_struct, IndexPath, QueryBoost, QueryStats, Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -123,7 +123,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                             .expect("Unable to open index.");
 
                     let docs = index
-                        .search_by_query(&db, Some(vec![doc.url.clone()]), None, None, None)
+                        .search_by_query(Some(vec![doc.url.clone()]), None, &[], &[])
                         .await;
                     println!("### Indexed Document ###");
                     if docs.is_empty() {
@@ -169,7 +169,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                 .expect("Unable to open index.");
 
             let docs = index
-                .search_by_query(&db, doc_query.urls, doc_query.ids, None, None)
+                .search_by_query(doc_query.urls, doc_query.ids, &[], &[])
                 .await;
 
             if docs.is_empty() {
@@ -177,15 +177,22 @@ async fn main() -> anyhow::Result<ExitCode> {
             } else {
                 for (_score, doc_addr) in docs {
                     let mut stats = QueryStats::default();
-                    let explain = Searcher::explain_search_with_lens(
-                        &db,
-                        doc_addr,
-                        &vec![],
-                        &index,
-                        query.as_str(),
-                        &mut stats,
-                    )
-                    .await;
+                    let boosts = check_query_for_tags(&db, &query)
+                        .await
+                        .iter()
+                        .map(|x| QueryBoost::Tag(*x))
+                        .collect::<Vec<_>>();
+
+                    let explain = index
+                        .explain_search_with_lens(
+                            doc_addr,
+                            &vec![],
+                            query.as_str(),
+                            None,
+                            &boosts,
+                            &mut stats,
+                        )
+                        .await;
                     match explain {
                         Some(explanation) => {
                             println!(
