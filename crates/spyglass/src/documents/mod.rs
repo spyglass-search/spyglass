@@ -147,7 +147,7 @@ pub async fn process_crawl_results(
         let url = Url::parse(&crawl_result.url)?;
         let url_host = url.host_str().unwrap_or("");
         // Add document to index
-        if let Ok(mut index_writer) = state.index.writer.lock() {
+        if let Ok(mut index_writer) = state.index.lock_writer() {
             let doc_id = Searcher::upsert_document(
                 &mut index_writer,
                 DocumentUpdate {
@@ -228,7 +228,7 @@ pub async fn process_records(
     state: &AppState,
     lens: &LensConfig,
     results: &mut Vec<ParseResult>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<indexed_document::Model>> {
     // get a list of all urls
     let parsed_urls = results
         .iter()
@@ -288,7 +288,7 @@ pub async fn process_records(
                     let url_host = url.host_str().unwrap_or("");
                     // Add document to index
                     let doc_id: Option<String> = {
-                        if let Ok(mut index_writer) = state.index.writer.lock() {
+                        if let Ok(mut index_writer) = state.index.lock_writer() {
                             match Searcher::upsert_document(
                                 &mut index_writer,
                                 DocumentUpdate {
@@ -338,7 +338,7 @@ pub async fn process_records(
     // Save the data
     indexed_document::insert_many(&transaction, &updates).await?;
     transaction.commit().await?;
-    if let Ok(mut writer) = state.index.writer.lock() {
+    if let Ok(mut writer) = state.index.lock_writer() {
         let _ = writer.commit();
     }
 
@@ -356,7 +356,7 @@ pub async fn process_records(
         }
     }
 
-    Ok(())
+    Ok(added_entries)
 }
 
 /// Processes an update tags request for the specified documents
@@ -459,7 +459,7 @@ pub async fn update_tags(
         let _ = Searcher::save(state).await;
 
         log::debug!("Tag map generated {}", tag_map.len());
-        if let Ok(mut index_writer) = state.index.writer.lock() {
+        if let Ok(mut index_writer) = state.index.lock_writer() {
             for (_, (doc, ids)) in tag_map.iter() {
                 let _doc_id = Searcher::upsert_document(
                     &mut index_writer,

@@ -1037,6 +1037,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_log"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be8aed40e4edbf4d3b4431ab260b63fdc40f5780a4766824329ea0f1eefe3c0f"
+dependencies = [
+ "log",
+ "web-sys",
+]
+
+[[package]]
 name = "const_fn"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2056,6 +2066,10 @@ name = "futures-timer"
 version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e64b03909df88034c26dc1547e8970b91f98bdb65165d6a4e9110d94263dbb2c"
+dependencies = [
+ "gloo-timers",
+ "send_wrapper",
+]
 
 [[package]]
 name = "futures-util"
@@ -2946,9 +2960,12 @@ checksum = "1788965e61b367cd03a62950836d5cd41560c3577d90e40e0819373194d1661c"
 dependencies = [
  "http",
  "hyper",
+ "log",
  "rustls",
+ "rustls-native-certs",
  "tokio",
  "tokio-rustls",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -3265,10 +3282,13 @@ version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d291e3a5818a2384645fd9756362e6d89cf0541b0b916fa7702ea4a9833608e"
 dependencies = [
+ "jsonrpsee-client-transport",
  "jsonrpsee-core",
+ "jsonrpsee-http-client",
  "jsonrpsee-proc-macros",
  "jsonrpsee-server",
  "jsonrpsee-types",
+ "jsonrpsee-wasm-client",
  "jsonrpsee-ws-client",
  "tracing",
 ]
@@ -3279,7 +3299,11 @@ version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "965de52763f2004bc91ac5bcec504192440f0b568a5d621c59d9dbd6f886c3fb"
 dependencies = [
+ "anyhow",
+ "futures-channel",
+ "futures-timer",
  "futures-util",
+ "gloo-net",
  "http",
  "jsonrpsee-core",
  "jsonrpsee-types",
@@ -3317,6 +3341,26 @@ dependencies = [
  "serde",
  "serde_json",
  "soketto",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "jsonrpsee-http-client"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc345b0a43c6bc49b947ebeb936e886a419ee3d894421790c969cc56040542ad"
+dependencies = [
+ "async-trait",
+ "hyper",
+ "hyper-rustls",
+ "jsonrpsee-core",
+ "jsonrpsee-types",
+ "rustc-hash",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -3369,6 +3413,17 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "jsonrpsee-wasm-client"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a77310456f43c6c89bcba1f6b2fc2a28300da7c341f320f5128f8c83cc63232d"
+dependencies = [
+ "jsonrpsee-client-transport",
+ "jsonrpsee-core",
+ "jsonrpsee-types",
 ]
 
 [[package]]
@@ -6004,6 +6059,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
+name = "send_wrapper"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f638d531eccd6e23b980caf34876660d38e265409d8e99b397ab71eb3612fad0"
+
+[[package]]
 name = "sentry"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6568,6 +6629,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tower",
  "tracing",
  "tracing-appender",
  "tracing-log",
@@ -6673,9 +6735,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3136ddfe60460cb35aa266d3462f397ad75c6d3aeb13e0f19e8ef4393d60519"
+checksum = "c3f491f6fe67a4bac08e6c793d744d8446e2460269c5976288276aebcb2689d9"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6700,6 +6762,7 @@ dependencies = [
  "rusoto_core",
  "rusoto_s3",
  "serde",
+ "serde_json",
  "sitemap",
  "spyglass-lens 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",
@@ -8083,6 +8146,7 @@ checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
 dependencies = [
  "futures-core",
  "futures-util",
+ "hdrhistogram",
  "indexmap",
  "pin-project",
  "pin-project-lite",
@@ -8964,6 +9028,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "console_log",
+ "futures",
+ "gloo",
+ "log",
+ "markdown",
+ "reqwest",
+ "serde",
+ "serde-wasm-bindgen 0.5.0",
+ "serde_json",
+ "shared",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "thiserror",
+ "ui-components",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "yew",
+ "yew-router",
+]
+
+[[package]]
 name = "web-sys"
 version = "0.3.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9090,16 +9179,17 @@ dependencies = [
 
 [[package]]
 name = "whisper-rs"
-version = "0.4.0"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=cf278027eeb5aa849360f664de2c34287418c625#cf278027eeb5aa849360f664de2c34287418c625"
+version = "0.6.0"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
 dependencies = [
+ "dashmap",
  "whisper-rs-sys",
 ]
 
 [[package]]
 name = "whisper-rs-sys"
-version = "0.3.1"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=cf278027eeb5aa849360f664de2c34287418c625#cf278027eeb5aa849360f664de2c34287418c625"
+version = "0.4.0"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
 dependencies = [
  "bindgen",
 ]

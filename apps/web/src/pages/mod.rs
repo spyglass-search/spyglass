@@ -34,7 +34,7 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct AppPageProps {
-    pub tab: Route,
+    pub lens: String,
 }
 
 #[function_component]
@@ -47,30 +47,26 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                         {"Spyglass"}
                     </div>
                     <ul>
-                        <li class="mb-2">
-                            <NavLink tab={Route::MyLibrary} current={props.tab.clone()}>
-                                <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
-                                {"My Library"}
-                            </NavLink>
+                        <li class="mb-2 flex flex-row items-center">
+                            <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
+                            {props.lens.clone()}
                         </li>
                     </ul>
                 </div>
-                <div>
+                <div class="hidden">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"Searches"}
                     </div>
                     <ul>
                         <li class="mb-2">
-                            <NavLink tab={Route::Start} current={props.tab.clone()}>
-                                <icons::GlobeIcon classes="mr-2" height="h-4" width="h-4" />
-                                {"Search"}
-                            </NavLink>
+                            <icons::GlobeIcon classes="mr-2" height="h-4" width="h-4" />
+                            {"Search"}
                         </li>
                     </ul>
                 </div>
             </div>
             <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
-                <search::SearchPage />
+                <search::SearchPage lens={props.lens.clone()} />
             </div>
         </div>
     }

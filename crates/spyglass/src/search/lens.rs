@@ -274,7 +274,7 @@ mod test {
             .with_db(db)
             .with_lenses(&vec![test_lens])
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory)
+            .with_index(&IndexPath::Memory, false)
             .build();
 
         let filters = lens_to_filters(state, "test").await;

@@ -28,6 +28,7 @@ module.exports = {
             },
             animation: {
                 "fade-in": "fade-in 0.5s ease-out",
+                "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite",
                 "wiggle-short": "wiggle 1s ease-in-out 10",
                 "wiggle": "wiggle 1s ease-in-out infinite",
             }
@@ -49,6 +50,7 @@ module.exports = {
         }
     },
     plugins: [
-        require("@tailwindcss/forms")({ strategy: "class" })
+        require("@tailwindcss/forms")({ strategy: "class" }),
+        require("@tailwindcss/typography")
     ],
 }

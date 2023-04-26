@@ -9,6 +9,7 @@ use super::tag::{Tag, TagIcon};
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
     pub id: String,
+    #[prop_or_default]
     pub onclick: Callback<MouseEvent>,
     pub result: SearchResult,
     #[prop_or_default]
@@ -177,22 +178,24 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
         html! {}
     };
 
+    let icon_classes = classes!("mt-1", "flex", "flex-none", "pr-2", "pl-6");
+    let title_classes = classes!("text-base", "truncate", "font-semibold", "w-[30rem]");
+
     html! {
         <a id={props.id.clone()} class={component_styles} onclick={props.onclick.clone()}>
-            <div class="mt-1 flex flex-none pl-6 pr-2">
+            <div class={icon_classes}>
                 <div class="relative flex-none bg-neutral-700 rounded h-12 w-12 items-center">
                     {icon}
                 </div>
             </div>
             <div class="grow">
                 <div class="text-xs text-cyan-500">{domain}</div>
-                <h2 class="text-base truncate font-semibold w-[30rem]">
-                    {title}
-                </h2>
+                <h2 class={title_classes}>{title}</h2>
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
                     {Html::from_html_unchecked(result.description.clone().into())}
                 </div>
                 {metadata}
+                <div class="text-neutral-600 text-xs pt-1">{result.score}</div>
             </div>
         </a>
     }
@@ -277,4 +280,157 @@ fn shorten_file_path(url: &Url, max_segments: usize, show_file_name: bool) -> Op
     }
 
     None
+}
+
+#[function_component(WebSearchResultItem)]
+pub fn web_search_result_component(props: &SearchResultProps) -> Html {
+    let is_selected = props.is_selected;
+    let result = &props.result;
+
+    let component_styles = classes!(
+        "flex",
+        "flex-row",
+        "gap-4",
+        "rounded",
+        "py-2",
+        "pr-2",
+        "mt-2",
+        "text-white",
+        "cursor-pointer",
+        "active:bg-cyan-900",
+        "scroll-mt-2",
+        if is_selected {
+            "bg-cyan-900"
+        } else {
+            "bg-neutral-800"
+        }
+    );
+
+    let metadata = render_metadata(result);
+
+    let score = {
+        #[cfg(debug_assertions)]
+        html! { <div class="text-neutral-600 text-xs pt-1">{result.score}</div> }
+
+        #[cfg(not(debug_assertions))]
+        html! {}
+    };
+
+    html! {
+        <a
+            id={props.id.clone()}
+            href={props.result.url.clone()}
+            class={component_styles}
+            target="_blank"
+        >
+            <div class={classes!("mt-1", "flex", "flex-none")}>
+                <div class="relative flex-none bg-neutral-700 rounded-sm h-6 w-6 items-center">
+                    <img class="w-4 h-4 m-auto mt-1"
+                        alt="website icon"
+                        src={format!("https://favicon.spyglass.workers.dev/{}", result.domain.clone())}
+                    />
+                </div>
+            </div>
+            <div class="grow">
+                <div class="text-xs text-cyan-500">
+                    <span>{format!("{}", result.domain.clone())}</span>
+                </div>
+                <h2 class={classes!("text-base", "font-semibold")}>{result.title.clone()}</h2>
+                <div class="text-sm leading-relaxed text-neutral-400">
+                    {Html::from_html_unchecked(result.description.clone().into())}
+                </div>
+                {metadata}
+                {score}
+            </div>
+        </a>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct ResultPaginatorProps {
+    pub children: Children,
+    pub page_size: usize,
+}
+
+#[function_component(ResultPaginator)]
+pub fn result_paginator(props: &ResultPaginatorProps) -> Html {
+    let page: UseStateHandle<usize> = use_state(|| 0);
+
+    let num_pages = props.children.len() / props.page_size;
+
+    let result_html = props
+        .children
+        .iter()
+        .skip(*page * props.page_size)
+        .take(props.page_size)
+        .collect::<Vec<Html>>();
+
+    let mut pages_html = Vec::new();
+    let component_classes = classes!(
+        "cursor-pointer",
+        "relative",
+        "block",
+        "rounded",
+        "px-3",
+        "py-1.5",
+        "text-sm",
+        "text-neutral-600",
+        "transition-all",
+        "duration-300",
+        "hover:bg-neutral-100",
+        "dark:text-white",
+        "dark:hover:bg-neutral-700",
+        "dark:hover:text-white"
+    );
+
+    for page_num in 0..num_pages {
+        // Highlight the current page
+        let mut classes = component_classes.clone();
+        if *page == page_num {
+            classes.push("bg-cyan-500");
+        }
+
+        let page_handle = page.clone();
+        pages_html.push(html! {
+            <li>
+                <a
+                    class={classes}
+                    onclick={move |_| page_handle.set(page_num)}
+                >
+                    {page_num + 1}
+                </a>
+            </li>
+        });
+    }
+
+    let page_handle = page.clone();
+    let handle_previous = move |_| {
+        if *page_handle > 0 {
+            page_handle.set(*page_handle - 1);
+        }
+    };
+
+    let page_handle = page.clone();
+    let handle_next = move |_| {
+        if *page_handle < (num_pages - 1) {
+            page_handle.set(*page_handle + 1);
+        }
+    };
+
+    html! {
+        <div>
+            <div>{result_html}</div>
+            <nav class="border-t-neutral-700 border-t py-4 mt-4">
+                <ul class="list-style-none flex flex-row gap-2 justify-around">
+                    <li>
+                        <button onclick={handle_previous} class={component_classes.clone()} disabled={*page == 0}>{"Previous"}</button>
+                    </li>
+                    {pages_html}
+                    <li>
+                        <button onclick={handle_next} class={component_classes} disabled={*page == num_pages}>{"Next"}</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    }
 }

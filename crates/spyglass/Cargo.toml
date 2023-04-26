@@ -55,6 +55,7 @@ tendril = "0.4.2"
 thiserror = "1.0.37"
 tokio = { version = "1", features = ["full"] }
 tokio-retry = "0.3"
+tower = { version = "0.4", features = ["full"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-log = "0.1.3"
@@ -65,7 +66,7 @@ warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
-whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "cf278027eeb5aa849360f664de2c34287418c625" }
+whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "efd18b6cc1ffc2b9561d038e9306251d5248c25d" }
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
@@ -75,7 +76,7 @@ reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2
 
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
-spyglass-netrunner = "0.2.10"
+spyglass-netrunner = "0.2.11"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 

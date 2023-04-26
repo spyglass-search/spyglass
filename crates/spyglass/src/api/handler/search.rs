@@ -31,6 +31,7 @@ pub async fn search_docs(
     let start = SystemTime::now();
     let index = &state.index;
     let searcher = index.reader.searcher();
+    let query = search_req.query.clone();
 
     let tags = tag::Entity::find()
         .filter(tag::Column::Label.eq(tag::TagType::Lens.to_string()))
@@ -44,19 +45,13 @@ pub async fn search_docs(
         .collect::<Vec<u64>>();
 
     let mut stats = QueryStats::new();
-    let docs = Searcher::search_with_lens(
-        state.db.clone(),
-        &tag_ids,
-        index,
-        &search_req.query,
-        &mut stats,
-    )
-    .await;
+
+    let docs =
+        Searcher::search_with_lens(&state.db, &tag_ids, index, &query, &[], &mut stats).await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
 
-    let query = search_req.query.clone();
     for (score, doc_addr) in docs {
         if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
@@ -82,11 +77,13 @@ pub async fn search_docs(
                         .index
                         .tokenizer_for_field(fields.content)
                         .expect("Unable to get tokenizer for content field");
+
                     let description = libspyglass::search::utils::generate_highlight_preview(
                         &tokenizer,
                         &query,
                         &doc.content,
                     );
+
                     let result = SearchResult {
                         doc_id: doc.doc_id.clone(),
                         domain: doc.domain,

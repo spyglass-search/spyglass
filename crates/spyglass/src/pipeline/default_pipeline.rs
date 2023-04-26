@@ -132,7 +132,7 @@ async fn start_crawl(
 
                         // Add document to index
                         let doc_id: Option<String> = {
-                            if let Ok(mut index_writer) = state.index.writer.lock() {
+                            if let Ok(mut index_writer) = state.index.lock_writer() {
                                 match Searcher::upsert_document(
                                     &mut index_writer,
                                     DocumentUpdate {

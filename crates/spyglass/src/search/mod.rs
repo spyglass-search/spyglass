@@ -3,7 +3,7 @@ use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::anyhow;
@@ -15,7 +15,7 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use crate::search::query::{build_document_query, build_query};
+use crate::search::query::{build_document_query, build_query, QueryBoosts};
 use crate::state::AppState;
 use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{self, DocFields, SearchDocument};
@@ -24,6 +24,7 @@ use entities::sea_orm::{prelude::*, DatabaseConnection};
 pub mod grouping;
 pub mod lens;
 mod query;
+pub mod similarity;
 pub mod utils;
 
 pub use query::QueryStats;
@@ -42,7 +43,7 @@ pub enum IndexPath {
 pub struct Searcher {
     pub index: Index,
     pub reader: IndexReader,
-    pub writer: Arc<Mutex<IndexWriter>>,
+    pub writer: Option<Arc<Mutex<IndexWriter>>>,
 }
 
 #[derive(Clone)]
@@ -62,6 +63,12 @@ pub struct DocumentUpdate<'a> {
     pub tags: &'a [i64],
 }
 
+#[derive(Clone)]
+pub enum QueryBoost {
+    Url(String),
+    DocId(String),
+}
+
 impl Debug for Searcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Searcher")
@@ -79,8 +86,19 @@ impl Debug for ReadonlySearcher {
 }
 
 impl Searcher {
+    pub fn lock_writer(&self) -> anyhow::Result<MutexGuard<IndexWriter>> {
+        if let Some(index) = &self.writer {
+            match index.lock() {
+                Ok(lock) => Ok(lock),
+                Err(_) => Err(anyhow!("writer already locked!")),
+            }
+        } else {
+            Err(anyhow!("readonly only mode enabled"))
+        }
+    }
+
     pub async fn save(state: &AppState) -> anyhow::Result<()> {
-        if let Ok(mut writer) = state.index.writer.lock() {
+        if let Ok(mut writer) = state.index.lock_writer() {
             match writer.commit() {
                 Ok(_) => Ok(()),
                 Err(err) => Err(anyhow::anyhow!(err.to_string())),
@@ -105,7 +123,7 @@ impl Searcher {
         remove_documents: bool,
     ) -> anyhow::Result<()> {
         // Remove from search index, immediately.
-        if let Ok(mut writer) = state.index.writer.lock() {
+        if let Ok(mut writer) = state.index.lock_writer() {
             Searcher::remove_many_from_index(&mut writer, doc_ids)?;
         };
 
@@ -198,7 +216,7 @@ impl Searcher {
     }
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
-    pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
+    pub fn with_index(index_path: &IndexPath, readonly: bool) -> anyhow::Result<Self> {
         let index = match index_path {
             IndexPath::LocalPath(path) => schema::initialize_index(path)?,
             IndexPath::Memory => schema::initialize_in_memory_index(),
@@ -206,9 +224,15 @@ impl Searcher {
 
         // Should only be one writer at a time. This single IndexWriter is already
         // multithreaded.
-        let writer = index
-            .writer(50_000_000)
-            .expect("Unable to create index_writer");
+        let writer = if readonly {
+            None
+        } else {
+            Some(Arc::new(Mutex::new(
+                index
+                    .writer(50_000_000)
+                    .expect("Unable to create index_writer"),
+            )))
+        };
 
         // For a search server you will typically create on reader for the entire
         // lifetime of your program.
@@ -221,7 +245,7 @@ impl Searcher {
         Ok(Searcher {
             index,
             reader,
-            writer: Arc::new(Mutex::new(writer)),
+            writer,
         })
     }
 
@@ -300,10 +324,11 @@ impl Searcher {
     }
 
     pub async fn search_with_lens(
-        db: DatabaseConnection,
+        db: &DatabaseConnection,
         applied_lenses: &Vec<u64>,
         searcher: &Searcher,
         query_string: &str,
+        boosts: &[QueryBoost],
         stats: &mut QueryStats,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
@@ -311,7 +336,7 @@ impl Searcher {
         let mut tag_boosts = HashSet::new();
         let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
             .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
-            .one(&db)
+            .one(db)
             .await
         {
             Some(favorited.id)
@@ -319,7 +344,7 @@ impl Searcher {
             None
         };
 
-        let tag_checks = get_tag_checks(&db, query_string).await.unwrap_or_default();
+        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
         tag_boosts.extend(tag_checks);
 
         let index = &searcher.index;
@@ -327,18 +352,34 @@ impl Searcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+
+        let mut docid_boosts = Vec::new();
+        let mut url_boosts = Vec::new();
+        for boost in boosts {
+            match boost {
+                QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
+                QueryBoost::Url(url) => url_boosts.push(url.clone()),
+            }
+        }
+
+        let boosts = QueryBoosts {
+            tags: tag_boosts.into_iter().collect(),
+            favorite: favorite_boost,
+            urls: url_boosts,
+            doc_ids: docid_boosts,
+        };
+
         let query = build_query(
             index.schema(),
             tokenizers,
             fields,
             query_string,
             applied_lenses,
-            tag_boosts.into_iter(),
-            favorite_boost,
             stats,
+            &boosts,
         );
 
-        let collector = TopDocs::with_limit(5);
+        let collector = TopDocs::with_limit(10);
 
         let top_docs = searcher
             .search(&query, &collector)
@@ -484,15 +525,20 @@ impl ReadonlySearcher {
         let fields = DocFields::as_fields();
         let tantivy_searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+        let boosts = QueryBoosts {
+            tags: tag_boosts.into_iter().collect(),
+            favorite: favorite_boost,
+            ..Default::default()
+        };
+
         let query = build_query(
             index.schema(),
             tokenizers.clone(),
             fields.clone(),
             query_string,
             applied_lenses,
-            tag_boosts.into_iter(),
-            favorite_boost,
             stats,
+            &boosts,
         );
 
         let mut combined: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Should, Box::new(query))];
@@ -544,6 +590,7 @@ impl ReadonlySearcher {
         applied_lenses: &Vec<u64>,
         searcher: &ReadonlySearcher,
         query_string: &str,
+        boosts: &[QueryBoost],
         stats: &mut QueryStats,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
@@ -567,15 +614,31 @@ impl ReadonlySearcher {
         let fields = DocFields::as_fields();
         let searcher = reader.searcher();
         let tokenizers = index.tokenizers().clone();
+
+        let mut docid_boosts = Vec::new();
+        let mut url_boosts = Vec::new();
+        for boost in boosts {
+            match boost {
+                QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
+                QueryBoost::Url(url) => url_boosts.push(url.clone()),
+            }
+        }
+
+        let boosts = QueryBoosts {
+            tags: tag_boosts.into_iter().collect(),
+            favorite: favorite_boost,
+            urls: url_boosts,
+            doc_ids: docid_boosts,
+        };
+
         let query = build_query(
             index.schema(),
             tokenizers,
             fields,
             query_string,
             applied_lenses,
-            tag_boosts.into_iter(),
-            favorite_boost,
             stats,
+            &boosts,
         );
 
         let collector = TopDocs::with_limit(5);
@@ -674,7 +737,7 @@ mod test {
     use shared::config::{Config, LensConfig};
 
     fn _build_test_index(searcher: &mut Searcher) {
-        let writer = &mut searcher.writer.lock().unwrap();
+        let writer = &mut searcher.lock_writer().unwrap();
         Searcher::upsert_document(
             writer,
             DocumentUpdate {
@@ -775,13 +838,14 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let mut stats = QueryStats::new();
         let query = "salinas";
         let results =
-            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -797,13 +861,14 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
 
         let mut stats = QueryStats::new();
         _build_test_index(&mut searcher);
         let query = "salinas";
         let results =
-            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
 
         assert_eq!(results.len(), 1);
     }
@@ -819,13 +884,14 @@ mod test {
             ..Default::default()
         };
 
-        let mut searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
+        let mut searcher =
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher);
 
         let mut stats = QueryStats::new();
         let query = "salinasd";
         let results =
-            Searcher::search_with_lens(db, &vec![2_u64], &searcher, query, &mut stats).await;
+            Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
         assert_eq!(results.len(), 0);
     }
 }

@@ -211,7 +211,7 @@ async fn main() -> anyhow::Result<ExitCode> {
             }
 
             let config = Config::new();
-            let state = AppState::new(&config).await;
+            let state = AppState::new(&config, false).await;
 
             let lens = shared::config::LensConfig {
                 author: "spyglass-search".into(),
