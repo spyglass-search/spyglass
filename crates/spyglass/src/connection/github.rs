@@ -240,10 +240,7 @@ impl GithubConnection {
         log::debug!("Removing {} unsynced docs", unsynced.len());
         let doc_ids: Vec<String> = unsynced.iter().map(|d| d.doc_id.to_owned()).collect();
         let dbids: Vec<i64> = unsynced.iter().map(|d| d.id).collect();
-        let _ = state
-            .index
-            .delete_many_by_id(&state.db, &doc_ids, false)
-            .await;
+        let _ = state.index.delete_many_by_id(&doc_ids).await;
         let _ = indexed_document::delete_many_by_id(&state.db, &dbids).await;
         for doc in unsynced {
             log::debug!("removed: {}", doc.url)

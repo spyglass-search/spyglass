@@ -137,7 +137,6 @@ pub fn generate_highlight_preview(tokenizer: &TextAnalyzer, query: &str, content
     format!("<span>{}</span>", desc.join(" "))
 }
 
-
 pub fn group_urls_by_scheme(urls: Vec<&str>) -> HashMap<&str, Vec<&str>> {
     let mut grouping: HashMap<&str, Vec<&str>> = HashMap::new();
     urls.iter().for_each(|url| {
@@ -151,7 +150,6 @@ pub fn group_urls_by_scheme(urls: Vec<&str>) -> HashMap<&str, Vec<&str>> {
     });
     grouping
 }
-
 
 #[cfg(test)]
 mod test {

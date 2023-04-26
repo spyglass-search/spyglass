@@ -51,11 +51,7 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
             .map(|x| x.to_owned())
             .collect::<Vec<String>>();
 
-        if let Err(err) = state
-            .index
-            .delete_many_by_id(&state.db, &doc_id_list, false)
-            .await
-        {
+        if let Err(err) = state.index.delete_many_by_id(&doc_id_list).await {
             log::warn!("Unable to delete_many_by_id: {err}")
         }
 
@@ -122,10 +118,7 @@ pub async fn process_crawl_results(
     let doc_id_list = id_map.values().cloned().collect::<Vec<String>>();
 
     // Delete existing docs
-    let _ = state
-        .index
-        .delete_many_by_id(&state.db, &doc_id_list, false)
-        .await;
+    let _ = state.index.delete_many_by_id(&doc_id_list).await;
     let _ = state.index.save().await;
 
     // Find/create the tags for this crawl.
@@ -253,10 +246,7 @@ pub async fn process_records(
         .map(|x| x.to_owned())
         .collect::<Vec<String>>();
 
-    let _ = state
-        .index
-        .delete_many_by_id(&state.db, &doc_id_list, false)
-        .await;
+    let _ = state.index.delete_many_by_id(&doc_id_list).await;
     let _ = state.index.save().await;
 
     // Grab tags from the lens.
@@ -450,10 +440,7 @@ pub async fn update_tags(
             }
         }
 
-        let _ = state
-            .index
-            .delete_many_by_id(&state.db, document_ids, false)
-            .await;
+        let _ = state.index.delete_many_by_id(document_ids).await;
         let _ = state.index.save().await;
 
         log::debug!("Tag map generated {}", tag_map.len());

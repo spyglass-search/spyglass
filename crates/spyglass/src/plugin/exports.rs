@@ -71,10 +71,14 @@ async fn handle_plugin_cmd_request(
     match cmd {
         // Delete document from index
         PluginCommandRequest::DeleteDoc { url } => {
-            env.app_state
-                .index
-                .delete_by_url(&env.app_state.db, url)
-                .await?;
+            let docs = indexed_document::Entity::find()
+                .filter(indexed_document::Column::Url.eq(url))
+                .all(&env.app_state.db)
+                .await
+                .unwrap_or_default();
+
+            let doc_ids = docs.iter().map(|x| x.doc_id.to_owned()).collect::<Vec<_>>();
+            env.app_state.index.delete_many_by_id(&doc_ids).await?;
         }
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),

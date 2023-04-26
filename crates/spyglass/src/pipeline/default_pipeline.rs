@@ -126,7 +126,8 @@ async fn start_crawl(
 
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
-                            let _ = state.index.delete_by_id(&state.db, &doc.doc_id).await;
+                            let _ = state.index.delete_by_id(&doc.doc_id).await;
+                            let _ = indexed_document::delete_many_by_id(&state.db, &[doc.id]).await;
                             let _ = state.index.save().await;
                         }
 

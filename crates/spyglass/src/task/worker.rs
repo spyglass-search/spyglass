@@ -78,7 +78,10 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                                     doc_id
                                 );
                                 // Found indexed document, so we must have had duplicates, remove dup
-                                let _ = state.index.delete_by_id(&state.db, doc_id.as_str()).await;
+                                let _ = state.index.delete_by_id(doc_id.as_str()).await;
+                                let _ =
+                                    indexed_document::delete_many_by_doc_id(&state.db, &[doc_id])
+                                        .await;
                                 changed = true;
                             }
                             None => {
@@ -97,7 +100,8 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                 Ok(None) => {
                     log::debug!("Could not find document for url {}, removing", url);
                     // can't find the url at all must be an old doc that was removed
-                    let _ = state.index.delete_by_id(&state.db, doc_id.as_str()).await;
+                    let _ = state.index.delete_by_id(doc_id.as_str()).await;
+                    let _ = indexed_document::delete_many_by_doc_id(&state.db, &[doc_id]).await;
                     changed = true;
                 }
                 Err(error) => {
@@ -301,7 +305,8 @@ pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<()
 
         // Remove doc references from DB & from index
         for doc_id in doc_ids {
-            let _ = state.index.delete_by_id(&state.db, &doc_id).await;
+            let _ = state.index.delete_by_id(&doc_id).await;
+            let _ = indexed_document::delete_many_by_doc_id(&state.db, &[doc_id]).await;
         }
 
         // Finally delete this crawl task as well.

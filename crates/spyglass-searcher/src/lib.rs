@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use anyhow::anyhow;
-use entities::BATCH_SIZE;
 use migration::{Expr, Func};
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
@@ -14,9 +13,9 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use entities::models::{document_tag, indexed_document, tag};
+use entities::models::tag;
 use entities::schema::{self, DocFields, SearchDocument};
-use entities::sea_orm::{prelude::*, DatabaseConnection};
+use entities::sea_orm::prelude::*;
 
 mod query;
 pub mod similarity;
@@ -36,13 +35,6 @@ pub enum IndexPath {
 }
 
 #[derive(Clone)]
-pub struct Searcher {
-    pub index: Index,
-    pub reader: IndexReader,
-    pub writer: Option<Arc<Mutex<IndexWriter>>>,
-}
-
-#[derive(Clone)]
 pub struct DocumentUpdate<'a> {
     pub doc_id: Option<String>,
     pub title: &'a str,
@@ -59,6 +51,13 @@ pub enum QueryBoost {
     DocId(String),
 }
 
+#[derive(Clone)]
+pub struct Searcher {
+    pub index: Index,
+    pub reader: IndexReader,
+    pub writer: Option<Arc<Mutex<IndexWriter>>>,
+}
+
 impl Debug for Searcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Searcher")
@@ -68,7 +67,6 @@ impl Debug for Searcher {
 }
 
 impl Searcher {
-
     pub fn is_readonly(&self) -> bool {
         self.writer.is_none()
     }
@@ -96,61 +94,19 @@ impl Searcher {
     }
 
     /// Deletes a single entry from the database & index
-    pub async fn delete_by_id(&self, db: &DatabaseConnection, doc_id: &str) -> anyhow::Result<()> {
-        self.delete_many_by_id(db, &[doc_id.into()], true).await?;
+    pub async fn delete_by_id(&self, doc_id: &str) -> anyhow::Result<()> {
+        self.delete_many_by_id(&[doc_id.into()]).await?;
         Ok(())
     }
 
     /// Deletes multiple ids from the searcher at one time. The caller can decide if the
     /// documents should also be removed from the database by setting the remove_documents
     /// flag.
-    pub async fn delete_many_by_id(
-        &self,
-        db: &DatabaseConnection,
-        doc_ids: &[String],
-        remove_documents: bool,
-    ) -> anyhow::Result<()> {
+    pub async fn delete_many_by_id(&self, doc_ids: &[String]) -> anyhow::Result<()> {
         // Remove from search index, immediately.
         if let Ok(mut writer) = self.lock_writer() {
             Searcher::remove_many_from_index(&mut writer, doc_ids)?;
         };
-
-        if remove_documents {
-            // Remove from indexed_doc table
-            let doc_refs: Vec<&str> = doc_ids.iter().map(AsRef::as_ref).collect();
-            // Chunk deletions
-            for doc_refs in doc_refs.chunks(BATCH_SIZE) {
-                let doc_refs = doc_refs.to_vec();
-                let docs = indexed_document::Entity::find()
-                    .filter(indexed_document::Column::DocId.is_in(doc_refs.clone()))
-                    .all(db)
-                    .await?;
-
-                let dbids: Vec<i64> = docs.iter().map(|x| x.id).collect();
-                // Remove tags
-                document_tag::Entity::delete_many()
-                    .filter(document_tag::Column::IndexedDocumentId.is_in(dbids))
-                    .exec(db)
-                    .await?;
-
-                indexed_document::Entity::delete_many()
-                    .filter(indexed_document::Column::DocId.is_in(doc_refs))
-                    .exec(db)
-                    .await?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Deletes a single entry from the database/index.
-    pub async fn delete_by_url(&self, db: &DatabaseConnection, url: &str) -> anyhow::Result<()> {
-        if let Some(model) = indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.eq(url))
-            .one(db)
-            .await?
-        {
-            self.delete_by_id(db, &model.doc_id).await?;
-        }
 
         Ok(())
     }
@@ -553,8 +509,8 @@ mod test {
     use shared::config::{Config, LensConfig};
 
     async fn _build_test_index(searcher: &mut Searcher) {
-        searcher.upsert_document(
-            DocumentUpdate {
+        searcher
+            .upsert_document(DocumentUpdate {
                 doc_id: None,
                 title: "Of Mice and Men",
                 description: "Of Mice and Men passage",
@@ -570,12 +526,11 @@ mod test {
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
                 tags: &vec![1_i64],
-            },
-        )
-        .expect("Unable to add doc");
+            })
+            .expect("Unable to add doc");
 
-        searcher.upsert_document(
-            DocumentUpdate {
+        searcher
+            .upsert_document(DocumentUpdate {
                 doc_id: None,
                 title: "Of Mice and Men",
                 description: "Of Mice and Men passage",
@@ -591,12 +546,11 @@ mod test {
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
                 tags: &vec![2_i64],
-            },
-        )
-        .expect("Unable to add doc");
+            })
+            .expect("Unable to add doc");
 
-        searcher.upsert_document(
-            DocumentUpdate {
+        searcher
+            .upsert_document(DocumentUpdate {
                 doc_id: None,
                 title: "Of Cheese and Crackers",
                 description: "Of Cheese and Crackers Passage",
@@ -610,9 +564,8 @@ mod test {
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
                 tags: &vec![2_i64],
-            },
-        )
-        .expect("Unable to add doc");
+            })
+            .expect("Unable to add doc");
 
         searcher.upsert_document(
             DocumentUpdate {
