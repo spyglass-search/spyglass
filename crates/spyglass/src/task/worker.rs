@@ -10,12 +10,13 @@ use shared::config::{Config, LensConfig, LensSource};
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
-use crate::search::Searcher;
+
 use crate::state::AppState;
 use crate::{
     crawler::{CrawlError, CrawlResult, Crawler},
     documents::process_crawl_results,
 };
+use spyglass_searcher::Searcher;
 
 /// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache.
 /// If no cache is accessible then we run the standard bootstrap process. Local lenses use
@@ -77,7 +78,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                                     doc_id
                                 );
                                 // Found indexed document, so we must have had duplicates, remove dup
-                                let _ = Searcher::delete_by_id(state, doc_id.as_str()).await;
+                                let _ = state.index.delete_by_id(&state.db, doc_id.as_str()).await;
                                 changed = true;
                             }
                             None => {
@@ -96,7 +97,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                 Ok(None) => {
                     log::debug!("Could not find document for url {}, removing", url);
                     // can't find the url at all must be an old doc that was removed
-                    let _ = Searcher::delete_by_id(state, doc_id.as_str()).await;
+                    let _ = state.index.delete_by_id(&state.db, doc_id.as_str()).await;
                     changed = true;
                 }
                 Err(error) => {
@@ -108,7 +109,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
     }
 
     if changed {
-        let _ = Searcher::save(state).await;
+        let _ = state.index.save().await;
     }
 
     Ok(())
@@ -300,7 +301,7 @@ pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<()
 
         // Remove doc references from DB & from index
         for doc_id in doc_ids {
-            let _ = Searcher::delete_by_id(&state, &doc_id).await;
+            let _ = state.index.delete_by_id(&state.db, &doc_id).await;
         }
 
         // Finally delete this crawl task as well.
@@ -313,13 +314,13 @@ pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<()
 #[cfg(test)]
 mod test {
     use crate::crawler::CrawlResult;
-    use crate::search::IndexPath;
     use entities::models::crawl_queue::{self, CrawlStatus, CrawlType};
     use entities::models::tag::{self, TagType};
     use entities::models::{bootstrap_queue, indexed_document};
     use entities::sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, Set};
     use entities::test::setup_test_db;
     use shared::config::{LensConfig, UserSettings};
+    use spyglass_searcher::IndexPath;
 
     use super::{handle_cdx_collection, process_crawl, AppState, FetchResult};
 

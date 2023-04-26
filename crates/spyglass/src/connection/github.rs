@@ -16,7 +16,6 @@ use super::credentials::connection_secret;
 use super::{handle_sync_credentials, load_credentials, Connection};
 use crate::crawler::{CrawlError, CrawlResult};
 use crate::documents::process_crawl_results;
-use crate::search::Searcher;
 use crate::state::AppState;
 
 const BUFFER_SYNC_SIZE: usize = 500;
@@ -112,7 +111,7 @@ impl GithubConnection {
                         log::error!("Unable to add issue: {}", err);
                     }
 
-                    if let Err(err) = Searcher::save(state).await {
+                    if let Err(err) = state.index.save().await {
                         log::error!("Unable to save issues: {}", err);
                     }
                 }
@@ -156,7 +155,7 @@ impl GithubConnection {
                         log::error!("Unable to add repo: {}", err);
                     }
 
-                    if let Err(err) = Searcher::save(state).await {
+                    if let Err(err) = state.index.save().await {
                         log::error!("Unable to save repos: {}", err);
                     }
                 }
@@ -202,7 +201,7 @@ impl GithubConnection {
                         log::error!("Unable to add repo: {}", err);
                     }
 
-                    if let Err(err) = Searcher::save(state).await {
+                    if let Err(err) = state.index.save().await {
                         log::error!("Unable to save repos: {}", err);
                     }
                 }
@@ -241,7 +240,10 @@ impl GithubConnection {
         log::debug!("Removing {} unsynced docs", unsynced.len());
         let doc_ids: Vec<String> = unsynced.iter().map(|d| d.doc_id.to_owned()).collect();
         let dbids: Vec<i64> = unsynced.iter().map(|d| d.id).collect();
-        let _ = Searcher::delete_many_by_id(state, &doc_ids, false).await;
+        let _ = state
+            .index
+            .delete_many_by_id(&state.db, &doc_ids, false)
+            .await;
         let _ = indexed_document::delete_many_by_id(&state.db, &dbids).await;
         for doc in unsynced {
             log::debug!("removed: {}", doc.url)

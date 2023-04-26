@@ -1,5 +1,5 @@
 use serde::Serialize;
-use spyglass_plugin::DocumentQuery;
+// use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -15,19 +15,17 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use crate::search::query::{build_document_query, build_query, QueryBoosts};
-use crate::state::AppState;
 use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{self, DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
 pub mod grouping;
-pub mod lens;
 mod query;
 pub mod similarity;
 pub mod utils;
 
 pub use query::QueryStats;
+use query::{build_document_query, build_query, QueryBoosts};
 
 type Score = f32;
 type SearchResult = (Score, DocAddress);
@@ -83,8 +81,8 @@ impl Searcher {
         }
     }
 
-    pub async fn save(state: &AppState) -> anyhow::Result<()> {
-        if let Ok(mut writer) = state.index.lock_writer() {
+    pub async fn save(&self) -> anyhow::Result<()> {
+        if let Ok(mut writer) = self.lock_writer() {
             match writer.commit() {
                 Ok(_) => Ok(()),
                 Err(err) => Err(anyhow::anyhow!(err.to_string())),
@@ -95,8 +93,8 @@ impl Searcher {
     }
 
     /// Deletes a single entry from the database & index
-    pub async fn delete_by_id(state: &AppState, doc_id: &str) -> anyhow::Result<()> {
-        Searcher::delete_many_by_id(state, &[doc_id.into()], true).await?;
+    pub async fn delete_by_id(&self, db: &DatabaseConnection, doc_id: &str) -> anyhow::Result<()> {
+        self.delete_many_by_id(db, &[doc_id.into()], true).await?;
         Ok(())
     }
 
@@ -104,12 +102,13 @@ impl Searcher {
     /// documents should also be removed from the database by setting the remove_documents
     /// flag.
     pub async fn delete_many_by_id(
-        state: &AppState,
+        &self,
+        db: &DatabaseConnection,
         doc_ids: &[String],
         remove_documents: bool,
     ) -> anyhow::Result<()> {
         // Remove from search index, immediately.
-        if let Ok(mut writer) = state.index.lock_writer() {
+        if let Ok(mut writer) = self.lock_writer() {
             Searcher::remove_many_from_index(&mut writer, doc_ids)?;
         };
 
@@ -121,19 +120,19 @@ impl Searcher {
                 let doc_refs = doc_refs.to_vec();
                 let docs = indexed_document::Entity::find()
                     .filter(indexed_document::Column::DocId.is_in(doc_refs.clone()))
-                    .all(&state.db)
+                    .all(db)
                     .await?;
 
                 let dbids: Vec<i64> = docs.iter().map(|x| x.id).collect();
                 // Remove tags
                 document_tag::Entity::delete_many()
                     .filter(document_tag::Column::IndexedDocumentId.is_in(dbids))
-                    .exec(&state.db)
+                    .exec(db)
                     .await?;
 
                 indexed_document::Entity::delete_many()
                     .filter(indexed_document::Column::DocId.is_in(doc_refs))
-                    .exec(&state.db)
+                    .exec(db)
                     .await?;
             }
         }
@@ -141,13 +140,13 @@ impl Searcher {
     }
 
     /// Deletes a single entry from the database/index.
-    pub async fn delete_by_url(state: &AppState, url: &str) -> anyhow::Result<()> {
+    pub async fn delete_by_url(&self, db: &DatabaseConnection, url: &str) -> anyhow::Result<()> {
         if let Some(model) = indexed_document::Entity::find()
             .filter(indexed_document::Column::Url.eq(url))
-            .one(&state.db)
+            .one(db)
             .await?
         {
-            Self::delete_by_id(state, &model.doc_id).await?;
+            self.delete_by_id(db, &model.doc_id).await?;
         }
 
         Ok(())
@@ -235,10 +234,7 @@ impl Searcher {
         })
     }
 
-    pub fn upsert_document(
-        writer: &mut IndexWriter,
-        doc_update: DocumentUpdate,
-    ) -> tantivy::Result<String> {
+    pub fn upsert_document(&self, doc_update: DocumentUpdate) -> tantivy::Result<String> {
         let fields = DocFields::as_fields();
 
         let doc_id = doc_update
@@ -255,18 +251,24 @@ impl Searcher {
         for t in doc_update.tags {
             doc.add_u64(fields.tags, *t as u64);
         }
-        writer.add_document(doc)?;
+
+        if let Ok(writer) = self.lock_writer() {
+            writer.add_document(doc)?;
+        }
 
         Ok(doc_id)
     }
 
     /// Helper method to execute a search based on the provided document query
     pub async fn search_by_query(
+        &self,
         db: &DatabaseConnection,
-        searcher: &Searcher,
-        query: &DocumentQuery,
+        urls: Option<Vec<String>>,
+        ids: Option<Vec<String>>,
+        has_tags: Option<Vec<(String, String)>>,
+        exclude_tags: Option<Vec<(String, String)>>,
     ) -> Vec<SearchResult> {
-        let tag_ids = match &query.has_tags {
+        let tag_ids = match &has_tags {
             Some(include_tags) => {
                 let tags = tag::get_tags_by_value(db, include_tags)
                     .await
@@ -278,7 +280,7 @@ impl Searcher {
             None => Vec::new(),
         };
 
-        let exclude_tag_ids = match &query.exclude_tags {
+        let exclude_tag_ids = match &exclude_tags {
             Some(excludes) => {
                 let exclude_tags = tag::get_tags_by_value(db, excludes)
                     .await
@@ -291,15 +293,15 @@ impl Searcher {
             None => Vec::new(),
         };
 
-        let urls = query.urls.clone().unwrap_or_default();
-        let ids = query.ids.clone().unwrap_or_default();
+        let urls = urls.clone().unwrap_or_default();
+        let ids = ids.clone().unwrap_or_default();
 
         let fields = DocFields::as_fields();
         let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
 
         let collector = tantivy::collector::DocSetCollector;
 
-        let reader = &searcher.reader;
+        let reader = &self.reader;
         let index_search = reader.searcher();
 
         let docs = index_search

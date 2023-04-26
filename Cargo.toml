@@ -13,7 +13,8 @@ members = [
     # Public published crates
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
-    "crates/spyglass-rpc"
+    "crates/spyglass-rpc",
+    "crates/spyglass-searcher"
 ]
 
 [profile.release]

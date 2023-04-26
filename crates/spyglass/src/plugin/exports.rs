@@ -28,12 +28,12 @@ use entities::sea_orm::ModelTrait;
 use entities::sea_orm::QueryFilter;
 
 use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
-use crate::search::{self, Searcher};
 use crate::state::AppState;
 use reqwest::header::USER_AGENT;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
 use spyglass_plugin::{DocumentQuery, PluginCommandRequest};
+use spyglass_searcher::document_to_struct;
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -71,7 +71,10 @@ async fn handle_plugin_cmd_request(
     match cmd {
         // Delete document from index
         PluginCommandRequest::DeleteDoc { url } => {
-            Searcher::delete_by_url(&env.app_state, url).await?
+            env.app_state
+                .index
+                .delete_by_url(&env.app_state.db, url)
+                .await?;
         }
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
@@ -149,8 +152,17 @@ async fn handle_plugin_cmd_request(
             tag_modifications,
         } => {
             log::trace!("Received modify tags command {:?}", documents);
-            let docs =
-                Searcher::search_by_query(&env.app_state.db, &env.app_state.index, documents).await;
+            let docs = env
+                .app_state
+                .index
+                .search_by_query(
+                    &env.app_state.db,
+                    documents.urls.clone(),
+                    documents.ids.clone(),
+                    documents.has_tags.clone(),
+                    documents.exclude_tags.clone(),
+                )
+                .await;
             if !docs.is_empty() {
                 let doc_ids = docs
                     .iter()
@@ -280,16 +292,23 @@ async fn query_document_and_send_loop(env: PluginEnv, query: DocumentQuery) {
 }
 
 async fn query_documents_and_send(env: &PluginEnv, query: &DocumentQuery, send_empty: bool) {
-    let docs = Searcher::search_by_query(&env.app_state.db, &env.app_state.index, query).await;
+    let docs = env
+        .app_state
+        .index
+        .search_by_query(
+            &env.app_state.db,
+            query.urls.clone(),
+            query.ids.clone(),
+            query.has_tags.clone(),
+            query.exclude_tags.clone(),
+        )
+        .await;
     log::debug!("Found {:?} documents for query", docs.len());
     let searcher = &env.app_state.index.reader.searcher();
     let mut results = Vec::new();
     let db = &env.app_state.db;
     for (_score, doc_addr) in docs {
-        if let Ok(Ok(doc)) = searcher
-            .doc(doc_addr)
-            .map(|doc| search::document_to_struct(&doc))
-        {
+        if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
             let indexed = indexed_document::Entity::find()
                 .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))

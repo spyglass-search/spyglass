@@ -18,7 +18,6 @@ diff-struct = "0.5.1"
 digest = "0.10"
 directories = "4.0"
 docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
-entities = { path = "../entities" }
 flate2 = "1.0.24"
 futures = "0.3"
 glob = "0.3.1"
@@ -74,11 +73,13 @@ github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2
 google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
 reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
 
+entities = { path = "../entities" }
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
 spyglass-netrunner = "0.2.11"
 spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-rpc = { path = "../spyglass-rpc" }
+spyglass-searcher = { path = "../spyglass-searcher" }
 
 [dev-dependencies]
 tracing-test = { version = "0.2.4", features = ["no-env-filter"] }

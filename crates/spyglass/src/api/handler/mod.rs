@@ -17,7 +17,6 @@ use libspyglass::crawler::CrawlResult;
 use libspyglass::documents::process_crawl_results;
 use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
@@ -199,11 +198,11 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_document(state: AppState, id: String) -> Result<(), Error> {
-    if let Err(e) = Searcher::delete_by_id(&state, &id).await {
+    if let Err(e) = state.index.delete_by_id(&state.db, &id).await {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-    let _ = Searcher::save(&state).await;
+    let _ = state.index.save().await;
     Ok(())
 }
 
@@ -237,9 +236,9 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
         log::debug!("removing docs from index");
         let indexed_count = indexed.len();
         for result in indexed {
-            let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
+            let _ = state.index.delete_by_id(&state.db, &result.doc_id).await;
         }
-        let _ = Searcher::save(&state).await;
+        let _ = state.index.save().await;
 
         log::debug!("removed {} items from index", indexed_count);
     }
@@ -587,10 +586,14 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
     if let Ok(ids) = indexed_document::find_by_lens(state.db.clone(), name).await {
         // - remove from db & index
         let doc_ids: Vec<String> = ids.iter().map(|x| x.doc_id.to_owned()).collect();
-        if let Err(err) = Searcher::delete_many_by_id(&state, &doc_ids, true).await {
+        if let Err(err) = state
+            .index
+            .delete_many_by_id(&state.db, &doc_ids, true)
+            .await
+        {
             return Err(Error::Custom(err.to_string()));
         } else {
-            let _ = Searcher::save(&state).await;
+            let _ = state.index.save().await;
         }
     }
 

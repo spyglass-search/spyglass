@@ -5,12 +5,12 @@ use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
 use jsonrpsee::core::Error;
-use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_searcher::{document_to_struct, QueryStats, Searcher};
 use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
@@ -78,7 +78,7 @@ pub async fn search_docs(
                         .tokenizer_for_field(fields.content)
                         .expect("Unable to get tokenizer for content field");
 
-                    let description = libspyglass::search::utils::generate_highlight_preview(
+                    let description = spyglass_searcher::utils::generate_highlight_preview(
                         &tokenizer,
                         &query,
                         &doc.content,

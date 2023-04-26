@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use libspyglass::search::{self, IndexPath, QueryStats, Searcher};
+use spyglass_searcher::{document_to_struct, IndexPath, QueryStats, Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -122,15 +122,9 @@ async fn main() -> anyhow::Result<ExitCode> {
                         Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
                             .expect("Unable to open index.");
 
-                    let docs = Searcher::search_by_query(
-                        &db,
-                        &index,
-                        &DocumentQuery {
-                            urls: Some(vec![doc.url.clone()]),
-                            ..Default::default()
-                        },
-                    )
-                    .await;
+                    let docs = index
+                        .search_by_query(&db, Some(vec![doc.url.clone()]), None, None, None)
+                        .await;
                     println!("### Indexed Document ###");
                     if docs.is_empty() {
                         println!("No indexed document for url {:?}", &doc.url);
@@ -140,7 +134,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                                 .reader
                                 .searcher()
                                 .doc(doc_addr)
-                                .map(|doc| search::document_to_struct(&doc))
+                                .map(|doc| document_to_struct(&doc))
                             {
                                 println!(
                                     "Indexed Document: {}",
@@ -174,7 +168,9 @@ async fn main() -> anyhow::Result<ExitCode> {
             let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
                 .expect("Unable to open index.");
 
-            let docs = Searcher::search_by_query(&db, &index, &doc_query).await;
+            let docs = index
+                .search_by_query(&db, doc_query.urls, doc_query.ids, None, None)
+                .await;
 
             if docs.is_empty() {
                 println!("No indexed document for url {:?}", id_or_url);
@@ -221,7 +217,7 @@ async fn main() -> anyhow::Result<ExitCode> {
             };
 
             process_update(state.clone(), &lens, archive_path, true).await;
-            let _ = Searcher::save(&state).await;
+            let _ = state.index.save().await;
         }
     }
 
