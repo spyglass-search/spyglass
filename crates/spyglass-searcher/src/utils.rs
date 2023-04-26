@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use tantivy::{
     fastfield::MultiValuedFastFieldReader, termdict::TermDictionary, tokenizer::TextAnalyzer, DocId,
@@ -136,6 +136,22 @@ pub fn generate_highlight_preview(tokenizer: &TextAnalyzer, query: &str, content
 
     format!("<span>{}</span>", desc.join(" "))
 }
+
+
+pub fn group_urls_by_scheme(urls: Vec<&str>) -> HashMap<&str, Vec<&str>> {
+    let mut grouping: HashMap<&str, Vec<&str>> = HashMap::new();
+    urls.iter().for_each(|url| {
+        let part = url.split(':').next();
+        if let Some(scheme) = part {
+            grouping
+                .entry(scheme)
+                .and_modify(|list| list.push(url))
+                .or_insert_with(|| Vec::from([url.to_owned()]));
+        }
+    });
+    grouping
+}
+
 
 #[cfg(test)]
 mod test {

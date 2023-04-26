@@ -1,5 +1,4 @@
 use serde::Serialize;
-// use spyglass_plugin::DocumentQuery;
 use std::collections::HashSet;
 use std::fmt::{Debug, Error, Formatter};
 use std::path::PathBuf;
@@ -19,7 +18,6 @@ use entities::models::{document_tag, indexed_document, tag};
 use entities::schema::{self, DocFields, SearchDocument};
 use entities::sea_orm::{prelude::*, DatabaseConnection};
 
-pub mod grouping;
 mod query;
 pub mod similarity;
 pub mod utils;
@@ -70,6 +68,11 @@ impl Debug for Searcher {
 }
 
 impl Searcher {
+
+    pub fn is_readonly(&self) -> bool {
+        self.writer.is_none()
+    }
+
     pub fn lock_writer(&self) -> anyhow::Result<MutexGuard<IndexWriter>> {
         if let Some(index) = &self.writer {
             match index.lock() {

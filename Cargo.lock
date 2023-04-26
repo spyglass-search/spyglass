@@ -1801,12 +1801,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
-name = "fallible-streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
-
-[[package]]
 name = "fastdivide"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2712,15 +2706,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
  "ahash",
-]
-
-[[package]]
-name = "hashlink"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7249a3129cbc1ffccd74857f81464a323a152173cdb134e0fd81bc803b29facf"
-dependencies = [
- "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -5627,21 +5612,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusqlite"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85127183a999f7db96d1a976a309eebbfb6ea3b0b400ddd8340190129de6eb7a"
-dependencies = [
- "bitflags",
- "fallible-iterator",
- "fallible-streaming-iterator",
- "hashlink 0.7.0",
- "libsqlite3-sys",
- "memchr",
- "smallvec",
-]
-
-[[package]]
 name = "rust-stemmers"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6611,7 +6581,6 @@ dependencies = [
  "reqwest",
  "ron",
  "rubato",
- "rusqlite",
  "sentry",
  "sentry-tracing",
  "serde",
@@ -6788,7 +6757,6 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "uuid 1.3.0",
 ]
 
 [[package]]
@@ -6805,7 +6773,6 @@ name = "spyglass-searcher"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "dashmap",
  "entities",
  "log",
  "migration",
@@ -6867,7 +6834,7 @@ dependencies = [
  "futures-executor",
  "futures-intrusive",
  "futures-util",
- "hashlink 0.8.1",
+ "hashlink",
  "hex",
  "hkdf",
  "hmac 0.12.1",
@@ -9061,7 +9028,6 @@ dependencies = [
  "markdown",
  "reqwest",
  "serde",
- "serde-wasm-bindgen 0.5.0",
  "serde_json",
  "shared",
  "strum 0.24.1",
