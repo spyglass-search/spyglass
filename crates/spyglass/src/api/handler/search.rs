@@ -1,6 +1,5 @@
 use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
 use entities::models::{indexed_document, lens, tag};
-use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
@@ -10,6 +9,7 @@ use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_searcher::schema::{DocFields, SearchDocument};
 use spyglass_searcher::{document_to_struct, QueryBoost, QueryStats};
 use std::collections::HashSet;
 use std::time::SystemTime;

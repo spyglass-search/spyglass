@@ -3855,6 +3855,7 @@ dependencies = [
  "rayon",
  "sea-orm-migration",
  "shared",
+ "spyglass-searcher",
  "tantivy 0.18.1",
  "tantivy 0.19.2",
  "tar",

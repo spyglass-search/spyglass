@@ -12,7 +12,8 @@ use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
-use entities::schema::{self, DocFields, SearchDocument};
+pub mod schema;
+use schema::{DocFields, SearchDocument};
 
 mod query;
 pub mod similarity;
