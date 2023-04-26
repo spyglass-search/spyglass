@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
-use tantivy::{schema::*, DocAddress};
+use tantivy::schema::*;
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use thiserror::Error;
 use uuid::Uuid;
@@ -23,7 +23,6 @@ pub use query::QueryStats;
 use query::{build_document_query, build_query, QueryBoosts};
 
 type Score = f32;
-type SearchResult = (Score, DocAddress);
 
 pub enum IndexPath {
     // Directory
@@ -215,7 +214,7 @@ impl Searcher {
         ids: Option<Vec<String>>,
         has_tags: &[u64],
         exclude_tags: &[u64],
-    ) -> Vec<SearchResult> {
+    ) -> Vec<(Score, RetrievedDocument)> {
         let urls = urls.unwrap_or_default();
         let ids = ids.unwrap_or_default();
 
@@ -231,7 +230,16 @@ impl Searcher {
             .search(&query, &collector)
             .expect("Unable to execute query");
 
-        docs.into_iter().map(|addr| (1.0, addr)).collect()
+        docs.into_iter()
+            .map(|addr| (1.0, addr))
+            .flat_map(|(score, addr)| {
+                if let Ok(Some(doc)) = index_search.doc(addr).map(|x| document_to_struct(&x)) {
+                    Some((score, doc))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub async fn search_with_lens(
@@ -242,7 +250,7 @@ impl Searcher {
         boosts: &[QueryBoost],
         stats: &mut QueryStats,
         num_results: usize,
-    ) -> Vec<SearchResult> {
+    ) -> Vec<(Score, RetrievedDocument)> {
         let start_timer = Instant::now();
         let index = &self.index;
         let reader = &self.reader;
@@ -294,16 +302,24 @@ impl Searcher {
             Instant::now().duration_since(start_timer).as_millis()
         );
 
+        let doc_reader = self.reader.searcher();
         top_docs
             .into_iter()
             // Filter out negative scores
             .filter(|(score, _)| *score > 0.0)
+            .flat_map(|(score, addr)| {
+                if let Ok(Some(doc)) = doc_reader.doc(addr).map(|x| document_to_struct(&x)) {
+                    Some((score, doc))
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
     pub async fn explain_search_with_lens(
         &self,
-        doc_address: DocAddress,
+        doc: RetrievedDocument,
         applied_lenses: &Vec<u64>,
         query_string: &str,
         favorite_id: Option<u64>,
@@ -347,21 +363,14 @@ impl Searcher {
         );
 
         let mut combined: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Should, Box::new(query))];
-        if let Ok(Some(doc)) = self
-            .reader
-            .searcher()
-            .doc(doc_address)
-            .map(|doc| document_to_struct(&doc))
-        {
-            combined.push((
-                Occur::Must,
-                Box::new(TermQuery::new(
-                    Term::from_field_text(fields.id, &doc.doc_id),
-                    // Needs WithFreqs otherwise scoring is wonky.
-                    IndexRecordOption::WithFreqs,
-                )),
-            ));
-        }
+        combined.push((
+            Occur::Must,
+            Box::new(TermQuery::new(
+                Term::from_field_text(fields.id, &doc.doc_id),
+                // Needs WithFreqs otherwise scoring is wonky.
+                IndexRecordOption::WithFreqs,
+            )),
+        ));
 
         let content_terms =
             query::terms_for_field(&index.schema(), &tokenizers, query_string, fields.content);
@@ -374,24 +383,26 @@ impl Searcher {
             .search(&final_query, &collector)
             .expect("Unable to execute query");
         for (score, addr) in docs {
-            if addr == doc_address {
-                for t in content_terms {
-                    let info = tantivy_searcher
-                        .segment_reader(addr.segment_ord)
-                        .inverted_index(fields.content)
-                        .unwrap()
-                        .get_term_info(&t.1);
-                    log::info!("Term {:?} Info {:?} ", t, info);
-                }
+            if let Ok(Some(result)) = tantivy_searcher.doc(addr).map(|x| document_to_struct(&x)) {
+                if result.doc_id == doc.doc_id {
+                    for t in content_terms {
+                        let info = tantivy_searcher
+                            .segment_reader(addr.segment_ord)
+                            .inverted_index(fields.content)
+                            .unwrap()
+                            .get_term_info(&t.1);
+                        log::info!("Term {:?} Info {:?} ", t, info);
+                    }
 
-                return Some(score);
+                    return Some(score);
+                }
             }
         }
         None
     }
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct RetrievedDocument {
     pub doc_id: String,
     pub domain: String,
@@ -537,7 +548,7 @@ mod test {
 
         let mut stats = QueryStats::new();
         let query = "salinas";
-        let results: Vec<(f32, tantivy::DocAddress)> = searcher
+        let results = searcher
             .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
             .await;
 

@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use spyglass_searcher::{document_to_struct, IndexPath, QueryBoost, QueryStats, Searcher};
+use spyglass_searcher::{IndexPath, QueryBoost, QueryStats, Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -129,21 +129,12 @@ async fn main() -> anyhow::Result<ExitCode> {
                     if docs.is_empty() {
                         println!("No indexed document for url {:?}", &doc.url);
                     } else {
-                        for (_score, doc_addr) in docs {
-                            if let Ok(Some(doc)) = index
-                                .reader
-                                .searcher()
-                                .doc(doc_addr)
-                                .map(|doc| document_to_struct(&doc))
-                            {
-                                println!(
-                                    "Indexed Document: {}",
-                                    ron::ser::to_string_pretty(&doc, PrettyConfig::new())
-                                        .unwrap_or_default()
-                                );
-                            } else {
-                                println!("Error accessing Doc at address {:?}", doc_addr);
-                            }
+                        for (_score, doc) in docs {
+                            println!(
+                                "Indexed Document: {}",
+                                ron::ser::to_string_pretty(&doc, PrettyConfig::new())
+                                    .unwrap_or_default()
+                            );
                         }
                     }
                 }
