@@ -49,9 +49,9 @@ fn _boosted_phrase(terms: Vec<(usize, Term)>, boost: Score) -> Box<BoostQuery> {
 #[derive(Clone, Default)]
 pub struct QueryBoosts {
     /// Boosts based on implicit/explicit tag detection
-    pub tags: Vec<i64>,
+    pub tags: Vec<u64>,
     /// Id of favorited boost
-    pub favorite: Option<i64>,
+    pub favorite: Option<u64>,
     /// Urls to boost
     pub urls: Vec<String>,
     /// Specific doc ids to boost
@@ -105,7 +105,7 @@ pub fn build_query(
     for tag_id in &boosts.tags {
         term_query.push((
             Occur::Should,
-            _boosted_term(Term::from_field_u64(fields.tags, *tag_id as u64), 1.5),
+            _boosted_term(Term::from_field_u64(fields.tags, *tag_id), 1.5),
         ))
     }
 
@@ -138,10 +138,7 @@ pub fn build_query(
     if let Some(favorite_boost) = boosts.favorite {
         combined.push((
             Occur::Should,
-            _boosted_term(
-                Term::from_field_u64(fields.tags, favorite_boost as u64),
-                3.0,
-            ),
+            _boosted_term(Term::from_field_u64(fields.tags, favorite_boost), 3.0),
         ));
     }
 
@@ -153,8 +150,8 @@ pub fn build_document_query(
     fields: DocFields,
     urls: &Vec<String>,
     ids: &Vec<String>,
-    tags: &Vec<u64>,
-    exclude_tags: &Vec<u64>,
+    tags: &[u64],
+    exclude_tags: &[u64],
 ) -> BooleanQuery {
     let mut term_query: QueryVec = Vec::new();
     let mut urls_query: QueryVec = Vec::new();

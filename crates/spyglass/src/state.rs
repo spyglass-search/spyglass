@@ -13,11 +13,11 @@ use crate::task::{AppShutdown, UserSettingsChange};
 use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
-    search::{IndexPath, Searcher},
     task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 use shared::metrics::Metrics;
+use spyglass_searcher::{IndexPath, Searcher};
 
 /// Used to track inflight requests and limit things
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

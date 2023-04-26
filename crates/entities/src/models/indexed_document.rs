@@ -314,6 +314,25 @@ pub async fn delete_by_rule(db: &DatabaseConnection, rule: &str) -> anyhow::Resu
         .collect::<Vec<String>>())
 }
 
+/// Remove by `doc_id`
+pub async fn delete_many_by_doc_id(
+    db: &DatabaseConnection,
+    doc_ids: &[String],
+) -> Result<u64, sea_orm::DbErr> {
+    let mut num_deleted = 0;
+    for chunk in doc_ids.chunks(BATCH_SIZE) {
+        let docs = Entity::find()
+            .filter(Column::DocId.is_in(chunk.to_vec()))
+            .all(db)
+            .await?;
+
+        let dbids: Vec<i64> = docs.iter().map(|x| x.id).collect();
+        num_deleted += delete_many_by_id(db, &dbids).await?;
+    }
+
+    Ok(num_deleted)
+}
+
 /// Helper method used to delete multiple documents by id. This method will first
 /// delete all related tag references before deleting the documents
 pub async fn delete_many_by_id(

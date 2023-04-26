@@ -4,14 +4,15 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use entities::models::schema::v3::SchemaReader;
-use entities::schema::DocFields;
 use sea_orm_migration::prelude::*;
 use tantivy::DateTime;
 use tantivy::{schema::*, IndexWriter};
 
-use entities::schema::{self, mapping_to_schema, SchemaMapping, SearchDocument};
 use entities::sea_orm::{ConnectionTrait, Statement};
 use shared::config::Config;
+use spyglass_searcher::schema::{
+    self, mapping_to_schema, DocFields, SchemaMapping, SearchDocument,
+};
 
 use crate::utils::migration_utils;
 pub struct Migration;

@@ -1,16 +1,16 @@
-use entities::models::tag::TagType;
+use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
 use entities::models::{indexed_document, lens, tag};
-use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
 use jsonrpsee::core::Error;
-use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_searcher::schema::{DocFields, SearchDocument};
+use spyglass_searcher::{document_to_struct, QueryBoost, QueryStats};
 use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
@@ -33,27 +33,33 @@ pub async fn search_docs(
     let searcher = index.reader.searcher();
     let query = search_req.query.clone();
 
-    let tags = tag::Entity::find()
+    let lens_ids = tag::Entity::find()
         .filter(tag::Column::Label.eq(tag::TagType::Lens.to_string()))
         .filter(tag::Column::Value.is_in(search_req.lenses))
         .all(&state.db)
         .await
-        .unwrap_or_default();
-    let tag_ids = tags
+        .unwrap_or_default()
         .iter()
         .map(|model| model.id as u64)
         .collect::<Vec<u64>>();
 
+    let mut boosts = Vec::new();
+    for tag in check_query_for_tags(&state.db, &query).await {
+        boosts.push(QueryBoost::Tag(tag))
+    }
+    let favorite_boost = get_favorite_tag(&state.db).await;
     let mut stats = QueryStats::new();
 
-    let docs =
-        Searcher::search_with_lens(&state.db, &tag_ids, index, &query, &[], &mut stats).await;
+    let docs = state
+        .index
+        .search_with_lens(&lens_ids, &query, favorite_boost, &boosts, &mut stats, 5)
+        .await;
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
 
     for (score, doc_addr) in docs {
-        if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
+        if let Ok(Some(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
             let indexed = indexed_document::Entity::find()
                 .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
@@ -78,7 +84,7 @@ pub async fn search_docs(
                         .tokenizer_for_field(fields.content)
                         .expect("Unable to get tokenizer for content field");
 
-                    let description = libspyglass::search::utils::generate_highlight_preview(
+                    let description = spyglass_searcher::utils::generate_highlight_preview(
                         &tokenizer,
                         &query,
                         &doc.content,

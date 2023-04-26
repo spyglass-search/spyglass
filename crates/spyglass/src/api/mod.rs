@@ -1,3 +1,4 @@
+use crate::task::lens::install_lens;
 use entities::get_library_stats;
 use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
@@ -6,7 +7,6 @@ use jsonrpsee::server::middleware::proxy_get_request::ProxyGetRequestLayer;
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use jsonrpsee::types::{SubscriptionEmptyError, SubscriptionResult};
 use jsonrpsee::SubscriptionSink;
-use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
@@ -118,7 +118,7 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
-        if let Err(error) = search::lens::install_lens(&self.state, &self.config, lens_name).await {
+        if let Err(error) = install_lens(&self.state, &self.config, lens_name).await {
             return Err(Error::Custom(error.to_string()));
         }
         Ok(())
@@ -164,8 +164,8 @@ impl RpcServer for SpyglassRpc {
             .map(|m| m.doc_id.clone())
             .collect::<Vec<String>>();
         let _ = connection::revoke_connection(&self.state.db, &api_id, &account).await;
-        let _ = Searcher::delete_many_by_id(&self.state, &doc_ids, false).await;
-        let _ = Searcher::save(&self.state).await;
+        let _ = self.state.index.delete_many_by_id(&doc_ids).await;
+        let _ = indexed_document::delete_many_by_doc_id(&self.state.db, &doc_ids).await;
         log::debug!("revoked & deleted {} docs", doc_ids.len());
         Ok(())
     }

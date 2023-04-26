@@ -6,6 +6,5 @@ pub mod parser;
 pub mod pipeline;
 pub mod platform;
 pub mod plugin;
-pub mod search;
 pub mod state;
 pub mod task;

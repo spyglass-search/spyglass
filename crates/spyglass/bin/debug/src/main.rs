@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use clap::{Parser, Subcommand};
-use entities::models::{self, indexed_document::DocumentIdentifier};
+use entities::models::{self, indexed_document::DocumentIdentifier, tag::check_query_for_tags};
 use libspyglass::state::AppState;
 use ron::ser::PrettyConfig;
 use shared::config::Config;
@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use libspyglass::search::{self, IndexPath, QueryStats, ReadonlySearcher, Searcher};
+use spyglass_searcher::{document_to_struct, IndexPath, QueryBoost, QueryStats, Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -119,28 +119,22 @@ async fn main() -> anyhow::Result<ExitCode> {
                         ron::ser::to_string_pretty(&tags, PrettyConfig::new()).unwrap_or_default()
                     );
                     let index =
-                        ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
+                        Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
                             .expect("Unable to open index.");
 
-                    let docs = ReadonlySearcher::search_by_query(
-                        &db,
-                        &index,
-                        &DocumentQuery {
-                            urls: Some(vec![doc.url.clone()]),
-                            ..Default::default()
-                        },
-                    )
-                    .await;
+                    let docs = index
+                        .search_by_query(Some(vec![doc.url.clone()]), None, &[], &[])
+                        .await;
                     println!("### Indexed Document ###");
                     if docs.is_empty() {
                         println!("No indexed document for url {:?}", &doc.url);
                     } else {
                         for (_score, doc_addr) in docs {
-                            if let Ok(Ok(doc)) = index
+                            if let Ok(Some(doc)) = index
                                 .reader
                                 .searcher()
                                 .doc(doc_addr)
-                                .map(|doc| search::document_to_struct(&doc))
+                                .map(|doc| document_to_struct(&doc))
                             {
                                 println!(
                                     "Indexed Document: {}",
@@ -171,25 +165,34 @@ async fn main() -> anyhow::Result<ExitCode> {
                 }
             };
 
-            let index = ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
+            let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
                 .expect("Unable to open index.");
 
-            let docs = ReadonlySearcher::search_by_query(&db, &index, &doc_query).await;
+            let docs = index
+                .search_by_query(doc_query.urls, doc_query.ids, &[], &[])
+                .await;
 
             if docs.is_empty() {
                 println!("No indexed document for url {:?}", id_or_url);
             } else {
                 for (_score, doc_addr) in docs {
                     let mut stats = QueryStats::default();
-                    let explain = ReadonlySearcher::explain_search_with_lens(
-                        &db,
-                        doc_addr,
-                        &vec![],
-                        &index,
-                        query.as_str(),
-                        &mut stats,
-                    )
-                    .await;
+                    let boosts = check_query_for_tags(&db, &query)
+                        .await
+                        .iter()
+                        .map(|x| QueryBoost::Tag(*x))
+                        .collect::<Vec<_>>();
+
+                    let explain = index
+                        .explain_search_with_lens(
+                            doc_addr,
+                            &vec![],
+                            query.as_str(),
+                            None,
+                            &boosts,
+                            &mut stats,
+                        )
+                        .await;
                     match explain {
                         Some(explanation) => {
                             println!(
@@ -221,7 +224,7 @@ async fn main() -> anyhow::Result<ExitCode> {
             };
 
             process_update(state.clone(), &lens, archive_path, true).await;
-            let _ = Searcher::save(&state).await;
+            let _ = state.index.save().await;
         }
     }
 

@@ -12,15 +12,13 @@ use libreddit::{
 use strum_macros::{Display, EnumString};
 use url::Url;
 
+use super::{
+    credentials::connection_secret, handle_sync_credentials, load_credentials, Connection,
+};
 use crate::{
     crawler::{CrawlError, CrawlResult},
     documents::process_crawl_results,
-    search::Searcher,
     state::AppState,
-};
-
-use super::{
-    credentials::connection_secret, handle_sync_credentials, load_credentials, Connection,
 };
 
 pub struct RedditConnection {
@@ -96,7 +94,7 @@ impl RedditConnection {
                     log::warn!("Unable to add posts: {}", err);
                 }
 
-                if let Err(err) = Searcher::save(state).await {
+                if let Err(err) = state.index.save().await {
                     log::warn!("Unable to save posts: {}", err);
                 }
             }
