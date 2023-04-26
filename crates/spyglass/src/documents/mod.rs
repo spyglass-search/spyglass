@@ -55,10 +55,6 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
             log::warn!("Unable to delete_many_by_id: {err}")
         }
 
-        if let Err(err) = state.index.save().await {
-            log::warn!("Unable to save searcher: {err}")
-        }
-
         // now that the documents are deleted delete from the queue
         if let Err(error) = indexed_document::delete_many_by_url(&state.db, chunk).await {
             log::warn!("Error deleting for indexed document store {:?}", error);
@@ -119,7 +115,6 @@ pub async fn process_crawl_results(
 
     // Delete existing docs
     let _ = state.index.delete_many_by_id(&doc_id_list).await;
-    let _ = state.index.save().await;
 
     // Find/create the tags for this crawl.
     let mut tag_map: HashMap<String, Vec<i64>> = HashMap::new();
@@ -247,7 +242,6 @@ pub async fn process_records(
         .collect::<Vec<String>>();
 
     let _ = state.index.delete_many_by_id(&doc_id_list).await;
-    let _ = state.index.save().await;
 
     // Grab tags from the lens.
     let tags = lens
@@ -370,7 +364,7 @@ pub async fn update_tags(
         .iter()
         .filter_map(|addr| {
             if let Ok(doc) = state.index.reader.searcher().doc(*addr) {
-                if let Ok(retrieved_doc) = document_to_struct(&doc) {
+                if let Some(retrieved_doc) = document_to_struct(&doc) {
                     return Some(retrieved_doc);
                 }
             }
@@ -441,7 +435,6 @@ pub async fn update_tags(
         }
 
         let _ = state.index.delete_many_by_id(document_ids).await;
-        let _ = state.index.save().await;
 
         log::debug!("Tag map generated {}", tag_map.len());
         for (_, (doc, ids)) in tag_map.iter() {

@@ -5,11 +5,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
-use anyhow::anyhow;
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
 use tantivy::{schema::*, DocAddress};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
+use thiserror::Error;
 use uuid::Uuid;
 
 pub mod schema;
@@ -50,6 +50,20 @@ pub enum QueryBoost {
     Tag(u64),
 }
 
+#[allow(clippy::enum_variant_names)]
+#[derive(Error, Debug)]
+pub enum SearchError {
+    #[error("Unable to perform action on index: {0}")]
+    IndexError(#[from] tantivy::TantivyError),
+    #[error("Index is in read only mode")]
+    ReadOnly,
+    #[error("Index writer is deadlocked")]
+    WriterLocked,
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
+}
+
+type SearcherResult<T> = Result<T, SearchError>;
 #[derive(Clone)]
 pub struct Searcher {
     pub index: Index,
@@ -70,30 +84,25 @@ impl Searcher {
         self.writer.is_none()
     }
 
-    pub fn lock_writer(&self) -> anyhow::Result<MutexGuard<IndexWriter>> {
+    pub fn lock_writer(&self) -> SearcherResult<MutexGuard<IndexWriter>> {
         if let Some(index) = &self.writer {
             match index.lock() {
                 Ok(lock) => Ok(lock),
-                Err(_) => Err(anyhow!("writer already locked!")),
+                Err(_) => Err(SearchError::WriterLocked),
             }
         } else {
-            Err(anyhow!("readonly only mode enabled"))
+            Err(SearchError::ReadOnly)
         }
     }
 
-    pub async fn save(&self) -> anyhow::Result<()> {
-        if let Ok(mut writer) = self.lock_writer() {
-            match writer.commit() {
-                Ok(_) => Ok(()),
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
-            }
-        } else {
-            Ok(())
-        }
+    pub async fn save(&self) -> SearcherResult<()> {
+        let mut writer = self.lock_writer()?;
+        writer.commit()?;
+        Ok(())
     }
 
     /// Deletes a single entry from the database & index
-    pub async fn delete_by_id(&self, doc_id: &str) -> anyhow::Result<()> {
+    pub async fn delete_by_id(&self, doc_id: &str) -> SearcherResult<()> {
         self.delete_many_by_id(&[doc_id.into()]).await?;
         Ok(())
     }
@@ -101,40 +110,23 @@ impl Searcher {
     /// Deletes multiple ids from the searcher at one time. The caller can decide if the
     /// documents should also be removed from the database by setting the remove_documents
     /// flag.
-    pub async fn delete_many_by_id(&self, doc_ids: &[String]) -> anyhow::Result<()> {
-        // Remove from search index, immediately.
-        if let Ok(mut writer) = self.lock_writer() {
-            Searcher::remove_many_from_index(&mut writer, doc_ids)?;
-        };
-
-        Ok(())
-    }
-
-    /// Remove document w/ `doc_id` from the search index but will still have a
-    /// reference in the database.
-    pub fn remove_from_index(writer: &mut IndexWriter, doc_id: &str) -> anyhow::Result<()> {
-        let fields = DocFields::as_fields();
-        writer.delete_term(Term::from_field_text(fields.id, doc_id));
-        Ok(())
-    }
-
-    /// Removes multiple documents from the index
-    pub fn remove_many_from_index(
-        writer: &mut IndexWriter,
-        doc_ids: &[String],
-    ) -> anyhow::Result<()> {
-        let fields = DocFields::as_fields();
-        for doc_id in doc_ids {
-            writer.delete_term(Term::from_field_text(fields.id, doc_id));
+    pub async fn delete_many_by_id(&self, doc_ids: &[String]) -> SearcherResult<()> {
+        {
+            let writer = self.lock_writer()?;
+            let fields = DocFields::as_fields();
+            for doc_id in doc_ids {
+                writer.delete_term(Term::from_field_text(fields.id, doc_id));
+            }
         }
 
+        self.save().await?;
         Ok(())
     }
 
     /// Get document with `doc_id` from index.
-    pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
+    pub fn get_by_id(&self, doc_id: &str) -> Option<Document> {
         let fields = DocFields::as_fields();
-        let searcher = reader.searcher();
+        let searcher = self.reader.searcher();
 
         let query = TermQuery::new(
             Term::from_field_text(fields.id, doc_id),
@@ -159,7 +151,7 @@ impl Searcher {
     }
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
-    pub fn with_index(index_path: &IndexPath, readonly: bool) -> anyhow::Result<Self> {
+    pub fn with_index(index_path: &IndexPath, readonly: bool) -> SearcherResult<Self> {
         let index = match index_path {
             IndexPath::LocalPath(path) => schema::initialize_index(path)?,
             IndexPath::Memory => schema::initialize_in_memory_index(),
@@ -192,7 +184,7 @@ impl Searcher {
         })
     }
 
-    pub fn upsert_document(&self, doc_update: DocumentUpdate) -> tantivy::Result<String> {
+    pub fn upsert_document(&self, doc_update: DocumentUpdate) -> SearcherResult<String> {
         let fields = DocFields::as_fields();
 
         let doc_id = doc_update
@@ -210,9 +202,8 @@ impl Searcher {
             doc.add_u64(fields.tags, *t as u64);
         }
 
-        if let Ok(writer) = self.lock_writer() {
-            writer.add_document(doc)?;
-        }
+        let writer = self.lock_writer()?;
+        writer.add_document(doc)?;
 
         Ok(doc_id)
     }
@@ -250,7 +241,7 @@ impl Searcher {
         favorite_id: Option<u64>,
         boosts: &[QueryBoost],
         stats: &mut QueryStats,
-        num_results: usize
+        num_results: usize,
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
         let index = &self.index;
@@ -356,7 +347,7 @@ impl Searcher {
         );
 
         let mut combined: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Should, Box::new(query))];
-        if let Ok(Ok(doc)) = self
+        if let Ok(Some(doc)) = self
             .reader
             .searcher()
             .doc(doc_address)
@@ -425,11 +416,11 @@ fn field_to_u64vec(doc: &Document, field: Field) -> Vec<u64> {
 }
 
 /// Helper method used to convert the provided document to a struct
-pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
+pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
     let fields = DocFields::as_fields();
     let doc_id = field_to_string(doc, fields.id);
     if doc_id.is_empty() {
-        return Err(anyhow!("Invalid doc_id"));
+        return None;
     }
 
     let domain = field_to_string(doc, fields.domain);
@@ -439,7 +430,7 @@ pub fn document_to_struct(doc: &Document) -> anyhow::Result<RetrievedDocument> {
     let content = field_to_string(doc, fields.content);
     let tags = field_to_u64vec(doc, fields.tags);
 
-    Ok(RetrievedDocument {
+    Some(RetrievedDocument {
         doc_id,
         domain,
         title,

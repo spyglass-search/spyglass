@@ -16,7 +16,6 @@ use crate::{
     crawler::{CrawlError, CrawlResult, Crawler},
     documents::process_crawl_results,
 };
-use spyglass_searcher::Searcher;
 
 /// Handles bootstrapping a lens. If the lens is remote we attempt to process the cache.
 /// If no cache is accessible then we run the standard bootstrap process. Local lenses use
@@ -68,8 +67,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                         // Found document for the url, but it has a different doc id.
                         // check if this document exists in the index to see if we
                         // had a duplicate
-                        let indexed_result =
-                            Searcher::get_by_id(&state.index.reader, doc_model.doc_id.as_str());
+                        let indexed_result = state.index.get_by_id(doc_model.doc_id.as_str());
                         match indexed_result {
                             Some(_doc) => {
                                 log::debug!(
@@ -304,10 +302,8 @@ pub async fn handle_deletion(state: AppState, task_id: i64) -> anyhow::Result<()
             .collect::<Vec<String>>();
 
         // Remove doc references from DB & from index
-        for doc_id in doc_ids {
-            let _ = state.index.delete_by_id(&doc_id).await;
-            let _ = indexed_document::delete_many_by_doc_id(&state.db, &[doc_id]).await;
-        }
+        let _ = state.index.delete_many_by_id(&doc_ids).await;
+        let _ = indexed_document::delete_many_by_doc_id(&state.db, &doc_ids).await;
 
         // Finally delete this crawl task as well.
         task.delete(&state.db).await?;

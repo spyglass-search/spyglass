@@ -342,7 +342,7 @@ async fn query_documents_and_send(env: &PluginEnv, query: &DocumentQuery, send_e
     let mut results = Vec::new();
     let db = &env.app_state.db;
     for (_score, doc_addr) in docs {
-        if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
+        if let Ok(Some(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
             log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
             let indexed = indexed_document::Entity::find()
                 .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))

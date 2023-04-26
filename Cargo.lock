@@ -6781,6 +6781,7 @@ dependencies = [
  "serde_json",
  "shared",
  "tantivy 0.19.2",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-log",

@@ -130,7 +130,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                         println!("No indexed document for url {:?}", &doc.url);
                     } else {
                         for (_score, doc_addr) in docs {
-                            if let Ok(Ok(doc)) = index
+                            if let Ok(Some(doc)) = index
                                 .reader
                                 .searcher()
                                 .doc(doc_addr)

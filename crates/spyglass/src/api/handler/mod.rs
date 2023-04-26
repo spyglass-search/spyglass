@@ -202,7 +202,6 @@ pub async fn delete_document(state: AppState, id: String) -> Result<(), Error> {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-    let _ = state.index.save().await;
     let _ = indexed_document::delete_many_by_doc_id(&state.db, &[id]).await;
     Ok(())
 }
@@ -239,7 +238,6 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 
         let doc_ids: Vec<String> = indexed.iter().map(|x| x.doc_id.to_string()).collect();
         let _ = state.index.delete_many_by_id(&doc_ids).await;
-        let _ = state.index.save().await;
         let _ = indexed_document::delete_many_by_doc_id(&state.db, &doc_ids).await;
 
         log::debug!("removed {} items from index", indexed_count);
@@ -593,10 +591,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
         // Remove from index
         if let Err(err) = state.index.delete_many_by_id(&doc_ids).await {
             return Err(Error::Custom(err.to_string()));
-        } else {
-            let _ = state.index.save().await;
         }
-
         // Remove from db
         let _ = indexed_document::delete_many_by_id(&state.db, &dbids).await;
     }
