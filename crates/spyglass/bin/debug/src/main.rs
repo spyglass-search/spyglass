@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use libspyglass::search::{self, IndexPath, QueryStats, ReadonlySearcher, Searcher};
+use libspyglass::search::{self, IndexPath, QueryStats, Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -119,10 +119,10 @@ async fn main() -> anyhow::Result<ExitCode> {
                         ron::ser::to_string_pretty(&tags, PrettyConfig::new()).unwrap_or_default()
                     );
                     let index =
-                        ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
+                        Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
                             .expect("Unable to open index.");
 
-                    let docs = ReadonlySearcher::search_by_query(
+                    let docs = Searcher::search_by_query(
                         &db,
                         &index,
                         &DocumentQuery {
@@ -171,17 +171,17 @@ async fn main() -> anyhow::Result<ExitCode> {
                 }
             };
 
-            let index = ReadonlySearcher::with_index(&IndexPath::LocalPath(config.index_dir()))
+            let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
                 .expect("Unable to open index.");
 
-            let docs = ReadonlySearcher::search_by_query(&db, &index, &doc_query).await;
+            let docs = Searcher::search_by_query(&db, &index, &doc_query).await;
 
             if docs.is_empty() {
                 println!("No indexed document for url {:?}", id_or_url);
             } else {
                 for (_score, doc_addr) in docs {
                     let mut stats = QueryStats::default();
-                    let explain = ReadonlySearcher::explain_search_with_lens(
+                    let explain = Searcher::explain_search_with_lens(
                         &db,
                         doc_addr,
                         &vec![],

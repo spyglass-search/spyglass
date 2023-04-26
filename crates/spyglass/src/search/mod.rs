@@ -47,12 +47,6 @@ pub struct Searcher {
 }
 
 #[derive(Clone)]
-pub struct ReadonlySearcher {
-    pub index: Index,
-    pub reader: IndexReader,
-}
-
-#[derive(Clone)]
 pub struct DocumentUpdate<'a> {
     pub doc_id: Option<String>,
     pub title: &'a str,
@@ -72,14 +66,6 @@ pub enum QueryBoost {
 impl Debug for Searcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         f.debug_struct("Searcher")
-            .field("index", &self.index)
-            .finish()
-    }
-}
-
-impl Debug for ReadonlySearcher {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("ReadonlySearcher")
             .field("index", &self.index)
             .finish()
     }
@@ -399,110 +385,12 @@ impl Searcher {
             .filter(|(score, _)| *score > 0.0)
             .collect()
     }
-}
-
-// Readonly Searcher implementation used for utilities that can run while
-// the spyglass system is running
-impl ReadonlySearcher {
-    /// Get document with `doc_id` from index.
-    pub fn get_by_id(reader: &IndexReader, doc_id: &str) -> Option<Document> {
-        let fields = DocFields::as_fields();
-        let searcher = reader.searcher();
-
-        let query = TermQuery::new(
-            Term::from_field_text(fields.id, doc_id),
-            IndexRecordOption::Basic,
-        );
-
-        let res = searcher
-            .search(&query, &TopDocs::with_limit(1))
-            .map_or(Vec::new(), |x| x);
-
-        if res.is_empty() {
-            return None;
-        }
-
-        if let Some((_, doc_address)) = res.first() {
-            if let Ok(doc) = searcher.doc(*doc_address) {
-                return Some(doc);
-            }
-        }
-
-        None
-    }
-
-    /// Constructs a new Searcher object w/ the index @ `index_path`
-    pub fn with_index(index_path: &IndexPath) -> anyhow::Result<Self> {
-        let index = match index_path {
-            IndexPath::LocalPath(path) => schema::initialize_index(path)?,
-            IndexPath::Memory => schema::initialize_in_memory_index(),
-        };
-
-        // For a search server you will typically create on reader for the entire
-        // lifetime of your program.
-        let reader = index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into()
-            .expect("Unable to create reader");
-
-        Ok(ReadonlySearcher { index, reader })
-    }
-
-    /// Helper method to execute a search based on the provided document query
-    pub async fn search_by_query(
-        db: &DatabaseConnection,
-        searcher: &ReadonlySearcher,
-        query: &DocumentQuery,
-    ) -> Vec<SearchResult> {
-        let tag_ids = match &query.has_tags {
-            Some(include_tags) => {
-                let tags = tag::get_tags_by_value(db, include_tags)
-                    .await
-                    .unwrap_or_default();
-                tags.iter()
-                    .map(|model| model.id as u64)
-                    .collect::<Vec<u64>>()
-            }
-            None => Vec::new(),
-        };
-
-        let exclude_tag_ids = match &query.exclude_tags {
-            Some(excludes) => {
-                let exclude_tags = tag::get_tags_by_value(db, excludes)
-                    .await
-                    .unwrap_or_default();
-                exclude_tags
-                    .iter()
-                    .map(|model| model.id as u64)
-                    .collect::<Vec<u64>>()
-            }
-            None => Vec::new(),
-        };
-
-        let urls = query.urls.clone().unwrap_or_default();
-        let ids = query.ids.clone().unwrap_or_default();
-
-        let fields = DocFields::as_fields();
-        let query = build_document_query(fields, &urls, &ids, &tag_ids, &exclude_tag_ids);
-
-        let collector = tantivy::collector::DocSetCollector;
-
-        let reader = &searcher.reader;
-        let index_search = reader.searcher();
-
-        let docs = index_search
-            .search(&query, &collector)
-            .expect("Unable to execute query");
-
-        docs.into_iter().map(|addr| (1.0, addr)).collect()
-    }
 
     pub async fn explain_search_with_lens(
         db: &DatabaseConnection,
         doc_address: DocAddress,
         applied_lenses: &Vec<u64>,
-        searcher: &ReadonlySearcher,
+        searcher: &Searcher,
         query_string: &str,
         stats: &mut QueryStats,
     ) -> Option<f32> {
@@ -583,83 +471,6 @@ impl ReadonlySearcher {
             }
         }
         None
-    }
-
-    pub async fn search_with_lens(
-        db: &DatabaseConnection,
-        applied_lenses: &Vec<u64>,
-        searcher: &ReadonlySearcher,
-        query_string: &str,
-        boosts: &[QueryBoost],
-        stats: &mut QueryStats,
-    ) -> Vec<SearchResult> {
-        let start_timer = Instant::now();
-
-        let mut tag_boosts = HashSet::new();
-        let favorite_boost = if let Ok(Some(favorited)) = tag::Entity::find()
-            .filter(tag::Column::Label.eq(tag::TagType::Favorited.to_string()))
-            .one(db)
-            .await
-        {
-            Some(favorited.id)
-        } else {
-            None
-        };
-
-        let tag_checks = get_tag_checks(db, query_string).await.unwrap_or_default();
-        tag_boosts.extend(tag_checks);
-
-        let index = &searcher.index;
-        let reader = &searcher.reader;
-        let fields = DocFields::as_fields();
-        let searcher = reader.searcher();
-        let tokenizers = index.tokenizers().clone();
-
-        let mut docid_boosts = Vec::new();
-        let mut url_boosts = Vec::new();
-        for boost in boosts {
-            match boost {
-                QueryBoost::DocId(doc_id) => docid_boosts.push(doc_id.clone()),
-                QueryBoost::Url(url) => url_boosts.push(url.clone()),
-            }
-        }
-
-        let boosts = QueryBoosts {
-            tags: tag_boosts.into_iter().collect(),
-            favorite: favorite_boost,
-            urls: url_boosts,
-            doc_ids: docid_boosts,
-        };
-
-        let query = build_query(
-            index.schema(),
-            tokenizers,
-            fields,
-            query_string,
-            applied_lenses,
-            stats,
-            &boosts,
-        );
-
-        let collector = TopDocs::with_limit(5);
-
-        let top_docs = searcher
-            .search(&query, &collector)
-            .expect("Unable to execute query");
-
-        log::debug!(
-            "query `{}` returned {} results from {} docs in {} ms",
-            query_string,
-            top_docs.len(),
-            searcher.num_docs(),
-            Instant::now().duration_since(start_timer).as_millis()
-        );
-
-        top_docs
-            .into_iter()
-            // Filter out negative scores
-            .filter(|(score, _)| *score > 0.0)
-            .collect()
     }
 }
 
@@ -844,7 +655,7 @@ mod test {
 
         let mut stats = QueryStats::new();
         let query = "salinas";
-        let results =
+        let results: Vec<(f32, tantivy::DocAddress)> =
             Searcher::search_with_lens(&db, &vec![2_u64], &searcher, query, &[], &mut stats).await;
 
         assert_eq!(results.len(), 1);
