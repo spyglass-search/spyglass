@@ -250,6 +250,7 @@ impl Searcher {
         favorite_id: Option<u64>,
         boosts: &[QueryBoost],
         stats: &mut QueryStats,
+        num_results: usize
     ) -> Vec<SearchResult> {
         let start_timer = Instant::now();
         let index = &self.index;
@@ -288,7 +289,7 @@ impl Searcher {
             &boosts,
         );
 
-        let collector = TopDocs::with_limit(10);
+        let collector = TopDocs::with_limit(num_results);
 
         let top_docs = searcher
             .search(&query, &collector)
@@ -546,7 +547,7 @@ mod test {
         let mut stats = QueryStats::new();
         let query = "salinas";
         let results: Vec<(f32, tantivy::DocAddress)> = searcher
-            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats)
+            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
             .await;
 
         assert_eq!(results.len(), 1);
@@ -561,7 +562,7 @@ mod test {
         _build_test_index(&mut searcher).await;
         let query = "salinas";
         let results = searcher
-            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats)
+            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
             .await;
 
         assert_eq!(results.len(), 1);
@@ -576,7 +577,7 @@ mod test {
         let mut stats = QueryStats::new();
         let query = "salinasd";
         let results = searcher
-            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats)
+            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
             .await;
         assert_eq!(results.len(), 0);
     }

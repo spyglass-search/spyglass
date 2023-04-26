@@ -52,7 +52,7 @@ pub async fn search_docs(
 
     let docs = state
         .index
-        .search_with_lens(&lens_ids, &query, favorite_boost, &boosts, &mut stats)
+        .search_with_lens(&lens_ids, &query, favorite_boost, &boosts, &mut stats, 5)
         .await;
 
     let mut results: Vec<SearchResult> = Vec::new();
