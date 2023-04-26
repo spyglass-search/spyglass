@@ -14,9 +14,9 @@ use spyglass_plugin::Authentication;
 use spyglass_plugin::DocumentUpdate;
 use spyglass_plugin::HttpMethod;
 use spyglass_plugin::{DocumentResult, PluginEvent};
+use spyglass_searcher::RetrievedDocument;
 use std::path::Path;
 use std::str::FromStr;
-use tantivy::DocAddress;
 use tokio::sync::mpsc::Sender;
 use url::Url;
 use wasmer::{Exports, Function, Store};
@@ -33,7 +33,6 @@ use reqwest::header::USER_AGENT;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
 use spyglass_plugin::{DocumentQuery, PluginCommandRequest};
-use spyglass_searcher::document_to_struct;
 
 pub fn register_exports(
     plugin_id: PluginId,
@@ -182,13 +181,16 @@ async fn handle_plugin_cmd_request(
                     &exclude_tags,
                 )
                 .await;
+
             if !docs.is_empty() {
-                let doc_ids = docs
+                let docs = docs
                     .iter()
-                    .map(|(_, addr)| *addr)
-                    .collect::<Vec<DocAddress>>();
+                    .map(|(_, doc)| doc)
+                    .cloned()
+                    .collect::<Vec<RetrievedDocument>>();
+
                 if let Err(error) =
-                    documents::update_tags(&env.app_state, &doc_ids, tag_modifications).await
+                    documents::update_tags(&env.app_state, &docs, tag_modifications).await
                 {
                     log::error!("Error updating document tags {:?}", error);
                 }
@@ -338,39 +340,36 @@ async fn query_documents_and_send(env: &PluginEnv, query: &DocumentQuery, send_e
         )
         .await;
     log::debug!("Found {:?} documents for query", docs.len());
-    let searcher = &env.app_state.index.reader.searcher();
     let mut results = Vec::new();
     let db = &env.app_state.db;
-    for (_score, doc_addr) in docs {
-        if let Ok(Some(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
-            log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
-                .one(db)
-                .await;
+    for (_score, doc) in docs {
+        log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
+        let indexed = indexed_document::Entity::find()
+            .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
+            .one(db)
+            .await;
 
-            let crawl_uri = doc.url;
-            if let Ok(Some(indexed)) = indexed {
-                let tags = indexed
-                    .find_related(tag::Entity)
-                    .all(db)
-                    .await
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|tag| (tag.label.to_string(), tag.value.clone()))
-                    .collect::<Vec<(String, String)>>();
+        let crawl_uri = doc.url;
+        if let Ok(Some(indexed)) = indexed {
+            let tags = indexed
+                .find_related(tag::Entity)
+                .all(db)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                .collect::<Vec<(String, String)>>();
 
-                let result = DocumentResult {
-                    doc_id: doc.doc_id.clone(),
-                    domain: doc.domain,
-                    title: doc.title,
-                    description: doc.description,
-                    url: indexed.open_url.unwrap_or(crawl_uri),
-                    tags,
-                };
+            let result = DocumentResult {
+                doc_id: doc.doc_id.clone(),
+                domain: doc.domain,
+                title: doc.title,
+                description: doc.description,
+                url: indexed.open_url.unwrap_or(crawl_uri),
+                tags,
+            };
 
-                results.push(result);
-            }
+            results.push(result);
         }
     }
 

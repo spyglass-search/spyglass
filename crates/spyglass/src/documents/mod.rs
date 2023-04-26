@@ -11,7 +11,6 @@ use entities::{
 use shared::config::LensConfig;
 use spyglass_plugin::TagModification;
 use std::{collections::HashMap, str::FromStr, time::Instant};
-use tantivy::DocAddress;
 
 use libnetrunner::parser::ParseResult;
 use url::Url;
@@ -19,7 +18,7 @@ use url::Url;
 use crate::{crawler::CrawlResult, state::AppState};
 use entities::models::tag::TagType;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
-use spyglass_searcher::{document_to_struct, DocumentUpdate, RetrievedDocument};
+use spyglass_searcher::{DocumentUpdate, RetrievedDocument};
 
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
@@ -346,7 +345,7 @@ pub async fn process_records(
 /// 5. Updates the indexed document with the new tags (index)
 pub async fn update_tags(
     state: &AppState,
-    doc_ids: &[DocAddress],
+    documents: &[RetrievedDocument],
     tag_modifications: &TagModification,
 ) -> anyhow::Result<()> {
     let mut tag_cache: HashMap<String, i64> = HashMap::new();
@@ -359,18 +358,6 @@ pub async fn update_tags(
         Some(to_add) => _get_tag_ids_string(&state.db, to_add, &mut tag_cache).await,
         None => Vec::new(),
     };
-
-    let documents = doc_ids
-        .iter()
-        .filter_map(|addr| {
-            if let Ok(doc) = state.index.reader.searcher().doc(*addr) {
-                if let Some(retrieved_doc) = document_to_struct(&doc) {
-                    return Some(retrieved_doc);
-                }
-            }
-            None
-        })
-        .collect::<Vec<RetrievedDocument>>();
 
     let document_ids = &documents
         .iter()
@@ -420,7 +407,7 @@ pub async fn update_tags(
                     tag_map.insert(
                         doc.doc_id.clone(),
                         (
-                            doc,
+                            doc.clone(),
                             ids.iter().map(|tag_id| tag_id.id).collect::<Vec<i64>>(),
                         ),
                     );
