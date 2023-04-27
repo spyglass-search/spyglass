@@ -7,7 +7,7 @@ use entities::models::{
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, LensSource};
-use spyglass_searcher::WriteTrait;
+use spyglass_searcher::{SearchTrait, WriteTrait};
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
@@ -68,7 +68,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                         // Found document for the url, but it has a different doc id.
                         // check if this document exists in the index to see if we
                         // had a duplicate
-                        let indexed_result = state.index.get_by_id(doc_model.doc_id.as_str());
+                        let indexed_result = state.index.get(doc_model.doc_id.as_str()).await;
                         match indexed_result {
                             Some(_doc) => {
                                 log::debug!(

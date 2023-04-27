@@ -13,8 +13,6 @@ mod query;
 pub mod similarity;
 pub mod utils;
 
-pub use query::QueryStats;
-
 type Score = f32;
 
 pub enum IndexBackend {
@@ -27,10 +25,45 @@ pub enum IndexBackend {
 }
 
 #[derive(Clone)]
-pub enum QueryBoost {
+pub struct QueryBoost {
+    /// What to boost
+    field: Boost,
+    /// The boost value (negative to lessen impact of something)
+    value: f32,
+}
+
+impl QueryBoost {
+    pub fn new(boost: Boost) -> Self {
+        let value = &match boost {
+            Boost::DocId(_) => 3.0,
+            Boost::Favorite { .. } => 3.0,
+            Boost::Tag(_) => 1.5,
+            Boost::Url(_) => 3.0,
+        };
+
+        QueryBoost {
+            field: boost,
+            value: *value,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum Boost {
+    // If required is set to true, _only_ favorites will be searched.
+    Favorite { id: u64, required: bool },
     Url(String),
     DocId(String),
     Tag(u64),
+}
+
+/// Contains stats & results for a search request
+#[derive(Clone)]
+pub struct SearchQueryResult {
+    pub wall_time_ms: u128,
+    pub num_docs: u64,
+    pub term_counts: usize,
+    pub documents: Vec<(Score, RetrievedDocument)>,
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -55,9 +88,10 @@ pub trait SearchTrait {
     async fn search(
         &self,
         query: &str,
+        filters: &[QueryBoost],
         boosts: &[QueryBoost],
         num_results: usize,
-    ) -> SearcherResult<Vec<RetrievedDocument>>;
+    ) -> SearchQueryResult;
 }
 
 #[async_trait::async_trait]
@@ -134,7 +168,7 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 #[cfg(test)]
 mod test {
     use crate::client::Searcher;
-    use crate::{DocumentUpdate, IndexBackend, QueryStats, WriteTrait};
+    use crate::{Boost, DocumentUpdate, IndexBackend, QueryBoost, SearchTrait, WriteTrait};
 
     async fn _build_test_index(searcher: &mut Searcher) {
         searcher
@@ -232,28 +266,22 @@ mod test {
             Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
-        let mut stats = QueryStats::new();
         let query = "salinas";
-        let results = searcher
-            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
-            .await;
-
-        assert_eq!(results.len(), 1);
+        let filters = vec![QueryBoost::new(Boost::Tag(2_u64))];
+        let results = searcher.search(query, &filters, &[], 5).await;
+        assert_eq!(results.documents.len(), 1);
     }
 
     #[tokio::test]
     pub async fn test_url_lens_search() {
         let mut searcher =
             Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
-
-        let mut stats = QueryStats::new();
         _build_test_index(&mut searcher).await;
-        let query = "salinas";
-        let results = searcher
-            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
-            .await;
 
-        assert_eq!(results.len(), 1);
+        let query = "salinas";
+        let filters = vec![QueryBoost::new(Boost::Tag(2_u64))];
+        let results = searcher.search(query, &filters, &[], 5).await;
+        assert_eq!(results.documents.len(), 1);
     }
 
     #[tokio::test]
@@ -262,11 +290,9 @@ mod test {
             Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
-        let mut stats = QueryStats::new();
         let query = "salinasd";
-        let results = searcher
-            .search_with_lens(&vec![2_u64], query, None, &[], &mut stats, 5)
-            .await;
-        assert_eq!(results.len(), 0);
+        let filters = vec![QueryBoost::new(Boost::Tag(2_u64))];
+        let results = searcher.search(query, &filters, &[], 5).await;
+        assert_eq!(results.documents.len(), 0);
     }
 }

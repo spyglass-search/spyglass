@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use spyglass_searcher::{client::Searcher, IndexBackend, QueryBoost, QueryStats};
+use spyglass_searcher::{client::Searcher, Boost, IndexBackend, QueryBoost};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -166,23 +166,15 @@ async fn main() -> anyhow::Result<ExitCode> {
             if docs.is_empty() {
                 println!("No indexed document for url {:?}", id_or_url);
             } else {
-                for (_score, doc_addr) in docs {
-                    let mut stats = QueryStats::default();
+                for (_score, doc) in docs {
                     let boosts = check_query_for_tags(&db, &query)
                         .await
                         .iter()
-                        .map(|x| QueryBoost::Tag(*x))
+                        .map(|x| QueryBoost::new(Boost::Tag(*x)))
                         .collect::<Vec<_>>();
 
                     let explain = index
-                        .explain_search_with_lens(
-                            doc_addr,
-                            &vec![],
-                            query.as_str(),
-                            None,
-                            &boosts,
-                            &mut stats,
-                        )
+                        .explain_search_with_lens(doc.doc_id, query.as_str(), &boosts)
                         .await;
                     match explain {
                         Some(explanation) => {

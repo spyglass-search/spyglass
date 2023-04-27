@@ -153,9 +153,10 @@ pub fn group_urls_by_scheme(urls: Vec<&str>) -> HashMap<&str, Vec<&str>> {
 
 #[cfg(test)]
 mod test {
+    use crate::client::Searcher;
     use crate::schema::{DocFields, SearchDocument};
     use crate::utils::generate_highlight_preview;
-    use crate::{IndexBackend, Searcher};
+    use crate::IndexBackend;
 
     #[test]
     fn test_find_highlights() {
