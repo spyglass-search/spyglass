@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use spyglass_searcher::{IndexPath, QueryBoost, QueryStats, Searcher};
+use spyglass_searcher::{IndexPath, QueryBoost, QueryStats, client::Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
