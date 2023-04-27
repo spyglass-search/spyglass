@@ -4,7 +4,7 @@ use shared::response::SimilaritySearchResult;
 use std::env;
 use std::time::SystemTime;
 
-use super::{document_to_struct, client::Searcher};
+use super::{client::Searcher, document_to_struct};
 
 const EMBEDDING_ENDPOINT: &str = "SIMILARITY_SEARCH_ENDPOINT";
 const EMBEDDING_PORT: &str = "SIMILARITY_SEARCH_PORT";

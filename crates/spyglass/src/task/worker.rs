@@ -7,6 +7,7 @@ use entities::models::{
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, LensSource};
+use spyglass_searcher::WriteTrait;
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
@@ -76,7 +77,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                                     doc_id
                                 );
                                 // Found indexed document, so we must have had duplicates, remove dup
-                                let _ = state.index.delete_by_id(doc_id.as_str()).await;
+                                let _ = state.index.delete(doc_id.as_str()).await;
                                 let _ =
                                     indexed_document::delete_many_by_doc_id(&state.db, &[doc_id])
                                         .await;
@@ -98,7 +99,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                 Ok(None) => {
                     log::debug!("Could not find document for url {}, removing", url);
                     // can't find the url at all must be an old doc that was removed
-                    let _ = state.index.delete_by_id(doc_id.as_str()).await;
+                    let _ = state.index.delete(doc_id.as_str()).await;
                     let _ = indexed_document::delete_many_by_doc_id(&state.db, &[doc_id]).await;
                     changed = true;
                 }

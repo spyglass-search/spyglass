@@ -3,12 +3,12 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use tantivy::schema::*;
 use thiserror::Error;
-use uuid::Uuid;
 use url::Url;
+use uuid::Uuid;
 
 pub mod client;
 pub mod schema;
-use schema::{DocFields, SearchDocument};
+use schema::{DocFields, DocumentUpdate, SearchDocument};
 
 mod query;
 pub mod similarity;
@@ -25,17 +25,6 @@ pub enum IndexBackend {
     LocalPath(PathBuf),
     // In memory index for testing purposes.
     Memory,
-}
-
-#[derive(Clone)]
-pub struct DocumentUpdate<'a> {
-    pub doc_id: Option<String>,
-    pub title: &'a str,
-    pub description: &'a str,
-    pub domain: &'a str,
-    pub url: &'a str,
-    pub content: &'a str,
-    pub tags: &'a [i64],
 }
 
 #[derive(Clone)]
@@ -64,15 +53,25 @@ pub trait SearchTrait {
     /// Get a single document by id
     fn get(&self, doc_id: &str) -> Option<RetrievedDocument>;
     /// Runs a search against the index
-    fn search(&self, query: &str, boosts: &[QueryBoost], num_results: usize) -> SearcherResult<Vec<RetrievedDocument>>;
+    fn search(
+        &self,
+        query: &str,
+        boosts: &[QueryBoost],
+        num_results: usize,
+    ) -> SearcherResult<Vec<RetrievedDocument>>;
 }
 
 #[async_trait::async_trait]
 pub trait WriteTrait {
+    /// Delete a single document.
+    async fn delete(&self, doc_id: &str) -> SearcherResult<()> {
+        self.delete_many_by_id(&[doc_id.to_owned()]).await?;
+        Ok(())
+    }
     /// Delete documents from the index by id, returning the number of docs deleted.
-    fn delete(&self, doc_ids: &[Uuid]) -> SearcherResult<usize>;
+    async fn delete_many_by_id(&self, doc_ids: &[String]) -> SearcherResult<usize>;
     /// Insert/update documents in the index, returning the list of document ids
-    fn upsert(&self, updates: &[DocumentUpdate]) -> SearcherResult<Vec<Uuid>>;
+    async fn upsert(&self, updates: &[DocumentUpdate]) -> SearcherResult<Vec<Uuid>>;
 }
 
 type SearcherResult<T> = Result<T, SearchError>;
@@ -129,8 +128,8 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 
 #[cfg(test)]
 mod test {
-    use crate::{DocumentUpdate, IndexBackend, QueryStats};
     use crate::client::Searcher;
+    use crate::{DocumentUpdate, IndexBackend, QueryStats};
 
     async fn _build_test_index(searcher: &mut Searcher) {
         searcher

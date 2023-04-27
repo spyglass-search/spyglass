@@ -1,3 +1,4 @@
+use chrono::Utc;
 use std::path::PathBuf;
 use tantivy::{directory::MmapDirectory, schema::*, tokenizer::*, Index};
 
@@ -75,6 +76,30 @@ pub fn register_tokenizer(index: &Index) {
     index
         .tokenizers()
         .register(TOKENIZER_NAME, full_content_tokenizer_en);
+}
+
+/// A new document to be added
+#[derive(Clone)]
+pub struct DocumentUpdate<'a> {
+    pub doc_id: Option<String>,
+    pub title: &'a str,
+    pub domain: &'a str,
+    pub url: &'a str,
+    pub content: &'a str,
+    pub tags: &'a [i64],
+    pub published_at: Option<chrono::DateTime<Utc>>,
+    pub last_modified: Option<chrono::DateTime<Utc>>,
+}
+
+/// Indexed fields which we can apply filters/boosts to
+pub enum IndexField {
+    DocId,
+    Domain,
+    Content,
+    Title,
+    Url,
+    PublishedAt,
+    LastModifiedAt,
 }
 
 #[derive(Clone)]

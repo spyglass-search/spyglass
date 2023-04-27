@@ -18,7 +18,7 @@ use url::Url;
 use crate::{crawler::CrawlResult, state::AppState};
 use entities::models::tag::TagType;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
-use spyglass_searcher::{DocumentUpdate, RetrievedDocument};
+use spyglass_searcher::{schema::DocumentUpdate, RetrievedDocument, WriteTrait};
 
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
@@ -141,11 +141,12 @@ pub async fn process_crawl_results(
         let doc_id = state.index.upsert_document(DocumentUpdate {
             doc_id: id_map.get(&crawl_result.url).cloned(),
             title: &crawl_result.title.clone().unwrap_or_default(),
-            description: &crawl_result.description.clone().unwrap_or_default(),
             domain: url_host,
             url: url.as_str(),
             content: &crawl_result.content.clone().unwrap_or_default(),
             tags: &tags_for_crawl.clone(),
+            published_at: None,
+            last_modified: None,
         })?;
 
         if !id_map.contains_key(&doc_id) {
@@ -276,11 +277,12 @@ pub async fn process_records(
                         match state.index.upsert_document(DocumentUpdate {
                             doc_id: id_map.get(&canonical_url_str.clone()).cloned(),
                             title: &crawl_result.title.clone().unwrap_or_default(),
-                            description: &crawl_result.description.clone(),
                             domain: url_host,
                             url: url.as_str(),
                             content: &crawl_result.content,
                             tags: &tag_list,
+                            published_at: None,
+                            last_modified: None,
                         }) {
                             Ok(new_doc_id) => Some(new_doc_id),
                             _ => None,
@@ -428,11 +430,12 @@ pub async fn update_tags(
             let _doc_id = state.index.upsert_document(DocumentUpdate {
                 doc_id: Some(doc.doc_id.clone()),
                 title: &doc.title,
-                description: &doc.description,
                 domain: &doc.domain,
                 url: &doc.url,
                 content: &doc.content,
                 tags: ids,
+                published_at: None,
+                last_modified: None,
             })?;
         }
     }
