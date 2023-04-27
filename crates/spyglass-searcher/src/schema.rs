@@ -91,17 +91,6 @@ pub struct DocumentUpdate<'a> {
     pub last_modified: Option<chrono::DateTime<Utc>>,
 }
 
-/// Indexed fields which we can apply filters/boosts to
-pub enum IndexField {
-    DocId,
-    Domain,
-    Content,
-    Title,
-    Url,
-    PublishedAt,
-    LastModifiedAt,
-}
-
 #[derive(Clone)]
 pub struct DocFields {
     pub id: Field,
