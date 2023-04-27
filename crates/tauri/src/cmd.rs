@@ -474,18 +474,19 @@ pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn ask_clippy(
     win: tauri::Window,
-    question: &str,
+    query: &str,
     context: Vec<ClippyContext>,
+    lens: Option<Vec<String>>,
 ) -> Result<(), String> {
-    log::debug!("ask_clippy: {} - {:?}", question, context);
+    log::info!("ask_clippy: {} - {:?}", query, context);
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let rpc = rpc.lock().await;
         if let Err(err) = rpc
             .client
             .ask_clippy(AskClippyRequest {
-                query: question.to_string(),
+                query: query.to_string(),
                 context,
-                lens: None,
+                lens,
             })
             .await
         {

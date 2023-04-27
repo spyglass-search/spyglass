@@ -29,7 +29,7 @@ inherits = "dev"
 debug = true
 
 # NOTE: Fixes an issue running ggml in debug mode on windows
-[profile.dev.package.ggml-raw]
+[profile.dev.package.ggml-sys]
 opt-level = 3
 
 [profile.dev.package.llama-rs]

@@ -2230,9 +2230,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "ggml-raw"
+name = "ggml"
 version = "0.1.0"
-source = "git+https://github.com/rustformers/llama-rs?rev=a067431773ba0194d6bc352faf40a770c1eac81c#a067431773ba0194d6bc352faf40a770c1eac81c"
+source = "git+https://github.com/rustformers/llama-rs?rev=5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0#5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0"
+dependencies = [
+ "ggml-sys",
+]
+
+[[package]]
+name = "ggml-format"
+version = "0.1.0"
+source = "git+https://github.com/rustformers/llama-rs?rev=5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0#5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0"
+dependencies = [
+ "ggml",
+ "thiserror",
+]
+
+[[package]]
+name = "ggml-sys"
+version = "0.1.0"
+source = "git+https://github.com/rustformers/llama-rs?rev=5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0#5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0"
 dependencies = [
  "cc",
 ]
@@ -3607,11 +3624,12 @@ checksum = "cd550e73688e6d578f0ac2119e32b797a327631a42f9433e59d02e139c8df60d"
 [[package]]
 name = "llama-rs"
 version = "0.1.0"
-source = "git+https://github.com/rustformers/llama-rs?rev=a067431773ba0194d6bc352faf40a770c1eac81c#a067431773ba0194d6bc352faf40a770c1eac81c"
+source = "git+https://github.com/rustformers/llama-rs?rev=5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0#5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0"
 dependencies = [
- "bincode",
  "bytemuck",
- "ggml-raw",
+ "ggml",
+ "ggml-format",
+ "memmap2",
  "partial_sort",
  "rand 0.8.5",
  "serde",

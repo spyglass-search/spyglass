@@ -11,7 +11,7 @@ keywords = ["spyglass"]
 license = "AGPL"
 
 [dependencies]
-llama-rs = { git = "https://github.com/rustformers/llama-rs", rev = "a067431773ba0194d6bc352faf40a770c1eac81c" }
+llama-rs = { git = "https://github.com/rustformers/llama-rs", rev = "5e0a8fccc6d5ebbc54bf91f49dc42eead64e08f0" }
 log = "0.4"
 rand = "0.8.5"
 tokio = { version = "1", features = ["full"] }

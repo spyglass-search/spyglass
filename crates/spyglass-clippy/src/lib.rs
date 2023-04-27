@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 
 use llama_rs::{
     InferenceParameters, InferenceSessionParameters, LoadError, LoadProgress, ModelKVMemoryType,
-    OutputToken, TokenBias,
+    TokenBias,
 };
 use rand::SeedableRng;
 
@@ -97,10 +97,9 @@ fn run_model(
         top_k: 40,
         top_p: 0.5,
         repeat_penalty: 1.17647,
-        temp: 0.5,
+        temperature: 0.5,
         bias_tokens: TokenBias::default(),
-        play_back_previous_tokens: false,
-        ..Default::default()
+        play_back_previous_tokens: false
     };
 
     let inference_session_params = {
@@ -112,19 +111,14 @@ fn run_model(
         }
     };
 
-    let (model, vocab) =
-        llama_rs::Model::load(model_path.clone(), 2048, |progress| match progress {
+    let model =
+        llama_rs::Model::load(model_path.clone(), false, 2048, |progress| match progress {
             LoadProgress::HyperparametersLoaded(hparams) => {
                 log::debug!("Loaded HyperParams {hparams:#?}")
             }
             LoadProgress::ContextSize { bytes } => log::debug!(
                 "ggml ctx size = {:.2} MB\n",
                 bytes as f64 / (1024.0 * 1024.0)
-            ),
-            LoadProgress::MemorySize { bytes, n_mem } => log::debug!(
-                "Memory size: {} MB {}",
-                bytes as f32 / 1024.0 / 1024.0,
-                n_mem
             ),
             LoadProgress::PartTensorLoaded {
                 file: _,
@@ -159,39 +153,29 @@ fn run_model(
     let og_prompt = prompt.to_string();
     let res = session.inference_with_prompt::<Infallible>(
         &model,
-        &vocab,
         &inference_params,
         &prompt,
         Some(2048),
         &mut rng,
-        move |t| {
+        move |token| {
             let pcheck = prompt_check.clone();
-            match t {
-                OutputToken::Token(c) => {
-                    let c = c.to_string();
-                    let tx = tx.clone();
-                    if output_prompt {
-                        tokio::spawn(async move {
-                            let _ = tx.send(TokenResult::Token(c.to_string()));
-                        });
-                    } else if let Ok(mut pcheck) = pcheck.lock() {
-                        // detect whether the model has finished inputting the prompt to the model
-                        if *pcheck == og_prompt {
-                            tokio::spawn(async move {
-                                let _ = tx.send(TokenResult::Token(c.to_string()));
-                            });
-                        } else {
-                            pcheck.push_str(&c);
-                        }
-                    }
-                }
-                OutputToken::EndOfText => {
-                    let tx = tx.clone();
+            let token = token.to_string();
+            let tx = tx.clone();
+            if output_prompt {
+                tokio::spawn(async move {
+                    let _ = tx.send(TokenResult::Token(token.clone()));
+                });
+            } else if let Ok(mut pcheck) = pcheck.lock() {
+                // detect whether the model has finished inputting the prompt to the model
+                if *pcheck == og_prompt {
                     tokio::spawn(async move {
-                        let _ = tx.send(TokenResult::EndOfText);
+                        let _ = tx.send(TokenResult::Token(token));
                     });
+                } else {
+                    pcheck.push_str(&token);
                 }
             }
+
             Ok(())
         },
     );
@@ -209,6 +193,9 @@ fn run_model(
             ));
         }
         Err(llama_rs::InferenceError::UserCallback(_)) => unreachable!("cannot fail"),
+        Err(llama_rs::InferenceError::EndOfText) => {
+            let _ = stream.send(TokenResult::EndOfText);
+        }
     }
 
     tokio::spawn(async move {
