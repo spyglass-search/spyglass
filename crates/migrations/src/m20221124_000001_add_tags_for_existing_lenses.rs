@@ -1,7 +1,6 @@
 use entities::{
     models::{
-        document_tag, indexed_document,
-        lens::{self, LensType},
+        document_tag, indexed_document, lens,
         tag::{get_or_create, TagType},
     },
     sea_orm::{
@@ -107,12 +106,7 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         // Loop through lenses
-        let lenses = lens::Entity::find()
-            .filter(lens::Column::IsEnabled.eq(true))
-            .filter(lens::Column::LensType.eq(LensType::Simple))
-            .all(db)
-            .await
-            .unwrap_or_default();
+        let lenses = lens::get_lens_names(db).await?;
 
         let lens_dir = config.lenses_dir();
 

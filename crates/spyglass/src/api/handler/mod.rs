@@ -17,7 +17,6 @@ use libspyglass::crawler::CrawlResult;
 use libspyglass::documents::process_crawl_results;
 use libspyglass::filesystem;
 use libspyglass::plugin::PluginCommand;
-use libspyglass::search::Searcher;
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
@@ -199,11 +198,11 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_document(state: AppState, id: String) -> Result<(), Error> {
-    if let Err(e) = Searcher::delete_by_id(&state, &id).await {
+    if let Err(e) = state.index.delete_by_id(&id).await {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
-    let _ = Searcher::save(&state).await;
+    let _ = indexed_document::delete_many_by_doc_id(&state.db, &[id]).await;
     Ok(())
 }
 
@@ -236,10 +235,10 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
     if let Ok(indexed) = indexed {
         log::debug!("removing docs from index");
         let indexed_count = indexed.len();
-        for result in indexed {
-            let _ = Searcher::delete_by_id(&state, &result.doc_id).await;
-        }
-        let _ = Searcher::save(&state).await;
+
+        let doc_ids: Vec<String> = indexed.iter().map(|x| x.doc_id.to_string()).collect();
+        let _ = state.index.delete_many_by_id(&doc_ids).await;
+        let _ = indexed_document::delete_many_by_doc_id(&state.db, &doc_ids).await;
 
         log::debug!("removed {} items from index", indexed_count);
     }
@@ -587,11 +586,14 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
     if let Ok(ids) = indexed_document::find_by_lens(state.db.clone(), name).await {
         // - remove from db & index
         let doc_ids: Vec<String> = ids.iter().map(|x| x.doc_id.to_owned()).collect();
-        if let Err(err) = Searcher::delete_many_by_id(&state, &doc_ids, true).await {
+        let dbids: Vec<i64> = ids.iter().map(|x| x.id).collect();
+
+        // Remove from index
+        if let Err(err) = state.index.delete_many_by_id(&doc_ids).await {
             return Err(Error::Custom(err.to_string()));
-        } else {
-            let _ = Searcher::save(&state).await;
         }
+        // Remove from db
+        let _ = indexed_document::delete_many_by_id(&state.db, &dbids).await;
     }
 
     // -- remove from crawl queue
@@ -654,9 +656,9 @@ mod test {
         models::{crawl_queue, indexed_document},
         test::setup_test_db,
     };
-    use libspyglass::search::{DocumentUpdate, Searcher};
     use libspyglass::state::AppState;
     use shared::config::{Config, LensConfig};
+    use spyglass_searcher::DocumentUpdate;
 
     #[tokio::test]
     async fn test_uninstall_lens() {
@@ -670,22 +672,19 @@ mod test {
             ..Default::default()
         };
 
-        if let Ok(mut writer) = state.index.writer.lock() {
-            Searcher::upsert_document(
-                &mut writer,
-                DocumentUpdate {
-                    doc_id: Some("test_id".into()),
-                    title: "test title",
-                    description: "test desc",
-                    domain: "example.com",
-                    url: "https://example.com/test",
-                    content: "test content",
-                    tags: &[],
-                },
-            )
+        state
+            .index
+            .upsert_document(DocumentUpdate {
+                doc_id: Some("test_id".into()),
+                title: "test title",
+                description: "test desc",
+                domain: "example.com",
+                url: "https://example.com/test",
+                content: "test content",
+                tags: &[],
+            })
             .expect("Unable to add doc");
-        }
-        let _ = Searcher::save(&state).await;
+        let _ = state.index.save().await;
 
         let doc = indexed_document::ActiveModel {
             domain: Set("example.com".into()),

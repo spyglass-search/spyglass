@@ -2,76 +2,7 @@ use shared::event::OpenResultParams;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::{
-    components::{icons, tooltip::Tooltip},
-    tauri_invoke,
-};
-
-#[derive(Properties, PartialEq, Eq)]
-pub struct DeleteButtonProps {
-    pub doc_id: String,
-}
-
-#[function_component(DeleteButton)]
-pub fn delete_btn(props: &DeleteButtonProps) -> Html {
-    let onclick = {
-        let doc_id = props.doc_id.clone();
-        Callback::from(move |e: MouseEvent| {
-            e.prevent_default();
-            e.stop_immediate_propagation();
-
-            let doc_id = doc_id.clone();
-            spawn_local(async move {
-                let _ = crate::delete_doc(doc_id.clone()).await;
-            });
-        })
-    };
-
-    html! {
-        <button
-            {onclick}
-            class="hover:text-red-600 text-neutral-600 group">
-            <Tooltip label={"Delete"} />
-            <icons::TrashIcon height={"h-4"} width={"w-4"} />
-        </button>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct RecrawlButtonProps {
-    pub domain: String,
-    pub onrecrawl: Option<Callback<MouseEvent>>,
-}
-
-#[function_component(RecrawlButton)]
-pub fn recrawl_button(props: &RecrawlButtonProps) -> Html {
-    let onclick = {
-        let domain = props.domain.clone();
-        let callback = props.onrecrawl.clone();
-
-        Callback::from(move |me| {
-            let domain = domain.clone();
-            let callback = callback.clone();
-
-            spawn_local(async move {
-                let _ = crate::recrawl_domain(domain.clone()).await;
-            });
-
-            if let Some(callback) = callback {
-                callback.emit(me);
-            }
-        })
-    };
-
-    html! {
-        <button
-            {onclick}
-            class="hover:text-red-600 text-neutral-600 group flex flex-row">
-            <icons::RefreshIcon height={"h-4"} width={"w-4"} />
-            <span class="pl-1">{"Recrawl"}</span>
-        </button>
-    }
-}
+use crate::tauri_invoke;
 
 #[allow(dead_code)]
 #[derive(Clone, PartialEq, Eq)]

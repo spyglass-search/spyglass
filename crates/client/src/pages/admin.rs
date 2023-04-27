@@ -1,11 +1,11 @@
 use strum_macros::{Display, EnumString};
+use ui_components::icons;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::{classes, prelude::*, Children};
 use yew_router::components::Link;
 use yew_router::hooks::use_navigator;
 
-use crate::components::icons;
 use crate::{listen, pages, Route};
 use shared::event::{ClientEvent, ListenPayload};
 

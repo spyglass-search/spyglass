@@ -1037,6 +1037,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_log"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be8aed40e4edbf4d3b4431ab260b63fdc40f5780a4766824329ea0f1eefe3c0f"
+dependencies = [
+ "log",
+ "web-sys",
+]
+
+[[package]]
 name = "const_fn"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1791,12 +1801,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
-name = "fallible-streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
-
-[[package]]
 name = "fastdivide"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2439,7 +2443,7 @@ dependencies = [
  "gloo-events",
  "gloo-utils",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.4.5",
  "serde_urlencoded",
  "thiserror",
  "wasm-bindgen",
@@ -2714,15 +2718,6 @@ dependencies = [
 
 [[package]]
 name = "hashlink"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7249a3129cbc1ffccd74857f81464a323a152173cdb134e0fd81bc803b29facf"
-dependencies = [
- "hashbrown 0.11.2",
-]
-
-[[package]]
-name = "hashlink"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69fe1fcf8b4278d860ad0548329f892a3631fb63f82574df68275f34cdbe0ffa"
@@ -2806,6 +2801,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hkdf"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "791a029f6b9fc27657f6f188ec6e5e43f6911f6f878e0dc5501396e09809d437"
+dependencies = [
+ "hmac 0.12.1",
+]
 
 [[package]]
 name = "hmac"
@@ -3813,6 +3817,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "md-5"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6365506850d44bff6e2fbcb5176cf63650e48bd45ef2fe2665ae1570e0f4b9ca"
+dependencies = [
+ "digest 0.10.6",
+]
+
+[[package]]
 name = "measure_time"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3865,6 +3878,7 @@ dependencies = [
  "rayon",
  "sea-orm-migration",
  "shared",
+ "spyglass-searcher",
  "tantivy 0.18.1",
  "tantivy 0.19.2",
  "tar",
@@ -5617,7 +5631,7 @@ dependencies = [
  "http",
  "hyper",
  "log",
- "md-5",
+ "md-5 0.9.1",
  "percent-encoding",
  "pin-project-lite",
  "rusoto_credential",
@@ -5625,21 +5639,6 @@ dependencies = [
  "serde",
  "sha2 0.9.9",
  "tokio",
-]
-
-[[package]]
-name = "rusqlite"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85127183a999f7db96d1a976a309eebbfb6ea3b0b400ddd8340190129de6eb7a"
-dependencies = [
- "bitflags",
- "fallible-iterator",
- "fallible-streaming-iterator",
- "hashlink 0.7.0",
- "libsqlite3-sys",
- "memchr",
- "smallvec",
 ]
 
 [[package]]
@@ -6192,6 +6191,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6601,7 +6611,6 @@ dependencies = [
  "reqwest",
  "ron",
  "rubato",
- "rusqlite",
  "sentry",
  "sentry-tracing",
  "serde",
@@ -6612,6 +6621,7 @@ dependencies = [
  "spyglass-netrunner",
  "spyglass-plugin",
  "spyglass-rpc",
+ "spyglass-searcher",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "symphonia",
@@ -6620,6 +6630,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tower",
  "tracing",
  "tracing-appender",
  "tracing-log",
@@ -6683,11 +6694,12 @@ dependencies = [
  "markdown",
  "num-format",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.5.0",
  "serde_json",
  "shared",
  "strum 0.24.1",
  "strum_macros 0.24.3",
+ "ui-components",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -6735,9 +6747,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-netrunner"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3136ddfe60460cb35aa266d3462f397ad75c6d3aeb13e0f19e8ef4393d60519"
+checksum = "c3f491f6fe67a4bac08e6c793d744d8446e2460269c5976288276aebcb2689d9"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -6762,6 +6774,7 @@ dependencies = [
  "rusoto_core",
  "rusoto_s3",
  "serde",
+ "serde_json",
  "sitemap",
  "spyglass-lens 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",
@@ -6786,7 +6799,6 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "uuid 1.3.0",
 ]
 
 [[package]]
@@ -6796,6 +6808,26 @@ dependencies = [
  "jsonrpsee",
  "serde",
  "shared",
+]
+
+[[package]]
+name = "spyglass-searcher"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "reqwest",
+ "ron",
+ "serde",
+ "serde_json",
+ "shared",
+ "tantivy 0.19.2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
+ "uuid 1.3.0",
 ]
 
 [[package]]
@@ -6827,11 +6859,13 @@ checksum = "fa8241483a83a3f33aa5fff7e7d9def398ff9990b2752b6c6112b83c6d246029"
 dependencies = [
  "ahash",
  "atoi",
+ "base64 0.13.1",
  "bitflags",
  "byteorder",
  "bytes",
  "chrono",
  "crossbeam-queue",
+ "dirs",
  "dotenvy",
  "either",
  "event-listener",
@@ -6841,21 +6875,27 @@ dependencies = [
  "futures-executor",
  "futures-intrusive",
  "futures-util",
- "hashlink 0.8.1",
+ "hashlink",
  "hex",
+ "hkdf",
+ "hmac 0.12.1",
  "indexmap",
  "itoa 1.0.6",
  "libc",
  "libsqlite3-sys",
  "log",
+ "md-5 0.10.5",
  "memchr",
  "once_cell",
  "paste",
  "percent-encoding",
+ "rand 0.8.5",
  "rustls",
  "rustls-pemfile 1.0.2",
  "serde",
  "serde_json",
+ "sha1 0.10.5",
+ "sha2 0.10.6",
  "smallvec",
  "sqlformat",
  "sqlx-rt",
@@ -6864,6 +6904,7 @@ dependencies = [
  "tokio-stream",
  "url",
  "webpki-roots",
+ "whoami",
 ]
 
 [[package]]
@@ -8136,6 +8177,7 @@ checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
 dependencies = [
  "futures-core",
  "futures-util",
+ "hdrhistogram",
  "indexmap",
  "pin-project",
  "pin-project-lite",
@@ -8331,6 +8373,17 @@ name = "ucd-trie"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e79c4d996edb816c91e4308506774452e55e95c3c9de07b6729e17e15a5ef81"
+
+[[package]]
+name = "ui-components"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "shared",
+ "url",
+ "wasm-bindgen-futures",
+ "yew",
+]
 
 [[package]]
 name = "uname"
@@ -9006,6 +9059,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "console_log",
+ "futures",
+ "gloo",
+ "log",
+ "markdown",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "shared",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
+ "thiserror",
+ "ui-components",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "yew",
+ "yew-router",
+]
+
+[[package]]
 name = "web-sys"
 version = "0.3.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9132,18 +9209,29 @@ dependencies = [
 
 [[package]]
 name = "whisper-rs"
-version = "0.4.0"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=cf278027eeb5aa849360f664de2c34287418c625#cf278027eeb5aa849360f664de2c34287418c625"
+version = "0.6.0"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
 dependencies = [
+ "dashmap",
  "whisper-rs-sys",
 ]
 
 [[package]]
 name = "whisper-rs-sys"
-version = "0.3.1"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=cf278027eeb5aa849360f664de2c34287418c625#cf278027eeb5aa849360f664de2c34287418c625"
+version = "0.4.0"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
 dependencies = [
  "bindgen",
+]
+
+[[package]]
+name = "whoami"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c70234412ca409cc04e864e89523cb0fc37f5e1344ebed5a3ebf4192b6b9f68"
+dependencies = [
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

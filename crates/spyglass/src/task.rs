@@ -20,14 +20,14 @@ use crate::connection::{api_id_to_label, load_connection};
 use crate::crawler::bootstrap;
 use crate::filesystem;
 use crate::filesystem::extensions::AudioExt;
-use crate::search::lens::{load_lenses, read_lenses};
-use crate::search::Searcher;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
 use diff::Diff;
 
+pub mod lens;
 mod manager;
 pub mod worker;
+use lens::{load_lenses, read_lenses};
 
 #[derive(Debug, Clone)]
 pub struct CrawlTask {
@@ -421,7 +421,7 @@ pub async fn worker_task(
                                 log::debug!("committing {} new/updated docs in index", num_updated);
                                 updated_docs.store(0, Ordering::Relaxed);
                                 tokio::spawn(async move {
-                                    let _ = Searcher::save(&state).await;
+                                    let _ = state.index.save().await;
                                 });
                             }
                         }

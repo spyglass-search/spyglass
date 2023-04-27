@@ -14,11 +14,11 @@ use crate::task::{AppShutdown, UserSettingsChange};
 use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
-    search::{IndexPath, Searcher},
     task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 use shared::metrics::Metrics;
+use spyglass_searcher::{IndexPath, Searcher};
 
 /// Used to track inflight requests and limit things
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -80,17 +80,18 @@ pub struct AppState {
     pub fetch_limits: Arc<DashMap<FetchLimitType, usize>>,
     // We should have only one LLM request going at a time.
     pub llm_request: Arc<Mutex<Option<JoinHandle<()>>>>,
+    pub readonly_mode: bool,
 }
 
 impl AppState {
-    pub async fn new(config: &Config) -> Self {
+    pub async fn new(config: &Config, readonly_mode: bool) -> Self {
         let db = create_connection(config, false)
             .await
             .expect("Unable to connect to database");
 
         AppStateBuilder::new()
             .with_db(db)
-            .with_index(&IndexPath::LocalPath(config.index_dir()))
+            .with_index(&IndexPath::LocalPath(config.index_dir()), readonly_mode)
             .with_lenses(&config.lenses.values().cloned().collect())
             .with_pipelines(
                 &config
@@ -146,6 +147,7 @@ pub struct AppStateBuilder {
     lenses: Option<Vec<LensConfig>>,
     pipelines: Option<Vec<PipelineConfiguration>>,
     user_settings: Option<UserSettings>,
+    readonly_mode: Option<bool>,
 }
 
 impl AppStateBuilder {
@@ -167,7 +169,7 @@ impl AppStateBuilder {
         let index = if let Some(index) = &self.index {
             index.to_owned()
         } else {
-            Searcher::with_index(&IndexPath::Memory).expect("Unable to open search index")
+            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open search index")
         };
 
         let user_settings = if let Some(settings) = &self.user_settings {
@@ -203,6 +205,7 @@ impl AppStateBuilder {
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
             llm_request: Arc::new(Mutex::new(None)),
+            readonly_mode: self.readonly_mode.unwrap_or_default(),
         }
     }
 
@@ -230,14 +233,14 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn with_index(&mut self, index: &IndexPath) -> &mut Self {
+    pub fn with_index(&mut self, index: &IndexPath, readonly: bool) -> &mut Self {
         if let IndexPath::LocalPath(path) = &index {
             if !path.exists() {
                 let _ = std::fs::create_dir_all(path);
             }
         }
 
-        self.index = Some(Searcher::with_index(index).expect("Unable to open index"));
+        self.index = Some(Searcher::with_index(index, readonly).expect("Unable to open index"));
         self
     }
 }

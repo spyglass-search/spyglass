@@ -292,6 +292,20 @@ pub struct DefaultIndices {
     pub extensions: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SimilarityResultPayload {
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SimilaritySearchResult {
+    pub id: usize,
+    pub version: usize,
+    pub score: f32,
+    pub payload: SimilarityResultPayload,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DocMetadata {
     pub doc_id: String,
@@ -304,4 +318,32 @@ pub struct DocMetadata {
 pub struct SendToAskClippyPayload {
     pub question: Option<String>,
     pub docs: Vec<DocMetadata>,
+}
+
+// Rougly in order of occurrence
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub enum ChatUpdate {
+    /// Searching our document index for relevant documents
+    SearchingDocuments,
+    /// Documents returned from search
+    DocumentContextAdded(Vec<SearchResult>),
+    /// Generating context from documents
+    GeneratingContext,
+    /// Context that has been generated
+    ContextGenerated(String),
+    /// Loading model / sending to API endpoint
+    LoadingModel,
+    LoadingPrompt,
+    /// Tokens being received from model
+    Token(String),
+    /// Done!
+    EndOfText,
+    Error(ChatErrorType),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ChatErrorType {
+    ContextLengthExceeded(String),
+    APIKeyMissing,
+    UnknownError(String),
 }

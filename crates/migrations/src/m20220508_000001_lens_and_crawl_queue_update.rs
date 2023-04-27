@@ -1,6 +1,6 @@
 use entities::{
     models::crawl_queue,
-    sea_orm::{ConnectionTrait, Statement},
+    sea_orm::{ConnectionTrait, DbBackend, Statement},
 };
 use sea_orm_migration::prelude::*;
 
@@ -15,22 +15,40 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let lens_table = r#"
-            CREATE TABLE IF NOT EXISTS "lens" (
-                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "name" text NOT NULL UNIQUE,
-                "author" text NOT NULL,
-                "description" text NOT NULL,
-                "version" text NOT NULL);"#;
+        let lens_table = if manager.get_database_backend() == DbBackend::Sqlite {
+            Some(
+                r#"
+                CREATE TABLE IF NOT EXISTS "lens" (
+                    "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    "name" text NOT NULL UNIQUE,
+                    "author" text NOT NULL,
+                    "description" text NOT NULL,
+                    "version" text NOT NULL);"#,
+            )
+        } else if manager.get_database_backend() == DbBackend::Postgres {
+            Some(
+                r#"
+                CREATE TABLE IF NOT EXISTS "lens" (
+                    "id" BIGSERIAL PRIMARY KEY,
+                    "name" text NOT NULL UNIQUE,
+                    "author" text NOT NULL,
+                    "description" text NOT NULL,
+                    "version" text NOT NULL);"#,
+            )
+        } else {
+            None
+        };
 
-        // Create lens table
-        manager
-            .get_connection()
-            .execute(Statement::from_string(
-                manager.get_database_backend(),
-                lens_table.to_owned().to_string(),
-            ))
-            .await?;
+        if let Some(lens_table) = lens_table {
+            // Create lens table
+            manager
+                .get_connection()
+                .execute(Statement::from_string(
+                    manager.get_database_backend(),
+                    lens_table.to_owned().to_string(),
+                ))
+                .await?;
+        }
 
         // Add crawl_type column
         manager

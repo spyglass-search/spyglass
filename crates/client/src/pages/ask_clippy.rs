@@ -3,6 +3,8 @@ use serde_wasm_bindgen::from_value;
 use shared::event::{self, ClientEvent, ListenPayload};
 use shared::request::{AskClippyRequest, ClippyContext, LLMResponsePayload};
 use shared::response::{DocMetadata, SendToAskClippyPayload};
+use strum_macros::Display;
+use ui_components::{btn, icons};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsValue;
 use web_sys::{HtmlElement, HtmlInputElement};
@@ -11,7 +13,6 @@ use yew::platform::spawn_local;
 use yew::prelude::*;
 use yew::NodeRef;
 
-use crate::components::{btn, icons};
 use crate::tauri_invoke;
 
 /// Number of messages to use as context
@@ -19,10 +20,13 @@ use crate::tauri_invoke;
 /// question & answer.
 const CHAT_CONTEXT_WINDOW: usize = 2;
 
-#[derive(Clone, PartialEq, Eq)]
-enum HistorySource {
+#[derive(Clone, PartialEq, Eq, Display)]
+pub enum HistorySource {
+    #[strum(serialize = "assistant")]
     Clippy,
+    #[strum(serialize = "user")]
     User,
+    #[strum(serialize = "system")]
     System,
 }
 
@@ -68,6 +72,11 @@ impl AskClippy {
             }
             LLMResponsePayload::LoadingPrompt => {
                 self.status = Some("Running inference...".into());
+            }
+            LLMResponsePayload::SearchingDocuments
+            | LLMResponsePayload::DocumentContextAdded(_)
+            | LLMResponsePayload::GeneratingContext => {
+                self.status = Some("Analzying documents...".into());
             }
             LLMResponsePayload::Token(token) => {
                 if let Some(tokens) = self.tokens.as_mut() {
@@ -179,7 +188,7 @@ impl Component for AskClippy {
                         .rev()
                         .take(CHAT_CONTEXT_WINDOW)
                         // Map into a chat log-esque format.
-                        .map(|x| ClippyContext::History(x.as_log()))
+                        .map(|x| ClippyContext::History(x.source.to_string(), x.as_log()))
                         .collect::<Vec<_>>();
                     // Reverse again so they're in order from oldest to newest.
                     context.reverse();
@@ -203,8 +212,9 @@ impl Component for AskClippy {
                     if let Err(err) = tauri_invoke::<AskClippyRequest, ()>(
                         event::ClientInvoke::AskClippy,
                         AskClippyRequest {
-                            question: query.to_string(),
+                            query: query.to_string(),
                             context,
+                            lens: None,
                         },
                     )
                     .await

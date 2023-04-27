@@ -1,3 +1,4 @@
+use crate::response::DocMetadata;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 
@@ -57,24 +58,28 @@ pub struct BatchDocumentRequest {
     pub tags: Vec<(String, String)>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum ClippyContext {
     /// Document the user is asking about
     DocId(String),
     /// Previous log of questions/answers
-    History(String),
+    History(String, String),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AskClippyRequest {
-    pub question: String,
+    pub query: String,
     pub context: Vec<ClippyContext>,
+    pub lens: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum LLMResponsePayload {
     Error(String),
     Finished,
+    SearchingDocuments,
+    DocumentContextAdded(Vec<DocMetadata>),
+    GeneratingContext,
     LoadingModel,
     LoadingPrompt,
     Token(String),

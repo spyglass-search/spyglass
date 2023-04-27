@@ -1,18 +1,18 @@
 use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
-use crate::search::{DocumentUpdate, Searcher};
 use crate::state::AppState;
 use crate::task::CrawlTask;
 
 use entities::models::{crawl_queue, indexed_document};
+use entities::sea_orm::prelude::*;
+use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, PipelineConfiguration};
+use spyglass_searcher::DocumentUpdate;
 use tokio::sync::mpsc;
+use url::Url;
 
 use super::parser::DefaultParser;
 use super::PipelineCommand;
-use entities::sea_orm::prelude::*;
-use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use url::Url;
 
 // General pipeline loop for configured pipelines. This code is responsible for
 // processing pipeline requests against the provided pipeline configuration
@@ -126,30 +126,23 @@ async fn start_crawl(
 
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
-                            let _ = Searcher::delete_by_id(&state, &doc.doc_id).await;
-                            let _ = Searcher::save(&state).await;
+                            let _ = state.index.delete_by_id(&doc.doc_id).await;
+                            let _ = indexed_document::delete_many_by_id(&state.db, &[doc.id]).await;
                         }
 
                         // Add document to index
                         let doc_id: Option<String> = {
-                            if let Ok(mut index_writer) = state.index.writer.lock() {
-                                match Searcher::upsert_document(
-                                    &mut index_writer,
-                                    DocumentUpdate {
-                                        doc_id: existing.clone().map(|f| f.doc_id),
-                                        title: &crawl_result.title.unwrap_or_default(),
-                                        description: &crawl_result.description.unwrap_or_default(),
-                                        domain: url_host,
-                                        url: url.as_str(),
-                                        content: &content,
-                                        tags: &[],
-                                    },
-                                ) {
-                                    Ok(new_doc_id) => Some(new_doc_id),
-                                    _ => None,
-                                }
-                            } else {
-                                None
+                            match state.index.upsert_document(DocumentUpdate {
+                                doc_id: existing.clone().map(|f| f.doc_id),
+                                title: &crawl_result.title.unwrap_or_default(),
+                                description: &crawl_result.description.unwrap_or_default(),
+                                domain: url_host,
+                                url: url.as_str(),
+                                content: &content,
+                                tags: &[],
+                            }) {
+                                Ok(new_doc_id) => Some(new_doc_id),
+                                _ => None,
                             }
                         };
 

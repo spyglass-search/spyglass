@@ -3,13 +3,10 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::components::forms::{FormElement, SettingChangeEvent};
-use crate::{
-    components::{btn, icons},
-    save_user_settings, tauri_invoke,
-    utils::RequestState,
-};
+use crate::{components::btn, save_user_settings, tauri_invoke, utils::RequestState};
 use shared::event::ClientInvoke;
 use shared::form::SettingOpts;
+use ui_components::icons;
 
 #[derive(Clone)]
 pub enum Msg {

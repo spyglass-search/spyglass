@@ -14,9 +14,9 @@ use spyglass_plugin::Authentication;
 use spyglass_plugin::DocumentUpdate;
 use spyglass_plugin::HttpMethod;
 use spyglass_plugin::{DocumentResult, PluginEvent};
+use spyglass_searcher::RetrievedDocument;
 use std::path::Path;
 use std::str::FromStr;
-use tantivy::DocAddress;
 use tokio::sync::mpsc::Sender;
 use url::Url;
 use wasmer::{Exports, Function, Store};
@@ -28,7 +28,6 @@ use entities::sea_orm::ModelTrait;
 use entities::sea_orm::QueryFilter;
 
 use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
-use crate::search::{self, Searcher};
 use crate::state::AppState;
 use reqwest::header::USER_AGENT;
 
@@ -71,7 +70,14 @@ async fn handle_plugin_cmd_request(
     match cmd {
         // Delete document from index
         PluginCommandRequest::DeleteDoc { url } => {
-            Searcher::delete_by_url(&env.app_state, url).await?
+            let docs = indexed_document::Entity::find()
+                .filter(indexed_document::Column::Url.eq(url))
+                .all(&env.app_state.db)
+                .await
+                .unwrap_or_default();
+
+            let doc_ids = docs.iter().map(|x| x.doc_id.to_owned()).collect::<Vec<_>>();
+            env.app_state.index.delete_many_by_id(&doc_ids).await?;
         }
         // Enqueue a list of URLs to be crawled
         PluginCommandRequest::Enqueue { urls } => handle_plugin_enqueue(env, urls),
@@ -149,15 +155,42 @@ async fn handle_plugin_cmd_request(
             tag_modifications,
         } => {
             log::trace!("Received modify tags command {:?}", documents);
-            let docs =
-                Searcher::search_by_query(&env.app_state.db, &env.app_state.index, documents).await;
+            let tag_ids = documents.has_tags.clone().unwrap_or_default();
+            let tag_ids = tag::get_tags_by_value(&env.app_state.db, &tag_ids)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|model| model.id as u64)
+                .collect::<Vec<u64>>();
+
+            let exclude_tags = documents.exclude_tags.clone().unwrap_or_default();
+            let exclude_tags = tag::get_tags_by_value(&env.app_state.db, &exclude_tags)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|model| model.id as u64)
+                .collect::<Vec<u64>>();
+
+            let docs = env
+                .app_state
+                .index
+                .search_by_query(
+                    documents.urls.clone(),
+                    documents.ids.clone(),
+                    &tag_ids,
+                    &exclude_tags,
+                )
+                .await;
+
             if !docs.is_empty() {
-                let doc_ids = docs
+                let docs = docs
                     .iter()
-                    .map(|(_, addr)| *addr)
-                    .collect::<Vec<DocAddress>>();
+                    .map(|(_, doc)| doc)
+                    .cloned()
+                    .collect::<Vec<RetrievedDocument>>();
+
                 if let Err(error) =
-                    documents::update_tags(&env.app_state, &doc_ids, tag_modifications).await
+                    documents::update_tags(&env.app_state, &docs, tag_modifications).await
                 {
                     log::error!("Error updating document tags {:?}", error);
                 }
@@ -280,44 +313,63 @@ async fn query_document_and_send_loop(env: PluginEnv, query: DocumentQuery) {
 }
 
 async fn query_documents_and_send(env: &PluginEnv, query: &DocumentQuery, send_empty: bool) {
-    let docs = Searcher::search_by_query(&env.app_state.db, &env.app_state.index, query).await;
+    let tag_ids = query.has_tags.clone().unwrap_or_default();
+    let tag_ids = tag::get_tags_by_value(&env.app_state.db, &tag_ids)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
+
+    let exclude_tags = query.exclude_tags.clone().unwrap_or_default();
+    let exclude_tags = tag::get_tags_by_value(&env.app_state.db, &exclude_tags)
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|model| model.id as u64)
+        .collect::<Vec<u64>>();
+
+    let docs = env
+        .app_state
+        .index
+        .search_by_query(
+            query.urls.clone(),
+            query.ids.clone(),
+            &tag_ids,
+            &exclude_tags,
+        )
+        .await;
     log::debug!("Found {:?} documents for query", docs.len());
-    let searcher = &env.app_state.index.reader.searcher();
     let mut results = Vec::new();
     let db = &env.app_state.db;
-    for (_score, doc_addr) in docs {
-        if let Ok(Ok(doc)) = searcher
-            .doc(doc_addr)
-            .map(|doc| search::document_to_struct(&doc))
-        {
-            log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
-                .one(db)
-                .await;
+    for (_score, doc) in docs {
+        log::trace!("Got id with url {} {}", doc.doc_id, doc.url);
+        let indexed = indexed_document::Entity::find()
+            .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
+            .one(db)
+            .await;
 
-            let crawl_uri = doc.url;
-            if let Ok(Some(indexed)) = indexed {
-                let tags = indexed
-                    .find_related(tag::Entity)
-                    .all(db)
-                    .await
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|tag| (tag.label.to_string(), tag.value.clone()))
-                    .collect::<Vec<(String, String)>>();
+        let crawl_uri = doc.url;
+        if let Ok(Some(indexed)) = indexed {
+            let tags = indexed
+                .find_related(tag::Entity)
+                .all(db)
+                .await
+                .unwrap_or_default()
+                .iter()
+                .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                .collect::<Vec<(String, String)>>();
 
-                let result = DocumentResult {
-                    doc_id: doc.doc_id.clone(),
-                    domain: doc.domain,
-                    title: doc.title,
-                    description: doc.description,
-                    url: indexed.open_url.unwrap_or(crawl_uri),
-                    tags,
-                };
+            let result = DocumentResult {
+                doc_id: doc.doc_id.clone(),
+                domain: doc.domain,
+                title: doc.title,
+                description: doc.description,
+                url: indexed.open_url.unwrap_or(crawl_uri),
+                tags,
+            };
 
-                results.push(result);
-            }
+            results.push(result);
         }
     }
 

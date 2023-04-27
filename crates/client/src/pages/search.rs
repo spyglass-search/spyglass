@@ -13,10 +13,10 @@ use shared::{
     event::{ClientEvent, ClientInvoke, OpenResultParams},
     response::{self, SearchMeta, SearchResult, SearchResults},
 };
+use ui_components::icons;
 
 use crate::components::user_action_list::{self, ActionListBtn, ActionsList, DEFAULT_ACTION_LABEL};
 use crate::components::{
-    icons,
     result::{FeedbackResult, LensResultItem, SearchResultItem},
     KeyComponent, SelectedLens,
 };

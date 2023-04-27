@@ -9,10 +9,10 @@ use tauri::api::dialog::FileDialogBuilder;
 use tauri::State;
 use tauri::{ClipboardManager, Manager};
 
-use crate::{open_folder, rpc, window, PauseState};
 use crate::constants::TabLocation;
 use crate::current_version;
 use crate::window::{navigate_to_tab, show_ask_clippy};
+use crate::{open_folder, rpc, window, PauseState};
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use shared::{event::ClientEvent, request, response};
@@ -483,8 +483,9 @@ pub async fn ask_clippy(
         if let Err(err) = rpc
             .client
             .ask_clippy(AskClippyRequest {
-                question: question.to_string(),
+                query: question.to_string(),
                 context,
+                lens: None,
             })
             .await
         {

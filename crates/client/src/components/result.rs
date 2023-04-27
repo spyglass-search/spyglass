@@ -5,11 +5,11 @@ use url::Url;
 use yew::{platform::spawn_local, prelude::*};
 use yew_router::Routable;
 
-use super::{
-    btn, icons,
-    tag::{Tag, TagIcon},
-};
+use super::btn;
+
 use crate::{pages::Tab, tauri_invoke, Route};
+use ui_components::icons;
+use ui_components::tag::{Tag, TagIcon};
 
 #[derive(Properties, PartialEq)]
 pub struct SearchResultProps {
