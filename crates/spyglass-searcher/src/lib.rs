@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use tantivy::schema::*;
 use thiserror::Error;
 use uuid::Uuid;
+use url::Url;
 
 pub mod client;
 pub mod schema;
@@ -17,7 +18,9 @@ pub use query::QueryStats;
 
 type Score = f32;
 
-pub enum IndexPath {
+pub enum IndexBackend {
+    // Elasticsearch compatible REST API (such as Quickwit for example)
+    Http(Url),
     // Directory
     LocalPath(PathBuf),
     // In memory index for testing purposes.
@@ -126,7 +129,7 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 
 #[cfg(test)]
 mod test {
-    use crate::{DocumentUpdate, IndexPath, QueryStats};
+    use crate::{DocumentUpdate, IndexBackend, QueryStats};
     use crate::client::Searcher;
 
     async fn _build_test_index(searcher: &mut Searcher) {
@@ -216,7 +219,7 @@ mod test {
     #[tokio::test]
     pub async fn test_basic_lense_search() {
         let mut searcher =
-            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let mut stats = QueryStats::new();
@@ -231,7 +234,7 @@ mod test {
     #[tokio::test]
     pub async fn test_url_lens_search() {
         let mut searcher =
-            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
 
         let mut stats = QueryStats::new();
         _build_test_index(&mut searcher).await;
@@ -246,7 +249,7 @@ mod test {
     #[tokio::test]
     pub async fn test_singular_url_lens_search() {
         let mut searcher =
-            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let mut stats = QueryStats::new();

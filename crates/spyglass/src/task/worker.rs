@@ -321,7 +321,7 @@ mod test {
     use entities::sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, Set};
     use entities::test::setup_test_db;
     use shared::config::{LensConfig, UserSettings};
-    use spyglass_searcher::IndexPath;
+    use spyglass_searcher::IndexBackend;
 
     use super::{handle_cdx_collection, process_crawl, AppState, FetchResult};
 
@@ -334,7 +334,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db)
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         // Should skip this lens since it's been bootstrapped already.
@@ -352,7 +352,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let model = crawl_queue::ActiveModel {
@@ -401,7 +401,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let task = crawl_queue::ActiveModel {
@@ -452,7 +452,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let model = crawl_queue::ActiveModel {
@@ -517,7 +517,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let task = crawl_queue::ActiveModel {

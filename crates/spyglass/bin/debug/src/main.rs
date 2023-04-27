@@ -10,7 +10,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use spyglass_searcher::{IndexPath, QueryBoost, QueryStats, client::Searcher};
+use spyglass_searcher::{IndexBackend, QueryBoost, QueryStats, client::Searcher};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -119,7 +119,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                         ron::ser::to_string_pretty(&tags, PrettyConfig::new()).unwrap_or_default()
                     );
                     let index =
-                        Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
+                        Searcher::with_index(&IndexBackend::LocalPath(config.index_dir()), true)
                             .expect("Unable to open index.");
 
                     let docs = index
@@ -156,7 +156,7 @@ async fn main() -> anyhow::Result<ExitCode> {
                 }
             };
 
-            let index = Searcher::with_index(&IndexPath::LocalPath(config.index_dir()), true)
+            let index = Searcher::with_index(&IndexBackend::LocalPath(config.index_dir()), true)
                 .expect("Unable to open index.");
 
             let docs = index

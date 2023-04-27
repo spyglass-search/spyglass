@@ -6787,6 +6787,7 @@ dependencies = [
  "tracing",
  "tracing-log",
  "tracing-subscriber",
+ "url",
  "uuid 1.3.0",
 ]
 
