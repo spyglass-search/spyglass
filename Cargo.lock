@@ -8486,6 +8486,7 @@ dependencies = [
  "getrandom 0.2.8",
  "rand 0.8.5",
  "serde",
+ "sha1_smol",
  "wasm-bindgen",
 ]
 

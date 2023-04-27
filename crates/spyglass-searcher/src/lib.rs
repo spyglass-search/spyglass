@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use tantivy::schema::*;
 use thiserror::Error;
 use url::Url;
-use uuid::Uuid;
 
 pub mod client;
 pub mod schema;
@@ -51,9 +50,9 @@ pub enum SearchError {
 #[async_trait::async_trait]
 pub trait SearchTrait {
     /// Get a single document by id
-    fn get(&self, doc_id: &str) -> Option<RetrievedDocument>;
+    async fn get(&self, doc_id: &str) -> Option<RetrievedDocument>;
     /// Runs a search against the index
-    fn search(
+    async fn search(
         &self,
         query: &str,
         boosts: &[QueryBoost],
@@ -70,8 +69,14 @@ pub trait WriteTrait {
     }
     /// Delete documents from the index by id, returning the number of docs deleted.
     async fn delete_many_by_id(&self, doc_ids: &[String]) -> SearcherResult<usize>;
+
+    async fn upsert(&self, single_doc: &DocumentUpdate) -> SearcherResult<String> {
+        let upserted = self.upsert_many(&[single_doc.clone()]).await?;
+        Ok(upserted.get(0).expect("Expected a single doc").to_owned())
+    }
+
     /// Insert/update documents in the index, returning the list of document ids
-    async fn upsert(&self, updates: &[DocumentUpdate]) -> SearcherResult<Vec<Uuid>>;
+    async fn upsert_many(&self, updates: &[DocumentUpdate]) -> SearcherResult<Vec<String>>;
 }
 
 type SearcherResult<T> = Result<T, SearchError>;
@@ -129,14 +134,13 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 #[cfg(test)]
 mod test {
     use crate::client::Searcher;
-    use crate::{DocumentUpdate, IndexBackend, QueryStats};
+    use crate::{DocumentUpdate, IndexBackend, QueryStats, WriteTrait};
 
     async fn _build_test_index(searcher: &mut Searcher) {
         searcher
-            .upsert_document(DocumentUpdate {
+            .upsert(&DocumentUpdate {
                 doc_id: None,
                 title: "Of Mice and Men",
-                description: "Of Mice and Men passage",
                 domain: "example.com",
                 url: "https://example.com/mice_and_men",
                 content:
@@ -149,14 +153,16 @@ mod test {
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
                 tags: &vec![1_i64],
+                published_at: None,
+                last_modified: None,
             })
+            .await
             .expect("Unable to add doc");
 
         searcher
-            .upsert_document(DocumentUpdate {
+            .upsert(&DocumentUpdate {
                 doc_id: None,
                 title: "Of Mice and Men",
-                description: "Of Mice and Men passage",
                 domain: "en.wikipedia.org",
                 url: "https://en.wikipedia.org/mice_and_men",
                 content:
@@ -169,14 +175,16 @@ mod test {
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
                 tags: &vec![2_i64],
+                published_at: None,
+                last_modified: None,
             })
+            .await
             .expect("Unable to add doc");
 
         searcher
-            .upsert_document(DocumentUpdate {
+            .upsert(&DocumentUpdate {
                 doc_id: None,
                 title: "Of Cheese and Crackers",
-                description: "Of Cheese and Crackers Passage",
                 domain: "en.wikipedia.org",
                 url: "https://en.wikipedia.org/cheese_and_crackers",
                 content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
@@ -187,14 +195,16 @@ mod test {
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
                 tags: &vec![2_i64],
+                published_at: None,
+                last_modified: None,
             })
+            .await
             .expect("Unable to add doc");
 
-        searcher.upsert_document(
-            DocumentUpdate {
+        searcher.upsert(
+            &DocumentUpdate {
             doc_id: None,
             title:"Frankenstein: The Modern Prometheus",
-            description: "A passage from Frankenstein",
             domain:"monster.com",
             url:"https://example.com/frankenstein",
             content:"You will rejoice to hear that no disaster has accompanied the commencement of an
@@ -202,8 +212,9 @@ mod test {
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
              tags: &vec![1_i64],
-        }
-        )
+             published_at: None,
+             last_modified: None
+        }).await
         .expect("Unable to add doc");
 
         let res = searcher.save().await;

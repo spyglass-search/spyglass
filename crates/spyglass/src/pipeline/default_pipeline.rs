@@ -132,16 +132,20 @@ async fn start_crawl(
 
                         // Add document to index
                         let doc_id: Option<String> = {
-                            match state.index.upsert_document(DocumentUpdate {
-                                doc_id: existing.clone().map(|f| f.doc_id),
-                                title: &crawl_result.title.unwrap_or_default(),
-                                domain: url_host,
-                                url: url.as_str(),
-                                content: &content,
-                                tags: &[],
-                                published_at: None,
-                                last_modified: None,
-                            }) {
+                            match state
+                                .index
+                                .upsert(&DocumentUpdate {
+                                    doc_id: existing.clone().map(|f| f.doc_id),
+                                    title: &crawl_result.title.unwrap_or_default(),
+                                    domain: url_host,
+                                    url: url.as_str(),
+                                    content: &content,
+                                    tags: &[],
+                                    published_at: None,
+                                    last_modified: None,
+                                })
+                                .await
+                            {
                                 Ok(new_doc_id) => Some(new_doc_id),
                                 _ => None,
                             }
