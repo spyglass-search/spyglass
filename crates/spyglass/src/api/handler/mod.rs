@@ -659,7 +659,8 @@ mod test {
     };
     use libspyglass::state::AppState;
     use shared::config::{Config, LensConfig};
-    use spyglass_searcher::DocumentUpdate;
+    use spyglass_searcher::schema::DocumentUpdate;
+    use spyglass_searcher::WriteTrait;
 
     #[tokio::test]
     async fn test_uninstall_lens() {
@@ -675,15 +676,17 @@ mod test {
 
         state
             .index
-            .upsert_document(DocumentUpdate {
+            .upsert(&DocumentUpdate {
                 doc_id: Some("test_id".into()),
                 title: "test title",
-                description: "test desc",
                 domain: "example.com",
                 url: "https://example.com/test",
                 content: "test content",
                 tags: &[],
+                published_at: None,
+                last_modified: None,
             })
+            .await
             .expect("Unable to add doc");
         let _ = state.index.save().await;
 
