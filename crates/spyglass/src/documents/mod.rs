@@ -18,7 +18,10 @@ use url::Url;
 use crate::{crawler::CrawlResult, state::AppState};
 use entities::models::tag::TagType;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
-use spyglass_searcher::{schema::DocumentUpdate, RetrievedDocument, WriteTrait};
+use spyglass_searcher::{
+    schema::{DocumentUpdate, ToDocument},
+    RetrievedDocument, WriteTrait,
+};
 
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
@@ -140,16 +143,19 @@ pub async fn process_crawl_results(
         // Add document to index
         let doc_id = state
             .index
-            .upsert(&DocumentUpdate {
-                doc_id: id_map.get(&crawl_result.url).cloned(),
-                title: &crawl_result.title.clone().unwrap_or_default(),
-                domain: url_host,
-                url: url.as_str(),
-                content: &crawl_result.content.clone().unwrap_or_default(),
-                tags: &tags_for_crawl.clone(),
-                published_at: None,
-                last_modified: None,
-            })
+            .upsert(
+                &DocumentUpdate {
+                    doc_id: id_map.get(&crawl_result.url).cloned(),
+                    title: &crawl_result.title.clone().unwrap_or_default(),
+                    domain: url_host,
+                    url: url.as_str(),
+                    content: &crawl_result.content.clone().unwrap_or_default(),
+                    tags: &tags_for_crawl.clone(),
+                    published_at: None,
+                    last_modified: None,
+                }
+                .to_document(),
+            )
             .await?;
 
         if !id_map.contains_key(&doc_id) {
@@ -279,16 +285,19 @@ pub async fn process_records(
                     let doc_id: Option<String> = {
                         match state
                             .index
-                            .upsert(&DocumentUpdate {
-                                doc_id: id_map.get(&canonical_url_str.clone()).cloned(),
-                                title: &crawl_result.title.clone().unwrap_or_default(),
-                                domain: url_host,
-                                url: url.as_str(),
-                                content: &crawl_result.content,
-                                tags: &tag_list,
-                                published_at: None,
-                                last_modified: None,
-                            })
+                            .upsert(
+                                &DocumentUpdate {
+                                    doc_id: id_map.get(&canonical_url_str.clone()).cloned(),
+                                    title: &crawl_result.title.clone().unwrap_or_default(),
+                                    domain: url_host,
+                                    url: url.as_str(),
+                                    content: &crawl_result.content,
+                                    tags: &tag_list,
+                                    published_at: None,
+                                    last_modified: None,
+                                }
+                                .to_document(),
+                            )
                             .await
                         {
                             Ok(new_doc_id) => Some(new_doc_id),
@@ -436,16 +445,19 @@ pub async fn update_tags(
         for (_, (doc, ids)) in tag_map.iter() {
             let _doc_id = state
                 .index
-                .upsert(&DocumentUpdate {
-                    doc_id: Some(doc.doc_id.clone()),
-                    title: &doc.title,
-                    domain: &doc.domain,
-                    url: &doc.url,
-                    content: &doc.content,
-                    tags: ids,
-                    published_at: None,
-                    last_modified: None,
-                })
+                .upsert(
+                    &DocumentUpdate {
+                        doc_id: Some(doc.doc_id.clone()),
+                        title: &doc.title,
+                        domain: &doc.domain,
+                        url: &doc.url,
+                        content: &doc.content,
+                        tags: ids,
+                        published_at: None,
+                        last_modified: None,
+                    }
+                    .to_document(),
+                )
                 .await?;
         }
     }

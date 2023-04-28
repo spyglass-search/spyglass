@@ -11,11 +11,11 @@ use uuid::Uuid;
 use crate::query::{build_document_query, build_query, terms_for_field, QueryOptions};
 use crate::schema::{self, DocFields, SearchDocument};
 use crate::{
-    document_to_struct, Boost, DocumentUpdate, IndexBackend, QueryBoost, RetrievedDocument, Score,
+    document_to_struct, field_to_string, Boost, IndexBackend, QueryBoost, RetrievedDocument, Score,
     SearchError, SearchQueryResult, SearchTrait, SearcherResult, WriteTrait,
 };
 
-const SPYGLASS_NS: Uuid = uuid::uuid!("5fdfe40a-de2c-11ed-bfa7-00155deae876");
+pub const SPYGLASS_NS: Uuid = uuid::uuid!("5fdfe40a-de2c-11ed-bfa7-00155deae876");
 
 /// Tantivy searcher client
 #[derive(Clone)]
@@ -48,33 +48,15 @@ impl WriteTrait for Searcher {
         Ok(doc_ids.len())
     }
 
-    async fn upsert_many(&self, updates: &[DocumentUpdate]) -> SearcherResult<Vec<String>> {
+    async fn upsert_many(&self, updates: &[Document]) -> SearcherResult<Vec<String>> {
         let mut upserted = Vec::new();
+        let fields = DocFields::as_fields();
+
         for doc_update in updates {
-            let fields = DocFields::as_fields();
-
-            let doc_id = doc_update.doc_id.clone().map_or_else(
-                || {
-                    Uuid::new_v5(&SPYGLASS_NS, doc_update.url.as_bytes())
-                        .as_hyphenated()
-                        .to_string()
-                },
-                |s| s,
-            );
-
-            let mut doc = Document::default();
-            doc.add_text(fields.content, doc_update.content);
-            doc.add_text(fields.domain, doc_update.domain);
-            doc.add_text(fields.id, &doc_id);
-            doc.add_text(fields.title, doc_update.title);
-            doc.add_text(fields.url, doc_update.url);
-            for t in doc_update.tags {
-                doc.add_u64(fields.tags, *t as u64);
-            }
-
             let writer = self.lock_writer()?;
-            writer.add_document(doc)?;
+            writer.add_document(doc_update.clone())?;
 
+            let doc_id = field_to_string(doc_update, fields.id);
             upserted.push(doc_id.clone());
         }
 
