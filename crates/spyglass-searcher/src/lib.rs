@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use tantivy::schema::*;
@@ -168,6 +168,7 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 #[cfg(test)]
 mod test {
     use crate::client::Searcher;
+    use crate::schema::{DocFields, SearchDocument};
     use crate::{Boost, DocumentUpdate, IndexBackend, QueryBoost, SearchTrait, WriteTrait};
 
     async fn _build_test_index(searcher: &mut Searcher) {
@@ -263,7 +264,8 @@ mod test {
     #[tokio::test]
     pub async fn test_basic_lense_search() {
         let mut searcher =
-            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, DocFields::as_schema(), false)
+                .expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let query = "salinas";
@@ -275,7 +277,8 @@ mod test {
     #[tokio::test]
     pub async fn test_url_lens_search() {
         let mut searcher =
-            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, DocFields::as_schema(), false)
+                .expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let query = "salinas";
@@ -287,7 +290,8 @@ mod test {
     #[tokio::test]
     pub async fn test_singular_url_lens_search() {
         let mut searcher =
-            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, DocFields::as_schema(), false)
+                .expect("Unable to open index");
         _build_test_index(&mut searcher).await;
 
         let query = "salinasd";

@@ -160,8 +160,8 @@ mod test {
 
     #[test]
     fn test_find_highlights() {
-        let searcher =
-            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
+        let searcher = Searcher::with_index(&IndexBackend::Memory, DocFields::as_schema(), false)
+            .expect("Unable to open index");
         let blurb = r#"Rust rust is a multi-paradigm, high-level, general-purpose programming"#;
 
         let fields = DocFields::as_fields();

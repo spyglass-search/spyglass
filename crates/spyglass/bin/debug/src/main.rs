@@ -10,7 +10,8 @@ use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 use libspyglass::pipeline::cache_pipeline::process_update;
-use spyglass_searcher::{client::Searcher, Boost, IndexBackend, QueryBoost};
+use spyglass_searcher::schema::SearchDocument;
+use spyglass_searcher::{client::Searcher, schema::DocFields, Boost, IndexBackend, QueryBoost};
 
 #[cfg(debug_assertions)]
 const LOG_LEVEL: &str = "spyglassdebug=DEBUG";
@@ -107,6 +108,7 @@ async fn main() -> anyhow::Result<ExitCode> {
             let doc_details =
                 models::indexed_document::get_document_details(&db, identifier).await?;
 
+            let schema = DocFields::as_schema();
             println!("## Document Details ##");
             match doc_details {
                 Some((doc, tags)) => {
@@ -118,9 +120,12 @@ async fn main() -> anyhow::Result<ExitCode> {
                         "Tags: {}",
                         ron::ser::to_string_pretty(&tags, PrettyConfig::new()).unwrap_or_default()
                     );
-                    let index =
-                        Searcher::with_index(&IndexBackend::LocalPath(config.index_dir()), true)
-                            .expect("Unable to open index.");
+                    let index = Searcher::with_index(
+                        &IndexBackend::LocalPath(config.index_dir()),
+                        schema,
+                        true,
+                    )
+                    .expect("Unable to open index.");
 
                     let docs = index
                         .search_by_query(Some(vec![doc.url.clone()]), None, &[], &[])
@@ -156,8 +161,10 @@ async fn main() -> anyhow::Result<ExitCode> {
                 }
             };
 
-            let index = Searcher::with_index(&IndexBackend::LocalPath(config.index_dir()), true)
-                .expect("Unable to open index.");
+            let schema = DocFields::as_schema();
+            let index =
+                Searcher::with_index(&IndexBackend::LocalPath(config.index_dir()), schema, true)
+                    .expect("Unable to open index.");
 
             let docs = index
                 .search_by_query(doc_query.urls, doc_query.ids, &[], &[])

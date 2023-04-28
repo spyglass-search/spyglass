@@ -22,7 +22,8 @@ impl Migration {
     }
 
     pub fn after_writer(&self, path: &PathBuf) -> IndexWriter {
-        let index = schema::initialize_index(path).expect("Unable to open search index");
+        let index = schema::initialize_index(DocFields::as_schema(), path)
+            .expect("Unable to open search index");
         index.writer(50_000_000).expect("Unable to create writer")
     }
 
