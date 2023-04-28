@@ -169,8 +169,8 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 #[cfg(test)]
 mod test {
     use crate::client::Searcher;
-    use crate::schema::{DocFields, SearchDocument};
-    use crate::{Boost, DocumentUpdate, IndexBackend, QueryBoost, SearchTrait, WriteTrait};
+    use crate::schema::{DocFields, SearchDocument, DocumentUpdate, ToDocument};
+    use crate::{Boost, IndexBackend, QueryBoost, SearchTrait, WriteTrait};
 
     async fn _build_test_index(searcher: &mut Searcher) {
         searcher

@@ -659,7 +659,7 @@ mod test {
     };
     use libspyglass::state::AppState;
     use shared::config::{Config, LensConfig};
-    use spyglass_searcher::schema::DocumentUpdate;
+    use spyglass_searcher::schema::{DocumentUpdate, ToDocument};
     use spyglass_searcher::WriteTrait;
 
     #[tokio::test]
@@ -685,7 +685,7 @@ mod test {
                 tags: &[],
                 published_at: None,
                 last_modified: None,
-            })
+            }.to_document())
             .await
             .expect("Unable to add doc");
         let _ = state.index.save().await;
