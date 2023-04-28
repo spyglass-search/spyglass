@@ -40,6 +40,7 @@ impl QueryBoost {
             Boost::Favorite { .. } => 3.0,
             Boost::Tag(_) => 1.5,
             Boost::Url(_) => 3.0,
+            Boost::CustomField { .. } => 0.0,
         };
 
         QueryBoost {
@@ -56,6 +57,7 @@ pub enum Boost {
     Url(String),
     DocId(String),
     Tag(u64),
+    CustomField { field_name: String, value: u64 },
 }
 
 /// Contains stats & results for a search request

@@ -121,6 +121,13 @@ pub fn build_query(
                 // Originally boosted to 3.0
                 _boosted_term(Term::from_field_text(fields.url, url), boost.value)
             }
+            Boost::CustomField { field_name, value } => {
+                if let Some((field, _)) = schema.find_field(field_name) {
+                    _boosted_term(Term::from_field_u64(field, *value), boost.value)
+                } else {
+                    continue;
+                }
+            }
         };
 
         term_query.push((Occur::Should, term));
@@ -157,6 +164,13 @@ pub fn build_query(
             Boost::Url(url) => {
                 // Originally boosted to 3.0
                 _boosted_term(Term::from_field_text(fields.url, url), 0.0)
+            }
+            Boost::CustomField { field_name, value } => {
+                if let Some((field, _)) = schema.find_field(field_name) {
+                    _boosted_term(Term::from_field_u64(field, *value), 0.0)
+                } else {
+                    continue;
+                }
             }
         };
 
