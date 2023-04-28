@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use tantivy::schema::*;
@@ -24,7 +24,7 @@ pub enum IndexBackend {
     Memory,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct QueryBoost {
     /// What to boost
     field: Boost,
@@ -48,7 +48,7 @@ impl QueryBoost {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Boost {
     // If required is set to true, _only_ favorites will be searched.
     Favorite { id: u64, required: bool },
