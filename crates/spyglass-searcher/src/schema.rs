@@ -46,8 +46,7 @@ pub fn mapping_to_schema(mapping: &SchemaMapping) -> Schema {
 }
 
 /// Helper used to create and configure an index from a path
-pub fn initialize_index(index_path: &PathBuf) -> anyhow::Result<Index> {
-    let schema = DocFields::as_schema();
+pub fn initialize_index(schema: Schema, index_path: &PathBuf) -> anyhow::Result<Index> {
     let dir = MmapDirectory::open(index_path)?;
     let index = Index::open_or_create(dir, schema)?;
     register_tokenizer(&index);
@@ -56,8 +55,7 @@ pub fn initialize_index(index_path: &PathBuf) -> anyhow::Result<Index> {
 }
 
 /// Helper used to create and configure an in memory index
-pub fn initialize_in_memory_index() -> Index {
-    let schema = DocFields::as_schema();
+pub fn initialize_in_memory_index(schema: Schema) -> Index {
     let index = Index::create_in_ram(schema);
     register_tokenizer(&index);
 

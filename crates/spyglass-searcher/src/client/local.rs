@@ -193,10 +193,14 @@ impl Searcher {
     }
 
     /// Constructs a new Searcher object w/ the index @ `index_path`
-    pub fn with_index(index_path: &IndexBackend, readonly: bool) -> SearcherResult<Self> {
+    pub fn with_index(
+        index_path: &IndexBackend,
+        schema: Schema,
+        readonly: bool,
+    ) -> SearcherResult<Self> {
         let index = match index_path {
-            IndexBackend::LocalPath(path) => schema::initialize_index(path)?,
-            IndexBackend::Memory => schema::initialize_in_memory_index(),
+            IndexBackend::LocalPath(path) => schema::initialize_index(schema, path)?,
+            IndexBackend::Memory => schema::initialize_in_memory_index(schema),
             IndexBackend::Http(_) => unimplemented!(""),
         };
 
