@@ -552,7 +552,8 @@ mod test {
     use entities::test::setup_test_db;
     use shared::config::{LensConfig, UserSettings};
     use spyglass_plugin::SearchFilter;
-    use spyglass_searcher::IndexBackend;
+    use spyglass_searcher::schema::SearchDocument;
+    use spyglass_searcher::{schema::DocFields, IndexBackend};
 
     use super::{lens_to_filters, AppState};
 
@@ -578,7 +579,7 @@ mod test {
             .with_db(db)
             .with_lenses(&vec![test_lens])
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexBackend::Memory, false)
+            .with_index(&IndexBackend::Memory, DocFields::as_schema(), false)
             .build();
 
         let filters = lens_to_filters(state, "test").await;
