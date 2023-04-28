@@ -1,7 +1,15 @@
+use super::stop_word_filter::StopWordFilter;
 use chrono::Utc;
 use std::path::PathBuf;
-use tantivy::{directory::MmapDirectory, schema::*, Index, tokenizer::{Language, SimpleTokenizer, RemoveLongFilter, Stemmer, AsciiFoldingFilter, LowerCaser, TextAnalyzer}};
-use super::stop_word_filter::StopWordFilter;
+use tantivy::{
+    directory::MmapDirectory,
+    schema::*,
+    tokenizer::{
+        AsciiFoldingFilter, Language, LowerCaser, RemoveLongFilter, SimpleTokenizer, Stemmer,
+        TextAnalyzer,
+    },
+    Index,
+};
 pub type FieldName = String;
 
 pub const TOKENIZER_NAME: &str = "spyglass_tokenizer_en";
