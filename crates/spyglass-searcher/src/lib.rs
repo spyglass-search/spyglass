@@ -5,6 +5,7 @@ use tantivy::schema::*;
 use thiserror::Error;
 use url::Url;
 
+pub mod stop_word_filter;
 pub mod client;
 pub mod schema;
 use schema::{DocFields, DocumentUpdate, SearchDocument};
