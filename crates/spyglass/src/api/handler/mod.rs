@@ -676,16 +676,19 @@ mod test {
 
         state
             .index
-            .upsert(&DocumentUpdate {
-                doc_id: Some("test_id".into()),
-                title: "test title",
-                domain: "example.com",
-                url: "https://example.com/test",
-                content: "test content",
-                tags: &[],
-                published_at: None,
-                last_modified: None,
-            }.to_document())
+            .upsert(
+                &DocumentUpdate {
+                    doc_id: Some("test_id".into()),
+                    title: "test title",
+                    domain: "example.com",
+                    url: "https://example.com/test",
+                    content: "test content",
+                    tags: &[],
+                    published_at: None,
+                    last_modified: None,
+                }
+                .to_document(),
+            )
             .await
             .expect("Unable to add doc");
         let _ = state.index.save().await;
