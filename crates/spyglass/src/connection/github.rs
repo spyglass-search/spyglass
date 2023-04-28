@@ -9,6 +9,7 @@ use entities::{
 use jsonrpsee::core::async_trait;
 use libgithub::types::{Issue, Repo};
 use libgithub::GithubClient;
+use spyglass_searcher::WriteTrait;
 use strum_macros::{Display, EnumString};
 use url::Url;
 

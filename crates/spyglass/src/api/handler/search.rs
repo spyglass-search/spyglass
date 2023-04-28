@@ -10,7 +10,7 @@ use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 use spyglass_searcher::schema::{DocFields, SearchDocument};
-use spyglass_searcher::{QueryBoost, QueryStats};
+use spyglass_searcher::{Boost, QueryBoost, SearchTrait};
 use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
@@ -45,20 +45,33 @@ pub async fn search_docs(
 
     let mut boosts = Vec::new();
     for tag in check_query_for_tags(&state.db, &query).await {
-        boosts.push(QueryBoost::Tag(tag))
+        boosts.push(QueryBoost::new(Boost::Tag(tag)))
     }
-    let favorite_boost = get_favorite_tag(&state.db).await;
-    let mut stats = QueryStats::new();
 
-    let docs = state
-        .index
-        .search_with_lens(&lens_ids, &query, favorite_boost, &boosts, &mut stats, 5)
-        .await;
+    let mut filters = Vec::new();
+    for lens in lens_ids {
+        filters.push(QueryBoost::new(Boost::Tag(lens)));
+    }
+
+    if let Some(tag_id) = get_favorite_tag(&state.db).await {
+        filters.push(QueryBoost::new(Boost::Favorite {
+            id: tag_id,
+            required: false,
+        }));
+    }
+
+    let search_result = state.index.search(&query, &filters, &boosts, 5).await;
+    log::debug!(
+        "query {}: {} results from {} docs in {}ms",
+        query,
+        search_result.documents.len(),
+        search_result.num_docs,
+        search_result.wall_time_ms
+    );
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
-
-    for (score, doc) in docs {
+    for (score, doc) in search_result.documents {
         log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
         let indexed = indexed_document::Entity::find()
             .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
@@ -125,7 +138,7 @@ pub async fn search_docs(
         .track(metrics::Event::SearchResult {
             num_results: results.len(),
             num_docs,
-            term_count: stats.term_count,
+            term_count: search_result.term_counts as i32,
             domains: domains.iter().cloned().collect(),
             wall_time_ms,
         })

@@ -14,7 +14,7 @@ use spyglass_plugin::Authentication;
 use spyglass_plugin::DocumentUpdate;
 use spyglass_plugin::HttpMethod;
 use spyglass_plugin::{DocumentResult, PluginEvent};
-use spyglass_searcher::RetrievedDocument;
+use spyglass_searcher::{RetrievedDocument, WriteTrait};
 use std::path::Path;
 use std::str::FromStr;
 use tokio::sync::mpsc::Sender;

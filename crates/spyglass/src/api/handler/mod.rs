@@ -28,6 +28,7 @@ use shared::response::{
     PluginResult, SupportedConnection, UserConnection,
 };
 use spyglass_rpc::{RpcEvent, RpcEventType};
+use spyglass_searcher::WriteTrait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -198,7 +199,7 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
 /// Remove a doc from the index
 #[instrument(skip(state))]
 pub async fn delete_document(state: AppState, id: String) -> Result<(), Error> {
-    if let Err(e) = state.index.delete_by_id(&id).await {
+    if let Err(e) = state.index.delete(&id).await {
         log::error!("Unable to delete doc {} due to {}", id, e);
         return Err(Error::Custom(e.to_string()));
     }
@@ -658,7 +659,8 @@ mod test {
     };
     use libspyglass::state::AppState;
     use shared::config::{Config, LensConfig};
-    use spyglass_searcher::DocumentUpdate;
+    use spyglass_searcher::schema::DocumentUpdate;
+    use spyglass_searcher::WriteTrait;
 
     #[tokio::test]
     async fn test_uninstall_lens() {
@@ -674,15 +676,17 @@ mod test {
 
         state
             .index
-            .upsert_document(DocumentUpdate {
+            .upsert(&DocumentUpdate {
                 doc_id: Some("test_id".into()),
                 title: "test title",
-                description: "test desc",
                 domain: "example.com",
                 url: "https://example.com/test",
                 content: "test content",
                 tags: &[],
+                published_at: None,
+                last_modified: None,
             })
+            .await
             .expect("Unable to add doc");
         let _ = state.index.save().await;
 

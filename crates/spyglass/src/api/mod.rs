@@ -13,6 +13,7 @@ use shared::config::{Config, UserSettings};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::{RpcEventType, RpcServer};
+use spyglass_searcher::WriteTrait;
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 

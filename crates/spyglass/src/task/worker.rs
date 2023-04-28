@@ -7,6 +7,7 @@ use entities::models::{
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, LensSource};
+use spyglass_searcher::{SearchTrait, WriteTrait};
 
 use super::{bootstrap, CollectTask, ManagerCommand};
 use super::{CleanupTask, CrawlTask};
@@ -67,7 +68,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                         // Found document for the url, but it has a different doc id.
                         // check if this document exists in the index to see if we
                         // had a duplicate
-                        let indexed_result = state.index.get_by_id(doc_model.doc_id.as_str());
+                        let indexed_result = state.index.get(doc_model.doc_id.as_str()).await;
                         match indexed_result {
                             Some(_doc) => {
                                 log::debug!(
@@ -76,7 +77,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                                     doc_id
                                 );
                                 // Found indexed document, so we must have had duplicates, remove dup
-                                let _ = state.index.delete_by_id(doc_id.as_str()).await;
+                                let _ = state.index.delete(doc_id.as_str()).await;
                                 let _ =
                                     indexed_document::delete_many_by_doc_id(&state.db, &[doc_id])
                                         .await;
@@ -98,7 +99,7 @@ pub async fn cleanup_database(state: &AppState, cleanup_task: CleanupTask) -> an
                 Ok(None) => {
                     log::debug!("Could not find document for url {}, removing", url);
                     // can't find the url at all must be an old doc that was removed
-                    let _ = state.index.delete_by_id(doc_id.as_str()).await;
+                    let _ = state.index.delete(doc_id.as_str()).await;
                     let _ = indexed_document::delete_many_by_doc_id(&state.db, &[doc_id]).await;
                     changed = true;
                 }
@@ -321,7 +322,7 @@ mod test {
     use entities::sea_orm::{ActiveModelTrait, EntityTrait, ModelTrait, Set};
     use entities::test::setup_test_db;
     use shared::config::{LensConfig, UserSettings};
-    use spyglass_searcher::IndexPath;
+    use spyglass_searcher::IndexBackend;
 
     use super::{handle_cdx_collection, process_crawl, AppState, FetchResult};
 
@@ -334,7 +335,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db)
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         // Should skip this lens since it's been bootstrapped already.
@@ -352,7 +353,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let model = crawl_queue::ActiveModel {
@@ -401,7 +402,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let task = crawl_queue::ActiveModel {
@@ -452,7 +453,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let model = crawl_queue::ActiveModel {
@@ -517,7 +518,7 @@ mod test {
         let state = AppState::builder()
             .with_db(db.clone())
             .with_user_settings(&UserSettings::default())
-            .with_index(&IndexPath::Memory, false)
+            .with_index(&IndexBackend::Memory, false)
             .build();
 
         let task = crawl_queue::ActiveModel {

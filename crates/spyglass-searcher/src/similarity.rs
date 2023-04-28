@@ -4,7 +4,8 @@ use shared::response::SimilaritySearchResult;
 use std::env;
 use std::time::SystemTime;
 
-use super::{document_to_struct, Searcher};
+use super::client::Searcher;
+use crate::SearchTrait;
 
 const EMBEDDING_ENDPOINT: &str = "SIMILARITY_SEARCH_ENDPOINT";
 const EMBEDDING_PORT: &str = "SIMILARITY_SEARCH_PORT";
@@ -74,14 +75,11 @@ pub async fn generate_similarity_context(
     log::info!("Generate Similarity for {} docs", doc_ids.len());
 
     for doc_id in doc_ids {
-        if let Some(doc) = searcher.get_by_id(doc_id) {
-            if let Some(doc) = document_to_struct(&doc) {
-                if let Some(doc_context) =
-                    generate_similarity_context_for_doc(&client, query, &doc.content, &doc.url)
-                        .await
-                {
-                    context.push(doc_context);
-                }
+        if let Some(doc) = searcher.get(doc_id).await {
+            if let Some(doc_context) =
+                generate_similarity_context_for_doc(&client, query, &doc.content, &doc.url).await
+            {
+                context.push(doc_context);
             }
         }
     }

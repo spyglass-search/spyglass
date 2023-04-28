@@ -153,14 +153,15 @@ pub fn group_urls_by_scheme(urls: Vec<&str>) -> HashMap<&str, Vec<&str>> {
 
 #[cfg(test)]
 mod test {
+    use crate::client::Searcher;
     use crate::schema::{DocFields, SearchDocument};
     use crate::utils::generate_highlight_preview;
-    use crate::{IndexPath, Searcher};
+    use crate::IndexBackend;
 
     #[test]
     fn test_find_highlights() {
         let searcher =
-            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open index");
+            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open index");
         let blurb = r#"Rust rust is a multi-paradigm, high-level, general-purpose programming"#;
 
         let fields = DocFields::as_fields();

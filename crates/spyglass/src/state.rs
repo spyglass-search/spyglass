@@ -17,7 +17,7 @@ use crate::{
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 use shared::metrics::Metrics;
-use spyglass_searcher::{IndexPath, Searcher};
+use spyglass_searcher::{client::Searcher, IndexBackend};
 
 /// Used to track inflight requests and limit things
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -88,7 +88,7 @@ impl AppState {
 
         AppStateBuilder::new()
             .with_db(db)
-            .with_index(&IndexPath::LocalPath(config.index_dir()), readonly_mode)
+            .with_index(&IndexBackend::LocalPath(config.index_dir()), readonly_mode)
             .with_lenses(&config.lenses.values().cloned().collect())
             .with_pipelines(
                 &config
@@ -166,7 +166,7 @@ impl AppStateBuilder {
         let index = if let Some(index) = &self.index {
             index.to_owned()
         } else {
-            Searcher::with_index(&IndexPath::Memory, false).expect("Unable to open search index")
+            Searcher::with_index(&IndexBackend::Memory, false).expect("Unable to open search index")
         };
 
         let user_settings = if let Some(settings) = &self.user_settings {
@@ -229,8 +229,8 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn with_index(&mut self, index: &IndexPath, readonly: bool) -> &mut Self {
-        if let IndexPath::LocalPath(path) = &index {
+    pub fn with_index(&mut self, index: &IndexBackend, readonly: bool) -> &mut Self {
+        if let IndexBackend::LocalPath(path) = &index {
             if !path.exists() {
                 let _ = std::fs::create_dir_all(path);
             }

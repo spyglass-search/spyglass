@@ -2,12 +2,12 @@ use crate::pipeline::collector::DefaultCollector;
 use crate::pipeline::PipelineContext;
 use crate::state::AppState;
 use crate::task::CrawlTask;
-
 use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, PipelineConfiguration};
-use spyglass_searcher::DocumentUpdate;
+use spyglass_searcher::schema::DocumentUpdate;
+use spyglass_searcher::WriteTrait;
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -126,21 +126,26 @@ async fn start_crawl(
 
                         // Delete old document, if any.
                         if let Some(doc) = &existing {
-                            let _ = state.index.delete_by_id(&doc.doc_id).await;
+                            let _ = state.index.delete(&doc.doc_id).await;
                             let _ = indexed_document::delete_many_by_id(&state.db, &[doc.id]).await;
                         }
 
                         // Add document to index
                         let doc_id: Option<String> = {
-                            match state.index.upsert_document(DocumentUpdate {
-                                doc_id: existing.clone().map(|f| f.doc_id),
-                                title: &crawl_result.title.unwrap_or_default(),
-                                description: &crawl_result.description.unwrap_or_default(),
-                                domain: url_host,
-                                url: url.as_str(),
-                                content: &content,
-                                tags: &[],
-                            }) {
+                            match state
+                                .index
+                                .upsert(&DocumentUpdate {
+                                    doc_id: existing.clone().map(|f| f.doc_id),
+                                    title: &crawl_result.title.unwrap_or_default(),
+                                    domain: url_host,
+                                    url: url.as_str(),
+                                    content: &content,
+                                    tags: &[],
+                                    published_at: None,
+                                    last_modified: None,
+                                })
+                                .await
+                            {
                                 Ok(new_doc_id) => Some(new_doc_id),
                                 _ => None,
                             }

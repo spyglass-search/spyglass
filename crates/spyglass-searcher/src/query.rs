@@ -1,28 +1,14 @@
 use tantivy::query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, Query, TermQuery};
-use tantivy::schema::*;
 use tantivy::tokenizer::*;
 use tantivy::Score;
+use tantivy::{schema::*, Index};
+
+use crate::schema::SearchDocument;
+use crate::{Boost, QueryBoost};
 
 use super::DocFields;
 
 type QueryVec = Vec<(Occur, Box<dyn Query>)>;
-
-#[derive(Clone, Debug)]
-pub struct QueryStats {
-    pub term_count: i32,
-}
-
-impl Default for QueryStats {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl QueryStats {
-    pub fn new() -> Self {
-        QueryStats { term_count: -1 }
-    }
-}
 
 fn _boosted_term(term: Term, boost: Score) -> Box<BoostQuery> {
     Box::new(BoostQuery::new(
@@ -46,33 +32,47 @@ fn _boosted_phrase(terms: Vec<(usize, Term)>, boost: Score) -> Box<BoostQuery> {
     ))
 }
 
-#[derive(Clone, Default)]
-pub struct QueryBoosts {
-    /// Boosts based on implicit/explicit tag detection
-    pub tags: Vec<u64>,
-    /// Id of favorited boost
-    pub favorite: Option<u64>,
-    /// Urls to boost
-    pub urls: Vec<String>,
-    /// Specific doc ids to boost
-    pub doc_ids: Vec<String>,
+pub struct QueryOptions {
+    /// single term matches in the content
+    content_boost: f32,
+    /// full phrase matches in the content
+    content_phrase_boost: f32,
+    /// single term matches in the title
+    title_boost: f32,
+    /// full phrase matches in the title
+    title_phrase_boost: f32,
 }
 
-#[allow(clippy::too_many_arguments)]
+impl Default for QueryOptions {
+    fn default() -> Self {
+        QueryOptions {
+            content_boost: 1.0,
+            content_phrase_boost: 1.5,
+            // weight title matches a little more
+            title_boost: 2.0,
+            title_phrase_boost: 2.5,
+        }
+    }
+}
+
 pub fn build_query(
-    schema: Schema,
-    tokenizers: TokenizerManager,
-    fields: DocFields,
+    index: &Index,
     query_string: &str,
     // Applied filters
-    applied_lenses: &Vec<u64>,
-    stats: &mut QueryStats,
-    boosts: &QueryBoosts,
-) -> BooleanQuery {
-    let content_terms = terms_for_field(&schema, &tokenizers, query_string, fields.content);
-    let title_terms = terms_for_field(&schema, &tokenizers, query_string, fields.title);
+    filters: &[QueryBoost],
+    // Applied boosts,
+    boosts: &[QueryBoost],
+    // title/content boost options
+    opts: QueryOptions,
+) -> (usize, BooleanQuery) {
+    let schema = index.schema();
+    let tokenizers = index.tokenizers();
+    let fields = DocFields::as_fields();
 
-    stats.term_count = content_terms.len() as i32;
+    let content_terms = terms_for_field(&schema, tokenizers, query_string, fields.content);
+    let title_terms = terms_for_field(&schema, tokenizers, query_string, fields.title);
+
+    let term_count = content_terms.len();
 
     let mut term_query: QueryVec = Vec::new();
 
@@ -80,7 +80,7 @@ pub fn build_query(
     if content_terms.len() > 1 {
         // boosting phrases relative to the number of segments in a
         // continuous phrase
-        let boost = 2.0 * content_terms.len() as f32;
+        let boost = opts.content_phrase_boost * content_terms.len() as f32;
         term_query.push((Occur::Should, _boosted_phrase(content_terms.clone(), boost)));
     }
 
@@ -89,60 +89,81 @@ pub fn build_query(
         // boosting phrases relative to the number of segments in a
         // continuous phrase, base score higher for title
         // than content
-        let boost = 2.5 * title_terms.len() as f32;
+        let boost = opts.title_phrase_boost * title_terms.len() as f32;
         term_query.push((Occur::Should, _boosted_phrase(title_terms.clone(), boost)));
     }
 
     for (_position, term) in content_terms {
-        term_query.push((Occur::Should, _boosted_term(term, 1.0)));
+        term_query.push((Occur::Should, _boosted_term(term, opts.content_boost)));
     }
 
     for (_position, term) in title_terms {
-        term_query.push((Occur::Should, _boosted_term(term, 2.0)));
+        term_query.push((Occur::Should, _boosted_term(term, opts.title_boost)));
     }
 
-    // Tags that might be represented by search terms (e.g. "repository" or "file")
-    for tag_id in &boosts.tags {
-        term_query.push((
-            Occur::Should,
-            _boosted_term(Term::from_field_u64(fields.tags, *tag_id), 1.5),
-        ))
+    // Boost fields that happen to have a value, such as
+    // - Tags that might be represented by search terms (e.g. "repository" or "file")
+    // - Certain URLs or documents we want to focus on
+    for boost in boosts {
+        let term = match &boost.field {
+            Boost::DocId(doc_id) => {
+                // Originally boosted to 3.0
+                _boosted_term(Term::from_field_text(fields.id, doc_id), boost.value)
+            }
+            // Only considered in filters
+            Boost::Favorite { .. } => continue,
+            Boost::Tag(tag_id) => {
+                // Defaults to 1.5
+                _boosted_term(Term::from_field_u64(fields.tags, *tag_id), boost.value)
+            }
+            // todo: handle regex/prefixes?
+            Boost::Url(url) => {
+                // Originally boosted to 3.0
+                _boosted_term(Term::from_field_text(fields.url, url), boost.value)
+            }
+        };
+
+        term_query.push((Occur::Should, term));
     }
 
-    // Greatly boost selected urls
-    // todo: handle regex/prefixes?
-    for url in &boosts.urls {
-        term_query.push((
-            Occur::Should,
-            _boosted_term(Term::from_field_text(fields.url, url), 3.0),
-        ));
-    }
-
-    // Greatly boost selected docs
-    for doc_id in &boosts.doc_ids {
-        term_query.push((
-            Occur::Should,
-            _boosted_term(Term::from_field_text(fields.id, doc_id), 3.0),
-        ));
-    }
-
+    // Must hit at least one of the terms
     let mut combined: QueryVec = vec![(Occur::Must, Box::new(BooleanQuery::new(term_query)))];
-    for id in applied_lenses {
-        combined.push((
-            Occur::Must,
-            _boosted_term(Term::from_field_u64(fields.tags, *id), 0.0),
-        ));
+    // Must have one of these, will filter out stuff that doesn't
+    for filter in filters {
+        let term = match &filter.field {
+            Boost::DocId(doc_id) => {
+                // Originally boosted to 3.0
+                _boosted_term(Term::from_field_text(fields.id, doc_id), 0.0)
+            }
+            Boost::Favorite { id, required } => {
+                let occur = if *required {
+                    Occur::Must
+                } else {
+                    Occur::Should
+                };
+
+                combined.push((
+                    occur,
+                    _boosted_term(Term::from_field_u64(fields.tags, *id), 3.0),
+                ));
+
+                continue;
+            }
+            Boost::Tag(tag_id) => {
+                // Defaults to 1.5
+                _boosted_term(Term::from_field_u64(fields.tags, *tag_id), 0.0)
+            }
+            // todo: handle regex/prefixes?
+            Boost::Url(url) => {
+                // Originally boosted to 3.0
+                _boosted_term(Term::from_field_text(fields.url, url), 0.0)
+            }
+        };
+
+        combined.push((Occur::Must, term));
     }
 
-    // Greatly boost content that have our terms + a favorite.
-    if let Some(favorite_boost) = boosts.favorite {
-        combined.push((
-            Occur::Should,
-            _boosted_term(Term::from_field_u64(fields.tags, favorite_boost), 3.0),
-        ));
-    }
-
-    BooleanQuery::new(combined)
+    (term_count, BooleanQuery::new(combined))
 }
 
 /// Helper method used to build a document query based on urls, ids or tags.
