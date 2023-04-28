@@ -7,6 +7,7 @@ use url::Url;
 
 pub mod client;
 pub mod schema;
+pub mod stop_word_filter;
 use schema::{DocFields, DocumentUpdate, SearchDocument};
 
 mod query;
