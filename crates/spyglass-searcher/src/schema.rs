@@ -10,6 +10,10 @@ use tantivy::{
     },
     Index,
 };
+use uuid::Uuid;
+
+use crate::client::SPYGLASS_NS;
+
 pub type FieldName = String;
 
 pub const TOKENIZER_NAME: &str = "spyglass_tokenizer_en";
@@ -84,6 +88,10 @@ pub fn register_tokenizer(index: &Index) {
         .register(TOKENIZER_NAME, full_content_tokenizer_en);
 }
 
+pub trait ToDocument {
+    fn to_document(&self) -> Document;
+}
+
 /// A new document to be added
 #[derive(Clone)]
 pub struct DocumentUpdate<'a> {
@@ -95,6 +103,33 @@ pub struct DocumentUpdate<'a> {
     pub tags: &'a [i64],
     pub published_at: Option<chrono::DateTime<Utc>>,
     pub last_modified: Option<chrono::DateTime<Utc>>,
+}
+
+impl<'a> ToDocument for DocumentUpdate<'a> {
+    fn to_document(&self) -> Document {
+        let fields = DocFields::as_fields();
+
+        let doc_id = self.doc_id.clone().map_or_else(
+            || {
+                Uuid::new_v5(&SPYGLASS_NS, self.url.as_bytes())
+                    .as_hyphenated()
+                    .to_string()
+            },
+            |s| s,
+        );
+
+        let mut doc = Document::default();
+        doc.add_text(fields.content, self.content);
+        doc.add_text(fields.domain, self.domain);
+        doc.add_text(fields.id, &doc_id);
+        doc.add_text(fields.title, self.title);
+        doc.add_text(fields.url, self.url);
+        for t in self.tags {
+            doc.add_u64(fields.tags, *t as u64);
+        }
+
+        doc
+    }
 }
 
 #[derive(Clone)]

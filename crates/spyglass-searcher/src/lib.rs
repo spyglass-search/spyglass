@@ -8,7 +8,7 @@ use url::Url;
 pub mod client;
 pub mod schema;
 pub mod stop_word_filter;
-use schema::{DocFields, DocumentUpdate, SearchDocument};
+use schema::{DocFields, SearchDocument};
 
 mod query;
 pub mod similarity;
@@ -40,6 +40,7 @@ impl QueryBoost {
             Boost::Favorite { .. } => 3.0,
             Boost::Tag(_) => 1.5,
             Boost::Url(_) => 3.0,
+            Boost::CustomField { .. } => 0.0,
         };
 
         QueryBoost {
@@ -56,6 +57,7 @@ pub enum Boost {
     Url(String),
     DocId(String),
     Tag(u64),
+    CustomField { field_name: String, value: u64 },
 }
 
 /// Contains stats & results for a search request
@@ -105,13 +107,13 @@ pub trait WriteTrait {
     /// Delete documents from the index by id, returning the number of docs deleted.
     async fn delete_many_by_id(&self, doc_ids: &[String]) -> SearcherResult<usize>;
 
-    async fn upsert(&self, single_doc: &DocumentUpdate) -> SearcherResult<String> {
+    async fn upsert(&self, single_doc: &Document) -> SearcherResult<String> {
         let upserted = self.upsert_many(&[single_doc.clone()]).await?;
         Ok(upserted.get(0).expect("Expected a single doc").to_owned())
     }
 
     /// Insert/update documents in the index, returning the list of document ids
-    async fn upsert_many(&self, updates: &[DocumentUpdate]) -> SearcherResult<Vec<String>>;
+    async fn upsert_many(&self, updates: &[Document]) -> SearcherResult<Vec<String>>;
 }
 
 type SearcherResult<T> = Result<T, SearchError>;
@@ -169,8 +171,8 @@ pub fn document_to_struct(doc: &Document) -> Option<RetrievedDocument> {
 #[cfg(test)]
 mod test {
     use crate::client::Searcher;
-    use crate::schema::{DocFields, SearchDocument};
-    use crate::{Boost, DocumentUpdate, IndexBackend, QueryBoost, SearchTrait, WriteTrait};
+    use crate::schema::{DocFields, DocumentUpdate, SearchDocument, ToDocument};
+    use crate::{Boost, IndexBackend, QueryBoost, SearchTrait, WriteTrait};
 
     async fn _build_test_index(searcher: &mut Searcher) {
         searcher
@@ -191,7 +193,7 @@ mod test {
                 tags: &vec![1_i64],
                 published_at: None,
                 last_modified: None,
-            })
+            }.to_document())
             .await
             .expect("Unable to add doc");
 
@@ -213,27 +215,30 @@ mod test {
                 tags: &vec![2_i64],
                 published_at: None,
                 last_modified: None,
-            })
+            }.to_document())
             .await
             .expect("Unable to add doc");
 
         searcher
-            .upsert(&DocumentUpdate {
-                doc_id: None,
-                title: "Of Cheese and Crackers",
-                domain: "en.wikipedia.org",
-                url: "https://en.wikipedia.org/cheese_and_crackers",
-                content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
+            .upsert(
+                &DocumentUpdate {
+                    doc_id: None,
+                    title: "Of Cheese and Crackers",
+                    domain: "en.wikipedia.org",
+                    url: "https://en.wikipedia.org/cheese_and_crackers",
+                    content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
             tellus tortor, varius sit amet fermentum a, finibus porttitor erat. Proin
             suscipit, dui ac posuere vulputate, justo est faucibus est, a bibendum
             nulla nulla sed elit. Vivamus et libero a tortor ultricies feugiat in vel
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-                tags: &vec![2_i64],
-                published_at: None,
-                last_modified: None,
-            })
+                    tags: &vec![2_i64],
+                    published_at: None,
+                    last_modified: None,
+                }
+                .to_document(),
+            )
             .await
             .expect("Unable to add doc");
 
@@ -250,7 +255,7 @@ mod test {
              tags: &vec![1_i64],
              published_at: None,
              last_modified: None
-        }).await
+        }.to_document()).await
         .expect("Unable to add doc");
 
         let res = searcher.save().await;

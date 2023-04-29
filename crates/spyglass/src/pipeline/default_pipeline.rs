@@ -6,7 +6,7 @@ use entities::models::{crawl_queue, indexed_document};
 use entities::sea_orm::prelude::*;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use shared::config::{Config, LensConfig, PipelineConfiguration};
-use spyglass_searcher::schema::DocumentUpdate;
+use spyglass_searcher::schema::{DocumentUpdate, ToDocument};
 use spyglass_searcher::WriteTrait;
 use tokio::sync::mpsc;
 use url::Url;
@@ -134,16 +134,19 @@ async fn start_crawl(
                         let doc_id: Option<String> = {
                             match state
                                 .index
-                                .upsert(&DocumentUpdate {
-                                    doc_id: existing.clone().map(|f| f.doc_id),
-                                    title: &crawl_result.title.unwrap_or_default(),
-                                    domain: url_host,
-                                    url: url.as_str(),
-                                    content: &content,
-                                    tags: &[],
-                                    published_at: None,
-                                    last_modified: None,
-                                })
+                                .upsert(
+                                    &DocumentUpdate {
+                                        doc_id: existing.clone().map(|f| f.doc_id),
+                                        title: &crawl_result.title.unwrap_or_default(),
+                                        domain: url_host,
+                                        url: url.as_str(),
+                                        content: &content,
+                                        tags: &[],
+                                        published_at: None,
+                                        last_modified: None,
+                                    }
+                                    .to_document(),
+                                )
                                 .await
                             {
                                 Ok(new_doc_id) => Some(new_doc_id),
