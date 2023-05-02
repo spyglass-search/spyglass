@@ -28,9 +28,9 @@ pub enum IndexBackend {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct QueryBoost {
     /// What to boost
-    field: Boost,
+    pub field: Boost,
     /// The boost value (negative to lessen impact of something)
-    value: f32,
+    pub value: f32,
 }
 
 impl QueryBoost {
