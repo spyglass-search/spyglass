@@ -55,22 +55,29 @@ pub fn AppPage(props: &AppPageProps) -> Html {
         });
     });
 
-    let name = auth_status.user_profile.map(|x| x.name);
     html! {
         <div class="text-white flex h-screen">
-            <div class="flex-col w-48 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
+            <div class="flex-col sm:w-32 md:w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
                 <div class="mb-6">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"Spyglass"}
                     </div>
                     {if auth_status.is_authenticated {
-                        html! {
-                            <div class="mb-4 flex flex-col gap-4">
-                                <div class="text-sm">{name}</div>
-                                <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_logout}>
-                                    {"Logout"}
-                                </button>
-                            </div>
+                        if let Some(profile) = auth_status.user_profile {
+                            html! {
+                                <div class="mb-4 flex flex-col gap-4">
+                                    <div class="text-sm flex flex-row items-center gap-2">
+                                        <img src={profile.picture} class="flex-none w-6 h-6 rounded-full mx-auto" />
+                                        <div class="flex-grow">{profile.name}</div>
+                                    </div>
+                                    <div class="text-sm text-neutral-700">{profile.sub}</div>
+                                    <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_logout}>
+                                        {"Logout"}
+                                    </button>
+                                </div>
+                            }
+                        } else {
+                            html !{}
                         }
                     } else {
                         html! {

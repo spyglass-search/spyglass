@@ -16,6 +16,7 @@ pub struct Auth0User {
     pub name: String,
     pub email: String,
     pub picture: String,
+    pub sub: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -88,8 +89,9 @@ fn App() -> Html {
             if let Ok(details) = handle_login_callback().await {
                 let _ =
                     history().replace_state_with_url(&JsValue::NULL, "Spyglass Search", Some("/"));
-                if let Ok(value) = serde_wasm_bindgen::from_value(details) {
-                    auth_status_handle.set(value);
+                match serde_wasm_bindgen::from_value(details) {
+                    Ok(value) => auth_status_handle.set(value),
+                    Err(err) => log::error!("Unable to parse user profile: {}", err.to_string()),
                 }
             }
         });
