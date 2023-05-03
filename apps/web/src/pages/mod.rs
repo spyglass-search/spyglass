@@ -59,23 +59,32 @@ pub fn AppPage(props: &AppPageProps) -> Html {
     html! {
         <div class="text-white flex h-screen">
             <div class="flex-col w-48 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
-                {if auth_status.is_authenticated {
-                    html! {
-                        <div class="my-4 flex flex-col">
-                            <div id="profile">{name}</div>
-                            <button id="logout" class="border p-2" onclick={auth_logout}>{"Logout"}</button>
-                        </div>
-                    }
-                } else {
-                    html! {
-                        <div class="my-4">
-                            <button id="login" class="border p-2" onclick={auth_login}>{"Login"}</button>
-                        </div>
-                    }
-                }}
                 <div class="mb-6">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"Spyglass"}
+                    </div>
+                    {if auth_status.is_authenticated {
+                        html! {
+                            <div class="mb-4 flex flex-col gap-4">
+                                <div class="text-sm">{name}</div>
+                                <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_logout}>
+                                    {"Logout"}
+                                </button>
+                            </div>
+                        }
+                    } else {
+                        html! {
+                            <div class="mb-4 flex flex-col">
+                                <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_login}>
+                                    {"Signin"}
+                                </button>
+                            </div>
+                        }
+                    }}
+                </div>
+                <div class="mb-6">
+                    <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
+                        {"My Collections"}
                     </div>
                     <ul>
                         <li class="mb-2 flex flex-row items-center">

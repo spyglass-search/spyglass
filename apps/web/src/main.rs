@@ -72,7 +72,7 @@ fn App() -> Html {
     init_env(
         dotenv!("AUTH0_DOMAIN"),
         dotenv!("AUTH0_CLIENT_ID"),
-        dotenv!("AUTH0_REDIRECT_URI")
+        dotenv!("AUTH0_REDIRECT_URI"),
     );
 
     let auth_status: UseStateHandle<Auth0Status> = use_state_eq(|| Auth0Status {
