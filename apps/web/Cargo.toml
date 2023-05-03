@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dotenv_codegen = "0.15.0"
 "shared" = { path = "../../crates/shared" }
 console_log = "1.0"
 futures = "0.3"

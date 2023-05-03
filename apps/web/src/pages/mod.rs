@@ -1,8 +1,8 @@
 use ui_components::icons;
-use yew::{prelude::*, platform::spawn_local};
+use yew::{platform::spawn_local, prelude::*};
 use yew_router::prelude::Link;
 
-use crate::{Route, auth0_login, auth0_logout, Auth0Status};
+use crate::{auth0_login, auth0_logout, Auth0Status, Route};
 pub mod search;
 
 #[derive(PartialEq, Properties)]
