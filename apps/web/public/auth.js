@@ -1,8 +1,9 @@
-export function init_env(domain, client_id, redirect_uri) {
+export function init_env(domain, client_id, redirect_uri, audience) {
     window.AUTH0 = {
         domain,
         client_id,
-        redirect_uri
+        redirect_uri,
+        audience
     };
 }
 
@@ -12,6 +13,7 @@ async function get_client() {
             domain: window.AUTH0.domain,
             clientId: window.AUTH0.client_id,
             authorizationParams: {
+                audience: window.AUTH0.audience,
                 redirect_uri: window.AUTH0.redirect_uri,
             },
         });
@@ -34,7 +36,8 @@ export async function handle_login_callback() {
 
             const isAuthenticated = await client.isAuthenticated();
             const userProfile = await client.getUser();
-            return { isAuthenticated, userProfile };
+            const token = await client.getTokenSilently();
+            return { isAuthenticated, userProfile, token };
         })
         .catch(err => console.log(err));
 }

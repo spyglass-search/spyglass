@@ -25,12 +25,13 @@ pub struct Auth0Status {
     pub is_authenticated: bool,
     #[serde(rename(deserialize = "userProfile"))]
     pub user_profile: Option<Auth0User>,
+    pub token: Option<String>,
 }
 
 #[wasm_bindgen(module = "/public/auth.js")]
 extern "C" {
     #[wasm_bindgen]
-    pub fn init_env(domain: &str, client_id: &str, redirect_uri: &str);
+    pub fn init_env(domain: &str, client_id: &str, redirect_uri: &str, audience: &str);
 
     #[wasm_bindgen(catch)]
     pub async fn auth0_login() -> Result<(), JsValue>;
@@ -74,11 +75,13 @@ fn App() -> Html {
         dotenv!("AUTH0_DOMAIN"),
         dotenv!("AUTH0_CLIENT_ID"),
         dotenv!("AUTH0_REDIRECT_URI"),
+        dotenv!("AUTH0_AUDIENCE"),
     );
 
     let auth_status: UseStateHandle<Auth0Status> = use_state_eq(|| Auth0Status {
         is_authenticated: false,
         user_profile: None,
+        token: None,
     });
     let search = window().location().search().unwrap_or_default();
 
@@ -89,7 +92,7 @@ fn App() -> Html {
             if let Ok(details) = handle_login_callback().await {
                 let _ =
                     history().replace_state_with_url(&JsValue::NULL, "Spyglass Search", Some("/"));
-                match serde_wasm_bindgen::from_value(details) {
+                match serde_wasm_bindgen::from_value::<Auth0Status>(details) {
                     Ok(value) => auth_status_handle.set(value),
                     Err(err) => log::error!("Unable to parse user profile: {}", err.to_string()),
                 }
