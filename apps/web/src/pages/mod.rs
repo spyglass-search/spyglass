@@ -94,7 +94,6 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                                         <img src={profile.picture} class="flex-none w-6 h-6 rounded-full mx-auto" />
                                         <div class="flex-grow">{profile.name}</div>
                                     </div>
-                                    <div class="text-sm text-neutral-700">{profile.sub}</div>
                                     <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_logout}>
                                         {"Logout"}
                                     </button>
