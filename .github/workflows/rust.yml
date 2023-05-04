@@ -30,6 +30,8 @@ jobs:
         echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV;
         echo "target_ext=" >> $GITHUB_ENV;
         echo "target_os_name=linux" >> $GITHUB_ENV;
+    - name: Setup env file
+      run: cp .env.template .env
     # Setup rust toolchain
     - name: Setup rust toolchain
       uses: actions-rs/toolchain@v1

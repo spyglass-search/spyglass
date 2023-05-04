@@ -2,6 +2,7 @@ data
 _notebooks
 *.wasm
 Makefile.dev
+.env
 
 # Added by cargo
 target
