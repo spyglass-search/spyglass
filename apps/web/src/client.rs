@@ -5,6 +5,7 @@ use futures::io::BufReader;
 use futures::{AsyncBufReadExt, TryStreamExt};
 use gloo::timers::future::sleep;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use shared::request::{AskClippyRequest, ClippyContext};
 use shared::response::{ChatErrorType, ChatUpdate, SearchResult};
 use thiserror::Error;
@@ -152,4 +153,27 @@ impl SpyglassClient {
 
         Ok(())
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct Lens {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct UserData {
+    pub display_name: String,
+    pub lenses: Vec<Lens>,
+}
+
+pub async fn get_user_data(auth_token: &str) -> Result<UserData, reqwest::Error> {
+    let client = reqwest::Client::new();
+    client
+        .get(format!("{}/user", constants::HTTP_ENDPOINT))
+        .bearer_auth(auth_token)
+        .send()
+        .await?
+        .json::<UserData>()
+        .await
 }

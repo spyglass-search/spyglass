@@ -1,3 +1,4 @@
+use client::UserData;
 use dotenv_codegen::dotenv;
 use gloo::utils::{history, window};
 use serde::{Deserialize, Serialize};
@@ -20,12 +21,15 @@ pub struct Auth0User {
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
-pub struct Auth0Status {
+pub struct AuthStatus {
     #[serde(rename(deserialize = "isAuthenticated"))]
     pub is_authenticated: bool,
     #[serde(rename(deserialize = "userProfile"))]
     pub user_profile: Option<Auth0User>,
     pub token: Option<String>,
+    // Only used internall
+    #[serde(skip)]
+    pub user_data: Option<UserData>,
 }
 
 #[wasm_bindgen(module = "/public/auth.js")]
@@ -49,8 +53,6 @@ pub enum Route {
     Start,
     #[at("/lens/:lens")]
     Search { lens: String },
-    // #[at("/library")]
-    // MyLibrary,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -78,10 +80,11 @@ fn App() -> Html {
         dotenv!("AUTH0_AUDIENCE"),
     );
 
-    let auth_status: UseStateHandle<Auth0Status> = use_state_eq(|| Auth0Status {
+    let auth_status: UseStateHandle<AuthStatus> = use_state_eq(|| AuthStatus {
         is_authenticated: false,
         user_profile: None,
         token: None,
+        user_data: None,
     });
     let search = window().location().search().unwrap_or_default();
 
@@ -92,8 +95,20 @@ fn App() -> Html {
             if let Ok(details) = handle_login_callback().await {
                 let _ =
                     history().replace_state_with_url(&JsValue::NULL, "Spyglass Search", Some("/"));
-                match serde_wasm_bindgen::from_value::<Auth0Status>(details) {
-                    Ok(value) => auth_status_handle.set(value),
+                match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
+                    Ok(mut value) => {
+                        let token = value
+                            .token
+                            .as_ref()
+                            .map(|x| x.to_string())
+                            .unwrap_or_default();
+
+                        if let Ok(user_data) = client::get_user_data(&token).await {
+                            value.user_data = Some(user_data);
+                        }
+
+                        auth_status_handle.set(value)
+                    }
                     Err(err) => log::error!("Unable to parse user profile: {}", err.to_string()),
                 }
             }
@@ -101,11 +116,12 @@ fn App() -> Html {
     }
 
     html! {
-        <ContextProvider<Auth0Status> context={(*auth_status).clone()}>
+        <ContextProvider<AuthStatus> context={(*auth_status).clone()}>
             <BrowserRouter>
                 <Switch<Route> render={switch} />
             </BrowserRouter>
-        </ContextProvider<Auth0Status>>
+        </ContextProvider<AuthStatus>>
+
     }
 }
 

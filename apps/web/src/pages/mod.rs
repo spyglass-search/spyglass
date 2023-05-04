@@ -1,8 +1,8 @@
 use ui_components::icons;
 use yew::{platform::spawn_local, prelude::*};
-use yew_router::prelude::Link;
+use yew_router::prelude::{use_navigator, Link};
 
-use crate::{auth0_login, auth0_logout, Auth0Status, Route};
+use crate::{auth0_login, auth0_logout, AuthStatus, Route};
 pub mod search;
 
 #[derive(PartialEq, Properties)]
@@ -39,7 +39,10 @@ pub struct AppPageProps {
 
 #[function_component]
 pub fn AppPage(props: &AppPageProps) -> Html {
-    let auth_status = use_context::<Auth0Status>().expect("Ctxt not set up");
+    let navigator = use_navigator().unwrap();
+    let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
+
+    let user_data = auth_status.user_data.clone();
 
     let auth_login = Callback::from(|e: MouseEvent| {
         e.prevent_default();
@@ -54,6 +57,27 @@ pub fn AppPage(props: &AppPageProps) -> Html {
             let _ = auth0_logout().await;
         });
     });
+
+    let mut lenses = Vec::new();
+    if let Some(user_data) = user_data {
+        for lens in user_data.lenses {
+            let navi = navigator.clone();
+            let lens_name = lens.name.clone();
+            let onclick = Callback::from(move |_| {
+                navi.push(&Route::Search {
+                    lens: lens_name.clone(),
+                })
+            });
+            lenses.push(html! {
+                <li>
+                    <a class="hover:bg-cyan-600 cursor-pointer flex flex-row items-center p-2 rounded" {onclick}>
+                        <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
+                        {lens.name.clone()}
+                    </a>
+                </li>
+            });
+        }
+    }
 
     html! {
         <div class="text-white flex h-screen">
@@ -94,10 +118,7 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                         {"My Collections"}
                     </div>
                     <ul>
-                        <li class="mb-2 flex flex-row items-center">
-                            <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
-                            {props.lens.clone()}
-                        </li>
+                        {lenses}
                     </ul>
                 </div>
                 <div class="hidden">
