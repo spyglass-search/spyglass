@@ -1,6 +1,7 @@
 use std::str::Utf8Error;
 use std::time::Duration;
 
+use dotenv_codegen::dotenv;
 use futures::io::BufReader;
 use futures::{AsyncBufReadExt, TryStreamExt};
 use gloo::timers::future::sleep;
@@ -12,10 +13,7 @@ use thiserror::Error;
 use yew::html::Scope;
 
 use crate::pages::search::{HistoryItem, HistorySource};
-use crate::{
-    constants,
-    pages::search::{Msg, SearchPage},
-};
+use crate::pages::search::{Msg, SearchPage};
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -31,12 +29,23 @@ pub enum ClientError {
 pub struct SpyglassClient {
     client: Client,
     lens: String,
+    endpoint: String,
 }
 
 impl SpyglassClient {
     pub fn new(lens: String) -> Self {
         let client = Client::new();
-        Self { client, lens }
+
+        #[cfg(debug_assertions)]
+        let endpoint = dotenv!("SPYGLASS_BACKEND_DEV");
+        #[cfg(not(debug_assertions))]
+        let endpoint = dotenv!("SPYGLASS_BACKEND_PROD");
+
+        Self {
+            client,
+            lens,
+            endpoint: endpoint.to_string(),
+        }
     }
 
     pub async fn followup(
@@ -85,7 +94,7 @@ impl SpyglassClient {
         body: &AskClippyRequest,
         link: Scope<SearchPage>,
     ) -> Result<(), ClientError> {
-        let url = format!("{}/chat", constants::HTTP_ENDPOINT);
+        let url = format!("{}/chat", self.endpoint);
 
         let res = self
             .client
@@ -168,9 +177,14 @@ pub struct UserData {
 }
 
 pub async fn get_user_data(auth_token: &str) -> Result<UserData, reqwest::Error> {
+    #[cfg(debug_assertions)]
+    let endpoint = dotenv!("SPYGLASS_BACKEND_DEV");
+    #[cfg(not(debug_assertions))]
+    let endpoint = dotenv!("SPYGLASS_BACKEND_PROD");
+
     let client = reqwest::Client::new();
     client
-        .get(format!("{}/user", constants::HTTP_ENDPOINT))
+        .get(format!("{}/user", endpoint))
         .bearer_auth(auth_token)
         .send()
         .await?
