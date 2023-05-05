@@ -91,36 +91,59 @@ fn App() -> Html {
         dotenv!("AUTH0_AUDIENCE"),
     );
 
+    let is_logged_in = use_state_eq(|| false);
     let auth_status: UseStateHandle<AuthStatus> = use_state_eq(|| AuthStatus {
         is_authenticated: false,
         user_profile: None,
         token: None,
         user_data: None,
     });
+
     let search = window().location().search().unwrap_or_default();
+
+    // Reload lenses if auth_status changes
+    {
+        let auth_status_handle = auth_status.clone();
+        use_effect_with_deps(
+            move |_| {
+                if auth_status_handle.user_data.is_some() {
+                    return;
+                }
+
+                let mut updated = (*auth_status_handle).clone();
+                spawn_local(async move {
+                    if let Some(token) = &auth_status_handle.token {
+                        log::info!("grabbing logged in user's data");
+                        if let Ok(user_data) = client::get_user_data(Some(token.to_owned())).await {
+                            updated.user_data = Some(user_data);
+                        }
+                    } else {
+                        log::info!("loading public data");
+                        if let Ok(user_data) = client::get_user_data(None).await {
+                            updated.user_data = Some(user_data);
+                        }
+                    }
+
+                    auth_status_handle.set(updated);
+                });
+            },
+            is_logged_in.clone(),
+        );
+    }
 
     // Handle auth callbacks
     if search.contains("state=") {
-        log::info!("handling auth callback");
         let auth_status_handle = auth_status.clone();
+        let is_logged_in_handle = is_logged_in.clone();
         spawn_local(async move {
             if let Ok(details) = handle_login_callback().await {
                 let _ =
                     history().replace_state_with_url(&JsValue::NULL, "Spyglass Search", Some("/"));
                 match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
-                    Ok(mut value) => {
-                        let token = value
-                            .token
-                            .as_ref()
-                            .map(|x| x.to_string())
-                            .unwrap_or_default();
-
-                        if let Ok(user_data) = client::get_user_data(&token).await {
-                            value.user_data = Some(user_data);
-                        }
-
+                    Ok(value) => {
+                        is_logged_in_handle.set(true);
                         auth_status_handle.set(value)
-                    }
+                    },
                     Err(err) => log::error!("Unable to parse user profile: {}", err.to_string()),
                 }
             }

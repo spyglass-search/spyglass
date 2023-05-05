@@ -43,7 +43,6 @@ pub fn AppPage(props: &AppPageProps) -> Html {
     let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
 
     let user_data = auth_status.user_data.clone();
-    log::info!("user_data: {:?}", user_data);
     let auth_login = Callback::from(|e: MouseEvent| {
         e.prevent_default();
         spawn_local(async {
@@ -151,7 +150,7 @@ pub fn lens_list(props: &LensListProps) -> Html {
         "flex",
         "flex-row",
         "items-center",
-        "p-2",
+        "p-1.5",
         "rounded",
         "text-sm"
     );
@@ -178,7 +177,7 @@ pub fn lens_list(props: &LensListProps) -> Html {
         });
 
         html.push(html! {
-            <li class="mb-2">
+            <li class="mb-1">
                 <a class={classes.clone()} {onclick}>
                     <icons::CollectionIcon classes="mr-2" height="h-3" width="w-3" />
                     {lens.display_name.clone()}

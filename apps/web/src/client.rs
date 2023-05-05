@@ -179,20 +179,20 @@ pub struct UserData {
     pub lenses: Vec<Lens>,
 }
 
-pub async fn get_user_data(auth_token: &str) -> Result<UserData, reqwest::Error> {
+pub async fn get_user_data(auth_token: Option<String>) -> Result<UserData, reqwest::Error> {
     #[cfg(debug_assertions)]
     let endpoint = dotenv!("SPYGLASS_BACKEND_DEV");
     #[cfg(not(debug_assertions))]
     let endpoint = dotenv!("SPYGLASS_BACKEND_PROD");
 
     let client = reqwest::Client::new();
-    let lenses = client
-        .get(format!("{}/user/lenses", endpoint))
-        .bearer_auth(auth_token)
-        .send()
-        .await?
-        .json::<Vec<Lens>>()
-        .await;
+    let mut request = client.get(format!("{}/user/lenses", endpoint));
+
+    if let Some(auth_token) = auth_token {
+        request = request.bearer_auth(auth_token);
+    }
+
+    let lenses = request.send().await?.json::<Vec<Lens>>().await;
 
     let lenses = match lenses {
         Ok(lenses) => lenses,

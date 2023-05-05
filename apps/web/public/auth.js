@@ -39,5 +39,8 @@ export async function handle_login_callback() {
             const token = await client.getTokenSilently();
             return { isAuthenticated, userProfile, token };
         })
-        .catch(err => console.log(err));
+        .catch(err => {
+            console.error('handle_login_callback: ', err);
+            throw err;
+        });
 }
