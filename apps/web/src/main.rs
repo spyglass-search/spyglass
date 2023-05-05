@@ -12,7 +12,9 @@ use yew_router::prelude::*;
 
 mod client;
 mod pages;
-use pages::AppPage;
+use pages::{create::CreateLensPage, AppPage};
+
+use crate::pages::search::SearchPageWrapper;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth0User {
@@ -53,6 +55,8 @@ extern "C" {
 pub enum Route {
     #[at("/")]
     Start,
+    #[at("/create")]
+    Create,
     #[at("/lens/:lens")]
     Search { lens: String },
     #[not_found]
@@ -63,15 +67,16 @@ pub enum Route {
 fn switch(routes: Route) -> Html {
     match &routes {
         Route::Start => html! { <AppPage /> },
+        Route::Create => html! { <AppPage><CreateLensPage /></AppPage> },
         Route::Search { lens } => {
-            let lens = if let Ok(Some(decoded)) = decode_uri_component(lens).map(|x| x.as_string())
-            {
-                decoded
-            } else {
-                lens.clone()
-            };
+            let decoded_lens =
+                if let Ok(Some(decoded)) = decode_uri_component(lens).map(|x| x.as_string()) {
+                    decoded
+                } else {
+                    lens.clone()
+                };
 
-            html! { <AppPage current_lens={lens} /> }
+            html! { <AppPage current_lens={decoded_lens.clone()}><SearchPageWrapper lens={decoded_lens} /></AppPage> }
         }
         Route::NotFound => html! { <div>{"Not Found!"}</div> },
     }
@@ -143,7 +148,7 @@ fn App() -> Html {
                     Ok(value) => {
                         is_logged_in_handle.set(true);
                         auth_status_handle.set(value)
-                    },
+                    }
                     Err(err) => log::error!("Unable to parse user profile: {}", err.to_string()),
                 }
             }

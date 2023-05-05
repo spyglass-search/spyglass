@@ -1,45 +1,26 @@
-use ui_components::{btn::{Btn, BtnSize, BtnType}, icons};
+use ui_components::{
+    btn::{Btn, BtnSize, BtnType},
+    icons,
+};
 use yew::{platform::spawn_local, prelude::*};
-use yew_router::prelude::{use_navigator, Link};
+use yew_router::prelude::use_navigator;
 
 use crate::{auth0_login, auth0_logout, client::Lens, AuthStatus, Route};
+
+pub mod create;
 pub mod search;
-
-#[derive(PartialEq, Properties)]
-pub struct NavLinkProps {
-    tab: Route,
-    children: Children,
-    current: Route,
-}
-
-#[function_component(NavLink)]
-pub fn nav_link(props: &NavLinkProps) -> Html {
-    let link_styles = classes!(
-        "flex-row",
-        "flex",
-        "hover:bg-neutral-700",
-        "items-center",
-        "p-2",
-        "rounded",
-        "w-full",
-        (props.current == props.tab).then_some(Some("bg-neutral-700"))
-    );
-
-    html! {
-        <Link<Route> classes={link_styles} to={props.tab.clone()}>
-            {props.children.clone()}
-        </Link<Route>>
-    }
-}
 
 #[derive(Properties, PartialEq)]
 pub struct AppPageProps {
     #[prop_or_default]
     pub current_lens: Option<String>,
+    #[prop_or_default]
+    pub children: Children,
 }
 
 #[function_component]
 pub fn AppPage(props: &AppPageProps) -> Html {
+    let navigator = use_navigator().expect("Navigator not available");
     let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
 
     let user_data = auth_status.user_data.clone();
@@ -56,19 +37,6 @@ pub fn AppPage(props: &AppPageProps) -> Html {
             let _ = auth0_logout().await;
         });
     });
-
-    let lens_info: Option<Lens> =
-        if let (Some(user_data), Some(current_lens)) = (&user_data, &props.current_lens) {
-            // find the currently selected lens
-            user_data
-                .lenses
-                .iter()
-                .find(|x| x.name == *current_lens)
-                .cloned()
-        } else {
-            None
-        };
-
     html! {
         <div class="text-white flex h-screen">
             <div class="flex-col sm:w-32 md:w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
@@ -104,7 +72,7 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"My Lenses"}
                     </div>
-                    <Btn size={BtnSize::Sm} classes="mb-1 w-full">
+                    <Btn size={BtnSize::Sm} classes="mb-1 w-full" onclick={move |_| navigator.push(&Route::Create)}>
                         <icons::PlusIcon width="w-3" height="h-3" />
                         <span>{"Create Lens"}</span>
                     </Btn>
@@ -127,11 +95,7 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                 </div>
             </div>
             <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
-                {if let Some(lens_data) = lens_info {
-                    html! { <search::SearchPage lens={lens_data} /> }
-                } else {
-                    html! {}
-                }}
+                {props.children.clone()}
             </div>
         </div>
     }

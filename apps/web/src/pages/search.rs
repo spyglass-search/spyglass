@@ -1,4 +1,7 @@
-use crate::client::{Lens, SpyglassClient};
+use crate::{
+    client::{Lens, SpyglassClient},
+    AuthStatus,
+};
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
 use shared::response::SearchResult;
@@ -16,6 +19,37 @@ use yew::prelude::*;
 
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
+
+#[derive(Properties, PartialEq)]
+pub struct SearchPageWrapperProps {
+    pub lens: String,
+}
+
+/// A utility component that decodes the lens name from the URI & attempts to load
+/// data about the lens for the search page.
+#[function_component(SearchPageWrapper)]
+pub fn search_page_wrapper(props: &SearchPageWrapperProps) -> Html {
+    let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
+    let user_data = auth_status.user_data.clone();
+    // Find or load lens data
+    let lens_info: Option<Lens> = if let Some(user_data) = &user_data {
+        // find the currently selected lens
+        user_data
+            .lenses
+            .iter()
+            .find(|x| x.name == *props.lens)
+            .cloned()
+    } else {
+        None
+    };
+
+    // todo: load data from server?
+    if let Some(lens_info) = lens_info {
+        html! { <SearchPage lens={lens_info} /> }
+    } else {
+        html! { <div>{"Unable to find lens"}</div> }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Display)]
 pub enum HistorySource {
