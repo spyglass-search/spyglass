@@ -3,6 +3,7 @@ extern crate dotenv_codegen;
 
 use client::UserData;
 use gloo::utils::{history, window};
+use js_sys::decode_uri_component;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
@@ -62,7 +63,16 @@ pub enum Route {
 fn switch(routes: Route) -> Html {
     match &routes {
         Route::Start => html! { <AppPage lens={String::from("yc")} /> },
-        Route::Search { lens } => html! { <AppPage lens={lens.clone()} /> },
+        Route::Search { lens } => {
+            let lens = if let Ok(Some(decoded)) = decode_uri_component(lens).map(|x| x.as_string())
+            {
+                decoded
+            } else {
+                lens.clone()
+            };
+
+            html! { <AppPage lens={lens} /> }
+        }
         Route::NotFound => html! { <div>{"Not Found!"}</div> },
     }
 }
