@@ -1,4 +1,4 @@
-use ui_components::icons;
+use ui_components::{btn::{Btn, BtnSize, BtnType}, icons};
 use yew::{platform::spawn_local, prelude::*};
 use yew_router::prelude::{use_navigator, Link};
 
@@ -84,9 +84,9 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                                         <img src={profile.picture} class="flex-none w-6 h-6 rounded-full mx-auto" />
                                         <div class="flex-grow">{profile.name}</div>
                                     </div>
-                                    <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_logout}>
+                                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_logout} classes="w-full">
                                         {"Logout"}
-                                    </button>
+                                    </Btn>
                                 </div>
                             }
                         } else {
@@ -94,18 +94,20 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                         }
                     } else {
                         html! {
-                            <div class="mb-4 flex flex-col">
-                                <button class="text-sm rounded-md border border-cyan-500 p-2" onclick={auth_login}>
-                                    {"Signin"}
-                                </button>
-                            </div>
+                            <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_login} classes="w-full">
+                                {"Sign In"}
+                            </Btn>
                         }
                     }}
                 </div>
                 <div class="mb-6">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
-                        {"My Collections"}
+                        {"My Lenses"}
                     </div>
+                    <Btn size={BtnSize::Sm} classes="mb-1 w-full">
+                        <icons::PlusIcon width="w-3" height="h-3" />
+                        <span>{"Create Lens"}</span>
+                    </Btn>
                     {if let Some(user_data) = &user_data {
                         html!{ <LensList current={props.current_lens.clone()} lenses={user_data.lenses.clone()} /> }
                     } else {
@@ -150,7 +152,8 @@ pub fn lens_list(props: &LensListProps) -> Html {
         "flex",
         "flex-row",
         "items-center",
-        "p-1.5",
+        "py-1.5",
+        "px-2",
         "rounded",
         "text-sm"
     );
@@ -162,7 +165,7 @@ pub fn lens_list(props: &LensListProps) -> Html {
         let classes = classes!(
             default_classes.clone(),
             if current_lens == lens.name {
-                Some("bg-cyan-500")
+                Some("bg-cyan-800")
             } else {
                 None
             }
