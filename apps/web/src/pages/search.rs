@@ -230,6 +230,7 @@ impl Component for SearchPage {
             }
             Msg::Reset => {
                 self.context = None;
+                self.current_query = None;
                 self.history.clear();
                 self.in_progress = false;
                 self.results.clear();
