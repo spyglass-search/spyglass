@@ -179,28 +179,53 @@ pub struct UserData {
     pub lenses: Vec<Lens>,
 }
 
-pub async fn get_user_data(auth_token: Option<String>) -> Result<UserData, reqwest::Error> {
-    #[cfg(debug_assertions)]
-    let endpoint = dotenv!("SPYGLASS_BACKEND_DEV");
-    #[cfg(not(debug_assertions))]
-    let endpoint = dotenv!("SPYGLASS_BACKEND_PROD");
+pub struct ApiClient {
+    client: reqwest::Client,
+    endpoint: String,
+    token: Option<String>,
+}
 
-    let client = reqwest::Client::new();
-    let mut request = client.get(format!("{}/user/lenses", endpoint));
+impl ApiClient {
+    pub fn new(token: Option<String>) -> Self {
+        #[cfg(debug_assertions)]
+        let endpoint: String = dotenv!("SPYGLASS_BACKEND_DEV").into();
+        #[cfg(not(debug_assertions))]
+        let endpoint: String = dotenv!("SPYGLASS_BACKEND_PROD").into();
 
-    if let Some(auth_token) = auth_token {
-        request = request.bearer_auth(auth_token);
+        let client = reqwest::Client::new();
+
+        Self {
+            client,
+            endpoint,
+            token,
+        }
     }
 
-    let lenses = request.send().await?.json::<Vec<Lens>>().await;
-
-    let lenses = match lenses {
-        Ok(lenses) => lenses,
-        Err(err) => {
-            log::error!("Unable to get lenses: {}", err.to_string());
-            Vec::new()
+    pub async fn lens_create(&self) -> Result<Lens, reqwest::Error> {
+        let mut request = self.client.post(format!("{}/user/lenses", self.endpoint));
+        if let Some(auth_token) = &self.token {
+            request = request.bearer_auth(auth_token);
         }
-    };
 
-    Ok(UserData { lenses })
+        request.send().await?.json::<Lens>().await
+    }
+
+    pub async fn get_user_data(&self) -> Result<UserData, reqwest::Error> {
+        let mut request = self.client.get(format!("{}/user/lenses", self.endpoint));
+        if let Some(auth_token) = &self.token {
+            request = request.bearer_auth(auth_token);
+        }
+
+        let lenses = request.send().await?.json::<Vec<Lens>>().await;
+
+        let lenses = match lenses {
+            Ok(lenses) => lenses,
+            Err(err) => {
+                log::error!("Unable to get lenses: {}", err.to_string());
+                Vec::new()
+            }
+        };
+
+        Ok(UserData { lenses })
+    }
 }

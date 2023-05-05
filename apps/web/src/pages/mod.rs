@@ -37,6 +37,23 @@ pub fn AppPage(props: &AppPageProps) -> Html {
             let _ = auth0_logout().await;
         });
     });
+
+    let auth_status_handle = auth_status.clone();
+    let create_lens_cb = Callback::from(move |_| {
+        let navigator = navigator.clone();
+        let auth_status_handle = auth_status_handle.clone();
+        spawn_local(async move {
+            // create a new lens
+            let api = auth_status_handle.get_client();
+            match api.lens_create().await {
+                Ok(new_lens) => navigator.push(&Route::Edit {
+                    lens: new_lens.name,
+                }),
+                Err(err) => log::error!("error creating lens: {err}"),
+            }
+        });
+    });
+
     html! {
         <div class="text-white flex h-screen">
             <div class="flex-col sm:w-32 md:w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
@@ -72,10 +89,14 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"My Lenses"}
                     </div>
-                    <Btn size={BtnSize::Sm} classes="mb-1 w-full" onclick={move |_| navigator.push(&Route::Create)}>
-                        <icons::PlusIcon width="w-3" height="h-3" />
-                        <span>{"Create Lens"}</span>
-                    </Btn>
+                    {if auth_status.is_authenticated {
+                        html! {
+                            <Btn size={BtnSize::Sm} classes="mb-2 w-full" onclick={create_lens_cb.clone()}>
+                                <icons::PlusIcon width="w-4" height="h-4" />
+                                <span>{"Create Lens"}</span>
+                            </Btn>
+                        }
+                    } else { html! {} }}
                     {if let Some(user_data) = &user_data {
                         html!{ <LensList current={props.current_lens.clone()} lenses={user_data.lenses.clone()} /> }
                     } else {
@@ -114,6 +135,7 @@ pub fn lens_list(props: &LensListProps) -> Html {
         "hover:bg-cyan-600",
         "cursor-pointer",
         "flex",
+        "flex-grow",
         "flex-row",
         "items-center",
         "py-1.5",
@@ -143,11 +165,35 @@ pub fn lens_list(props: &LensListProps) -> Html {
             })
         });
 
+        let icon = if lens.is_public {
+            html! { <icons::GlobeIcon classes="mr-2" height="h-3" width="w-3" /> }
+        } else {
+            html! { <icons::CollectionIcon classes="mr-2" height="h-3" width="w-3" /> }
+        };
+
+        let navi = navigator.clone();
+        let lens_name = lens.name.clone();
+        let on_edit = Callback::from(move |e: MouseEvent| {
+            e.stop_immediate_propagation();
+            navi.push(&Route::Edit { lens: lens_name.clone() })
+        });
+
+        let edit_icon = if lens.is_public {
+            html! {}
+        } else {
+            html! {
+                <Btn size={BtnSize::Sm} _type={BtnType::Borderless} classes="ml-auto" onclick={on_edit}>
+                    <icons::PencilIcon height="h-3" width="w-3" />
+                </Btn>
+            }
+        };
+
         html.push(html! {
-            <li class="mb-1">
+            <li class="mb-1 flex flex-row items-center">
                 <a class={classes.clone()} {onclick}>
-                    <icons::CollectionIcon classes="mr-2" height="h-3" width="w-3" />
+                    {icon}
                     {lens.display_name.clone()}
+                    {edit_icon}
                 </a>
             </li>
         });

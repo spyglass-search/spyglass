@@ -30,7 +30,7 @@ pub struct SearchPageWrapperProps {
 #[function_component(SearchPageWrapper)]
 pub fn search_page_wrapper(props: &SearchPageWrapperProps) -> Html {
     let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
-    let user_data = auth_status.user_data.clone();
+    let user_data = auth_status.user_data;
     // Find or load lens data
     let lens_info: Option<Lens> = if let Some(user_data) = &user_data {
         // find the currently selected lens

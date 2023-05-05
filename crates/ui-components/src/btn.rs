@@ -16,6 +16,7 @@ impl Default for BtnAlign {
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
+    Borderless,
     Default,
     Danger,
     Success,
@@ -70,6 +71,11 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         BtnType::Default => classes!(
             "border-neutral-600",
             "border",
+            "hover:bg-neutral-600",
+            "active:bg-neutral-700",
+            "text-white",
+        ),
+        BtnType::Borderless => classes!(
             "hover:bg-neutral-600",
             "active:bg-neutral-700",
             "text-white",

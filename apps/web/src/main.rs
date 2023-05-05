@@ -14,7 +14,7 @@ mod client;
 mod pages;
 use pages::{create::CreateLensPage, AppPage};
 
-use crate::pages::search::SearchPageWrapper;
+use crate::{client::ApiClient, pages::search::SearchPageWrapper};
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth0User {
@@ -36,6 +36,12 @@ pub struct AuthStatus {
     pub user_data: Option<UserData>,
 }
 
+impl AuthStatus {
+    pub fn get_client(&self) -> ApiClient {
+        ApiClient::new(self.token.clone())
+    }
+}
+
 #[wasm_bindgen(module = "/public/auth.js")]
 extern "C" {
     #[wasm_bindgen]
@@ -55,8 +61,8 @@ extern "C" {
 pub enum Route {
     #[at("/")]
     Start,
-    #[at("/create")]
-    Create,
+    #[at("/edit/:lens")]
+    Edit { lens: String },
     #[at("/lens/:lens")]
     Search { lens: String },
     #[not_found]
@@ -67,7 +73,7 @@ pub enum Route {
 fn switch(routes: Route) -> Html {
     match &routes {
         Route::Start => html! { <AppPage /> },
-        Route::Create => html! { <AppPage><CreateLensPage /></AppPage> },
+        Route::Edit { lens } => html! { <AppPage><CreateLensPage lens={lens.clone()} /></AppPage> },
         Route::Search { lens } => {
             let decoded_lens =
                 if let Ok(Some(decoded)) = decode_uri_component(lens).map(|x| x.as_string()) {
@@ -82,86 +88,120 @@ fn switch(routes: Route) -> Html {
     }
 }
 
-pub async fn listen(_event_name: &str, _cb: &Closure<dyn Fn(JsValue)>) -> Result<JsValue, JsValue> {
-    Ok(JsValue::NULL)
+pub enum Msg {
+    AuthenticateUser,
+    LoadLenses,
+    ToggleNavbar,
+    UpdateAuth(AuthStatus),
+    UpdateUserData(UserData),
 }
 
-#[function_component]
-fn App() -> Html {
-    // Initialize JS env vars
-    init_env(
-        dotenv!("AUTH0_DOMAIN"),
-        dotenv!("AUTH0_CLIENT_ID"),
-        dotenv!("AUTH0_REDIRECT_URI"),
-        dotenv!("AUTH0_AUDIENCE"),
-    );
+pub struct App {
+    navbar_active: bool,
+    auth_status: AuthStatus,
+}
 
-    let is_logged_in = use_state_eq(|| false);
-    let auth_status: UseStateHandle<AuthStatus> = use_state_eq(|| AuthStatus {
-        is_authenticated: false,
-        user_profile: None,
-        token: None,
-        user_data: None,
-    });
+impl Component for App {
+    type Message = Msg;
+    type Properties = ();
 
-    let search = window().location().search().unwrap_or_default();
+    fn create(ctx: &Context<Self>) -> Self {
+        // Initialize JS env vars
+        init_env(
+            dotenv!("AUTH0_DOMAIN"),
+            dotenv!("AUTH0_CLIENT_ID"),
+            dotenv!("AUTH0_REDIRECT_URI"),
+            dotenv!("AUTH0_AUDIENCE"),
+        );
 
-    // Reload lenses if auth_status changes
-    {
-        let auth_status_handle = auth_status.clone();
-        use_effect_with_deps(
-            move |_| {
-                if auth_status_handle.user_data.is_some() {
-                    return;
-                }
+        ctx.link().send_message(Msg::LoadLenses);
 
-                let mut updated = (*auth_status_handle).clone();
+        Self {
+            navbar_active: false,
+            auth_status: AuthStatus {
+                is_authenticated: false,
+                user_profile: None,
+                token: None,
+                user_data: None,
+            },
+        }
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let link = ctx.link();
+        match msg {
+            Msg::AuthenticateUser => {
+                let link = link.clone();
                 spawn_local(async move {
-                    if let Some(token) = &auth_status_handle.token {
+                    if let Ok(details) = handle_login_callback().await {
+                        let _ = history().replace_state_with_url(
+                            &JsValue::NULL,
+                            "Spyglass Search",
+                            Some("/"),
+                        );
+                        match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
+                            Ok(status) => link.send_message(Msg::UpdateAuth(status)),
+                            Err(err) => {
+                                log::error!("Unable to parse user profile: {}", err.to_string())
+                            }
+                        }
+                    }
+                });
+                false
+            }
+            Msg::LoadLenses => {
+                let link = link.clone();
+                let auth_status = self.auth_status.clone();
+                spawn_local(async move {
+                    let api = auth_status.get_client();
+                    if auth_status.is_authenticated {
                         log::info!("grabbing logged in user's data");
-                        if let Ok(user_data) = client::get_user_data(Some(token.to_owned())).await {
-                            updated.user_data = Some(user_data);
+                        if let Ok(user_data) = api.get_user_data().await {
+                            link.send_message(Msg::UpdateUserData(user_data));
                         }
                     } else {
                         log::info!("loading public data");
-                        if let Ok(user_data) = client::get_user_data(None).await {
-                            updated.user_data = Some(user_data);
+                        if let Ok(user_data) = api.get_user_data().await {
+                            link.send_message(Msg::UpdateUserData(user_data));
                         }
                     }
-
-                    auth_status_handle.set(updated);
                 });
-            },
-            is_logged_in.clone(),
-        );
-    }
-
-    // Handle auth callbacks
-    if search.contains("state=") {
-        let auth_status_handle = auth_status.clone();
-        let is_logged_in_handle = is_logged_in.clone();
-        spawn_local(async move {
-            if let Ok(details) = handle_login_callback().await {
-                let _ =
-                    history().replace_state_with_url(&JsValue::NULL, "Spyglass Search", Some("/"));
-                match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
-                    Ok(value) => {
-                        is_logged_in_handle.set(true);
-                        auth_status_handle.set(value)
-                    }
-                    Err(err) => log::error!("Unable to parse user profile: {}", err.to_string()),
-                }
+                false
             }
-        });
+            Msg::ToggleNavbar => {
+                self.navbar_active = !self.navbar_active;
+                true
+            }
+            Msg::UpdateAuth(auth) => {
+                self.auth_status = auth;
+                link.send_message(Msg::LoadLenses);
+                true
+            }
+            Msg::UpdateUserData(user_data) => {
+                self.auth_status.user_data = Some(user_data);
+                true
+            }
+        }
     }
 
-    html! {
-        <ContextProvider<AuthStatus> context={(*auth_status).clone()}>
-            <BrowserRouter>
-                <Switch<Route> render={switch} />
-            </BrowserRouter>
-        </ContextProvider<AuthStatus>>
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let search = window().location().search().unwrap_or_default();
+        let link = ctx.link();
 
+        // Handle auth callbacks
+        if search.contains("state=") {
+            link.send_message(Msg::AuthenticateUser);
+        }
+
+        html! {
+            <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
+                <BrowserRouter>
+
+                    <Switch<Route> render={switch} />
+                </BrowserRouter>
+            </ContextProvider<AuthStatus>>
+
+        }
     }
 }
 
