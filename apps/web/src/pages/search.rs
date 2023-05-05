@@ -45,6 +45,7 @@ pub enum Msg {
     SetStatus(String),
     TokenReceived(String),
     SetFinished,
+    Reset,
 }
 
 #[derive(Properties, PartialEq)]
@@ -54,6 +55,7 @@ pub struct SearchPageProps {
 }
 
 pub struct SearchPage {
+    current_lens: String,
     client: Client,
     current_query: Option<String>,
     history: Vec<HistoryItem>,
@@ -73,6 +75,7 @@ impl Component for SearchPage {
     fn create(ctx: &yew::Context<Self>) -> Self {
         let props = ctx.props();
         Self {
+            current_lens: props.lens.clone(),
             client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.clone()))),
             current_query: None,
             history: Vec::new(),
@@ -83,6 +86,17 @@ impl Component for SearchPage {
             status_msg: None,
             tokens: None,
             context: None,
+        }
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
+        let new_lens = ctx.props().lens.clone();
+        if self.current_lens != new_lens {
+            self.current_lens = new_lens;
+            ctx.link().send_message(Msg::Reset);
+            true
+        } else {
+            false
         }
     }
 
@@ -212,6 +226,15 @@ impl Component for SearchPage {
                 } else {
                     self.tokens = Some(token.to_owned());
                 }
+                true
+            }
+            Msg::Reset => {
+                self.context = None;
+                self.history.clear();
+                self.in_progress = false;
+                self.results.clear();
+                self.status_msg = None;
+                self.tokens = None;
                 true
             }
         }
