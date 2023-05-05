@@ -34,6 +34,9 @@ pub enum TagType {
     /// Owner of a doc/item, if relevant.
     #[strum(serialize = "owner")]
     Owner,
+    /// Author of a document.
+    #[strum(serialize = "author")]
+    Author,
     /// Shared/invited to a doc/event/etc.
     #[strum(serialize = "shared")]
     SharedWith,
@@ -69,6 +72,7 @@ fn string_to_tag_type(v: &str) -> TagType {
         "type" => TagType::Type,
         "source" => TagType::Source,
         "owner" => TagType::Owner,
+        "author" => TagType::Author,
         "shared" => TagType::SharedWith,
         "lens" => TagType::Lens,
         "repository" => TagType::Repository,
@@ -87,6 +91,7 @@ impl ToString for TagType {
             Self::Type => "type",
             Self::Source => "source",
             Self::Owner => "owner",
+            Self::Author => "author",
             Self::SharedWith => "shared",
             Self::Lens => "lens",
             Self::Repository => "repository",

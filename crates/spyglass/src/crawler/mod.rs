@@ -593,7 +593,13 @@ async fn _process_file(
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
                 Ok(parsed) => {
-                    content = Some(parsed);
+                    content = Some(parsed.content);
+                    if let Some(parsed_author) = parsed.author {
+                        tags.push((TagType::Author, parsed_author))
+                    }
+                    if let Some(parsed_title) = parsed.title {
+                        title = Some(parsed_title);
+                    }
                 }
                 Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
             },

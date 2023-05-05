@@ -1,3 +1,4 @@
+use pdf::file::FileOptions;
 use std::{env, fs, path::Path, process};
 
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
@@ -51,7 +52,7 @@ const EXE_NAME: &str = "../../utils/linux/pdftotext";
 //   -help                  : print usage information
 //   --help                 : print usage information
 //   -?                     : print usage information
-pub fn parse(path: &Path) -> anyhow::Result<String> {
+pub fn parse(path: &Path) -> anyhow::Result<Pdf> {
     let uuid = uuid::Uuid::new_v4().as_hyphenated().to_string();
 
     let current_dir = match env::current_exe() {
@@ -100,15 +101,68 @@ pub fn parse(path: &Path) -> anyhow::Result<String> {
         }
     }
 
-    match std::fs::read(txt_path.as_path()) {
+    let content = match std::fs::read(txt_path.as_path()) {
         Ok(content) => {
             let pdf_contents = String::from_utf8_lossy(&content);
             let _ = fs::remove_file(txt_path);
-            Ok(String::from(pdf_contents.as_ref()))
+            String::from(pdf_contents.as_ref())
         }
         Err(err) => {
             let _ = fs::remove_file(txt_path);
-            Err(anyhow::format_err!(err))
+            return Err(anyhow::format_err!(err));
         }
+    };
+
+    let metadata = PdfMetadata::parse(path);
+
+    Ok(Pdf { content, metadata })
+}
+
+pub struct Pdf {
+    pub content: String,
+    pub metadata: PdfMetadata,
+}
+
+#[derive(Default)]
+pub struct PdfMetadata {
+    pub title: Option<String>,
+    pub author: Option<String>,
+}
+
+impl PdfMetadata {
+    pub fn parse(path: &Path) -> Self {
+        let pdf = match FileOptions::cached().open(path) {
+            Ok(pdf) => pdf,
+            Err(_) => return Default::default(),
+        };
+        let pdf_info = match &pdf.trailer.info_dict {
+            Some(dict) => dict,
+            None => return Default::default(),
+        };
+        Self {
+            title: pdf_info.get("Title").and_then(|v| v.to_string().ok()),
+            author: pdf_info.get("Author").and_then(|v| v.to_string().ok()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    #[test]
+    fn test_pdf_metadata_extraction_from_pdf_with_metadata() {
+        let path_with_metadata = Path::new("../../fixtures/pdf/pdf_with_metadata.pdf");
+        let metadata = super::PdfMetadata::parse(&path_with_metadata);
+        assert_eq!(metadata.title, Some("PDF title".to_string()));
+        assert_eq!(metadata.author, Some("PDF author".to_string()));
+    }
+
+    #[test]
+    fn test_pdf_metadata_extraction_from_pdf_with_missing_metadata() {
+        let path_with_metadata = Path::new("../../fixtures/pdf/pdf_without_metadata.pdf");
+        let metadata = super::PdfMetadata::parse(&path_with_metadata);
+        assert_eq!(metadata.title, None);
+        assert_eq!(metadata.author, None);
     }
 }

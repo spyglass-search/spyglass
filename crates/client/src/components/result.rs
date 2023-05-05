@@ -159,9 +159,14 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
     let metadata = render_metadata(result);
 
     let mut title = result.title.clone();
+    let mut subtitle = None;
+
     if result.url.starts_with("file://") {
         if let Ok(url) = Url::parse(&result.url) {
             if let Some(path) = shorten_file_path(&url, 3, true) {
+                if !path.ends_with(&title) {
+                    subtitle = Some(title);
+                }
                 title = path;
             }
         }
@@ -193,6 +198,11 @@ pub fn search_result_component(props: &SearchResultProps) -> Html {
                 <h2 class="text-base truncate font-semibold w-[30rem]">
                     {title}
                 </h2>
+                if let Some(subtitle) = subtitle {
+                    <div class="text-sm truncate">
+                        {subtitle}
+                    </div>
+                }
                 <div class="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
                     {Html::from_html_unchecked(result.description.clone().into())}
                 </div>
