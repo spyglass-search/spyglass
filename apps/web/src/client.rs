@@ -164,15 +164,18 @@ impl SpyglassClient {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Lens {
     pub id: i64,
     pub name: String,
+    pub display_name: String,
+    pub example_questions: Vec<String>,
+    pub example_docs: Vec<String>,
+    pub is_public: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserData {
-    pub display_name: String,
     pub lenses: Vec<Lens>,
 }
 
@@ -183,11 +186,21 @@ pub async fn get_user_data(auth_token: &str) -> Result<UserData, reqwest::Error>
     let endpoint = dotenv!("SPYGLASS_BACKEND_PROD");
 
     let client = reqwest::Client::new();
-    client
-        .get(format!("{}/user", endpoint))
+    let lenses = client
+        .get(format!("{}/user/lenses", endpoint))
         .bearer_auth(auth_token)
         .send()
         .await?
-        .json::<UserData>()
-        .await
+        .json::<Vec<Lens>>()
+        .await;
+
+    let lenses = match lenses {
+        Ok(lenses) => lenses,
+        Err(err) => {
+            log::error!("Unable to get lenses: {}", err.to_string());
+            Vec::new()
+        }
+    };
+
+    Ok(UserData { lenses })
 }

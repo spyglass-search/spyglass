@@ -62,7 +62,7 @@ pub enum Route {
 
 fn switch(routes: Route) -> Html {
     match &routes {
-        Route::Start => html! { <AppPage lens={String::from("yc")} /> },
+        Route::Start => html! { <AppPage /> },
         Route::Search { lens } => {
             let lens = if let Ok(Some(decoded)) = decode_uri_component(lens).map(|x| x.as_string())
             {
@@ -71,7 +71,7 @@ fn switch(routes: Route) -> Html {
                 lens.clone()
             };
 
-            html! { <AppPage lens={lens} /> }
+            html! { <AppPage current_lens={lens} /> }
         }
         Route::NotFound => html! { <div>{"Not Found!"}</div> },
     }
@@ -99,6 +99,7 @@ fn App() -> Html {
     });
     let search = window().location().search().unwrap_or_default();
 
+    // Handle auth callbacks
     if search.contains("state=") {
         log::info!("handling auth callback");
         let auth_status_handle = auth_status.clone();

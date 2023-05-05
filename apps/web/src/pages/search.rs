@@ -1,4 +1,4 @@
-use crate::client::SpyglassClient;
+use crate::client::{Lens, SpyglassClient};
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
 use shared::response::SearchResult;
@@ -51,11 +51,11 @@ pub enum Msg {
 #[derive(Properties, PartialEq)]
 pub struct SearchPageProps {
     // todo: allow multiple
-    pub lens: String,
+    pub lens: Lens,
 }
 
 pub struct SearchPage {
-    current_lens: String,
+    current_lens: Lens,
     client: Client,
     current_query: Option<String>,
     history: Vec<HistoryItem>,
@@ -76,7 +76,7 @@ impl Component for SearchPage {
         let props = ctx.props();
         Self {
             current_lens: props.lens.clone(),
-            client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.clone()))),
+            client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.name.clone()))),
             current_query: None,
             history: Vec::new(),
             in_progress: false,
@@ -244,7 +244,7 @@ impl Component for SearchPage {
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         let link = ctx.link();
 
-        let placeholder = format!("Ask anything related to {}", ctx.props().lens);
+        let placeholder = format!("Ask anything related to {}", ctx.props().lens.display_name);
 
         let results = self
             .results

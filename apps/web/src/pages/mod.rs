@@ -2,7 +2,7 @@ use ui_components::icons;
 use yew::{platform::spawn_local, prelude::*};
 use yew_router::prelude::{use_navigator, Link};
 
-use crate::{auth0_login, auth0_logout, AuthStatus, Route};
+use crate::{auth0_login, auth0_logout, client::Lens, AuthStatus, Route};
 pub mod search;
 
 #[derive(PartialEq, Properties)]
@@ -34,16 +34,16 @@ pub fn nav_link(props: &NavLinkProps) -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct AppPageProps {
-    pub lens: String,
+    #[prop_or_default]
+    pub current_lens: Option<String>,
 }
 
 #[function_component]
 pub fn AppPage(props: &AppPageProps) -> Html {
-    let navigator = use_navigator().unwrap();
     let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
 
     let user_data = auth_status.user_data.clone();
-
+    log::info!("user_data: {:?}", user_data);
     let auth_login = Callback::from(|e: MouseEvent| {
         e.prevent_default();
         spawn_local(async {
@@ -58,26 +58,17 @@ pub fn AppPage(props: &AppPageProps) -> Html {
         });
     });
 
-    let mut lenses = Vec::new();
-    if let Some(user_data) = user_data {
-        for lens in user_data.lenses {
-            let navi = navigator.clone();
-            let lens_name = lens.name.clone();
-            let onclick = Callback::from(move |_| {
-                navi.push(&Route::Search {
-                    lens: lens_name.clone(),
-                })
-            });
-            lenses.push(html! {
-                <li>
-                    <a class="hover:bg-cyan-600 cursor-pointer flex flex-row items-center p-2 rounded" {onclick}>
-                        <icons::CollectionIcon classes="mr-2" height="h-4" width="h-4" />
-                        {lens.name.clone()}
-                    </a>
-                </li>
-            });
-        }
-    }
+    let lens_info: Option<Lens> =
+        if let (Some(user_data), Some(current_lens)) = (&user_data, &props.current_lens) {
+            // find the currently selected lens
+            user_data
+                .lenses
+                .iter()
+                .find(|x| x.name == *current_lens)
+                .cloned()
+        } else {
+            None
+        };
 
     html! {
         <div class="text-white flex h-screen">
@@ -116,9 +107,11 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"My Collections"}
                     </div>
-                    <ul>
-                        {lenses}
-                    </ul>
+                    {if let Some(user_data) = &user_data {
+                        html!{ <LensList current={props.current_lens.clone()} lenses={user_data.lenses.clone()} /> }
+                    } else {
+                        html! {}
+                    }}
                 </div>
                 <div class="hidden">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
@@ -133,8 +126,66 @@ pub fn AppPage(props: &AppPageProps) -> Html {
                 </div>
             </div>
             <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
-                <search::SearchPage lens={props.lens.clone()} />
+                {if let Some(lens_data) = lens_info {
+                    html! { <search::SearchPage lens={lens_data} /> }
+                } else {
+                    html! {}
+                }}
             </div>
         </div>
     }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct LensListProps {
+    current: Option<String>,
+    lenses: Option<Vec<Lens>>,
+}
+
+#[function_component(LensList)]
+pub fn lens_list(props: &LensListProps) -> Html {
+    let navigator = use_navigator().unwrap();
+    let default_classes = classes!(
+        "hover:bg-cyan-600",
+        "cursor-pointer",
+        "flex",
+        "flex-row",
+        "items-center",
+        "p-2",
+        "rounded",
+        "text-sm"
+    );
+
+    let current_lens = props.current.clone().unwrap_or_default();
+    let mut html = Vec::new();
+    let lenses = props.lenses.clone();
+    for lens in lenses.unwrap_or_default() {
+        let classes = classes!(
+            default_classes.clone(),
+            if current_lens == lens.name {
+                Some("bg-cyan-500")
+            } else {
+                None
+            }
+        );
+
+        let navi = navigator.clone();
+        let lens_name = lens.name.clone();
+        let onclick = Callback::from(move |_| {
+            navi.push(&Route::Search {
+                lens: lens_name.clone(),
+            })
+        });
+
+        html.push(html! {
+            <li class="mb-2">
+                <a class={classes.clone()} {onclick}>
+                    <icons::CollectionIcon classes="mr-2" height="h-3" width="w-3" />
+                    {lens.display_name.clone()}
+                </a>
+            </li>
+        });
+    }
+
+    html! { <ul>{html}</ul> }
 }
