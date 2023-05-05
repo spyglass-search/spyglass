@@ -1,5 +1,7 @@
+#[macro_use]
+extern crate dotenv_codegen;
+
 use client::UserData;
-use dotenv_codegen::dotenv;
 use gloo::utils::{history, window};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::*, JsValue};
