@@ -11,7 +11,9 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 mod client;
+mod components;
 mod pages;
+use components::nav::NavBar;
 use pages::{create::CreateLensPage, AppPage};
 
 use crate::{client::ApiClient, pages::search::SearchPageWrapper};
@@ -97,6 +99,7 @@ pub enum Msg {
 }
 
 pub struct App {
+    current_lens: Option<String>,
     navbar_active: bool,
     auth_status: AuthStatus,
 }
@@ -117,6 +120,7 @@ impl Component for App {
         ctx.link().send_message(Msg::LoadLenses);
 
         Self {
+            current_lens: None,
             navbar_active: false,
             auth_status: AuthStatus {
                 is_authenticated: false,
@@ -196,11 +200,12 @@ impl Component for App {
         html! {
             <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
                 <BrowserRouter>
-
-                    <Switch<Route> render={switch} />
+                    <div class="text-white flex h-screen">
+                        <NavBar current_lens={self.current_lens.clone()} />
+                        <Switch<Route> render={switch} />
+                    </div>
                 </BrowserRouter>
             </ContextProvider<AuthStatus>>
-
         }
     }
 }

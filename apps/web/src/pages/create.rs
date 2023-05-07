@@ -37,10 +37,7 @@ impl Component for CreateLensPage {
 
     fn create(ctx: &Context<Self>) -> Self {
         // initialize gapi
-        init_gapi(
-            dotenv!("GOOGLE_CLIENT_ID"),
-            dotenv!("GOOGLE_API_KEY"),
-        );
+        init_gapi(dotenv!("GOOGLE_CLIENT_ID"), dotenv!("GOOGLE_API_KEY"));
 
         Self {
             lens: ctx.props().lens.clone(),
