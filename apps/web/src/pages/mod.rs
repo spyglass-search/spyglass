@@ -6,8 +6,6 @@ pub mod search;
 #[derive(Properties, PartialEq)]
 pub struct AppPageProps {
     #[prop_or_default]
-    pub current_lens: Option<String>,
-    #[prop_or_default]
     pub children: Children,
 }
 

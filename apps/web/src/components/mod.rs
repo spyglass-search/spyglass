@@ -13,6 +13,10 @@ pub mod nav;
 pub struct LensListProps {
     pub current: Option<String>,
     pub lenses: Option<Vec<Lens>>,
+    #[prop_or_default]
+    pub on_select: Callback<Lens>,
+    #[prop_or_default]
+    pub on_edit: Callback<Lens>,
 }
 
 #[function_component(LensList)]
@@ -44,28 +48,38 @@ pub fn lens_list(props: &LensListProps) -> Html {
             }
         );
 
-        let navi = navigator.clone();
-        let lens_name = lens.name.clone();
-        let onclick = Callback::from(move |_| {
-            navi.push(&Route::Search {
-                lens: lens_name.clone(),
+        let onclick = {
+            let navi = navigator.clone();
+            let lens = lens.clone();
+            let on_select = props.on_select.clone();
+
+            Callback::from(move |_| {
+                on_select.emit(lens.clone());
+                navi.push(&Route::Search {
+                    lens: lens.name.clone(),
+                })
             })
-        });
+        };
+
+        let on_edit = {
+            let navi = navigator.clone();
+            let lens = lens.clone();
+            let on_edit = props.on_edit.clone();
+
+            Callback::from(move |e: MouseEvent| {
+                e.stop_immediate_propagation();
+                on_edit.emit(lens.clone());
+                navi.push(&Route::Edit {
+                    lens: lens.name.clone(),
+                })
+            })
+        };
 
         let icon = if lens.is_public {
             html! { <icons::GlobeIcon classes="mr-2" height="h-3" width="w-3" /> }
         } else {
             html! { <icons::CollectionIcon classes="mr-2" height="h-3" width="w-3" /> }
         };
-
-        let navi = navigator.clone();
-        let lens_name = lens.name.clone();
-        let on_edit = Callback::from(move |e: MouseEvent| {
-            e.stop_immediate_propagation();
-            navi.push(&Route::Edit {
-                lens: lens_name.clone(),
-            })
-        });
 
         let edit_icon = if lens.is_public {
             html! {}

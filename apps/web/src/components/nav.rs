@@ -4,11 +4,18 @@ use yew::{platform::spawn_local, prelude::*};
 use yew_router::prelude::use_navigator;
 
 use super::LensList;
+use crate::client::Lens;
 use crate::{auth0_login, auth0_logout, AuthStatus, Route};
 
 #[derive(Properties, PartialEq)]
 pub struct NavBarProps {
     pub current_lens: Option<String>,
+    #[prop_or_default]
+    pub on_create_lens: Callback<Lens>,
+    #[prop_or_default]
+    pub on_select_lens: Callback<Lens>,
+    #[prop_or_default]
+    pub on_edit_lens: Callback<Lens>,
 }
 
 #[function_component(NavBar)]
@@ -32,16 +39,21 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
     });
 
     let auth_status_handle = auth_status.clone();
+    let on_create = props.on_create_lens.clone();
     let create_lens_cb = Callback::from(move |_| {
         let navigator = navigator.clone();
-        let auth_status_handle = auth_status_handle.clone();
+        let auth_status_handle: AuthStatus = auth_status_handle.clone();
+        let on_create = on_create.clone();
         spawn_local(async move {
             // create a new lens
             let api = auth_status_handle.get_client();
             match api.lens_create().await {
-                Ok(new_lens) => navigator.push(&Route::Edit {
-                    lens: new_lens.name,
-                }),
+                Ok(new_lens) => {
+                    on_create.emit(new_lens.clone());
+                    navigator.push(&Route::Edit {
+                        lens: new_lens.name,
+                    })
+                }
                 Err(err) => log::error!("error creating lens: {err}"),
             }
         });
@@ -90,7 +102,14 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                     }
                 } else { html! {} }}
                 {if let Some(user_data) = &user_data {
-                    html!{ <LensList current={props.current_lens.clone()} lenses={user_data.lenses.clone()} /> }
+                    html!{
+                        <LensList
+                            current={props.current_lens.clone()}
+                            lenses={user_data.lenses.clone()}
+                            on_select={props.on_select_lens.clone()}
+                            on_edit={props.on_edit_lens.clone()}
+                        />
+                    }
                 } else {
                     html! {}
                 }}

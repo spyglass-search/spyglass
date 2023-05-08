@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate dotenv_codegen;
 
-use client::UserData;
+use client::{Lens, UserData};
 use gloo::utils::{history, window};
 use js_sys::decode_uri_component;
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ fn switch(routes: Route) -> Html {
                     lens.clone()
                 };
 
-            html! { <AppPage current_lens={decoded_lens.clone()}><SearchPageWrapper lens={decoded_lens} /></AppPage> }
+            html! { <AppPage><SearchPageWrapper lens={decoded_lens} /></AppPage> }
         }
         Route::NotFound => html! { <div>{"Not Found!"}</div> },
     }
@@ -93,15 +93,14 @@ fn switch(routes: Route) -> Html {
 pub enum Msg {
     AuthenticateUser,
     LoadLenses,
-    ToggleNavbar,
+    SetSelectedLens(Lens),
     UpdateAuth(AuthStatus),
     UpdateUserData(UserData),
 }
 
 pub struct App {
-    current_lens: Option<String>,
-    navbar_active: bool,
     auth_status: AuthStatus,
+    current_lens: Option<String>,
 }
 
 impl Component for App {
@@ -120,19 +119,19 @@ impl Component for App {
         ctx.link().send_message(Msg::LoadLenses);
 
         Self {
-            current_lens: None,
-            navbar_active: false,
             auth_status: AuthStatus {
                 is_authenticated: false,
                 user_profile: None,
                 token: None,
                 user_data: None,
             },
+            current_lens: None,
         }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
+
         match msg {
             Msg::AuthenticateUser => {
                 let link = link.clone();
@@ -172,8 +171,8 @@ impl Component for App {
                 });
                 false
             }
-            Msg::ToggleNavbar => {
-                self.navbar_active = !self.navbar_active;
+            Msg::SetSelectedLens(lens) => {
+                self.current_lens = Some(lens.name);
                 true
             }
             Msg::UpdateAuth(auth) => {
@@ -197,11 +196,24 @@ impl Component for App {
             link.send_message(Msg::AuthenticateUser);
         }
 
+        let handle_on_create_lens = {
+            let link = link.clone();
+            Callback::from(move |lens| {
+                link.send_message_batch(vec![Msg::LoadLenses, Msg::SetSelectedLens(lens)])
+            })
+        };
+
         html! {
             <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
                 <BrowserRouter>
                     <div class="text-white flex h-screen">
-                        <NavBar current_lens={self.current_lens.clone()} />
+                        <NavBar
+                            current_lens={self.current_lens.clone()}
+                            // Reload lenses after a new one is created.
+                            on_create_lens={handle_on_create_lens.clone()}
+                            on_select_lens={link.callback(Msg::SetSelectedLens)}
+                            on_edit_lens={link.callback(Msg::SetSelectedLens)}
+                        />
                         <Switch<Route> render={switch} />
                     </div>
                 </BrowserRouter>
