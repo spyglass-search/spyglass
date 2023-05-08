@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-pub mod create;
+pub mod lens_edit;
 pub mod search;
 
 #[derive(Properties, PartialEq)]

@@ -14,7 +14,7 @@ mod client;
 mod components;
 mod pages;
 use components::nav::NavBar;
-use pages::{create::CreateLensPage, AppPage};
+use pages::{lens_edit::CreateLensPage, AppPage};
 
 use crate::{client::ApiClient, pages::search::SearchPageWrapper};
 
@@ -117,7 +117,6 @@ impl Component for App {
         );
 
         ctx.link().send_message(Msg::LoadLenses);
-
         Self {
             auth_status: AuthStatus {
                 is_authenticated: false,
