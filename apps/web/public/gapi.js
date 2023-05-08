@@ -9,7 +9,7 @@ export function init_gapi(client_id, api_key) {
     API_KEY = api_key;
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.file',
+        scope: 'email https://www.googleapis.com/auth/drive.readonly',
         callback: '', // defined later
     });
 }
