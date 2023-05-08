@@ -15,12 +15,12 @@ export function init_gapi(client_id, api_key) {
 }
 
 function pickerCallback(data) {
-    let url = null;
+    let file_id = null;
     if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
         let doc = data[google.picker.Response.DOCUMENTS][0];
-        url = doc[google.picker.Document.URL];
+        file_id = doc[google.picker.Document.ID];
     }
-    return url;
+    return file_id;
 }
 
 export function create_picker(callback) {

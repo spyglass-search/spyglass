@@ -6,7 +6,10 @@ use wasm_bindgen::{
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use crate::{client::LensSource, AuthStatus};
+use crate::{
+    client::{LensDocType, LensSource, Lens},
+    AuthStatus,
+};
 
 #[wasm_bindgen(module = "/public/gapi.js")]
 extern "C" {
@@ -63,8 +66,8 @@ impl Component for CreateLensPage {
             Msg::AddUrl => {
                 self.sources.push(LensSource {
                     url: "https://example.com".into(),
+                    doc_type: LensDocType::WebUrl,
                     is_crawling: true,
-                    access_token: None,
                 });
                 true
             }
@@ -73,7 +76,7 @@ impl Component for CreateLensPage {
                 let new_source = LensSource {
                     url,
                     is_crawling: true,
-                    access_token: Some(token),
+                    doc_type: LensDocType::GDrive { token },
                 };
 
                 self.sources.push(new_source.clone());

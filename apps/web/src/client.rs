@@ -180,10 +180,19 @@ pub struct UserData {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum LensDocType {
+    /// Token is used to download the document from GDrive.
+    GDrive { token: String },
+    /// Normal, web accessible URL.
+    WebUrl,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LensSource {
+    pub doc_type: LensDocType,
     pub url: String,
+    #[serde(skip_serializing)]
     pub is_crawling: bool,
-    pub access_token: Option<String>,
 }
 
 pub struct ApiClient {
@@ -226,7 +235,7 @@ impl ApiClient {
             Some(token) => {
                 match self
                     .client
-                    .post(format!("{}/user/lenses/{}/source", lens, self.endpoint))
+                    .post(format!("{}/user/lenses/{}/source", self.endpoint, lens))
                     .bearer_auth(token)
                     .json(source)
                     .send()
