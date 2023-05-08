@@ -179,6 +179,13 @@ pub struct UserData {
     pub lenses: Vec<Lens>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LensSource {
+    pub url: String,
+    pub is_crawling: bool,
+    pub access_token: Option<String>,
+}
+
 pub struct ApiClient {
     client: reqwest::Client,
     endpoint: String,
@@ -208,6 +215,30 @@ impl ApiClient {
         }
 
         request.send().await?.json::<Lens>().await
+    }
+
+    pub async fn lens_add_source(
+        &self,
+        lens: &str,
+        source: &LensSource,
+    ) -> Result<(), reqwest::Error> {
+        match &self.token {
+            Some(token) => {
+                match self
+                    .client
+                    .post(format!("{}/user/lenses/{}/source", lens, self.endpoint))
+                    .bearer_auth(token)
+                    .json(source)
+                    .send()
+                    .await?
+                    .error_for_status()
+                {
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(err),
+                }
+            }
+            None => Ok(()),
+        }
     }
 
     pub async fn get_user_data(&self) -> Result<UserData, reqwest::Error> {

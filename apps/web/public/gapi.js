@@ -36,7 +36,7 @@ export function create_picker(callback) {
             .setCallback((data) => {
                 let result = pickerCallback(data);
                 if (result) {
-                    callback(result)
+                    callback(accessToken, result)
                 };
             })
             .build();

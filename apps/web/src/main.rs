@@ -26,14 +26,14 @@ pub struct Auth0User {
     pub sub: String,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct AuthStatus {
     #[serde(rename(deserialize = "isAuthenticated"))]
     pub is_authenticated: bool,
     #[serde(rename(deserialize = "userProfile"))]
     pub user_profile: Option<Auth0User>,
     pub token: Option<String>,
-    // Only used internall
+    // Only used internally
     #[serde(skip)]
     pub user_data: Option<UserData>,
 }
