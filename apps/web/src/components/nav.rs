@@ -125,6 +125,10 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                     </li>
                 </ul>
             </div>
+            <div class="absolute text-xs text-neutral-600 bottom-0 py-4">
+                <span class="font-bold text-cyan-700">{"build: "}</span>
+                <span>{dotenv!("GIT_HASH")}</span>
+            </div>
         </div>
     }
 }
