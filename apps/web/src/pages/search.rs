@@ -525,7 +525,7 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
 pub struct FAQComponentProps {
     questions: Vec<String>,
     #[prop_or_default]
-    onclick: Callback<String>
+    onclick: Callback<String>,
 }
 
 #[function_component(FAQComponent)]
