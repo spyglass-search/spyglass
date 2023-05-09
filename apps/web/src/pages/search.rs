@@ -69,6 +69,7 @@ pub struct HistoryItem {
     pub value: String,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
@@ -76,6 +77,7 @@ pub enum Msg {
     HandleSearch,
     SetSearchResults(Vec<SearchResult>),
     ContextAdded(String),
+    ToggleContext,
     SetError(String),
     SetStatus(String),
     TokenReceived(String),
@@ -101,6 +103,7 @@ pub struct SearchPage {
     status_msg: Option<String>,
     tokens: Option<String>,
     context: Option<String>,
+    show_context: bool,
 }
 
 impl Component for SearchPage {
@@ -121,6 +124,7 @@ impl Component for SearchPage {
             status_msg: None,
             tokens: None,
             context: None,
+            show_context: false,
         }
     }
 
@@ -255,6 +259,10 @@ impl Component for SearchPage {
                 self.status_msg = Some(msg);
                 true
             }
+            Msg::ToggleContext => {
+                self.show_context = !self.show_context;
+                true
+            }
             Msg::TokenReceived(token) => {
                 if let Some(tokens) = self.tokens.as_mut() {
                     tokens.push_str(&token);
@@ -318,6 +326,16 @@ impl Component for SearchPage {
                         }}
                     </Btn>
                 </div>
+                {if self.show_context {
+                    html! {
+                        <div class="p-4">
+                            <div>{"Context"}</div>
+                            <div>{self.context.clone()}</div>
+                        </div>
+                    }
+                } else {
+                    html! {}
+                }}
                 {if let Some(query) = &self.current_query {
                     html! { <div class="mt-4 mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
@@ -333,7 +351,7 @@ impl Component for SearchPage {
                             />
                         }
                     } else {
-                        html! {}
+                        html! { <FAQComponent questions={self.current_lens.example_questions.clone()} />}
                     }}
 
                     <div class="animate-fade-in col-span-1">
@@ -477,6 +495,44 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
             } else {
                 html! {}
             }}
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct FAQComponentProps {
+    questions: Vec<String>,
+}
+
+#[function_component(FAQComponent)]
+fn faq_component(props: &FAQComponentProps) -> Html {
+    let qa_classes = classes!(
+        "text-cyan-500",
+        "text-lg",
+        "p-4",
+        "rounded",
+        "border",
+        "border-neutral-500",
+        "underline",
+        "cursor-pointer",
+        "hover:bg-neutral-700"
+    );
+
+    let questions = props
+        .questions
+        .iter()
+        .map(|q| html! { <div class={qa_classes.clone()}>{q}</div> })
+        .collect::<Html>();
+
+    html! {
+        <div>
+            <div class="text-xl text-white">{"Frequently Asked Questions"}</div>
+            <div class="text-neutral-500 text-base">
+                {"Not sure where to start? Try one of these questions"}
+            </div>
+            <div class="flex flex-col gap-4 mt-4">
+                {questions}
+            </div>
         </div>
     }
 }
