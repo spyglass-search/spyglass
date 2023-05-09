@@ -220,10 +220,10 @@ impl Component for CreateLensPage {
             .iter()
             .map(|x| {
                 html! {
-                    <div class="border-b border-neutral-600 py-4 flex flex-row items-center">
-                        <div>
+                    <div class="border-b border-neutral-600 py-4 flex flex-row items-center gap-6">
+                        <div class="overflow-hidden">
                             <div>{x.display_name.clone()}</div>
-                            <div class="text-sm text-neutral-600 overflow-hidden">{x.url.clone()}</div>
+                            <div class="text-sm text-neutral-600">{x.url.clone()}</div>
                         </div>
                         <div class="text-base ml-auto">{x.status.clone()}</div>
                     </div>
