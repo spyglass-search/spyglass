@@ -28,6 +28,7 @@ ignore = "0.4"
 jsonrpsee = { version = "0.16.2", features = ["server"] }
 lnk = "0.5.1"
 log = "0.4"
+pdf = "0.8.1"
 mime = "0.3.16"
 new_mime_guess = "4.0.1"
 nonzero_ext = "0.3.0"
