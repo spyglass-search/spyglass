@@ -1,6 +1,6 @@
 use crate::{
     client::{Lens, SpyglassClient},
-    AuthStatus,
+    AuthStatus, Route,
 };
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
@@ -16,6 +16,7 @@ use ui_components::{
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
+use yew_router::prelude::Redirect;
 
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
@@ -43,11 +44,11 @@ pub fn search_page_wrapper(props: &SearchPageWrapperProps) -> Html {
         None
     };
 
-    // todo: load data from server?
     if let Some(lens_info) = lens_info {
         html! { <SearchPage lens={lens_info} /> }
     } else {
-        html! { <div>{"Unable to find lens"}</div> }
+        // redirect forbidden/bad requests to start page
+        html! { <Redirect<Route> to={Route::Start} /> }
     }
 }
 

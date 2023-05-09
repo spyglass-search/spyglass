@@ -72,24 +72,6 @@ pub enum Route {
     NotFound,
 }
 
-fn switch(routes: Route) -> Html {
-    match &routes {
-        Route::Start => html! { <AppPage /> },
-        Route::Edit { lens } => html! { <AppPage><CreateLensPage lens={lens.clone()} /></AppPage> },
-        Route::Search { lens } => {
-            let decoded_lens =
-                if let Ok(Some(decoded)) = decode_uri_component(lens).map(|x| x.as_string()) {
-                    decoded
-                } else {
-                    lens.clone()
-                };
-
-            html! { <AppPage><SearchPageWrapper lens={decoded_lens} /></AppPage> }
-        }
-        Route::NotFound => html! { <div>{"Not Found!"}</div> },
-    }
-}
-
 pub enum Msg {
     AuthenticateUser,
     LoadLenses,
@@ -200,6 +182,30 @@ impl Component for App {
             Callback::from(move |lens| {
                 link.send_message_batch(vec![Msg::LoadLenses, Msg::SetSelectedLens(lens)])
             })
+        };
+
+        let switch = {
+            let link = link.clone();
+            move |routes: Route| match &routes {
+                Route::Start => html! { <AppPage /> },
+                Route::Edit { lens } => html! {
+                    <AppPage>
+                        <CreateLensPage lens={lens.clone()} onupdate={link.callback(|_| Msg::LoadLenses)} />
+                    </AppPage>
+                },
+                Route::Search { lens } => {
+                    let decoded_lens = if let Ok(Some(decoded)) =
+                        decode_uri_component(lens).map(|x| x.as_string())
+                    {
+                        decoded
+                    } else {
+                        lens.clone()
+                    };
+
+                    html! { <AppPage><SearchPageWrapper lens={decoded_lens} /></AppPage> }
+                }
+                Route::NotFound => html! { <div>{"Not Found!"}</div> },
+            }
         };
 
         html! {

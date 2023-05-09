@@ -247,7 +247,12 @@ impl ApiClient {
             request = request.bearer_auth(auth_token);
         }
 
-        request.send().await?.json::<Lens>().await
+        request
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<Lens>()
+            .await
     }
 
     pub async fn lens_add_source(
@@ -274,13 +279,38 @@ impl ApiClient {
         }
     }
 
+    pub async fn lens_update(&self, lens: &str, display_name: &str) -> Result<(), reqwest::Error> {
+        match &self.token {
+            Some(token) => {
+                match self
+                    .client
+                    .patch(format!("{}/user/lenses/{}", self.endpoint, lens))
+                    .bearer_auth(token)
+                    .json(&serde_json::json!({ "display_name": display_name }))
+                    .send()
+                    .await?
+                    .error_for_status()
+                {
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(err),
+                }
+            }
+            None => Ok(()),
+        }
+    }
+
     pub async fn get_user_data(&self) -> Result<UserData, reqwest::Error> {
         let mut request = self.client.get(format!("{}/user/lenses", self.endpoint));
         if let Some(auth_token) = &self.token {
             request = request.bearer_auth(auth_token);
         }
 
-        let lenses = request.send().await?.json::<Vec<Lens>>().await;
+        let lenses = request
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<Vec<Lens>>()
+            .await;
 
         let lenses = match lenses {
             Ok(lenses) => lenses,
