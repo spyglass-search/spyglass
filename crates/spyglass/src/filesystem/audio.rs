@@ -245,7 +245,7 @@ pub fn transcibe_audio(
                 }
             };
 
-            let state = ctx.create_state()?;
+            let mut state = ctx.create_state()?;
 
             res.metadata = Some(audio_file.metadata);
 
@@ -254,15 +254,15 @@ pub fn transcibe_audio(
             params.set_print_progress(false);
             params.set_token_timestamps(true);
 
-            ctx.full(&state, params, &audio_file.samples)?;
-            let num_segments = ctx.full_n_segments(&state)?;
+            state.full(params, &audio_file.samples)?;
+            let num_segments = state.full_n_segments()?;
             log::debug!("Extracted {} segments", num_segments);
             for i in 0..num_segments {
-                let segment = ctx
-                    .full_get_segment_text(&state, i)
+                let segment = state
+                    .full_get_segment_text(i)
                     .expect("failed to get segment");
-                let start_timestamp = ctx.full_get_segment_t0(&state, i)?;
-                let end_timestamp = ctx.full_get_segment_t1(&state, i)?;
+                let start_timestamp = state.full_get_segment_t0(i)?;
+                let end_timestamp = state.full_get_segment_t1(i)?;
                 res.segments
                     .push(Segment::new(start_timestamp, end_timestamp, &segment));
             }

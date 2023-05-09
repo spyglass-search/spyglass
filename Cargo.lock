@@ -9206,7 +9206,7 @@ dependencies = [
 [[package]]
 name = "whisper-rs"
 version = "0.6.0"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=0859b41191dcbf176f9924eb82854262c3417b42#0859b41191dcbf176f9924eb82854262c3417b42"
 dependencies = [
  "dashmap",
  "whisper-rs-sys",
@@ -9215,7 +9215,7 @@ dependencies = [
 [[package]]
 name = "whisper-rs-sys"
 version = "0.4.0"
-source = "git+https://github.com/tazz4843/whisper-rs?rev=efd18b6cc1ffc2b9561d038e9306251d5248c25d#efd18b6cc1ffc2b9561d038e9306251d5248c25d"
+source = "git+https://github.com/tazz4843/whisper-rs?rev=0859b41191dcbf176f9924eb82854262c3417b42#0859b41191dcbf176f9924eb82854262c3417b42"
 dependencies = [
  "bindgen",
 ]
