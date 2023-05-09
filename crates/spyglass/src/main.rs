@@ -263,7 +263,7 @@ async fn start_backend(state: AppState, config: Config) {
         manager_cmd_rx,
     ));
 
-    // Work scheduler
+    // Config change detection
     let config_handle = tokio::spawn(task::config_task(state.clone()));
 
     // Crawlers

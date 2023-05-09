@@ -151,7 +151,10 @@ impl Component for App {
                             match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
                                 Ok(status) => link.send_message(Msg::UpdateAuth(status)),
                                 Err(err) => {
-                                    log::error!("Unable to parse user profile: {}", err.to_string());
+                                    log::error!(
+                                        "Unable to parse user profile: {}",
+                                        err.to_string()
+                                    );
                                     link.send_message(Msg::LoadLenses);
                                 }
                             }

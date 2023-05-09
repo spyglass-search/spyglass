@@ -80,6 +80,7 @@ pub enum Msg {
     ToggleContext,
     SetError(String),
     SetStatus(String),
+    SetQuery(String),
     TokenReceived(String),
     SetFinished,
     Reset,
@@ -142,6 +143,10 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::ContextAdded(context) => {
+                self.context = Some(context);
+                false
+            }
             Msg::HandleFollowup(question) => {
                 log::info!("handling followup: {}", question);
                 // Push existing question & answer into history
@@ -212,37 +217,11 @@ impl Component for SearchPage {
                 false
             }
             Msg::HandleSearch => {
-                self.in_progress = true;
-                self.tokens = None;
-                self.status_msg = None;
-                self.results = Vec::new();
-
                 if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
                     let query = search_input.value();
-                    log::info!("handling search! {:?}", query);
-
-                    self.current_query = Some(query.clone());
+                    link.send_message(Msg::SetQuery(query));
                     search_input.set_value("");
-                    self.status_msg = Some(format!("searching: {query}"));
-
-                    let link = link.clone();
-                    let client = self.client.clone();
-                    spawn_local(async move {
-                        let mut client = client.lock().await;
-                        if let Err(err) = client.search(&query, link.clone()).await {
-                            log::error!("{}", err.to_string());
-                            link.send_message(Msg::SetError(err.to_string()));
-                        }
-                    });
                 }
-                true
-            }
-            Msg::SetSearchResults(results) => {
-                self.results = results;
-                true
-            }
-            Msg::ContextAdded(context) => {
-                self.context = Some(context);
                 false
             }
             Msg::SetError(err) => {
@@ -255,8 +234,33 @@ impl Component for SearchPage {
                 self.status_msg = None;
                 true
             }
+            Msg::SetSearchResults(results) => {
+                self.results = results;
+                true
+            }
             Msg::SetStatus(msg) => {
                 self.status_msg = Some(msg);
+                true
+            }
+            Msg::SetQuery(query) => {
+                self.in_progress = true;
+                self.tokens = None;
+                self.results = Vec::new();
+                self.current_query = Some(query.clone());
+
+                log::info!("handling search! {}", query);
+                self.status_msg = Some(format!("searching: {query}"));
+
+                let link = link.clone();
+                let client = self.client.clone();
+                spawn_local(async move {
+                    let mut client = client.lock().await;
+                    if let Err(err) = client.search(&query, link.clone()).await {
+                        log::error!("{}", err.to_string());
+                        link.send_message(Msg::SetError(err.to_string()));
+                    }
+                });
+
                 true
             }
             Msg::ToggleContext => {
@@ -351,7 +355,12 @@ impl Component for SearchPage {
                             />
                         }
                     } else {
-                        html! { <FAQComponent questions={self.current_lens.example_questions.clone()} />}
+                        html! {
+                            <FAQComponent
+                                questions={self.current_lens.example_questions.clone()}
+                                onclick={link.callback(Msg::SetQuery)}
+                            />
+                        }
                     }}
 
                     <div class="animate-fade-in col-span-1">
@@ -360,6 +369,19 @@ impl Component for SearchPage {
                                 <>
                                     <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
                                     <ResultPaginator page_size={5}>{results}</ResultPaginator>
+                                </>
+                            }
+                        } else if self.current_query.is_some() {
+                            html! {
+                                <>
+                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
+                                    <div class="text-sm text-neutral-500">
+                                        {
+                                            "We didn't find any relevant documents, but we
+                                            will try to answer the question to the best of our ability
+                                            without any additional context"
+                                        }
+                                    </div>
                                 </>
                             }
                         } else {
@@ -502,6 +524,8 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
 #[derive(Properties, PartialEq)]
 pub struct FAQComponentProps {
     questions: Vec<String>,
+    #[prop_or_default]
+    onclick: Callback<String>
 }
 
 #[function_component(FAQComponent)]
@@ -515,13 +539,24 @@ fn faq_component(props: &FAQComponentProps) -> Html {
         "border-neutral-500",
         "underline",
         "cursor-pointer",
-        "hover:bg-neutral-700"
+        "hover:bg-neutral-700",
+        "text-left",
     );
 
+    let onclick = props.onclick.clone();
     let questions = props
         .questions
         .iter()
-        .map(|q| html! { <div class={qa_classes.clone()}>{q}</div> })
+        .map(|q| {
+            let onclick = onclick.clone();
+            let question = q.clone();
+            let callback = Callback::from(move |_| {
+                onclick.emit(question.clone());
+            });
+            html! {
+                <button class={qa_classes.clone()} onclick={callback}>{q.clone()}</button>
+            }
+        })
         .collect::<Html>();
 
     html! {
