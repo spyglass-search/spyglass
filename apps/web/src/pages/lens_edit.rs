@@ -1,4 +1,4 @@
-use ui_components::btn::{Btn, BtnType};
+use ui_components::btn::{Btn, BtnType, BtnSize};
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
     JsValue,
@@ -7,7 +7,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
 use crate::{
-    client::{LensDocType, LensSource},
+    client::{Lens, LensAddDocType, LensAddDocument},
     AuthStatus,
 };
 
@@ -21,8 +21,8 @@ extern "C" {
 }
 
 pub struct CreateLensPage {
-    pub lens: String,
-    pub sources: Vec<LensSource>,
+    pub lens_identifier: String,
+    pub lens_data: Option<Lens>,
     pub auth_status: AuthStatus,
     pub _context_listener: ContextHandle<AuthStatus>,
 }
@@ -35,6 +35,8 @@ pub struct CreateLensProps {
 pub enum Msg {
     AddUrl,
     FilePicked { token: String, url: String },
+    Reload,
+    SetLensData(Lens),
     OpenCloudFilePicker,
     UpdateContext(AuthStatus),
 }
@@ -52,44 +54,68 @@ impl Component for CreateLensPage {
             .context(ctx.link().callback(Msg::UpdateContext))
             .expect("No Message Context Provided");
 
+        ctx.link().send_message(Msg::Reload);
+
         Self {
-            lens: ctx.props().lens.clone(),
-            sources: Vec::new(),
+            lens_identifier: ctx.props().lens.clone(),
+            lens_data: None,
             auth_status,
             _context_listener: context_listener,
+        }
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
+        let new_lens = ctx.props().lens.clone();
+        if self.lens_identifier != new_lens {
+            self.lens_identifier = new_lens;
+            ctx.link().send_message(Msg::Reload);
+            true
+        } else {
+            false
         }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AddUrl => {
-                self.sources.push(LensSource {
-                    url: "https://example.com".into(),
-                    doc_type: LensDocType::WebUrl,
-                    is_crawling: true,
-                });
-                true
-            }
+            Msg::AddUrl => true,
             Msg::FilePicked { token, url } => {
-                // let link = link.clone();
-                let new_source = LensSource {
+                let new_source = LensAddDocument {
                     url,
-                    is_crawling: true,
-                    doc_type: LensDocType::GDrive { token },
+                    doc_type: LensAddDocType::GDrive { token },
                 };
-
-                self.sources.push(new_source.clone());
 
                 // Add to lens
                 let auth_status = self.auth_status.clone();
-                let lens_name = self.lens.clone();
+                let identifier = self.lens_identifier.clone();
+                let link = link.clone();
                 spawn_local(async move {
                     let api = auth_status.get_client();
-                    if let Err(err) = api.lens_add_source(&lens_name, &new_source).await {
-                        log::error!("erro adding lens: {}", err);
+                    if let Err(err) = api.lens_add_source(&identifier, &new_source).await {
+                        log::error!("error adding lens: {}", err);
+                    } else {
+                        // Reload data if successful
+                        link.send_message(Msg::Reload);
                     }
                 });
+                true
+            }
+            Msg::Reload => {
+                let auth_status = self.auth_status.clone();
+                let identifier = self.lens_identifier.clone();
+                let link = link.clone();
+                spawn_local(async move {
+                    let api = auth_status.get_client();
+                    match api.lens_retrieve(&identifier).await {
+                        Ok(lens) => link.send_message(Msg::SetLensData(lens)),
+                        Err(err) => log::error!("error retrieving lens: {}", err),
+                    }
+                });
+
+                false
+            }
+            Msg::SetLensData(lens_data) => {
+                self.lens_data = Some(lens_data);
                 true
             }
             Msg::OpenCloudFilePicker => {
@@ -122,13 +148,21 @@ impl Component for CreateLensPage {
         let link = ctx.link();
 
         let sources = self
-            .sources
+            .lens_data
+            .as_ref()
+            .map(|x| x.sources.clone())
+            .unwrap_or_default();
+
+        let sources = sources
             .iter()
             .map(|x| {
                 html! {
-                    <div>
-                        <div>{x.url.clone()}</div>
-                        <div>{x.is_crawling}</div>
+                    <div class="border-b border-neutral-600 py-4 flex flex-row items-center">
+                        <div>
+                            <div>{x.display_name.clone()}</div>
+                            <div class="text-sm text-neutral-600 overflow-hidden">{x.url.clone()}</div>
+                        </div>
+                        <div class="text-base ml-auto">{x.status.clone()}</div>
                     </div>
                 }
             })
@@ -136,13 +170,25 @@ impl Component for CreateLensPage {
 
         html! {
             <div>
-                <div class="px-6 pt-4 flex flex-row items-center">
-                    <h2 class="bold text-xl ">
-                        {format!("New Lens: {}", self.lens.clone())}
-                    </h2>
-                    <Btn classes="ml-auto" _type={BtnType::Success}>{"Save"}</Btn>
+                <div class="flex flex-row items-center px-8 pt-6">
+                    {if let Some(lens_data) = self.lens_data.as_ref() {
+                        html! {
+                            <input
+                                class="border-b-2 border-neutral-600 py-3 bg-neutral-800 text-white text-2xl outline-none active:outline-none focus:outline-none caret-white"
+                                type="text"
+                                spellcheck="false"
+                                tabindex="-1"
+                                value={format!("{}", lens_data.display_name)}
+                            />
+                        }
+                    } else {
+                        html! {
+                            <h2 class="bold text-xl ">{"Loading"}</h2>
+                        }
+                    }}
+                    <Btn _type={BtnType::Success} classes="ml-auto">{"Save"}</Btn>
                 </div>
-                <div class="flex flex-col gap-8 px-6 py-4">
+                <div class="flex flex-col gap-8 px-8 py-4">
                     <div class="flex flex-row gap-4">
                         <Btn onclick={link.callback(|_| Msg::AddUrl)}>{"Add data from URL"}</Btn>
                         <Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn>

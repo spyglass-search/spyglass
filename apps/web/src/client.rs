@@ -172,6 +172,7 @@ pub struct Lens {
     pub example_questions: Vec<String>,
     pub example_docs: Vec<String>,
     pub is_public: bool,
+    pub sources: Vec<LensSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -180,7 +181,7 @@ pub struct UserData {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum LensDocType {
+pub enum LensAddDocType {
     /// Token is used to download the document from GDrive.
     GDrive { token: String },
     /// Normal, web accessible URL.
@@ -188,11 +189,23 @@ pub enum LensDocType {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LensAddDocument {
+    pub doc_type: LensAddDocType,
+    pub url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum LensDocType {
+    GDrive,
+    Web,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct LensSource {
+    pub display_name: String,
     pub doc_type: LensDocType,
     pub url: String,
-    #[serde(skip_serializing)]
-    pub is_crawling: bool,
+    pub status: String,
 }
 
 pub struct ApiClient {
@@ -226,10 +239,21 @@ impl ApiClient {
         request.send().await?.json::<Lens>().await
     }
 
+    pub async fn lens_retrieve(&self, id: &str) -> Result<Lens, reqwest::Error> {
+        let mut request = self
+            .client
+            .get(format!("{}/user/lenses/{}", self.endpoint, id));
+        if let Some(auth_token) = &self.token {
+            request = request.bearer_auth(auth_token);
+        }
+
+        request.send().await?.json::<Lens>().await
+    }
+
     pub async fn lens_add_source(
         &self,
         lens: &str,
-        source: &LensSource,
+        request: &LensAddDocument,
     ) -> Result<(), reqwest::Error> {
         match &self.token {
             Some(token) => {
@@ -237,7 +261,7 @@ impl ApiClient {
                     .client
                     .post(format!("{}/user/lenses/{}/source", self.endpoint, lens))
                     .bearer_auth(token)
-                    .json(source)
+                    .json(request)
                     .send()
                     .await?
                     .error_for_status()
