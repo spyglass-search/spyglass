@@ -50,6 +50,9 @@ extern "C" {
     pub fn init_env(domain: &str, client_id: &str, redirect_uri: &str, audience: &str);
 
     #[wasm_bindgen(catch)]
+    pub async fn check_login() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch)]
     pub async fn auth0_login() -> Result<(), JsValue>;
 
     #[wasm_bindgen(catch)]
@@ -74,6 +77,7 @@ pub enum Route {
 
 pub enum Msg {
     AuthenticateUser,
+    CheckAuth,
     LoadLenses,
     SetSelectedLens(Lens),
     UpdateAuth(AuthStatus),
@@ -98,7 +102,9 @@ impl Component for App {
             dotenv!("AUTH0_AUDIENCE"),
         );
 
-        ctx.link().send_message(Msg::LoadLenses);
+        // Check if user is logged in
+        ctx.link().send_message(Msg::CheckAuth);
+
         Self {
             auth_status: AuthStatus {
                 is_authenticated: false,
@@ -127,6 +133,27 @@ impl Component for App {
                             Ok(status) => link.send_message(Msg::UpdateAuth(status)),
                             Err(err) => {
                                 log::error!("Unable to parse user profile: {}", err.to_string())
+                            }
+                        }
+                    }
+                });
+                false
+            }
+            Msg::CheckAuth => {
+                let link = link.clone();
+                spawn_local(async move {
+                    if let Ok(details) = check_login().await {
+                        // Not logged in, load lenses
+                        if details.is_null() {
+                            link.send_message(Msg::LoadLenses);
+                        } else {
+                            // Logged in!
+                            match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
+                                Ok(status) => link.send_message(Msg::UpdateAuth(status)),
+                                Err(err) => {
+                                    log::error!("Unable to parse user profile: {}", err.to_string());
+                                    link.send_message(Msg::LoadLenses);
+                                }
                             }
                         }
                     }
