@@ -11,6 +11,7 @@ pub const ODS: &str = "application/vnd.oasis.opendocument.spreadsheet";
 pub const GDOC: &str = "application/vnd.google-apps.document";
 pub const GSHEET: &str = "application/vnd.google-apps.spreadsheet";
 pub const GSLIDES: &str = "application/vnd.google-apps.presentation";
+pub const TEXT: &str = "text/plain";
 
 use crate::utils::extensions::*;
 use mime::Mime;
@@ -93,10 +94,14 @@ impl SupportedMime {
             Err(_) => Self::NotSupported,
         }
     }
+
+    pub fn is_supported(mime_str: &str) -> bool {
+        SupportedMime::from_mime(mime_str) != SupportedMime::NotSupported
+    }
 }
 #[cfg(test)]
 mod test {
-    use crate::utils::mime::{SupportedMime, DOCX, ODS, XLS, XLSX};
+    use crate::utils::mime::{SupportedMime, DOCX, ODS, XLS, XLSX, GSLIDES};
 
     #[test]
     pub fn test_document_mime_types() {
@@ -204,5 +209,12 @@ mod test {
             SupportedMime::from_mime("video/webm"),
             SupportedMime::Audio("video/webm".parse().unwrap())
         );
+    }
+
+    #[test]
+    pub fn test_is_supported() {
+        assert_eq!(SupportedMime::is_supported("application/javascript"), true);
+
+        assert_eq!(SupportedMime::is_supported(GSLIDES), false);
     }
 }

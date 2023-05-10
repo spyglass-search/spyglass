@@ -88,6 +88,7 @@ pub enum TextExt {
     Txt,
     Yaml,
     Yml,
+    Gdoc,
 }
 
 #[cfg(test)]
