@@ -59,6 +59,17 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
         });
     });
 
+    #[cfg(debug_assertions)]
+    let debug_vars = html! {
+        <>
+            <div><span class="text-cyan-700 font-bold">{"AUTH0_AUDIENCE: "}</span><span>{dotenv!("AUTH0_AUDIENCE")}</span></div>
+            <div><span class="text-cyan-700 font-bold">{"AUTH0_REDIRECT_URI: "}</span><span>{dotenv!("AUTH0_REDIRECT_URI")}</span></div>
+        </>
+    };
+
+    #[cfg(not(debug_assertions))]
+    let debug_vars = html! {};
+
     html! {
         <div class="flex-col sm:w-32 md:w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
             <div class="mb-6">
@@ -125,9 +136,12 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                     </li>
                 </ul>
             </div>
-            <div class="absolute text-xs text-neutral-600 bottom-0 py-4">
-                <span class="font-bold text-cyan-700">{"build: "}</span>
-                <span>{dotenv!("GIT_HASH")}</span>
+            <div class="absolute text-xs text-neutral-600 bottom-0 py-4 flex flex-col">
+                <div>
+                    <span class="font-bold text-cyan-700">{"build: "}</span>
+                    <span>{dotenv!("GIT_HASH")}</span>
+                </div>
+                {debug_vars}
             </div>
         </div>
     }
