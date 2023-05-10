@@ -16,7 +16,7 @@ mod pages;
 use components::nav::NavBar;
 use pages::{lens_edit::CreateLensPage, AppPage};
 
-use crate::{client::ApiClient, pages::search::SearchPageWrapper};
+use crate::{client::ApiClient, pages::search::SearchPage};
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth0User {
@@ -232,7 +232,7 @@ impl Component for App {
                         lens.clone()
                     };
 
-                    html! { <AppPage><SearchPageWrapper lens={decoded_lens} /></AppPage> }
+                    html! { <AppPage><SearchPage lens={decoded_lens} /></AppPage> }
                 }
                 Route::NotFound => html! { <div>{"Not Found!"}</div> },
             }

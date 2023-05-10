@@ -1,6 +1,6 @@
 use crate::{
     client::{Lens, SpyglassClient},
-    AuthStatus, Route,
+    AuthStatus
 };
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
@@ -15,42 +15,11 @@ use ui_components::{
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
-use yew::prelude::*;
-use yew_router::prelude::Redirect;
+use yew::{html::Scope, prelude::*};
+use yew_router::prelude::*;
 
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
-
-#[derive(Properties, PartialEq)]
-pub struct SearchPageWrapperProps {
-    pub lens: String,
-}
-
-/// A utility component that decodes the lens name from the URI & attempts to load
-/// data about the lens for the search page.
-#[function_component(SearchPageWrapper)]
-pub fn search_page_wrapper(props: &SearchPageWrapperProps) -> Html {
-    let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
-    let user_data = auth_status.user_data;
-    // Find or load lens data
-    let lens_info: Option<Lens> = if let Some(user_data) = &user_data {
-        // find the currently selected lens
-        user_data
-            .lenses
-            .iter()
-            .find(|x| x.name == *props.lens)
-            .cloned()
-    } else {
-        None
-    };
-
-    if let Some(lens_info) = lens_info {
-        html! { <SearchPage lens={lens_info} /> }
-    } else {
-        // redirect forbidden/bad requests to start page
-        html! { <Redirect<Route> to={Route::Start} /> }
-    }
-}
 
 #[derive(Clone, PartialEq, Eq, Display)]
 pub enum HistorySource {
@@ -70,31 +39,33 @@ pub struct HistoryItem {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
 pub enum Msg {
-    HandleKeyboardEvent(KeyboardEvent),
-    HandleFollowup(String),
-    HandleSearch,
-    SetSearchResults(Vec<SearchResult>),
     ContextAdded(String),
-    ToggleContext,
+    HandleFollowup(String),
+    HandleKeyboardEvent(KeyboardEvent),
+    HandleSearch,
+    Reload,
     SetError(String),
-    SetStatus(String),
-    SetQuery(String),
-    TokenReceived(String),
     SetFinished,
-    Reset,
+    SetLensData(Lens),
+    SetQuery(String),
+    SetSearchResults(Vec<SearchResult>),
+    SetStatus(String),
+    ToggleContext,
+    TokenReceived(String),
+    UpdateContext(AuthStatus),
 }
 
 #[derive(Properties, PartialEq)]
 pub struct SearchPageProps {
-    // todo: allow multiple
-    pub lens: Lens,
+    pub lens: String,
 }
 
 pub struct SearchPage {
-    current_lens: Lens,
     client: Client,
+    lens_identifier: String,
+    lens_data: Option<Lens>,
+    auth_status: AuthStatus,
     current_query: Option<String>,
     history: Vec<HistoryItem>,
     in_progress: bool,
@@ -105,6 +76,7 @@ pub struct SearchPage {
     tokens: Option<String>,
     context: Option<String>,
     show_context: bool,
+    _context_listener: ContextHandle<AuthStatus>,
 }
 
 impl Component for SearchPage {
@@ -113,27 +85,40 @@ impl Component for SearchPage {
 
     fn create(ctx: &yew::Context<Self>) -> Self {
         let props = ctx.props();
+        let link = ctx.link();
+        link.send_message(Msg::Reload);
+
+        let (auth_status, context_listener) = ctx
+            .link()
+            .context(ctx.link().callback(Msg::UpdateContext))
+            .expect("No Message Context Provided");
+
+        ctx.link().send_message(Msg::Reload);
+
         Self {
-            current_lens: props.lens.clone(),
-            client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.name.clone()))),
+            auth_status,
+            client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.clone()))),
+            context: None,
             current_query: None,
             history: Vec::new(),
             in_progress: false,
+            lens_data: None,
+            lens_identifier: props.lens.clone(),
             results: Vec::new(),
             search_input_ref: Default::default(),
             search_wrapper_ref: Default::default(),
+            show_context: false,
             status_msg: None,
             tokens: None,
-            context: None,
-            show_context: false,
+            _context_listener: context_listener,
         }
     }
 
     fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
         let new_lens = ctx.props().lens.clone();
-        if self.current_lens != new_lens {
-            self.current_lens = new_lens;
-            ctx.link().send_message(Msg::Reset);
+        if self.lens_identifier != new_lens {
+            self.lens_identifier = new_lens;
+            ctx.link().send_message(Msg::Reload);
             true
         } else {
             false
@@ -177,8 +162,6 @@ impl Component for SearchPage {
                 self.in_progress = true;
 
                 let link = link.clone();
-                let client = self.client.clone();
-
                 let mut cur_history = self.history.clone();
                 // Add context to the beginning
                 if let Some(context) = &self.context {
@@ -192,7 +175,7 @@ impl Component for SearchPage {
                 }
 
                 let cur_doc_context = self.results.clone();
-
+                let client = self.client.clone();
                 spawn_local(async move {
                     let mut client = client.lock().await;
                     if let Err(err) = client
@@ -224,6 +207,37 @@ impl Component for SearchPage {
                 }
                 false
             }
+            Msg::Reload => {
+                self.context = None;
+                self.current_query = None;
+                self.history.clear();
+                self.in_progress = false;
+                self.results.clear();
+                self.status_msg = None;
+                self.tokens = None;
+
+                let auth_status = self.auth_status.clone();
+                let identifier = self.lens_identifier.clone();
+                let link = link.clone();
+                spawn_local(async move {
+                    let api = auth_status.get_client();
+                    match api.lens_retrieve(&identifier).await {
+                        Ok(lens) => link.send_message(Msg::SetLensData(lens)),
+                        Err(err) => {
+                            if let Some(status) = err.status() {
+                                // Unauthorized
+                                if status.as_u16() == 400 {
+                                    let navi = link.navigator().expect("No navigator");
+                                    navi.push(&crate::Route::Start);
+                                }
+                            }
+                            log::error!("error retrieving lens: {}", err);
+                        }
+                    }
+                });
+
+                true
+            }
             Msg::SetError(err) => {
                 self.in_progress = false;
                 self.status_msg = Some(err);
@@ -232,6 +246,10 @@ impl Component for SearchPage {
             Msg::SetFinished => {
                 self.in_progress = false;
                 self.status_msg = None;
+                true
+            }
+            Msg::SetLensData(data) => {
+                self.lens_data = Some(data);
                 true
             }
             Msg::SetSearchResults(results) => {
@@ -275,23 +293,26 @@ impl Component for SearchPage {
                 }
                 true
             }
-            Msg::Reset => {
-                self.context = None;
-                self.current_query = None;
-                self.history.clear();
-                self.in_progress = false;
-                self.results.clear();
-                self.status_msg = None;
-                self.tokens = None;
-                true
+            Msg::UpdateContext(auth) => {
+                self.auth_status = auth;
+                false
             }
         }
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         let link = ctx.link();
+        if let Some(lens) = self.lens_data.clone() {
+            self.render_search(link, &lens)
+        } else {
+            html! {}
+        }
+    }
+}
 
-        let placeholder = format!("Ask anything related to {}", ctx.props().lens.display_name);
+impl SearchPage {
+    fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
+        let placeholder = format!("Ask anything related to {}", lens.display_name);
 
         let results = self
             .results
@@ -305,6 +326,7 @@ impl Component for SearchPage {
                 }
             })
             .collect::<Vec<Html>>();
+
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
                 <div class="flex flex-nowrap w-full bg-neutral-800 p-4 border-b-2 border-neutral-900">
@@ -357,14 +379,14 @@ impl Component for SearchPage {
                     } else {
                         html! {
                             <FAQComponent
-                                questions={self.current_lens.example_questions.clone()}
+                                questions={lens.example_questions.clone()}
                                 onclick={link.callback(Msg::SetQuery)}
                             />
                         }
                     }}
 
                     <div class="animate-fade-in col-span-1">
-                        {if !self.results.is_empty() {
+                        {if !results.is_empty() {
                             html! {
                                 <>
                                     <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
