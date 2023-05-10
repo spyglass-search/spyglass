@@ -93,7 +93,7 @@ pub enum TextExt {
 #[cfg(test)]
 mod test {
     use super::SupportedExt;
-    use crate::filesystem::extensions::AudioExt;
+    use crate::utils::extensions::AudioExt;
 
     #[test]
     fn test_extension_to_enum() {

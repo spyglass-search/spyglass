@@ -13,11 +13,11 @@ use tokio::task::JoinHandle;
 use url::Url;
 
 use crate::crawler::CrawlResult;
-use crate::filesystem::extensions::SupportedExt;
 use crate::state::AppState;
 use entities::sea_orm::Set;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use migration::OnConflict;
+use spyglass_processor::utils::extensions::SupportedExt;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -37,7 +37,6 @@ use notify_debouncer_mini::{DebouncedEvent, DebouncedEventKind, Debouncer};
 use crate::documents;
 
 pub mod audio;
-pub mod extensions;
 pub mod utils;
 
 /// The lens name for indexed files

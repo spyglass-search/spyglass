@@ -2,7 +2,6 @@ pub mod connection;
 pub mod crawler;
 pub mod documents;
 pub mod filesystem;
-pub mod parser;
 pub mod pipeline;
 pub mod platform;
 pub mod plugin;
