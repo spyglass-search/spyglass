@@ -75,6 +75,7 @@ pub enum DocumentExt {
     Ods,
     Xls,
     Xlsx,
+    Gsheet,
     Pdf,
 }
 

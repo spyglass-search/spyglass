@@ -50,10 +50,12 @@ pub fn parse_content(mime_type_str: &str, content: &Bytes) -> anyhow::Result<Par
                     content: docx_parser::parse_bytes(content.clone())?,
                     ..Default::default()
                 }),
-                utils::mime::XLSX | utils::mime::XLS | utils::mime::ODS => Ok(ParsedDocument {
-                    content: xlsx_parser::parse_bytes(content.clone())?,
-                    ..Default::default()
-                }),
+                utils::mime::XLSX | utils::mime::XLS | utils::mime::ODS | utils::mime::GSHEET => {
+                    Ok(ParsedDocument {
+                        content: xlsx_parser::parse_bytes(content.clone())?,
+                        ..Default::default()
+                    })
+                }
                 _ => Err(anyhow!(format!(
                     "Document Mimetype {mime_type_str:?} not supported"
                 ))),
