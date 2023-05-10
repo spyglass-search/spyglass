@@ -101,7 +101,7 @@ impl SupportedMime {
 }
 #[cfg(test)]
 mod test {
-    use crate::utils::mime::{SupportedMime, DOCX, ODS, XLS, XLSX, GSLIDES};
+    use crate::utils::mime::{SupportedMime, DOCX, GSLIDES, ODS, XLS, XLSX};
 
     #[test]
     pub fn test_document_mime_types() {
