@@ -1,6 +1,6 @@
 use crate::{
     client::{Lens, SpyglassClient},
-    AuthStatus
+    AuthStatus,
 };
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
