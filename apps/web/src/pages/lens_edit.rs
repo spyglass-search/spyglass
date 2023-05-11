@@ -121,8 +121,10 @@ impl Component for CreateLensPage {
                         if let Err(err) = api.lens_add_source(&identifier, &new_source).await {
                             log::error!("error adding url source: {err}");
                             match err {
-                                ApiError::ClientError(msg) => link.send_message(Msg::AddUrlError(msg.message)),
-                                _ => link.send_message(Msg::AddUrlError(err.to_string()))
+                                ApiError::ClientError(msg) => {
+                                    link.send_message(Msg::AddUrlError(msg.message))
+                                }
+                                _ => link.send_message(Msg::AddUrlError(err.to_string())),
                             };
                         } else {
                             // Reload data if successful
