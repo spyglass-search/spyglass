@@ -11,6 +11,7 @@ pub const ODS: &str = "application/vnd.oasis.opendocument.spreadsheet";
 pub const GDOC: &str = "application/vnd.google-apps.document";
 pub const GSHEET: &str = "application/vnd.google-apps.spreadsheet";
 pub const GSLIDES: &str = "application/vnd.google-apps.presentation";
+pub const PDF: &str = "application/pdf";
 pub const TEXT: &str = "text/plain";
 
 use crate::utils::extensions::*;

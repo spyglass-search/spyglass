@@ -56,6 +56,14 @@ pub fn parse_content(mime_type_str: &str, content: &Bytes) -> anyhow::Result<Par
                         ..Default::default()
                     })
                 }
+                utils::mime::PDF => {
+                    let pdf_content = pdf_parser::parse_bytes(content.clone())?;
+                    Ok(ParsedDocument {
+                        content: pdf_content.content,
+                        title: pdf_content.metadata.title,
+                        author: pdf_content.metadata.author,
+                    })
+                }
                 _ => Err(anyhow!(format!(
                     "Document Mimetype {mime_type_str:?} not supported"
                 ))),
