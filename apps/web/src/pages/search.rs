@@ -353,13 +353,15 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
-                <div class="text-2xl p-6 font-bold">{lens.display_name.clone()}</div>
+                <div class="py-6 px-8">
+                    <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
+                </div>
                 <div class="flex flex-nowrap w-full">
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="flex-1 overflow-hidden p-6 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
+                        class="flex-1 overflow-hidden py-6 px-8 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
                         placeholder={self.current_query.clone().unwrap_or(placeholder)}
                         spellcheck="false"
                         tabindex="-1"
@@ -402,7 +404,7 @@ impl SearchPage {
                 {if let Some(query) = &self.current_query {
                     html! { <div class="mt-4 mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
-                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 px-6 py-4">
+                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-8">
                     { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
                         html! {
                             <AnswerSection
