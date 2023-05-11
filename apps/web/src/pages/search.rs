@@ -212,6 +212,7 @@ impl Component for SearchPage {
             }
             Msg::HandleSearch => {
                 if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
+                    self.reset_search();
                     let query = search_input.value();
                     link.send_message(Msg::SetQuery(query));
                     search_input.set_value("");
@@ -219,14 +220,7 @@ impl Component for SearchPage {
                 false
             }
             Msg::Reload => {
-                self.context = None;
-                self.current_query = None;
-                self.history.clear();
-                self.in_progress = false;
-                self.results.clear();
-                self.status_msg = None;
-                self.tokens = None;
-
+                self.reset_search();
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
                 let link = link.clone();
@@ -335,6 +329,16 @@ impl Component for SearchPage {
 }
 
 impl SearchPage {
+    fn reset_search(&mut self) {
+        self.context = None;
+        self.current_query = None;
+        self.history.clear();
+        self.in_progress = false;
+        self.results.clear();
+        self.status_msg = None;
+        self.tokens = None;
+    }
+
     fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
         let placeholder = format!("Ask anything related to {}", lens.display_name);
 
@@ -361,7 +365,7 @@ impl SearchPage {
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="flex-1 overflow-hidden py-6 px-8 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
+                        class="flex-1 overflow-hidden py-6 px-8 text-2xl text-black placeholder-neutral-400 caret-black outline-none focus:outline-none active:outline-none"
                         placeholder={self.current_query.clone().unwrap_or(placeholder)}
                         spellcheck="false"
                         tabindex="-1"
@@ -402,7 +406,7 @@ impl SearchPage {
                     html! {}
                 }}
                 {if let Some(query) = &self.current_query {
-                    html! { <div class="mt-4 mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
+                    html! { <div class="mt-8 px-8 text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
                 <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-8">
                     { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
