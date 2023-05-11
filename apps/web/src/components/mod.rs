@@ -32,7 +32,10 @@ pub fn lens_list(props: &LensListProps) -> Html {
         "py-1.5",
         "px-2",
         "rounded",
-        "text-sm"
+        "text-sm",
+        "overflow-hidden",
+        "whitespace-nowrap",
+        "text-ellipsis"
     );
 
     let current_lens = props.current.clone().unwrap_or_default();
@@ -76,9 +79,9 @@ pub fn lens_list(props: &LensListProps) -> Html {
         };
 
         let icon = if lens.is_public {
-            html! { <icons::GlobeIcon classes="mr-2" height="h-3" width="w-3" /> }
+            html! { <icons::GlobeIcon classes="mr-2 flex-none" height="h-3" width="w-3" /> }
         } else {
-            html! { <icons::CollectionIcon classes="mr-2" height="h-3" width="w-3" /> }
+            html! { <icons::CollectionIcon classes="mr-2 flex-none" height="h-3" width="w-3" /> }
         };
 
         let edit_icon = if lens.is_public {
@@ -95,7 +98,7 @@ pub fn lens_list(props: &LensListProps) -> Html {
             <li class="mb-1 flex flex-row items-center">
                 <a class={classes.clone()} {onclick}>
                     {icon}
-                    {lens.display_name.clone()}
+                    <div class="truncate text-ellipsis">{lens.display_name.clone()}</div>
                     {edit_icon}
                 </a>
             </li>

@@ -81,7 +81,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
     let debug_vars = html! {};
 
     html! {
-        <div class="flex-col sm:w-32 md:w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
+        <div class="flex-col hidden sm:block w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
             <div class="mb-6">
                 <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                     {"Spyglass"}
