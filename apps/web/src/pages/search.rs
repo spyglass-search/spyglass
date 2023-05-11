@@ -15,8 +15,8 @@ use ui_components::{
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
-use yew::{html::Scope, prelude::*, platform::pinned::mpsc::UnboundedSender};
 use yew::platform::pinned::mpsc;
+use yew::{html::Scope, platform::pinned::mpsc::UnboundedSender, prelude::*};
 use yew_router::prelude::*;
 
 // make sure we only have one connection per client
@@ -65,7 +65,7 @@ pub struct SearchPageProps {
 
 #[derive(Clone, Debug)]
 pub enum WorkerCmd {
-    Stop
+    Stop,
 }
 
 pub struct SearchPage {
@@ -119,7 +119,7 @@ impl Component for SearchPage {
             status_msg: None,
             tokens: None,
             _context_listener: context_listener,
-            _worker_cmd: None
+            _worker_cmd: None,
         }
     }
 
@@ -300,7 +300,7 @@ impl Component for SearchPage {
                 if let Some(tx) = &self._worker_cmd {
                     self.in_progress = false;
                     let _ = tx.send_now(WorkerCmd::Stop);
-                    let _ = tx.close_now();
+                    tx.close_now();
                     self._worker_cmd = None;
                 }
                 true
@@ -353,12 +353,13 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
-                <div class="flex flex-nowrap w-full bg-neutral-800 p-4 border-b-2 border-neutral-900">
+                <div class="text-2xl p-6 font-bold">{lens.display_name.clone()}</div>
+                <div class="flex flex-nowrap w-full">
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-2xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white placeholder-neutral-600"
+                        class="flex-1 overflow-hidden p-6 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
                         placeholder={self.current_query.clone().unwrap_or(placeholder)}
                         spellcheck="false"
                         tabindex="-1"
@@ -368,9 +369,10 @@ impl SearchPage {
                         html! {
                             <Btn
                                 _type={BtnType::Primary}
+                                classes="rounded-none px-8"
                                 onclick={link.callback(|_| Msg::StopSearch)}
                             >
-                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white"} />
+                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
                                 {"Stop"}
                             </Btn>
                         }
@@ -378,6 +380,7 @@ impl SearchPage {
                         html! {
                             <Btn
                                 _type={BtnType::Primary}
+                                classes="rounded-none px-8"
                                 onclick={link.callback(|_| Msg::HandleSearch)}
                             >
                                 <SearchIcon width="w-6" height="h-6" />
@@ -410,13 +413,15 @@ impl SearchPage {
                                 on_followup={link.callback(Msg::HandleFollowup)}
                             />
                         }
-                    } else {
+                    } else if !lens.example_questions.is_empty() {
                         html! {
                             <FAQComponent
                                 questions={lens.example_questions.clone()}
                                 onclick={link.callback(Msg::SetQuery)}
                             />
                         }
+                    } else {
+                        html! {}
                     }}
 
                     <div class="animate-fade-in col-span-1">

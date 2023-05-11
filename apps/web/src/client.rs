@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use dotenv_codegen::dotenv;
 use futures::io::BufReader;
-use futures::{AsyncBufReadExt, TryStreamExt, select, StreamExt, FutureExt};
+use futures::{select, AsyncBufReadExt, FutureExt, StreamExt, TryStreamExt};
 use gloo::timers::future::sleep;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -119,7 +119,7 @@ impl SpyglassClient {
             let mut read_line = reader.read_line(&mut buf).fuse();
             select! {
                 res = read_line => {
-                    if !res.is_ok() {
+                    if res.is_err() {
                         break;
                     }
 
