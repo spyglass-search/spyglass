@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use dotenv_codegen::dotenv;
 use futures::io::BufReader;
-use futures::{AsyncBufReadExt, TryStreamExt};
+use futures::{AsyncBufReadExt, TryStreamExt, select, StreamExt, FutureExt};
 use gloo::timers::future::sleep;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -11,8 +11,9 @@ use shared::request::{AskClippyRequest, ClippyContext};
 use shared::response::{ChatErrorType, ChatUpdate, SearchResult};
 use thiserror::Error;
 use yew::html::Scope;
+use yew::platform::pinned::mpsc::UnboundedReceiver;
 
-use crate::pages::search::{HistoryItem, HistorySource};
+use crate::pages::search::{HistoryItem, HistorySource, WorkerCmd};
 use crate::pages::search::{Msg, SearchPage};
 
 #[allow(clippy::enum_variant_names)]
@@ -54,6 +55,7 @@ impl SpyglassClient {
         history: &[HistoryItem],
         doc_context: &[SearchResult],
         link: Scope<SearchPage>,
+        channel: UnboundedReceiver<WorkerCmd>,
     ) -> Result<(), ClientError> {
         let mut context = history
             .iter()
@@ -72,13 +74,14 @@ impl SpyglassClient {
             context,
         };
 
-        self.handle_request(&body, link.clone()).await
+        self.handle_request(&body, link.clone(), channel).await
     }
 
     pub async fn search(
         &mut self,
         query: &str,
         link: Scope<SearchPage>,
+        channel: UnboundedReceiver<WorkerCmd>,
     ) -> Result<(), ClientError> {
         let body = AskClippyRequest {
             query: query.to_string(),
@@ -86,78 +89,94 @@ impl SpyglassClient {
             context: Vec::new(),
         };
 
-        self.handle_request(&body, link.clone()).await
+        self.handle_request(&body, link.clone(), channel).await
     }
 
     async fn handle_request(
         &mut self,
         body: &AskClippyRequest,
         link: Scope<SearchPage>,
+        mut channel: UnboundedReceiver<WorkerCmd>,
     ) -> Result<(), ClientError> {
         let url = format!("{}/chat", self.endpoint);
 
-        let res = self
+        let resp = self
             .client
             .post(url)
             .body(serde_json::to_string(&body)?)
             .send()
             .await?;
 
-        let res = res
+        let res = resp
             .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
             .into_async_read();
 
         let mut reader = BufReader::new(res);
         let mut buf = String::new();
-        while reader.read_line(&mut buf).await.is_ok() {
-            let line = buf.trim_end_matches(|c| c == '\r' || c == '\n');
-            let line = line.strip_prefix("data:").unwrap_or(line);
-            if line.is_empty() {
-                buf.clear();
-                continue;
-            }
 
-            let update = serde_json::from_str::<ChatUpdate>(line)?;
-            match update {
-                ChatUpdate::SearchingDocuments => {
-                    log::info!("ChatUpdate::SearchingDocuments");
-                    link.send_message(Msg::SetStatus("Searching...".into()))
+        loop {
+            let mut read_line = reader.read_line(&mut buf).fuse();
+            select! {
+                res = read_line => {
+                    if !res.is_ok() {
+                        break;
+                    }
+
+                    let line = buf.trim_end_matches(|c| c == '\r' || c == '\n');
+                    let line = line.strip_prefix("data:").unwrap_or(line);
+                    if line.is_empty() {
+                        buf.clear();
+                        continue;
+                    }
+
+                    let update = serde_json::from_str::<ChatUpdate>(line)?;
+                    match update {
+                        ChatUpdate::SearchingDocuments => {
+                            log::info!("ChatUpdate::SearchingDocuments");
+                            link.send_message(Msg::SetStatus("Searching...".into()))
+                        }
+                        ChatUpdate::DocumentContextAdded(docs) => {
+                            log::info!("ChatUpdate::DocumentContextAdded");
+                            link.send_message(Msg::SetSearchResults(docs))
+                        }
+                        ChatUpdate::GeneratingContext => {
+                            log::info!("ChatUpdate::SearchingDocuments");
+                            link.send_message(Msg::SetStatus("Analyzing documents...".into()))
+                        }
+                        ChatUpdate::ContextGenerated(context) => {
+                            log::info!("ChatUpdate::ContextGenerated {}", context);
+                            link.send_message(Msg::ContextAdded(context));
+                        }
+                        ChatUpdate::LoadingModel | ChatUpdate::LoadingPrompt => {
+                            link.send_message(Msg::SetStatus("Generating answer...".into()))
+                        }
+                        ChatUpdate::Token(token) => link.send_message(Msg::TokenReceived(token)),
+                        ChatUpdate::EndOfText => {
+                            link.send_message(Msg::SetFinished);
+                            break;
+                        }
+                        ChatUpdate::Error(err) => {
+                            log::error!("ChatUpdate::Error: {err:?}");
+                            let msg = match err {
+                                ChatErrorType::ContextLengthExceeded(msg) => msg,
+                                ChatErrorType::APIKeyMissing => "No API key".into(),
+                                ChatErrorType::UnknownError(msg) => msg,
+                            };
+                            link.send_message(Msg::SetError(msg));
+                            break;
+                        }
+                    }
+                    buf.clear();
+                    // give ui thread a chance to do something
+                    sleep(Duration::from_millis(50)).await;
                 }
-                ChatUpdate::DocumentContextAdded(docs) => {
-                    log::info!("ChatUpdate::DocumentContextAdded");
-                    link.send_message(Msg::SetSearchResults(docs))
-                }
-                ChatUpdate::GeneratingContext => {
-                    log::info!("ChatUpdate::SearchingDocuments");
-                    link.send_message(Msg::SetStatus("Analyzing documents...".into()))
-                }
-                ChatUpdate::ContextGenerated(context) => {
-                    log::info!("ChatUpdate::ContextGenerated {}", context);
-                    link.send_message(Msg::ContextAdded(context));
-                }
-                ChatUpdate::LoadingModel | ChatUpdate::LoadingPrompt => {
-                    link.send_message(Msg::SetStatus("Generating answer...".into()))
-                }
-                ChatUpdate::Token(token) => link.send_message(Msg::TokenReceived(token)),
-                ChatUpdate::EndOfText => {
-                    link.send_message(Msg::SetFinished);
-                    break;
-                }
-                ChatUpdate::Error(err) => {
-                    log::error!("ChatUpdate::Error: {err:?}");
-                    let msg = match err {
-                        ChatErrorType::ContextLengthExceeded(msg) => msg,
-                        ChatErrorType::APIKeyMissing => "No API key".into(),
-                        ChatErrorType::UnknownError(msg) => msg,
-                    };
-                    link.send_message(Msg::SetError(msg));
+                _ = channel.next() => {
+                    // aborting response generation
+                    drop(reader);
                     break;
                 }
             }
-            buf.clear();
-            // give ui thread a chance to do something
-            sleep(Duration::from_millis(50)).await;
         }
 
         Ok(())

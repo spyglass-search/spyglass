@@ -15,7 +15,8 @@ use ui_components::{
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
-use yew::{html::Scope, prelude::*};
+use yew::{html::Scope, prelude::*, platform::pinned::mpsc::UnboundedSender};
+use yew::platform::pinned::mpsc;
 use yew_router::prelude::*;
 
 // make sure we only have one connection per client
@@ -51,6 +52,7 @@ pub enum Msg {
     SetQuery(String),
     SetSearchResults(Vec<SearchResult>),
     SetStatus(String),
+    StopSearch,
     ToggleContext,
     TokenReceived(String),
     UpdateContext(AuthStatus),
@@ -59,6 +61,11 @@ pub enum Msg {
 #[derive(Properties, PartialEq)]
 pub struct SearchPageProps {
     pub lens: String,
+}
+
+#[derive(Clone, Debug)]
+pub enum WorkerCmd {
+    Stop
 }
 
 pub struct SearchPage {
@@ -76,6 +83,7 @@ pub struct SearchPage {
     tokens: Option<String>,
     context: Option<String>,
     show_context: bool,
+    _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
     _context_listener: ContextHandle<AuthStatus>,
 }
 
@@ -111,6 +119,7 @@ impl Component for SearchPage {
             status_msg: None,
             tokens: None,
             _context_listener: context_listener,
+            _worker_cmd: None
         }
     }
 
@@ -176,10 +185,12 @@ impl Component for SearchPage {
 
                 let cur_doc_context = self.results.clone();
                 let client = self.client.clone();
+                let (tx, rx) = mpsc::unbounded::<WorkerCmd>();
+                self._worker_cmd = Some(tx);
                 spawn_local(async move {
                     let mut client = client.lock().await;
                     if let Err(err) = client
-                        .followup(&question, &cur_history, &cur_doc_context, link.clone())
+                        .followup(&question, &cur_history, &cur_doc_context, link.clone(), rx)
                         .await
                     {
                         log::error!("{}", err.to_string());
@@ -270,14 +281,28 @@ impl Component for SearchPage {
 
                 let link = link.clone();
                 let client = self.client.clone();
+
+                let (tx, rx) = mpsc::unbounded::<WorkerCmd>();
+                self._worker_cmd = Some(tx);
                 spawn_local(async move {
                     let mut client = client.lock().await;
-                    if let Err(err) = client.search(&query, link.clone()).await {
+                    if let Err(err) = client.search(&query, link.clone(), rx).await {
                         log::error!("{}", err.to_string());
                         link.send_message(Msg::SetError(err.to_string()));
+                    } else {
+                        log::info!("finished response");
                     }
                 });
 
+                true
+            }
+            Msg::StopSearch => {
+                if let Some(tx) = &self._worker_cmd {
+                    self.in_progress = false;
+                    let _ = tx.send_now(WorkerCmd::Stop);
+                    let _ = tx.close_now();
+                    self._worker_cmd = None;
+                }
                 true
             }
             Msg::ToggleContext => {
@@ -339,17 +364,27 @@ impl SearchPage {
                         tabindex="-1"
                         onkeyup={link.callback(Msg::HandleKeyboardEvent)}
                     />
-                    <Btn
-                        _type={BtnType::Primary}
-                        onclick={link.callback(|_| Msg::HandleSearch)}
-                        disabled={self.in_progress}
-                    >
-                        {if self.in_progress {
-                            html! { <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white"} /> }
-                        } else {
-                            html! { <>{"Search"}</> }
-                        }}
-                    </Btn>
+                    {if self.in_progress {
+                        html! {
+                            <Btn
+                                _type={BtnType::Primary}
+                                onclick={link.callback(|_| Msg::StopSearch)}
+                            >
+                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white"} />
+                                {"Stop"}
+                            </Btn>
+                        }
+                    } else {
+                        html! {
+                            <Btn
+                                _type={BtnType::Primary}
+                                onclick={link.callback(|_| Msg::HandleSearch)}
+                            >
+                                <SearchIcon width="w-6" height="h-6" />
+                            </Btn>
+
+                        }
+                    }}
                 </div>
                 {if self.show_context {
                     html! {
