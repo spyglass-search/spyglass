@@ -1,5 +1,5 @@
 use gloo::timers::callback::Timeout;
-use ui_components::btn::{Btn, BtnSize, BtnType};
+use ui_components::btn::Btn;
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
     JsValue,
@@ -10,7 +10,7 @@ use yew::prelude::*;
 use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
-    client::{Lens, LensAddDocType, LensAddDocument},
+    client::{ApiError, Lens, LensAddDocType, LensAddDocument},
     AuthStatus,
 };
 
@@ -35,9 +35,11 @@ pub struct CreateLensPage {
     pub lens_identifier: String,
     pub lens_data: Option<Lens>,
     pub auth_status: AuthStatus,
+    pub add_url_error: Option<String>,
     pub _context_listener: ContextHandle<AuthStatus>,
     pub _query_debounce: Option<JsValue>,
     pub _name_input_ref: NodeRef,
+    pub _url_input_ref: NodeRef,
 }
 
 #[derive(Properties, PartialEq)]
@@ -49,6 +51,7 @@ pub struct CreateLensProps {
 
 pub enum Msg {
     AddUrl,
+    AddUrlError(String),
     FilePicked { token: String, url: String },
     Reload,
     Save { display_name: String },
@@ -77,9 +80,11 @@ impl Component for CreateLensPage {
             lens_identifier: ctx.props().lens.clone(),
             lens_data: None,
             auth_status,
+            add_url_error: None,
             _context_listener: context_listener,
             _query_debounce: None,
             _name_input_ref: NodeRef::default(),
+            _url_input_ref: NodeRef::default(),
         }
     }
 
@@ -97,7 +102,40 @@ impl Component for CreateLensPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AddUrl => true,
+            Msg::AddUrl => {
+                if let Some(node) = self._url_input_ref.cast::<HtmlInputElement>() {
+                    let url = node.value();
+                    node.set_value("");
+
+                    let new_source = LensAddDocument {
+                        url,
+                        doc_type: LensAddDocType::WebUrl,
+                    };
+
+                    // Add to lens
+                    let auth_status = self.auth_status.clone();
+                    let identifier = self.lens_identifier.clone();
+                    let link = link.clone();
+                    spawn_local(async move {
+                        let api = auth_status.get_client();
+                        if let Err(err) = api.lens_add_source(&identifier, &new_source).await {
+                            log::error!("error adding url source: {err}");
+                            match err {
+                                ApiError::ClientError(msg) => link.send_message(Msg::AddUrlError(msg.message)),
+                                _ => link.send_message(Msg::AddUrlError(err.to_string()))
+                            };
+                        } else {
+                            // Reload data if successful
+                            link.send_message(Msg::Reload);
+                        }
+                    });
+                }
+                true
+            }
+            Msg::AddUrlError(msg) => {
+                self.add_url_error = Some(msg);
+                true
+            }
             Msg::FilePicked { token, url } => {
                 let new_source = LensAddDocument {
                     url,
@@ -111,7 +149,7 @@ impl Component for CreateLensPage {
                 spawn_local(async move {
                     let api = auth_status.get_client();
                     if let Err(err) = api.lens_add_source(&identifier, &new_source).await {
-                        log::error!("error adding lens: {}", err);
+                        log::error!("error adding gdrive source: {err}");
                     } else {
                         // Reload data if successful
                         link.send_message(Msg::Reload);
@@ -127,16 +165,16 @@ impl Component for CreateLensPage {
                     let api = auth_status.get_client();
                     match api.lens_retrieve(&identifier).await {
                         Ok(lens) => link.send_message(Msg::SetLensData(lens)),
-                        Err(err) => {
-                            if let Some(status) = err.status() {
-                                // Unauthorized
-                                if status.as_u16() == 400 {
-                                    let navi = link.navigator().expect("No navigator");
-                                    navi.push(&crate::Route::Start);
-                                }
+                        Err(ApiError::ClientError(msg)) => {
+                            // Unauthorized
+                            if msg.code == 400 {
+                                let navi = link.navigator().expect("No navigator");
+                                navi.push(&crate::Route::Start);
                             }
-                            log::error!("error retrieving lens: {}", err);
+
+                            log::error!("error retrieving lens: {msg}");
                         }
+                        Err(err) => log::error!("error retrieving lens: {err}"),
                     }
                 });
 
@@ -181,6 +219,7 @@ impl Component for CreateLensPage {
             }
             Msg::UpdateContext(auth_status) => {
                 self.auth_status = auth_status;
+                link.send_message(Msg::Reload);
                 true
             }
             Msg::UpdateDisplayName => {
@@ -253,12 +292,19 @@ impl Component for CreateLensPage {
                         }
                     }}
                     </div>
-                    <Btn _type={BtnType::Success} size={BtnSize::Lg} classes="ml-auto">{"Save"}</Btn>
                 </div>
                 <div class="flex flex-col gap-8 px-8 py-4">
-                    <div class="flex flex-row gap-4">
-                        <Btn onclick={link.callback(|_| Msg::AddUrl)}>{"Add data from URL"}</Btn>
-                        <Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn>
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-row gap-4 items-center">
+                            <input ref={self._url_input_ref.clone()}
+                                type="text"
+                                class="rounded p-2 text-sm text-neutral-800"
+                                placeholder="https://example.com"
+                            />
+                            <Btn onclick={link.callback(|_| Msg::AddUrl)}>{"Add data from URL"}</Btn>
+                            <div class="text-sm text-red-700">{self.add_url_error.clone()}</div>
+                        </div>
+                        <div><Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn></div>
                     </div>
                     <div class="flex flex-col">
                         <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>

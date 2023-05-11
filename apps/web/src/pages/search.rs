@@ -1,5 +1,5 @@
 use crate::{
-    client::{Lens, SpyglassClient},
+    client::{ApiError, Lens, SpyglassClient},
     AuthStatus,
 };
 use futures::lock::Mutex;
@@ -223,16 +223,15 @@ impl Component for SearchPage {
                     let api = auth_status.get_client();
                     match api.lens_retrieve(&identifier).await {
                         Ok(lens) => link.send_message(Msg::SetLensData(lens)),
-                        Err(err) => {
-                            if let Some(status) = err.status() {
-                                // Unauthorized
-                                if status.as_u16() == 400 {
-                                    let navi = link.navigator().expect("No navigator");
-                                    navi.push(&crate::Route::Start);
-                                }
+                        Err(ApiError::ClientError(msg)) => {
+                            // Unauthorized
+                            if msg.code == 400 {
+                                let navi = link.navigator().expect("No navigator");
+                                navi.push(&crate::Route::Start);
                             }
-                            log::error!("error retrieving lens: {}", err);
+                            log::error!("error retrieving lens: {msg}");
                         }
+                        Err(err) => log::error!("error retrieving lens: {}", err),
                     }
                 });
 

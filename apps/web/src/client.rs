@@ -208,6 +208,28 @@ pub struct LensSource {
     pub status: String,
 }
 
+#[derive(Error, Debug)]
+pub enum ApiError {
+    #[error("Unable to make request: {0}")]
+    RequestError(#[from] reqwest::Error),
+    #[error("Api Error: {0}")]
+    ClientError(ApiErrorMessage),
+    #[error("Unable to make request: {0}")]
+    Other(String),
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct ApiErrorMessage {
+    pub code: u16,
+    pub message: String,
+}
+
+impl std::fmt::Display for ApiErrorMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("({}) {}", self.code, self.message))
+    }
+}
+
 pub struct ApiClient {
     client: reqwest::Client,
     endpoint: String,
@@ -230,16 +252,16 @@ impl ApiClient {
         }
     }
 
-    pub async fn lens_create(&self) -> Result<Lens, reqwest::Error> {
+    pub async fn lens_create(&self) -> Result<Lens, ApiError> {
         let mut request = self.client.post(format!("{}/user/lenses", self.endpoint));
         if let Some(auth_token) = &self.token {
             request = request.bearer_auth(auth_token);
         }
 
-        request.send().await?.json::<Lens>().await
+        Ok(request.send().await?.json::<Lens>().await?)
     }
 
-    pub async fn lens_retrieve(&self, id: &str) -> Result<Lens, reqwest::Error> {
+    pub async fn lens_retrieve(&self, id: &str) -> Result<Lens, ApiError> {
         let mut request = self
             .client
             .get(format!("{}/user/lenses/{}", self.endpoint, id));
@@ -247,39 +269,42 @@ impl ApiClient {
             request = request.bearer_auth(auth_token);
         }
 
-        request
+        Ok(request
             .send()
             .await?
             .error_for_status()?
             .json::<Lens>()
-            .await
+            .await?)
     }
 
     pub async fn lens_add_source(
         &self,
         lens: &str,
         request: &LensAddDocument,
-    ) -> Result<(), reqwest::Error> {
+    ) -> Result<(), ApiError> {
         match &self.token {
             Some(token) => {
-                match self
+                let resp = self
                     .client
                     .post(format!("{}/user/lenses/{}/source", self.endpoint, lens))
                     .bearer_auth(token)
                     .json(request)
                     .send()
-                    .await?
-                    .error_for_status()
-                {
+                    .await?;
+
+                match resp.error_for_status_ref() {
                     Ok(_) => Ok(()),
-                    Err(err) => Err(err),
+                    Err(err) => match resp.json::<ApiErrorMessage>().await {
+                        Ok(msg) => Err(ApiError::ClientError(msg)),
+                        Err(_) => Err(ApiError::RequestError(err)),
+                    },
                 }
             }
             None => Ok(()),
         }
     }
 
-    pub async fn lens_update(&self, lens: &str, display_name: &str) -> Result<(), reqwest::Error> {
+    pub async fn lens_update(&self, lens: &str, display_name: &str) -> Result<(), ApiError> {
         match &self.token {
             Some(token) => {
                 match self
@@ -292,14 +317,14 @@ impl ApiClient {
                     .error_for_status()
                 {
                     Ok(_) => Ok(()),
-                    Err(err) => Err(err),
+                    Err(err) => Err(ApiError::RequestError(err)),
                 }
             }
             None => Ok(()),
         }
     }
 
-    pub async fn get_user_data(&self) -> Result<UserData, reqwest::Error> {
+    pub async fn get_user_data(&self) -> Result<UserData, ApiError> {
         let mut request = self.client.get(format!("{}/user/lenses", self.endpoint));
         if let Some(auth_token) = &self.token {
             request = request.bearer_auth(auth_token);
