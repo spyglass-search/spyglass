@@ -306,7 +306,7 @@ pub fn web_search_result_component(props: &SearchResultProps) -> Html {
         }
     );
 
-    let metadata = render_metadata(result);
+    // let metadata = render_metadata(result);
 
     let score = {
         #[cfg(debug_assertions)]
@@ -339,7 +339,6 @@ pub fn web_search_result_component(props: &SearchResultProps) -> Html {
                 <div class="text-sm leading-relaxed text-neutral-400">
                     {Html::from_html_unchecked(result.description.clone().into())}
                 </div>
-                {metadata}
                 {score}
             </div>
         </a>
