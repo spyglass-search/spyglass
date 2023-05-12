@@ -75,6 +75,7 @@ pub enum DocumentExt {
     Ods,
     Xls,
     Xlsx,
+    Gsheet,
     Pdf,
 }
 
@@ -88,12 +89,13 @@ pub enum TextExt {
     Txt,
     Yaml,
     Yml,
+    Gdoc,
 }
 
 #[cfg(test)]
 mod test {
     use super::SupportedExt;
-    use crate::filesystem::extensions::AudioExt;
+    use crate::utils::extensions::AudioExt;
 
     #[test]
     fn test_extension_to_enum() {

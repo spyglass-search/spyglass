@@ -1,5 +1,12 @@
+use bytes::Bytes;
 use pdf::file::FileOptions;
-use std::{env, fs, path::Path, process};
+use std::{
+    env,
+    fs::{self, File},
+    io::Write,
+    path::Path,
+    process,
+};
 
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
 const EXE_NAME: &str = "./pdftotext.exe";
@@ -116,6 +123,21 @@ pub fn parse(path: &Path) -> anyhow::Result<Pdf> {
     let metadata = PdfMetadata::parse(path);
 
     Ok(Pdf { content, metadata })
+}
+
+pub fn parse_bytes(b: Bytes) -> anyhow::Result<Pdf> {
+    let uuid = uuid::Uuid::new_v4().as_hyphenated().to_string();
+    let temp_dir = env::temp_dir();
+    let temp_doc = temp_dir.join(format!("{uuid}.pdf"));
+
+    {
+        let mut file = File::create(temp_doc.as_path())?;
+        file.write_all(&b)?;
+    }
+
+    let result = parse(temp_doc.as_path());
+    let _ = fs::remove_file(temp_doc);
+    result
 }
 
 pub struct Pdf {

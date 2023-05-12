@@ -14,7 +14,8 @@ members = [
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",
-    "crates/spyglass-searcher"
+    "crates/spyglass-searcher",
+    "crates/spyglass-processor"
 ]
 
 [profile.release]

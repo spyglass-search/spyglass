@@ -28,9 +28,9 @@ use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
 use crate::filesystem::audio;
-use crate::filesystem::extensions::SupportedExt;
-use crate::parser;
 use crate::state::{AppState, FetchLimitType};
+use spyglass_processor::parser;
+use spyglass_processor::utils::extensions::SupportedExt;
 
 pub mod archive;
 pub mod bootstrap;

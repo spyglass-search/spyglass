@@ -189,11 +189,11 @@ impl Connection for DriveConnection {
                     match metadata.mime_type.as_str() {
                         // Pass to docx parser
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
-                            crate::parser::docx_parser::parse_bytes(b).ok()
+                            spyglass_processor::parser::docx_parser::parse_bytes(b).ok()
                         }
                         // Pass to xlxs parser
                         "application/vnd.google-apps.spreadsheet" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
-                            crate::parser::xlsx_parser::parse_bytes(b).ok()
+                            spyglass_processor::parser::xlsx_parser::parse_bytes(b).ok()
                         }
                         _ => if let Ok(s) = std::str::from_utf8(&b) {
                             Some(s.to_string())

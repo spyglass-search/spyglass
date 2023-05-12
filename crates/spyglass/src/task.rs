@@ -19,10 +19,10 @@ use tokio::sync::{broadcast, mpsc};
 use crate::connection::{api_id_to_label, load_connection};
 use crate::crawler::bootstrap;
 use crate::filesystem;
-use crate::filesystem::extensions::AudioExt;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
 use diff::Diff;
+use spyglass_processor::utils::extensions::AudioExt;
 
 pub mod lens;
 mod manager;
