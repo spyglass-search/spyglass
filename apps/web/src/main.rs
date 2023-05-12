@@ -95,6 +95,15 @@ impl Component for App {
 
     fn create(ctx: &Context<Self>) -> Self {
         // Initialize JS env vars
+        #[cfg(debug_assertions)]
+        init_env(
+            dotenv!("DEV_AUTH0_DOMAIN"),
+            dotenv!("DEV_AUTH0_CLIENT_ID"),
+            dotenv!("DEV_AUTH0_REDIRECT_URI"),
+            dotenv!("DEV_AUTH0_AUDIENCE"),
+        );
+
+        #[cfg(not(debug_assertions))]
         init_env(
             dotenv!("AUTH0_DOMAIN"),
             dotenv!("AUTH0_CLIENT_ID"),
