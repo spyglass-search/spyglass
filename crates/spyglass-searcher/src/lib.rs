@@ -16,6 +16,7 @@ pub mod utils;
 
 type Score = f32;
 
+#[derive(Debug)]
 pub enum IndexBackend {
     // Elasticsearch compatible REST API (such as Quickwit for example)
     Http(Url),
