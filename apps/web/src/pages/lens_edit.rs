@@ -1,5 +1,5 @@
 use gloo::timers::callback::Timeout;
-use ui_components::btn::Btn;
+use ui_components::{btn::Btn, icons};
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
     JsValue,
@@ -10,7 +10,7 @@ use yew::prelude::*;
 use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
-    client::{ApiError, Lens, LensAddDocType, LensAddDocument},
+    client::{ApiError, Lens, LensAddDocType, LensAddDocument, LensSource, LensDocType},
     AuthStatus,
 };
 
@@ -257,19 +257,9 @@ impl Component for CreateLensPage {
             .map(|x| x.sources.clone())
             .unwrap_or_default();
 
-        let sources = sources
+        let source_html = sources
             .iter()
-            .map(|x| {
-                html! {
-                    <div class="border-b border-neutral-600 py-4 flex flex-row items-center gap-6">
-                        <div class="overflow-hidden">
-                            <div>{x.display_name.clone()}</div>
-                            <div class="text-sm text-neutral-600">{x.url.clone()}</div>
-                        </div>
-                        <div class="text-base ml-auto">{x.status.clone()}</div>
-                    </div>
-                }
-            })
+            .map(|x| html! { <LensSourceComponent source={x.clone()} /> })
             .collect::<Html>();
 
         html! {
@@ -309,13 +299,52 @@ impl Component for CreateLensPage {
                         <div><Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn></div>
                     </div>
                     <div class="flex flex-col">
-                        <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
-                        <div class="flex flex-col">
-                            {sources}
+                        <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">
+                            {format!("Sources ({})", sources.len())}
                         </div>
+                        <div class="flex flex-col">{source_html}</div>
                     </div>
                 </div>
             </div>
         }
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct LensSourceComponentProps {
+    source: LensSource
+}
+
+#[function_component(LensSourceComponent)]
+fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
+    let source = props.source.clone();
+
+    let doc_type_icon = match source.doc_type {
+        LensDocType::GDrive => html! { <icons::GDrive /> },
+        LensDocType::Web => html! { <icons::GlobeIcon /> }
+    };
+
+    let status_icon = match source.status.as_ref() {
+        "Deployed" => html! { <icons::BadgeCheckIcon classes="fill-green-500" /> },
+        _ => html! { <icons::RefreshIcon animate_spin={true} /> }
+    };
+
+    html! {
+        <div class="border-b border-neutral-700 py-4 flex flex-row items-center gap-2">
+            <div class="flex-none px-2">
+                {doc_type_icon}
+            </div>
+            <div class="overflow-hidden">
+                <div class="text-sm">
+                    <a href={source.url.clone()} target="_blank" class="text-cyan-500 underline">
+                        {source.display_name.clone()}
+                    </a>
+                </div>
+                <div class="text-sm text-neutral-600">{source.url.clone()}</div>
+            </div>
+            <div class="flex-none text-base ml-auto pr-4">
+                {status_icon}
+            </div>
+        </div>
     }
 }
