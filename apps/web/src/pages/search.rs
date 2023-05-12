@@ -124,6 +124,10 @@ impl Component for SearchPage {
     }
 
     fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
+        if self.in_progress {
+            ctx.link().send_message(Msg::StopSearch);
+        }
+
         let new_lens = ctx.props().lens.clone();
         if self.lens_identifier != new_lens {
             self.lens_identifier = new_lens;
@@ -221,6 +225,8 @@ impl Component for SearchPage {
             }
             Msg::Reload => {
                 self.reset_search();
+                self.client = Arc::new(Mutex::new(SpyglassClient::new(self.lens_identifier.clone())));
+
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
                 let link = link.clone();
