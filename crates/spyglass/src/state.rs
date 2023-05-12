@@ -85,9 +85,12 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: &Config, readonly_mode: bool) -> Self {
-        let db = create_connection(config, false)
-            .await
-            .expect("Unable to connect to database");
+        let db_connection_result = create_connection(config, false).await;
+        if let Err(error) = &db_connection_result {
+            log::error!("Error connecting to database {:?}", error);
+        }
+
+        let db = db_connection_result.expect("Unable to connect to database");
 
         AppStateBuilder::new()
             .with_db(db)
@@ -249,8 +252,12 @@ impl AppStateBuilder {
             }
         }
 
-        self.index =
-            Some(Searcher::with_index(index, schema, readonly).expect("Unable to open index"));
+        let searcher = Searcher::with_index(index, schema, readonly);
+        if let Err(error) = &searcher {
+            log::error!("Error connecting to index {index:?}. Error: {error:?}");
+        }
+
+        self.index = Some(searcher.expect("Unable to open index"));
         self
     }
 }
