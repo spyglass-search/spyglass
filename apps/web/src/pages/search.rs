@@ -366,8 +366,17 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()} class="relative">
-                <div class="py-6 px-8">
+                <div class="py-6 px-8 flex flex-row">
                     <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
+                    {if cfg!(debug_assertions) {
+                        html! {
+                            <Btn _type={BtnType::Primary} onclick={link.callback(|_| Msg::ToggleContext)} classes="ml-auto">
+                                {"Toggle Context"}
+                            </Btn>
+                        }
+                    } else {
+                        html! {}
+                    }}
                 </div>
                 <div class="flex flex-nowrap w-full px-8">
                     <input
@@ -406,9 +415,9 @@ impl SearchPage {
                 </div>
                 {if self.show_context {
                     html! {
-                        <div class="p-4">
-                            <div>{"Context"}</div>
-                            <div>{self.context.clone()}</div>
+                        <div class="px-8 py-6">
+                            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Context"}</div>
+                            <pre class="text-sm">{self.context.clone()}</pre>
                         </div>
                     }
                 } else {
