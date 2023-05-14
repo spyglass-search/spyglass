@@ -10,7 +10,7 @@ use yew::prelude::*;
 use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
-    client::{ApiError, Lens, LensAddDocType, LensAddDocument, LensSource, LensDocType},
+    client::{ApiError, Lens, LensAddDocType, LensAddDocument, LensDocType, LensSource},
     AuthStatus,
 };
 
@@ -312,7 +312,7 @@ impl Component for CreateLensPage {
 
 #[derive(Properties, PartialEq)]
 struct LensSourceComponentProps {
-    source: LensSource
+    source: LensSource,
 }
 
 #[function_component(LensSourceComponent)]
@@ -321,12 +321,12 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
 
     let doc_type_icon = match source.doc_type {
         LensDocType::GDrive => html! { <icons::GDrive /> },
-        LensDocType::Web => html! { <icons::GlobeIcon /> }
+        LensDocType::Web => html! { <icons::GlobeIcon /> },
     };
 
     let status_icon = match source.status.as_ref() {
         "Deployed" => html! { <icons::BadgeCheckIcon classes="fill-green-500" /> },
-        _ => html! { <icons::RefreshIcon animate_spin={true} /> }
+        _ => html! { <icons::RefreshIcon animate_spin={true} /> },
     };
 
     html! {

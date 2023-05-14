@@ -225,7 +225,9 @@ impl Component for SearchPage {
             }
             Msg::Reload => {
                 self.reset_search();
-                self.client = Arc::new(Mutex::new(SpyglassClient::new(self.lens_identifier.clone())));
+                self.client = Arc::new(Mutex::new(SpyglassClient::new(
+                    self.lens_identifier.clone(),
+                )));
 
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
@@ -319,6 +321,7 @@ impl Component for SearchPage {
             }
             Msg::UpdateContext(auth) => {
                 self.auth_status = auth;
+                link.send_message(Msg::Reload);
                 false
             }
         }
@@ -366,12 +369,12 @@ impl SearchPage {
                 <div class="py-6 px-8">
                     <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
                 </div>
-                <div class="flex flex-nowrap w-full">
+                <div class="flex flex-nowrap w-full px-8">
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="flex-1 overflow-hidden py-6 px-8 text-2xl text-black placeholder-neutral-400 caret-black outline-none focus:outline-none active:outline-none"
+                        class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
                         placeholder={self.current_query.clone().unwrap_or(placeholder)}
                         spellcheck="false"
                         tabindex="-1"
@@ -380,8 +383,8 @@ impl SearchPage {
                     {if self.in_progress {
                         html! {
                             <Btn
-                                _type={BtnType::Primary}
-                                classes="rounded-none px-8"
+                                _type={BtnType::Borderless}
+                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
                                 onclick={link.callback(|_| Msg::StopSearch)}
                             >
                                 <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
@@ -391,8 +394,8 @@ impl SearchPage {
                     } else {
                         html! {
                             <Btn
-                                _type={BtnType::Primary}
-                                classes="rounded-none px-8"
+                                _type={BtnType::Borderless}
+                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
                                 onclick={link.callback(|_| Msg::HandleSearch)}
                             >
                                 <SearchIcon width="w-6" height="h-6" />
