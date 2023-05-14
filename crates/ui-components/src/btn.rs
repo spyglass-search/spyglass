@@ -113,7 +113,11 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         "font-semibold",
         "items-center",
         "leading-5",
-        if props._type != BtnType::Borderless { Some("rounded-md") } else { None }
+        if props._type != BtnType::Borderless {
+            Some("rounded-md")
+        } else {
+            None
+        }
     );
 
     let is_confirmed = use_state(|| false);
