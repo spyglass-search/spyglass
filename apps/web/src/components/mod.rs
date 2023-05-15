@@ -17,6 +17,8 @@ pub struct LensListProps {
     pub on_select: Callback<Lens>,
     #[prop_or_default]
     pub on_edit: Callback<Lens>,
+    #[prop_or_default]
+    pub class: Classes,
 }
 
 #[function_component(LensList)]
@@ -32,10 +34,10 @@ pub fn lens_list(props: &LensListProps) -> Html {
         "py-1.5",
         "px-2",
         "rounded",
-        "text-sm",
         "overflow-hidden",
         "whitespace-nowrap",
-        "text-ellipsis"
+        "text-ellipsis",
+        props.class.clone(),
     );
 
     let current_lens = props.current.clone().unwrap_or_default();

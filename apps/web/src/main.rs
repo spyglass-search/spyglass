@@ -250,7 +250,7 @@ impl Component for App {
         html! {
             <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
                 <BrowserRouter>
-                    <div class="text-white flex h-screen">
+                    <div class="flex flex-col sm:flex-row">
                         <NavBar
                             current_lens={self.current_lens.clone()}
                             // Reload lenses after a new one is created.

@@ -365,7 +365,7 @@ impl SearchPage {
             .collect::<Vec<Html>>();
 
         html! {
-            <div ref={self.search_wrapper_ref.clone()} class="relative">
+            <div ref={self.search_wrapper_ref.clone()} class="relative min-h-screen">
                 <div class="py-6 px-8 flex flex-row">
                     <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
                     {if cfg!(debug_assertions) {
