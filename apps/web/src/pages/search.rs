@@ -1,4 +1,7 @@
-use crate::client::SpyglassClient;
+use crate::{
+    client::{ApiError, Lens, SpyglassClient},
+    AuthStatus,
+};
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
 use shared::response::SearchResult;
@@ -12,7 +15,9 @@ use ui_components::{
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use yew::platform::pinned::mpsc;
+use yew::{html::Scope, platform::pinned::mpsc::UnboundedSender, prelude::*};
+use yew_router::prelude::*;
 
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
@@ -34,27 +39,40 @@ pub struct HistoryItem {
     pub value: String,
 }
 
-#[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Msg {
-    HandleKeyboardEvent(KeyboardEvent),
-    HandleFollowup(String),
-    HandleSearch,
-    SetSearchResults(Vec<SearchResult>),
     ContextAdded(String),
+    HandleFollowup(String),
+    HandleKeyboardEvent(KeyboardEvent),
+    HandleSearch,
+    Reload,
     SetError(String),
-    SetStatus(String),
-    TokenReceived(String),
     SetFinished,
+    SetLensData(Lens),
+    SetQuery(String),
+    SetSearchResults(Vec<SearchResult>),
+    SetStatus(String),
+    StopSearch,
+    ToggleContext,
+    TokenReceived(String),
+    UpdateContext(AuthStatus),
 }
 
 #[derive(Properties, PartialEq)]
 pub struct SearchPageProps {
-    // todo: allow multiple
     pub lens: String,
+}
+
+#[derive(Clone, Debug)]
+pub enum WorkerCmd {
+    Stop,
 }
 
 pub struct SearchPage {
     client: Client,
+    lens_identifier: String,
+    lens_data: Option<Lens>,
+    auth_status: AuthStatus,
     current_query: Option<String>,
     history: Vec<HistoryItem>,
     in_progress: bool,
@@ -64,6 +82,9 @@ pub struct SearchPage {
     status_msg: Option<String>,
     tokens: Option<String>,
     context: Option<String>,
+    show_context: bool,
+    _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
+    _context_listener: ContextHandle<AuthStatus>,
 }
 
 impl Component for SearchPage {
@@ -72,23 +93,58 @@ impl Component for SearchPage {
 
     fn create(ctx: &yew::Context<Self>) -> Self {
         let props = ctx.props();
+        let link = ctx.link();
+        link.send_message(Msg::Reload);
+
+        let (auth_status, context_listener) = ctx
+            .link()
+            .context(ctx.link().callback(Msg::UpdateContext))
+            .expect("No Message Context Provided");
+
+        ctx.link().send_message(Msg::Reload);
+
         Self {
+            auth_status,
             client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.clone()))),
+            context: None,
             current_query: None,
             history: Vec::new(),
             in_progress: false,
+            lens_data: None,
+            lens_identifier: props.lens.clone(),
             results: Vec::new(),
             search_input_ref: Default::default(),
             search_wrapper_ref: Default::default(),
+            show_context: false,
             status_msg: None,
             tokens: None,
-            context: None,
+            _context_listener: context_listener,
+            _worker_cmd: None,
+        }
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
+        if self.in_progress {
+            ctx.link().send_message(Msg::StopSearch);
+        }
+
+        let new_lens = ctx.props().lens.clone();
+        if self.lens_identifier != new_lens {
+            self.lens_identifier = new_lens;
+            ctx.link().send_message(Msg::Reload);
+            true
+        } else {
+            false
         }
     }
 
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::ContextAdded(context) => {
+                self.context = Some(context);
+                false
+            }
             Msg::HandleFollowup(question) => {
                 log::info!("handling followup: {}", question);
                 // Push existing question & answer into history
@@ -119,8 +175,6 @@ impl Component for SearchPage {
                 self.in_progress = true;
 
                 let link = link.clone();
-                let client = self.client.clone();
-
                 let mut cur_history = self.history.clone();
                 // Add context to the beginning
                 if let Some(context) = &self.context {
@@ -134,11 +188,13 @@ impl Component for SearchPage {
                 }
 
                 let cur_doc_context = self.results.clone();
-
+                let client = self.client.clone();
+                let (tx, rx) = mpsc::unbounded::<WorkerCmd>();
+                self._worker_cmd = Some(tx);
                 spawn_local(async move {
                     let mut client = client.lock().await;
                     if let Err(err) = client
-                        .followup(&question, &cur_history, &cur_doc_context, link.clone())
+                        .followup(&question, &cur_history, &cur_doc_context, link.clone(), rx)
                         .await
                     {
                         log::error!("{}", err.to_string());
@@ -159,38 +215,40 @@ impl Component for SearchPage {
                 false
             }
             Msg::HandleSearch => {
-                self.in_progress = true;
-                self.tokens = None;
-                self.status_msg = None;
-                self.results = Vec::new();
-
                 if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
+                    self.reset_search();
                     let query = search_input.value();
-                    log::info!("handling search! {:?}", query);
-
-                    self.current_query = Some(query.clone());
+                    link.send_message(Msg::SetQuery(query));
                     search_input.set_value("");
-                    self.status_msg = Some(format!("searching: {query}"));
-
-                    let link = link.clone();
-                    let client = self.client.clone();
-                    spawn_local(async move {
-                        let mut client = client.lock().await;
-                        if let Err(err) = client.search(&query, link.clone()).await {
-                            log::error!("{}", err.to_string());
-                            link.send_message(Msg::SetError(err.to_string()));
-                        }
-                    });
                 }
-                true
-            }
-            Msg::SetSearchResults(results) => {
-                self.results = results;
-                true
-            }
-            Msg::ContextAdded(context) => {
-                self.context = Some(context);
                 false
+            }
+            Msg::Reload => {
+                self.reset_search();
+                self.client = Arc::new(Mutex::new(SpyglassClient::new(
+                    self.lens_identifier.clone(),
+                )));
+
+                let auth_status = self.auth_status.clone();
+                let identifier = self.lens_identifier.clone();
+                let link = link.clone();
+                spawn_local(async move {
+                    let api = auth_status.get_client();
+                    match api.lens_retrieve(&identifier).await {
+                        Ok(lens) => link.send_message(Msg::SetLensData(lens)),
+                        Err(ApiError::ClientError(msg)) => {
+                            // Unauthorized
+                            if msg.code == 400 {
+                                let navi = link.navigator().expect("No navigator");
+                                navi.push(&crate::Route::Start);
+                            }
+                            log::error!("error retrieving lens: {msg}");
+                        }
+                        Err(err) => log::error!("error retrieving lens: {}", err),
+                    }
+                });
+
+                true
             }
             Msg::SetError(err) => {
                 self.in_progress = false;
@@ -202,8 +260,55 @@ impl Component for SearchPage {
                 self.status_msg = None;
                 true
             }
+            Msg::SetLensData(data) => {
+                self.lens_data = Some(data);
+                true
+            }
+            Msg::SetSearchResults(results) => {
+                self.results = results;
+                true
+            }
             Msg::SetStatus(msg) => {
                 self.status_msg = Some(msg);
+                true
+            }
+            Msg::SetQuery(query) => {
+                self.in_progress = true;
+                self.tokens = None;
+                self.results = Vec::new();
+                self.current_query = Some(query.clone());
+
+                log::info!("handling search! {}", query);
+                self.status_msg = Some(format!("searching: {query}"));
+
+                let link = link.clone();
+                let client = self.client.clone();
+
+                let (tx, rx) = mpsc::unbounded::<WorkerCmd>();
+                self._worker_cmd = Some(tx);
+                spawn_local(async move {
+                    let mut client = client.lock().await;
+                    if let Err(err) = client.search(&query, link.clone(), rx).await {
+                        log::error!("{}", err.to_string());
+                        link.send_message(Msg::SetError(err.to_string()));
+                    } else {
+                        log::info!("finished response");
+                    }
+                });
+
+                true
+            }
+            Msg::StopSearch => {
+                if let Some(tx) = &self._worker_cmd {
+                    self.in_progress = false;
+                    let _ = tx.send_now(WorkerCmd::Stop);
+                    tx.close_now();
+                    self._worker_cmd = None;
+                }
+                true
+            }
+            Msg::ToggleContext => {
+                self.show_context = !self.show_context;
                 true
             }
             Msg::TokenReceived(token) => {
@@ -214,13 +319,37 @@ impl Component for SearchPage {
                 }
                 true
             }
+            Msg::UpdateContext(auth) => {
+                self.auth_status = auth;
+                link.send_message(Msg::Reload);
+                false
+            }
         }
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         let link = ctx.link();
+        if let Some(lens) = self.lens_data.clone() {
+            self.render_search(link, &lens)
+        } else {
+            html! {}
+        }
+    }
+}
 
-        let placeholder = format!("Ask anything related to {}", ctx.props().lens);
+impl SearchPage {
+    fn reset_search(&mut self) {
+        self.context = None;
+        self.current_query = None;
+        self.history.clear();
+        self.in_progress = false;
+        self.results.clear();
+        self.status_msg = None;
+        self.tokens = None;
+    }
+
+    fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
+        let placeholder = format!("Ask anything related to {}", lens.display_name);
 
         let results = self
             .results
@@ -234,35 +363,70 @@ impl Component for SearchPage {
                 }
             })
             .collect::<Vec<Html>>();
+
         html! {
-            <div ref={self.search_wrapper_ref.clone()} class="relative">
-                <div class="flex flex-nowrap w-full bg-neutral-800 p-4 border-b-2 border-neutral-900">
+            <div ref={self.search_wrapper_ref.clone()} class="relative min-h-screen">
+                <div class="py-6 px-8 flex flex-row">
+                    <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
+                    {if cfg!(debug_assertions) {
+                        html! {
+                            <Btn _type={BtnType::Primary} onclick={link.callback(|_| Msg::ToggleContext)} classes="ml-auto">
+                                {"Toggle Context"}
+                            </Btn>
+                        }
+                    } else {
+                        html! {}
+                    }}
+                </div>
+                <div class="flex flex-nowrap w-full px-8">
                     <input
                         ref={self.search_input_ref.clone()}
                         id="searchbox"
                         type="text"
-                        class="bg-neutral-800 text-white text-2xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white placeholder-neutral-600"
+                        class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
                         placeholder={self.current_query.clone().unwrap_or(placeholder)}
                         spellcheck="false"
                         tabindex="-1"
                         onkeyup={link.callback(Msg::HandleKeyboardEvent)}
                     />
-                    <Btn
-                        _type={BtnType::Primary}
-                        onclick={link.callback(|_| Msg::HandleSearch)}
-                        disabled={self.in_progress}
-                    >
-                        {if self.in_progress {
-                            html! { <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white"} /> }
-                        } else {
-                            html! { <>{"Search"}</> }
-                        }}
-                    </Btn>
+                    {if self.in_progress {
+                        html! {
+                            <Btn
+                                _type={BtnType::Borderless}
+                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                onclick={link.callback(|_| Msg::StopSearch)}
+                            >
+                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
+                                {"Stop"}
+                            </Btn>
+                        }
+                    } else {
+                        html! {
+                            <Btn
+                                _type={BtnType::Borderless}
+                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                onclick={link.callback(|_| Msg::HandleSearch)}
+                            >
+                                <SearchIcon width="w-6" height="h-6" />
+                            </Btn>
+
+                        }
+                    }}
                 </div>
+                {if self.show_context {
+                    html! {
+                        <div class="px-8 py-6">
+                            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Context"}</div>
+                            <pre class="text-sm">{self.context.clone()}</pre>
+                        </div>
+                    }
+                } else {
+                    html! {}
+                }}
                 {if let Some(query) = &self.current_query {
-                    html! { <div class="mt-4 mb-2 px-6 text-2xl font-semibold text-white">{query}</div> }
+                    html! { <div class="mt-8 px-8 text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
-                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 px-6 py-4">
+                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-8">
                     { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
                         html! {
                             <AnswerSection
@@ -273,16 +437,36 @@ impl Component for SearchPage {
                                 on_followup={link.callback(Msg::HandleFollowup)}
                             />
                         }
+                    } else if !lens.example_questions.is_empty() {
+                        html! {
+                            <FAQComponent
+                                questions={lens.example_questions.clone()}
+                                onclick={link.callback(Msg::SetQuery)}
+                            />
+                        }
                     } else {
                         html! {}
                     }}
 
                     <div class="animate-fade-in col-span-1">
-                        {if !self.results.is_empty() {
+                        {if !results.is_empty() {
                             html! {
                                 <>
                                     <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
                                     <ResultPaginator page_size={5}>{results}</ResultPaginator>
+                                </>
+                            }
+                        } else if self.current_query.is_some() {
+                            html! {
+                                <>
+                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
+                                    <div class="text-sm text-neutral-500">
+                                        {
+                                            "We didn't find any relevant documents, but we
+                                            will try to answer the question to the best of our ability
+                                            without any additional context"
+                                        }
+                                    </div>
                                 </>
                             }
                         } else {
@@ -418,6 +602,57 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
             } else {
                 html! {}
             }}
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct FAQComponentProps {
+    questions: Vec<String>,
+    #[prop_or_default]
+    onclick: Callback<String>,
+}
+
+#[function_component(FAQComponent)]
+fn faq_component(props: &FAQComponentProps) -> Html {
+    let qa_classes = classes!(
+        "text-cyan-500",
+        "text-lg",
+        "p-4",
+        "rounded",
+        "border",
+        "border-neutral-500",
+        "underline",
+        "cursor-pointer",
+        "hover:bg-neutral-700",
+        "text-left",
+    );
+
+    let onclick = props.onclick.clone();
+    let questions = props
+        .questions
+        .iter()
+        .map(|q| {
+            let onclick = onclick.clone();
+            let question = q.clone();
+            let callback = Callback::from(move |_| {
+                onclick.emit(question.clone());
+            });
+            html! {
+                <button class={qa_classes.clone()} onclick={callback}>{q.clone()}</button>
+            }
+        })
+        .collect::<Html>();
+
+    html! {
+        <div>
+            <div class="text-xl text-white">{"Frequently Asked Questions"}</div>
+            <div class="text-neutral-500 text-base">
+                {"Not sure where to start? Try one of these questions"}
+            </div>
+            <div class="flex flex-col gap-4 mt-4">
+                {questions}
+            </div>
         </div>
     }
 }

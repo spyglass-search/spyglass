@@ -16,6 +16,7 @@ impl Default for BtnAlign {
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum BtnType {
+    Borderless,
     Default,
     Danger,
     Success,
@@ -74,6 +75,11 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
             "active:bg-neutral-700",
             "text-white",
         ),
+        BtnType::Borderless => classes!(
+            "hover:bg-neutral-600",
+            "active:bg-neutral-700",
+            "text-white",
+        ),
         BtnType::Danger => classes!(
             "border",
             "border-red-700",
@@ -107,7 +113,11 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         "font-semibold",
         "items-center",
         "leading-5",
-        "rounded-md",
+        if props._type != BtnType::Borderless {
+            Some("rounded-md")
+        } else {
+            None
+        }
     );
 
     let is_confirmed = use_state(|| false);
