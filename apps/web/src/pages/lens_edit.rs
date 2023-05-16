@@ -420,7 +420,12 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
 
     let doc_type_icon = match source.doc_type {
         LensDocType::GDrive => html! { <icons::GDrive /> },
-        LensDocType::Web => html! { <icons::GlobeIcon /> },
+        LensDocType::Web => html! {
+            <div class="flex flex-col items-center">
+                <icons::GlobeIcon width="w-4" height="h-4" />
+                <div class="text-xs">{"Web"}</div>
+            </div>
+        },
     };
 
     let status_icon = match source.status.as_ref() {

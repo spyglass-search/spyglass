@@ -90,7 +90,7 @@ pub fn lens_list(props: &LensListProps) -> Html {
             html! {}
         } else {
             html! {
-                <Btn size={BtnSize::Sm} _type={BtnType::Borderless} classes="ml-auto" onclick={on_edit}>
+                <Btn size={BtnSize::Sm} _type={BtnType::Borderless} classes="ml-auto rounded" onclick={on_edit}>
                     <icons::PencilIcon height="h-3" width="w-3" />
                 </Btn>
             }
