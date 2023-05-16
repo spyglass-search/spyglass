@@ -71,6 +71,7 @@ pub struct AskClippyRequest {
     pub query: String,
     pub context: Vec<ClippyContext>,
     pub lens: Option<Vec<String>>,
+    pub request_uuid: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
