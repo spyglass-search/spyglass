@@ -191,7 +191,6 @@ pub struct Lens {
     pub example_questions: Vec<String>,
     pub example_docs: Vec<String>,
     pub is_public: bool,
-    pub sources: Vec<LensSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -227,8 +226,18 @@ pub struct LensSource {
     pub status: String,
 }
 
+#[derive(Deserialize)]
+pub struct GetLensSourceResponse {
+    pub page: usize,
+    pub num_items: usize,
+    pub num_pages: usize,
+    pub results: Vec<LensSource>,
+}
+
 #[derive(Error, Debug)]
 pub enum ApiError {
+    #[error("You need to sign in.")]
+    Unauthorized,
     #[error("Unable to make request: {0}")]
     RequestError(#[from] reqwest::Error),
     #[error("Api Error: {0}")]
@@ -294,6 +303,26 @@ impl ApiClient {
             .error_for_status()?
             .json::<Lens>()
             .await?)
+    }
+
+    pub async fn lens_retrieve_sources(
+        &self,
+        id: &str,
+        page: usize,
+    ) -> Result<GetLensSourceResponse, ApiError> {
+        match &self.token {
+            Some(token) => Ok(self
+                .client
+                .get(format!("{}/user/lenses/{}/sources", self.endpoint, id))
+                .query(&[("page".to_string(), page.to_string())])
+                .bearer_auth(token)
+                .send()
+                .await?
+                .error_for_status()?
+                .json::<GetLensSourceResponse>()
+                .await?),
+            None => Err(ApiError::Unauthorized),
+        }
     }
 
     pub async fn lens_add_source(
