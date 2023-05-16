@@ -137,7 +137,7 @@ impl SpyglassClient {
                     match update {
                         ChatUpdate::ChatStart(uuid) => {
                             log::info!("ChatUpdate::ChatStart");
-                            link.send_message(Msg::SetChatUuid(uuid.into()))
+                            link.send_message(Msg::SetChatUuid(uuid))
                         }
                         ChatUpdate::SearchingDocuments => {
                             log::info!("ChatUpdate::SearchingDocuments");
