@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 dotenv_codegen = "0.15.0"
 "shared" = { path = "../../crates/shared" }
+chrono = { version = "0.4", features = ["serde"] }
 console_log = "1.0"
 futures = "0.3"
 gloo = "0.8.0"
@@ -22,6 +23,7 @@ ui-components = { path = "../../crates/ui-components" }
 wasm-bindgen = "0.2.83"
 wasm-bindgen-futures = "0.4.33"
 serde-wasm-bindgen = "0.5"
+uuid = { version = "1.0.0", features = ["v4"], default-features = false }
 web-sys = { version = "0.3.60", features = ["History", "Navigator", "VisibilityState"] }
 yew = { version = "0.20.0", features = ["csr"] }
 yew-router = "0.17"

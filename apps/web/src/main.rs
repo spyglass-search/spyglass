@@ -12,6 +12,7 @@ use yew_router::prelude::*;
 
 mod client;
 mod components;
+mod metrics;
 mod pages;
 use components::nav::NavBar;
 use pages::{lens_edit::CreateLensPage, AppPage};
@@ -87,6 +88,7 @@ pub enum Msg {
 pub struct App {
     auth_status: AuthStatus,
     current_lens: Option<String>,
+    session_uuid: String,
 }
 
 impl Component for App {
@@ -122,6 +124,7 @@ impl Component for App {
                 user_data: None,
             },
             current_lens: None,
+            session_uuid: uuid::Uuid::new_v4().hyphenated().to_string(),
         }
     }
 
@@ -225,6 +228,7 @@ impl Component for App {
 
         let switch = {
             let link = link.clone();
+            let uuid = self.session_uuid.clone();
             move |routes: Route| match &routes {
                 Route::Start => html! { <AppPage /> },
                 Route::Edit { lens } => html! {
@@ -241,7 +245,7 @@ impl Component for App {
                         lens.clone()
                     };
 
-                    html! { <AppPage><SearchPage lens={decoded_lens} /></AppPage> }
+                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} /></AppPage> }
                 }
                 Route::NotFound => html! { <div>{"Not Found!"}</div> },
             }
@@ -253,6 +257,7 @@ impl Component for App {
                     <div class="flex flex-col sm:flex-row">
                         <NavBar
                             current_lens={self.current_lens.clone()}
+                            session_uuid={self.session_uuid.clone()}
                             // Reload lenses after a new one is created.
                             on_create_lens={handle_on_create_lens.clone()}
                             on_select_lens={link.callback(Msg::SetSelectedLens)}

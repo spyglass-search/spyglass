@@ -31,10 +31,12 @@ pub struct SpyglassClient {
     client: Client,
     lens: String,
     endpoint: String,
+    auth: Option<String>,
+    session_uuid: String,
 }
 
 impl SpyglassClient {
-    pub fn new(lens: String) -> Self {
+    pub fn new(lens: String, session_uuid: String, auth: Option<String>) -> Self {
         let client = Client::new();
 
         #[cfg(debug_assertions)]
@@ -46,6 +48,8 @@ impl SpyglassClient {
             client,
             lens,
             endpoint: endpoint.to_string(),
+            auth,
+            session_uuid,
         }
     }
 
@@ -103,12 +107,14 @@ impl SpyglassClient {
     ) -> Result<(), ClientError> {
         let url = format!("{}/chat", self.endpoint);
 
-        let resp = self
-            .client
-            .post(url)
-            .body(serde_json::to_string(&body)?)
-            .send()
-            .await?;
+        let mut request = self.client.post(url).body(serde_json::to_string(&body)?);
+
+        if let Some(auth_token) = &self.auth {
+            request = request.bearer_auth(auth_token);
+        }
+        request = request.header("spyglass-session", self.session_uuid.clone());
+
+        let resp = request.send().await?;
 
         let res = resp
             .bytes_stream()

@@ -62,6 +62,7 @@ pub enum Msg {
 #[derive(Properties, PartialEq)]
 pub struct SearchPageProps {
     pub lens: String,
+    pub session_uuid: String,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +86,7 @@ pub struct SearchPage {
     context: Option<String>,
     show_context: bool,
     chat_uuid: Option<String>,
+    session_uuid: String,
     _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
     _context_listener: ContextHandle<AuthStatus>,
 }
@@ -106,8 +108,12 @@ impl Component for SearchPage {
         ctx.link().send_message(Msg::Reload);
 
         Self {
+            client: Arc::new(Mutex::new(SpyglassClient::new(
+                props.lens.clone(),
+                props.session_uuid.clone(),
+                auth_status.token.clone(),
+            ))),
             auth_status,
-            client: Arc::new(Mutex::new(SpyglassClient::new(props.lens.clone()))),
             context: None,
             current_query: None,
             history: Vec::new(),
@@ -121,6 +127,7 @@ impl Component for SearchPage {
             status_msg: None,
             tokens: None,
             chat_uuid: None,
+            session_uuid: props.session_uuid.clone(),
             _context_listener: context_listener,
             _worker_cmd: None,
         }
@@ -242,6 +249,8 @@ impl Component for SearchPage {
                 self.reset_search();
                 self.client = Arc::new(Mutex::new(SpyglassClient::new(
                     self.lens_identifier.clone(),
+                    self.session_uuid.clone(),
+                    self.auth_status.token.clone(),
                 )));
 
                 let auth_status = self.auth_status.clone();
