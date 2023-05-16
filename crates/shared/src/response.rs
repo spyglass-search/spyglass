@@ -323,6 +323,8 @@ pub struct SendToAskClippyPayload {
 // Rougly in order of occurrence
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum ChatUpdate {
+    /// Chat started
+    ChatStart(String),
     /// Searching our document index for relevant documents
     SearchingDocuments,
     /// Documents returned from search

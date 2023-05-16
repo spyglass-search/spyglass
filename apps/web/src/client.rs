@@ -54,6 +54,7 @@ impl SpyglassClient {
         followup: &str,
         history: &[HistoryItem],
         doc_context: &[SearchResult],
+        chat_uuid: &Option<String>,
         link: Scope<SearchPage>,
         channel: UnboundedReceiver<WorkerCmd>,
     ) -> Result<(), ClientError> {
@@ -72,6 +73,7 @@ impl SpyglassClient {
             query: followup.to_string(),
             lens: Some(vec![self.lens.clone()]),
             context,
+            request_uuid: chat_uuid.clone(),
         };
 
         self.handle_request(&body, link.clone(), channel).await
@@ -87,6 +89,7 @@ impl SpyglassClient {
             query: query.to_string(),
             lens: Some(vec![self.lens.clone()]),
             context: Vec::new(),
+            request_uuid: None,
         };
 
         self.handle_request(&body, link.clone(), channel).await
@@ -132,6 +135,10 @@ impl SpyglassClient {
 
                     let update = serde_json::from_str::<ChatUpdate>(line)?;
                     match update {
+                        ChatUpdate::ChatStart(uuid) => {
+                            log::info!("ChatUpdate::ChatStart");
+                            link.send_message(Msg::SetChatUuid(uuid))
+                        }
                         ChatUpdate::SearchingDocuments => {
                             log::info!("ChatUpdate::SearchingDocuments");
                             link.send_message(Msg::SetStatus("Searching...".into()))

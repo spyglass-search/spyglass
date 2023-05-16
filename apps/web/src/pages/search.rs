@@ -41,6 +41,7 @@ pub struct HistoryItem {
 
 #[allow(dead_code)]
 pub enum Msg {
+    SetChatUuid(String),
     ContextAdded(String),
     HandleFollowup(String),
     HandleKeyboardEvent(KeyboardEvent),
@@ -83,6 +84,7 @@ pub struct SearchPage {
     tokens: Option<String>,
     context: Option<String>,
     show_context: bool,
+    chat_uuid: Option<String>,
     _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
     _context_listener: ContextHandle<AuthStatus>,
 }
@@ -118,6 +120,7 @@ impl Component for SearchPage {
             show_context: false,
             status_msg: None,
             tokens: None,
+            chat_uuid: None,
             _context_listener: context_listener,
             _worker_cmd: None,
         }
@@ -141,6 +144,10 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::SetChatUuid(uuid) => {
+                self.chat_uuid = Some(uuid);
+                false
+            }
             Msg::ContextAdded(context) => {
                 self.context = Some(context);
                 false
@@ -188,13 +195,21 @@ impl Component for SearchPage {
                 }
 
                 let cur_doc_context = self.results.clone();
+                let chat_uuid = self.chat_uuid.clone();
                 let client = self.client.clone();
                 let (tx, rx) = mpsc::unbounded::<WorkerCmd>();
                 self._worker_cmd = Some(tx);
                 spawn_local(async move {
                     let mut client = client.lock().await;
                     if let Err(err) = client
-                        .followup(&question, &cur_history, &cur_doc_context, link.clone(), rx)
+                        .followup(
+                            &question,
+                            &cur_history,
+                            &cur_doc_context,
+                            &chat_uuid,
+                            link.clone(),
+                            rx,
+                        )
                         .await
                     {
                         log::error!("{}", err.to_string());
@@ -346,6 +361,7 @@ impl SearchPage {
         self.results.clear();
         self.status_msg = None;
         self.tokens = None;
+        self.chat_uuid = None;
     }
 
     fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
