@@ -65,13 +65,13 @@ impl Metrics {
         Self { client, disabled }
     }
 
-    #[allow(dead_code)]
     pub async fn track(&self, event: WebClientEvent, uuid: &str) {
         // nothing to do if telemetry is disabled.
         if self.disabled {
             return;
         }
 
+        #[allow(unused_variables)]
         let data = EventProps::new(uuid, event.as_ref());
 
         #[cfg(not(debug_assertions))]
