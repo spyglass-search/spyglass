@@ -65,10 +65,10 @@ wasmer-wasi = "2.3.0"
 whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "0859b41191dcbf176f9924eb82854262c3417b42" }
 
 # Spyglass libs
-auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
-github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
-google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
-reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "2a2f4532364e931b4ce5cfdeb55383a43d092391" }
+auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dafb599bb24f505ce96d975e922bfadba6e2d1ff" }
+github = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dafb599bb24f505ce96d975e922bfadba6e2d1ff" }
+google = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dafb599bb24f505ce96d975e922bfadba6e2d1ff" }
+reddit = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dafb599bb24f505ce96d975e922bfadba6e2d1ff" }
 
 entities = { path = "../entities" }
 migration = { path = "../migrations" }

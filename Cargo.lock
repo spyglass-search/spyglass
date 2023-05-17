@@ -313,7 +313,7 @@ dependencies = [
 [[package]]
 name = "auth_core"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dafb599bb24f505ce96d975e922bfadba6e2d1ff#dafb599bb24f505ce96d975e922bfadba6e2d1ff"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2402,7 +2402,7 @@ dependencies = [
 [[package]]
 name = "github"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dafb599bb24f505ce96d975e922bfadba6e2d1ff#dafb599bb24f505ce96d975e922bfadba6e2d1ff"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2675,7 +2675,7 @@ dependencies = [
 [[package]]
 name = "google"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dafb599bb24f505ce96d975e922bfadba6e2d1ff#dafb599bb24f505ce96d975e922bfadba6e2d1ff"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5461,7 +5461,7 @@ dependencies = [
 [[package]]
 name = "reddit"
 version = "0.1.0"
-source = "git+https://github.com/spyglass-search/third-party-apis?rev=2a2f4532364e931b4ce5cfdeb55383a43d092391#2a2f4532364e931b4ce5cfdeb55383a43d092391"
+source = "git+https://github.com/spyglass-search/third-party-apis?rev=dafb599bb24f505ce96d975e922bfadba6e2d1ff#dafb599bb24f505ce96d975e922bfadba6e2d1ff"
 dependencies = [
  "anyhow",
  "async-trait",
