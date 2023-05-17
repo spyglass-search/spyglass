@@ -65,6 +65,7 @@ impl Metrics {
         Self { client, disabled }
     }
 
+    #[allow(dead_code)]
     pub async fn track(&self, event: WebClientEvent, uuid: &str) {
         // nothing to do if telemetry is disabled.
         if self.disabled {
