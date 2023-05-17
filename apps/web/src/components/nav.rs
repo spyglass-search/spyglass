@@ -5,6 +5,7 @@ use yew_router::prelude::use_navigator;
 
 use super::LensList;
 use crate::client::Lens;
+use crate::metrics::{Metrics, WebClientEvent};
 use crate::{auth0_login, auth0_logout, AuthStatus, Route};
 
 #[derive(Properties, PartialEq)]
@@ -16,6 +17,7 @@ pub struct NavBarProps {
     pub on_select_lens: Callback<Lens>,
     #[prop_or_default]
     pub on_edit_lens: Callback<Lens>,
+    pub session_uuid: String,
 }
 
 #[function_component(NavBar)]
@@ -24,17 +26,27 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
     let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
     let user_data = auth_status.user_data.clone();
     let toggle_nav = use_state(|| false);
+    let metrics = Metrics::new(false);
+    let uuid = props.session_uuid.clone();
 
-    let auth_login = Callback::from(|e: MouseEvent| {
+    let metrics_client = metrics.clone();
+    let auth_login = Callback::from(move |e: MouseEvent| {
         e.prevent_default();
-        spawn_local(async {
+        let metrics = metrics_client.clone();
+        let uuid = uuid.clone();
+        spawn_local(async move {
+            metrics.track(WebClientEvent::Login, &uuid).await;
             let _ = auth0_login().await;
         });
     });
 
-    let auth_logout = Callback::from(|e: MouseEvent| {
+    let uuid = props.session_uuid.clone();
+    let auth_logout = Callback::from(move |e: MouseEvent| {
         e.prevent_default();
-        spawn_local(async {
+        let metrics = metrics.clone();
+        let uuid = uuid.clone();
+        spawn_local(async move {
+            metrics.track(WebClientEvent::Logout, &uuid).await;
             let _ = auth0_logout().await;
         });
     });
