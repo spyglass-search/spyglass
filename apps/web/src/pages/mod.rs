@@ -12,7 +12,7 @@ pub struct AppPageProps {
 #[function_component]
 pub fn AppPage(props: &AppPageProps) -> Html {
     html! {
-        <div class="flex-col flex-1 h-screen overflow-y-auto bg-neutral-800">
+        <div class="flex-col flex-1">
             {props.children.clone()}
         </div>
     }

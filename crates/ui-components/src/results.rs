@@ -364,6 +364,35 @@ pub fn result_paginator(props: &ResultPaginatorProps) -> Html {
         .take(props.page_size)
         .collect::<Vec<Html>>();
 
+    let page_handle = page.clone();
+    let handle_select_page = move |new_page| {
+        page_handle.set(new_page);
+    };
+
+    html! {
+        <div>
+            <div>{result_html}</div>
+            <Paginator
+                cur_page={*page}
+                num_pages={num_pages}
+                on_select_page={handle_select_page}
+            />
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct PaginatorProps {
+    #[prop_or_default]
+    pub disabled: bool,
+    pub cur_page: usize,
+    pub num_pages: usize,
+    #[prop_or_default]
+    pub on_select_page: Callback<usize>,
+}
+
+#[function_component(Paginator)]
+pub fn paginator_component(props: &PaginatorProps) -> Html {
     let mut pages_html = Vec::new();
     let component_classes = classes!(
         "cursor-pointer",
@@ -382,54 +411,71 @@ pub fn result_paginator(props: &ResultPaginatorProps) -> Html {
         "dark:hover:text-white"
     );
 
-    for page_num in 0..num_pages {
+    for page_num in 0..props.num_pages {
         // Highlight the current page
         let mut classes = component_classes.clone();
-        if *page == page_num {
+        if props.cur_page == page_num {
             classes.push("bg-cyan-500");
         }
 
-        let page_handle = page.clone();
+        let on_select_page = props.on_select_page.clone();
         pages_html.push(html! {
             <li>
-                <a
+                <button
+                    disabled={props.disabled}
                     class={classes}
-                    onclick={move |_| page_handle.set(page_num)}
+                    onclick={move |_| on_select_page.emit(page_num)}
                 >
                     {page_num + 1}
-                </a>
+                </button>
             </li>
         });
     }
 
-    let page_handle = page.clone();
-    let handle_previous = move |_| {
-        if *page_handle > 0 {
-            page_handle.set(*page_handle - 1);
+    let handle_previous = {
+        let cur_page = props.cur_page;
+        let on_select_page = props.on_select_page.clone();
+        move |_| {
+            if cur_page > 0 {
+                on_select_page.emit(cur_page - 1);
+            }
         }
     };
 
-    let page_handle = page.clone();
-    let handle_next = move |_| {
-        if *page_handle < (num_pages - 1) {
-            page_handle.set(*page_handle + 1);
+    let handle_next = {
+        let cur_page = props.cur_page;
+        let on_select_page = props.on_select_page.clone();
+        let num_pages = props.num_pages;
+        move |_| {
+            if cur_page < (num_pages - 1) {
+                on_select_page.emit(cur_page + 1);
+            }
         }
     };
 
     html! {
-        <div>
-            <div>{result_html}</div>
-            <nav class="border-t-neutral-700 border-t py-4 mt-4">
-                <ul class="list-style-none flex flex-row gap-2 justify-around">
-                    <li>
-                        <button onclick={handle_previous} class={component_classes.clone()} disabled={*page == 0}>{"Previous"}</button>
-                    </li>
-                    {pages_html}
-                    <li>
-                        <button onclick={handle_next} class={component_classes} disabled={*page == num_pages}>{"Next"}</button>
-                    </li>
-                </ul>
-            </nav>
-        </div>
+        <nav class="border-t-neutral-700 border-t py-4 mt-4">
+            <ul class="list-style-none flex flex-row gap-2 justify-around">
+                <li>
+                    <button
+                        disabled={props.disabled}
+                        onclick={handle_previous}
+                        class={component_classes.clone()}
+                        disabled={props.cur_page == 0}>
+                        {"Previous"}
+                    </button>
+                </li>
+                {pages_html}
+                <li>
+                    <button
+                        disabled={props.disabled}
+                        onclick={handle_next}
+                        class={component_classes}
+                        disabled={props.cur_page == props.num_pages}>
+                        {"Next"}
+                    </button>
+                </li>
+            </ul>
+        </nav>
     }
 }

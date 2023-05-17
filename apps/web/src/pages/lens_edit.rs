@@ -1,5 +1,9 @@
 use gloo::timers::callback::Timeout;
-use ui_components::{btn::Btn, icons};
+use ui_components::{
+    btn::{Btn, BtnSize},
+    icons,
+    results::Paginator,
+};
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
     JsValue,
@@ -10,7 +14,10 @@ use yew::prelude::*;
 use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
-    client::{ApiError, Lens, LensAddDocType, LensAddDocument, LensDocType, LensSource},
+    client::{
+        ApiError, GetLensSourceResponse, Lens, LensAddDocType, LensAddDocument, LensDocType,
+        LensSource,
+    },
     AuthStatus,
 };
 
@@ -31,9 +38,21 @@ extern "C" {
     fn clear_timeout(handle: JsValue);
 }
 
+#[derive(Clone)]
+pub struct LensSourcePaginator {
+    page: usize,
+    num_items: usize,
+    num_pages: usize,
+}
+
 pub struct CreateLensPage {
     pub lens_identifier: String,
     pub lens_data: Option<Lens>,
+
+    pub lens_sources: Option<Vec<LensSource>>,
+    pub lens_source_paginator: Option<LensSourcePaginator>,
+    pub is_loading_lens_sources: bool,
+
     pub auth_status: AuthStatus,
     pub add_url_error: Option<String>,
     pub _context_listener: ContextHandle<AuthStatus>,
@@ -54,8 +73,10 @@ pub enum Msg {
     AddUrlError(String),
     FilePicked { token: String, url: String },
     Reload,
+    ReloadSources(usize),
     Save { display_name: String },
     SetLensData(Lens),
+    SetLensSources(GetLensSourceResponse),
     OpenCloudFilePicker,
     UpdateContext(AuthStatus),
     UpdateDisplayName,
@@ -74,11 +95,15 @@ impl Component for CreateLensPage {
             .context(ctx.link().callback(Msg::UpdateContext))
             .expect("No Message Context Provided");
 
-        ctx.link().send_message(Msg::Reload);
+        ctx.link()
+            .send_message_batch(vec![Msg::Reload, Msg::ReloadSources(0)]);
 
         Self {
             lens_identifier: ctx.props().lens.clone(),
             lens_data: None,
+            lens_sources: None,
+            lens_source_paginator: None,
+            is_loading_lens_sources: false,
             auth_status,
             add_url_error: None,
             _context_listener: context_listener,
@@ -92,7 +117,15 @@ impl Component for CreateLensPage {
         let new_lens = ctx.props().lens.clone();
         if self.lens_identifier != new_lens {
             self.lens_identifier = new_lens;
-            ctx.link().send_message(Msg::Reload);
+
+            let page = self
+                .lens_source_paginator
+                .as_ref()
+                .map(|x| x.page)
+                .unwrap_or(0);
+
+            ctx.link()
+                .send_message_batch(vec![Msg::Reload, Msg::ReloadSources(page)]);
             true
         } else {
             false
@@ -182,6 +215,30 @@ impl Component for CreateLensPage {
 
                 false
             }
+            Msg::ReloadSources(page) => {
+                let auth_status = self.auth_status.clone();
+                let identifier = self.lens_identifier.clone();
+                let link = link.clone();
+                self.is_loading_lens_sources = true;
+                spawn_local(async move {
+                    let api: crate::client::ApiClient = auth_status.get_client();
+                    match api.lens_retrieve_sources(&identifier, page).await {
+                        Ok(lens) => link.send_message(Msg::SetLensSources(lens)),
+                        Err(ApiError::ClientError(msg)) => {
+                            // Unauthorized
+                            if msg.code == 400 {
+                                let navi = link.navigator().expect("No navigator");
+                                navi.push(&crate::Route::Start);
+                            }
+
+                            log::error!("error retrieving lens: {msg}");
+                        }
+                        Err(err) => log::error!("error retrieving lens: {err}"),
+                    }
+                });
+
+                true
+            }
             Msg::Save { display_name } => {
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
@@ -198,6 +255,17 @@ impl Component for CreateLensPage {
             }
             Msg::SetLensData(lens_data) => {
                 self.lens_data = Some(lens_data);
+                true
+            }
+            Msg::SetLensSources(sources) => {
+                self.is_loading_lens_sources = false;
+                self.lens_source_paginator = Some(LensSourcePaginator {
+                    page: sources.page,
+                    num_items: sources.num_items,
+                    num_pages: sources.num_pages,
+                });
+
+                self.lens_sources = Some(sources.results);
                 true
             }
             Msg::OpenCloudFilePicker => {
@@ -221,7 +289,12 @@ impl Component for CreateLensPage {
             }
             Msg::UpdateContext(auth_status) => {
                 self.auth_status = auth_status;
-                link.send_message(Msg::Reload);
+                let page = self
+                    .lens_source_paginator
+                    .as_ref()
+                    .map(|x| x.page)
+                    .unwrap_or(0);
+                link.send_message_batch(vec![Msg::Reload, Msg::ReloadSources(page)]);
                 true
             }
             Msg::UpdateDisplayName => {
@@ -251,17 +324,14 @@ impl Component for CreateLensPage {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
 
-        let sources = self
-            .lens_data
-            .as_ref()
-            .map(|x| x.sources.clone())
-            .unwrap_or_default();
+        let sources = self.lens_sources.as_ref().cloned().unwrap_or_default();
 
         let source_html = sources
             .iter()
             .map(|x| html! { <LensSourceComponent source={x.clone()} /> })
             .collect::<Html>();
 
+        let is_loading_sources = self.is_loading_lens_sources;
         html! {
             <div>
                 <div class="flex flex-row items-center px-8 pt-6">
@@ -298,12 +368,41 @@ impl Component for CreateLensPage {
                         </div>
                         <div><Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn></div>
                     </div>
-                    <div class="flex flex-col">
-                        <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">
-                            {format!("Sources ({})", sources.len())}
-                        </div>
-                        <div class="flex flex-col">{source_html}</div>
-                    </div>
+                    {if let Some(paginator) = self.lens_source_paginator.clone() {
+                        html! {
+                            <div class="flex flex-col">
+                                <div class="flex flex-row mb-2 text-sm font-semibold uppercase text-cyan-500">
+                                    <div>{format!("Sources ({})", paginator.num_items)}</div>
+                                    <div class="ml-auto">
+                                        <Btn size={BtnSize::Sm} onclick={link.callback(move |_| Msg::ReloadSources(paginator.page))}>
+                                            <icons::RefreshIcon
+                                                classes="mr-1"
+                                                width="w-3"
+                                                height="h-3"
+                                                animate_spin={is_loading_sources}
+                                            />
+                                            {"Refresh"}
+                                        </Btn>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col">{source_html}</div>
+                                {if paginator.num_pages > 1 {
+                                    html! {
+                                        <div>
+                                            <Paginator
+                                                disabled={is_loading_sources}
+                                                cur_page={paginator.page}
+                                                num_pages={paginator.num_pages}
+                                                on_select_page={link.callback(Msg::ReloadSources)}
+                                            />
+                                        </div>
+                                    }
+                                } else {
+                                    html! {}
+                                }}
+                            </div>
+                        }
+                    } else { html! {} }}
                 </div>
             </div>
         }
@@ -321,7 +420,12 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
 
     let doc_type_icon = match source.doc_type {
         LensDocType::GDrive => html! { <icons::GDrive /> },
-        LensDocType::Web => html! { <icons::GlobeIcon /> },
+        LensDocType::Web => html! {
+            <div class="flex flex-col items-center">
+                <icons::GlobeIcon width="w-4" height="h-4" />
+                <div class="text-xs">{"Web"}</div>
+            </div>
+        },
     };
 
     let status_icon = match source.status.as_ref() {
@@ -330,7 +434,7 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     };
 
     html! {
-        <div class="border-b border-neutral-700 py-4 flex flex-row items-center gap-2">
+        <div class="py-4 flex flex-row items-center gap-2">
             <div class="flex-none px-2">
                 {doc_type_icon}
             </div>
