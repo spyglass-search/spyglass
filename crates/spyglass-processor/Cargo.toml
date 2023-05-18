@@ -1,0 +1,26 @@
+[package]
+name = "spyglass-processor"
+version = "0.1.0"
+authors = ["Spyglass <team@spyglass.fyi>"]
+description = "Content processing functionality"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+bytes = "1.2.1"
+calamine = "0.19.1"
+docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
+log = "0.4"
+mime = "0.3.16"
+new_mime_guess = "4.0.1"
+pdf = "0.8.1"
+strum = "0.24"
+strum_macros = "0.24"
+uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
+
+# Internal spyglass libs
+shared = { path = "../shared" }
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["lib"]

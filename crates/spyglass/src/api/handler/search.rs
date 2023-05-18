@@ -1,137 +1,19 @@
-use entities::models::tag::TagType;
+use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
 use entities::models::{indexed_document, lens, tag};
-use entities::schema::{DocFields, SearchDocument};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
 use jsonrpsee::core::Error;
-use libspyglass::search::{document_to_struct, QueryStats, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_searcher::schema::{DocFields, SearchDocument};
+use spyglass_searcher::{Boost, QueryBoost, SearchTrait};
 use std::collections::HashSet;
 use std::time::SystemTime;
 use tracing::instrument;
-
-/// Max number of tokens we'll look at for matches before stopping.
-const MAX_HIGHLIGHT_SCAN: usize = 10_000;
-/// Max number of matches we need to generate a decent preview.
-const MAX_HIGHLIGHT_MATCHES: usize = 5;
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct WordRange {
-    start: usize,
-    end: usize,
-    matches: Vec<usize>,
-}
-
-impl WordRange {
-    pub fn new(start: usize, end: usize, match_idx: usize) -> Self {
-        Self {
-            start,
-            end,
-            matches: vec![match_idx],
-        }
-    }
-
-    pub fn overlaps(&self, other: &WordRange) -> bool {
-        self.start <= other.start && other.start <= self.end
-            || self.start <= other.end && other.end <= self.end
-    }
-
-    pub fn merge(&mut self, other: &WordRange) {
-        self.start = self.start.min(other.start);
-        self.end = self.end.max(other.end);
-        self.matches.extend(other.matches.iter());
-    }
-}
-
-/// Creates a short preview from content based on the search query terms by
-/// finding matches for words and creating a window around each match, joining
-/// together overlaps & returning the final string.
-fn generate_highlight_preview(index: &Searcher, query: &str, content: &str) -> String {
-    let fields = DocFields::as_fields();
-    let tokenizer = index
-        .index
-        .tokenizer_for_field(fields.content)
-        .expect("Unable to get tokenizer for content field");
-
-    // tokenize search query
-    let mut terms = HashSet::new();
-    let mut tokens = tokenizer.token_stream(query);
-    while let Some(t) = tokens.next() {
-        terms.insert(t.text.clone());
-    }
-
-    let tokens = content
-        .split_whitespace()
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
-
-    let mut matched_indices = Vec::new();
-    let mut num_tokens_scanned = 0;
-    for (idx, w) in content.split_whitespace().enumerate() {
-        num_tokens_scanned += 1;
-
-        let normalized = tokenizer
-            .token_stream(w)
-            .next()
-            .map(|t| t.text.clone())
-            .unwrap_or_else(|| w.to_string());
-        if terms.contains(&normalized) {
-            matched_indices.push(idx);
-        }
-
-        if matched_indices.len() > MAX_HIGHLIGHT_MATCHES {
-            break;
-        }
-
-        if num_tokens_scanned > MAX_HIGHLIGHT_SCAN {
-            break;
-        }
-    }
-
-    // Create word ranges from the indices
-    let mut ranges: Vec<WordRange> = Vec::new();
-    for idx in matched_indices {
-        let start = (idx as i32 - 5).max(0) as usize;
-        let end = (idx + 5).min(tokens.len() - 1);
-        let new_range = WordRange::new(start, end, idx);
-
-        if let Some(last) = ranges.last_mut() {
-            if last.overlaps(&new_range) {
-                last.merge(&new_range);
-                continue;
-            }
-        }
-
-        ranges.push(new_range);
-    }
-
-    // Create preview from word ranges
-    let mut desc: Vec<String> = Vec::new();
-    let mut num_windows = 0;
-    for range in ranges {
-        let mut slice = tokens[range.start..=range.end].to_vec();
-        if !slice.is_empty() {
-            for idx in range.matches {
-                let slice_idx = idx - range.start;
-                slice[slice_idx] = format!("<mark>{}</mark>", &slice[slice_idx]);
-            }
-            desc.extend(slice);
-            desc.push("...".to_string());
-            num_windows += 1;
-
-            if num_windows > 3 {
-                break;
-            }
-        }
-    }
-
-    format!("<span>{}</span>", desc.join(" "))
-}
 
 /// Search the user's indexed documents
 #[instrument(skip(state))]
@@ -149,70 +31,92 @@ pub async fn search_docs(
     let start = SystemTime::now();
     let index = &state.index;
     let searcher = index.reader.searcher();
+    let query = search_req.query.clone();
 
-    let tags = tag::Entity::find()
+    let lens_ids = tag::Entity::find()
         .filter(tag::Column::Label.eq(tag::TagType::Lens.to_string()))
         .filter(tag::Column::Value.is_in(search_req.lenses))
         .all(&state.db)
         .await
-        .unwrap_or_default();
-    let tag_ids = tags
+        .unwrap_or_default()
         .iter()
         .map(|model| model.id as u64)
         .collect::<Vec<u64>>();
 
-    let mut stats = QueryStats::new();
-    let docs = Searcher::search_with_lens(
-        state.db.clone(),
-        &tag_ids,
-        index,
-        &search_req.query,
-        &mut stats,
-    )
-    .await;
+    let mut boosts = Vec::new();
+    for tag in check_query_for_tags(&state.db, &query).await {
+        boosts.push(QueryBoost::new(Boost::Tag(tag)))
+    }
+
+    let mut filters = Vec::new();
+    for lens in lens_ids {
+        filters.push(QueryBoost::new(Boost::Tag(lens)));
+    }
+
+    if let Some(tag_id) = get_favorite_tag(&state.db).await {
+        filters.push(QueryBoost::new(Boost::Favorite {
+            id: tag_id,
+            required: false,
+        }));
+    }
+
+    let search_result = state.index.search(&query, &filters, &boosts, 5).await;
+    log::debug!(
+        "query {}: {} results from {} docs in {}ms",
+        query,
+        search_result.documents.len(),
+        search_result.num_docs,
+        search_result.wall_time_ms
+    );
 
     let mut results: Vec<SearchResult> = Vec::new();
     let mut missing: Vec<(String, String)> = Vec::new();
+    for (score, doc) in search_result.documents {
+        log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
+        let indexed = indexed_document::Entity::find()
+            .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
+            .one(&state.db)
+            .await;
 
-    let query = search_req.query.clone();
-    for (score, doc_addr) in docs {
-        if let Ok(Ok(doc)) = searcher.doc(doc_addr).map(|doc| document_to_struct(&doc)) {
-            log::debug!("Got id with url {} {}", doc.doc_id, doc.url);
-            let indexed = indexed_document::Entity::find()
-                .filter(indexed_document::Column::DocId.eq(doc.doc_id.clone()))
-                .one(&state.db)
-                .await;
+        let crawl_uri = doc.url;
+        match indexed {
+            Ok(Some(indexed)) => {
+                let tags = indexed
+                    .find_related(tag::Entity)
+                    .all(&state.db)
+                    .await
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|tag| (tag.label.to_string(), tag.value.clone()))
+                    .collect::<Vec<(String, String)>>();
 
-            let crawl_uri = doc.url;
-            match indexed {
-                Ok(Some(indexed)) => {
-                    let tags = indexed
-                        .find_related(tag::Entity)
-                        .all(&state.db)
-                        .await
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|tag| (tag.label.to_string(), tag.value.clone()))
-                        .collect::<Vec<(String, String)>>();
+                let fields = DocFields::as_fields();
+                let tokenizer = index
+                    .index
+                    .tokenizer_for_field(fields.content)
+                    .expect("Unable to get tokenizer for content field");
 
-                    let description =
-                        generate_highlight_preview(&state.index, &query, &doc.content);
-                    let result = SearchResult {
-                        doc_id: doc.doc_id.clone(),
-                        domain: doc.domain,
-                        title: doc.title,
-                        crawl_uri: crawl_uri.clone(),
-                        description,
-                        url: indexed.open_url.unwrap_or(crawl_uri),
-                        tags,
-                        score,
-                    };
+                let description = spyglass_searcher::utils::generate_highlight_preview(
+                    &tokenizer,
+                    &query,
+                    &doc.content,
+                );
 
-                    results.push(result);
-                }
-                _ => {
-                    missing.push((doc.doc_id.to_owned(), crawl_uri.to_owned()));
-                }
+                let result = SearchResult {
+                    doc_id: doc.doc_id.clone(),
+                    domain: doc.domain,
+                    title: doc.title,
+                    crawl_uri: crawl_uri.clone(),
+                    description,
+                    url: indexed.open_url.unwrap_or(crawl_uri),
+                    tags,
+                    score,
+                };
+
+                results.push(result);
+            }
+            _ => {
+                missing.push((doc.doc_id.to_owned(), crawl_uri.to_owned()));
             }
         }
     }
@@ -234,7 +138,7 @@ pub async fn search_docs(
         .track(metrics::Event::SearchResult {
             num_results: results.len(),
             num_docs,
-            term_count: stats.term_count,
+            term_count: search_result.term_counts as i32,
             domains: domains.iter().cloned().collect(),
             wall_time_ms,
         })
@@ -303,18 +207,4 @@ pub async fn search_lenses(
     }
 
     Ok(SearchLensesResp { results })
-}
-
-#[cfg(test)]
-mod test {
-    use crate::api::handler::search::generate_highlight_preview;
-    use libspyglass::search::{IndexPath, Searcher};
-
-    #[test]
-    fn test_find_highlights() {
-        let searcher = Searcher::with_index(&IndexPath::Memory).expect("Unable to open index");
-        let blurb = r#"Rust rust is a multi-paradigm, high-level, general-purpose programming"#;
-        let desc = generate_highlight_preview(&searcher, "rust programming", &blurb);
-        assert_eq!(desc, "<span><mark>Rust</mark> <mark>rust</mark> is a multi-paradigm, high-level, general-purpose <mark>programming</mark> ...</span>");
-    }
 }

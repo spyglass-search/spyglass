@@ -1,13 +1,13 @@
 use shared::event::{ClientEvent, ClientInvoke, InstallLensParams};
 use shared::response::{InstallableLens, LensResult};
 use std::collections::{HashMap, HashSet};
+use ui_components::icons;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlElement, HtmlInputElement};
 use yew::prelude::*;
 
-use crate::components::lens::LensEvent;
-use crate::components::{icons, lens::LibraryLens};
+use crate::components::lens::{LensEvent, LibraryLens};
 use crate::invoke;
 use crate::utils::RequestState;
 

@@ -1,4 +1,4 @@
-use jsonrpsee::core::Error;
+use jsonrpsee::core::{Error, JsonValue};
 use jsonrpsee::proc_macros::rpc;
 use shared::config::UserSettings;
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
@@ -17,6 +17,9 @@ pub trait Rpc {
     /// Returns a protocol version
     #[method(name = "protocol_version")]
     fn protocol_version(&self) -> Result<String, Error>;
+
+    #[method(name = "system_health")]
+    fn system_health(&self) -> Result<JsonValue, Error>;
 
     /// Adds an unparsed document to the spyglass index.
     #[method(name = "index.add_raw_document")]

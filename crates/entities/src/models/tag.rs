@@ -1,4 +1,8 @@
-use sea_orm::{entity::prelude::*, Condition, ConnectionTrait, Set};
+use sea_orm::{
+    entity::prelude::*,
+    sea_query::{Expr, Func},
+    Condition, ConnectionTrait, Set,
+};
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display, EnumString};
 
@@ -30,6 +34,9 @@ pub enum TagType {
     /// Owner of a doc/item, if relevant.
     #[strum(serialize = "owner")]
     Owner,
+    /// Author of a document.
+    #[strum(serialize = "author")]
+    Author,
     /// Shared/invited to a doc/event/etc.
     #[strum(serialize = "shared")]
     SharedWith,
@@ -65,6 +72,7 @@ fn string_to_tag_type(v: &str) -> TagType {
         "type" => TagType::Type,
         "source" => TagType::Source,
         "owner" => TagType::Owner,
+        "author" => TagType::Author,
         "shared" => TagType::SharedWith,
         "lens" => TagType::Lens,
         "repository" => TagType::Repository,
@@ -83,6 +91,7 @@ impl ToString for TagType {
             Self::Type => "type",
             Self::Source => "source",
             Self::Owner => "owner",
+            Self::Author => "author",
             Self::SharedWith => "shared",
             Self::Lens => "lens",
             Self::Repository => "repository",
@@ -198,8 +207,8 @@ where
                 .do_nothing()
                 .to_owned(),
         )
-        .exec_with_returning(db)
-        .await;
+        .exec_without_returning(db)
+        .await?;
 
     let tag = Entity::find()
         .filter(Column::Label.eq(label.to_string()))
@@ -318,6 +327,56 @@ pub async fn get_tags_by_value(
     }
 
     find.all(db).await
+}
+
+// Helper method to copy the table from one database to another
+pub async fn copy_table(
+    from: &DatabaseConnection,
+    to: &DatabaseConnection,
+) -> anyhow::Result<(), sea_orm::DbErr> {
+    let mut pages = Entity::find().paginate(from, 1000);
+    Entity::delete_many().exec(to).await?;
+    while let Ok(Some(pages)) = pages.fetch_and_next().await {
+        let active_model = pages
+            .into_iter()
+            .map(|model| model.into())
+            .collect::<Vec<ActiveModel>>();
+        Entity::insert_many(active_model)
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns(vec![Column::Id])
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(to)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn get_favorite_tag(db: &DatabaseConnection) -> Option<u64> {
+    if let Ok(Some(favorited)) = Entity::find()
+        .filter(Column::Label.eq(TagType::Favorited.to_string()))
+        .one(db)
+        .await
+    {
+        Some(favorited.id as u64)
+    } else {
+        None
+    }
+}
+
+// Helper method used to get the list of tag ids that should be included in the search
+pub async fn check_query_for_tags(db: &DatabaseConnection, search: &str) -> Vec<u64> {
+    let lower: String = search.to_lowercase();
+    let tokens = lower.split(' ').collect::<Vec<&str>>();
+    let expr = Expr::expr(Func::lower(Expr::col(Column::Value))).is_in(tokens);
+    let tag_rslt = Entity::find().filter(expr).all(db).await;
+
+    if let Ok(tags) = tag_rslt {
+        return tags.iter().map(|tag| tag.id as u64).collect();
+    } else {
+        Vec::new()
+    }
 }
 
 #[cfg(test)]

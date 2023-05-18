@@ -99,7 +99,8 @@ setup-dev-linux:
 		libayatana-appindicator3-dev \
 		librsvg2-dev \
 		cmake \
-		libsdl2-dev
+		libsdl2-dev \
+		clang
 
 run-client-dev:
 	cargo tauri dev

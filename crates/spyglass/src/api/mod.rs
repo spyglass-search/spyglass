@@ -1,17 +1,19 @@
+use crate::task::lens::install_lens;
 use entities::get_library_stats;
 use entities::models::indexed_document;
 use entities::sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
-use jsonrpsee::core::{async_trait, Error};
+use jsonrpsee::core::{async_trait, Error, JsonValue};
+use jsonrpsee::server::middleware::proxy_get_request::ProxyGetRequestLayer;
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
 use jsonrpsee::types::{SubscriptionEmptyError, SubscriptionResult};
 use jsonrpsee::SubscriptionSink;
-use libspyglass::search::{self, Searcher};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::{RpcEventType, RpcServer};
+use spyglass_searcher::WriteTrait;
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -27,6 +29,10 @@ pub struct SpyglassRpc {
 impl RpcServer for SpyglassRpc {
     fn protocol_version(&self) -> Result<String, Error> {
         Ok("0.1.2".into())
+    }
+
+    fn system_health(&self) -> Result<JsonValue, Error> {
+        Ok(serde_json::json!({ "health": true }))
     }
 
     async fn add_raw_document(&self, req: RawDocumentRequest) -> Result<(), Error> {
@@ -113,7 +119,7 @@ impl RpcServer for SpyglassRpc {
     }
 
     async fn install_lens(&self, lens_name: String) -> Result<(), Error> {
-        if let Err(error) = search::lens::install_lens(&self.state, &self.config, lens_name).await {
+        if let Err(error) = install_lens(&self.state, &self.config, lens_name).await {
             return Err(Error::Custom(error.to_string()));
         }
         Ok(())
@@ -159,8 +165,8 @@ impl RpcServer for SpyglassRpc {
             .map(|m| m.doc_id.clone())
             .collect::<Vec<String>>();
         let _ = connection::revoke_connection(&self.state.db, &api_id, &account).await;
-        let _ = Searcher::delete_many_by_id(&self.state, &doc_ids, false).await;
-        let _ = Searcher::save(&self.state).await;
+        let _ = self.state.index.delete_many_by_id(&doc_ids).await;
+        let _ = indexed_document::delete_many_by_doc_id(&self.state.db, &doc_ids).await;
         log::debug!("revoked & deleted {} docs", doc_ids.len());
         Ok(())
     }
@@ -247,18 +253,28 @@ impl RpcServer for SpyglassRpc {
 }
 
 pub async fn start_api_server(
+    addr: Option<IpAddr>,
     state: AppState,
     config: Config,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
-    let server_addr = SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::LOCALHOST),
-        state.user_settings.load_full().port,
+    let middleware = tower::ServiceBuilder::new().layer(
+        ProxyGetRequestLayer::new("/health", "spyglass_system_health")
+            .expect("Unable to create middleware"),
     );
-    let server = ServerBuilder::default().build(server_addr).await?;
+
+    let ip = addr.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    let server_addr = SocketAddr::new(ip, state.user_settings.load_full().port);
+
+    let server = ServerBuilder::default()
+        .set_middleware(middleware)
+        .build(server_addr)
+        .await?;
+
     let rpc_module = SpyglassRpc {
         state: state.clone(),
         config: config.clone(),
     };
+
     let addr = server.local_addr()?;
     let server_handle = server.start(rpc_module.into_rpc())?;
 

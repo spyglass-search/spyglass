@@ -1,0 +1,11 @@
+{
+    "scripts": {
+        "build": "tailwindcss -i src-css/main.css -o ./public/main.css --minify",
+        "watch": "tailwindcss -i src-css/main.css -o ./public/main.css --minify --watch"
+    },
+    "devDependencies": {
+        "@tailwindcss/forms": "^0.5.2",
+        "@tailwindcss/typography": "^0.5.9",
+        "tailwindcss": "^3.0.24"
+    }
+}

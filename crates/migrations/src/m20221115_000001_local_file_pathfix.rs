@@ -1,7 +1,7 @@
 use crate::sea_orm::Statement;
-use entities::schema::{DocFields, SearchDocument};
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;
+use spyglass_searcher::schema::{DocFields, SearchDocument};
 
 use shared::config::Config;
 use tantivy::collector::TopDocs;

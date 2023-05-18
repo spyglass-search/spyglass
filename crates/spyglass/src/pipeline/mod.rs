@@ -3,9 +3,8 @@ pub mod collector;
 pub mod default_pipeline;
 pub mod parser;
 
-use crate::search::lens;
 use crate::state::AppState;
-use crate::task::CrawlTask;
+use crate::task::{lens::read_lenses, CrawlTask};
 use entities::models::crawl_queue;
 use shared::config::Config;
 use shared::config::PipelineConfiguration;
@@ -55,7 +54,7 @@ pub async fn initialize_pipelines(
     let mut shutdown_rx = app_state.shutdown_cmd_tx.lock().await.subscribe();
     // Yes probably should do some error handling, but not really needed. No pipelines
     // just means not tasks to send.
-    let lens_map = lens::read_lenses(&config).await.unwrap_or_default();
+    let lens_map = read_lenses(&config).await.unwrap_or_default();
     let _ = read_pipelines(&app_state, &config).await;
 
     // Grab all pipelines
@@ -129,8 +128,13 @@ pub async fn initialize_pipelines(
                 }
                 PipelineCommand::ProcessCache(lens, cache_file) => {
                     if let Some(lens_config) = app_state.lenses.get(&lens) {
-                        cache_pipeline::process_update(app_state.clone(), &lens_config, cache_file)
-                            .await;
+                        cache_pipeline::process_update(
+                            app_state.clone(),
+                            &lens_config,
+                            cache_file,
+                            false,
+                        )
+                        .await;
                     }
                 }
             }

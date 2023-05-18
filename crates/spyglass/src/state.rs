@@ -3,7 +3,10 @@ use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
 use spyglass_rpc::RpcEvent;
+use spyglass_searcher::schema::DocFields;
+use spyglass_searcher::schema::SearchDocument;
 use std::sync::Arc;
+use tantivy::schema::Schema;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::Mutex;
 use tokio::sync::{broadcast, mpsc};
@@ -13,11 +16,11 @@ use crate::task::{AppShutdown, UserSettingsChange};
 use crate::{
     pipeline::PipelineCommand,
     plugin::{PluginCommand, PluginManager},
-    search::{IndexPath, Searcher},
     task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
 use shared::metrics::Metrics;
+use spyglass_searcher::{client::Searcher, IndexBackend};
 
 /// Used to track inflight requests and limit things
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -77,17 +80,25 @@ pub struct AppState {
     pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
     // Keep track of in-flight tasks
     pub fetch_limits: Arc<DashMap<FetchLimitType, usize>>,
+    pub readonly_mode: bool,
 }
 
 impl AppState {
-    pub async fn new(config: &Config) -> Self {
-        let db = create_connection(config, false)
-            .await
-            .expect("Unable to connect to database");
+    pub async fn new(config: &Config, readonly_mode: bool) -> Self {
+        let db_connection_result = create_connection(config, false).await;
+        if let Err(error) = &db_connection_result {
+            log::error!("Error connecting to database {:?}", error);
+        }
+
+        let db = db_connection_result.expect("Unable to connect to database");
 
         AppStateBuilder::new()
             .with_db(db)
-            .with_index(&IndexPath::LocalPath(config.index_dir()))
+            .with_index(
+                &IndexBackend::LocalPath(config.index_dir()),
+                DocFields::as_schema(),
+                readonly_mode,
+            )
             .with_lenses(&config.lenses.values().cloned().collect())
             .with_pipelines(
                 &config
@@ -143,6 +154,7 @@ pub struct AppStateBuilder {
     lenses: Option<Vec<LensConfig>>,
     pipelines: Option<Vec<PipelineConfiguration>>,
     user_settings: Option<UserSettings>,
+    readonly_mode: Option<bool>,
 }
 
 impl AppStateBuilder {
@@ -164,7 +176,8 @@ impl AppStateBuilder {
         let index = if let Some(index) = &self.index {
             index.to_owned()
         } else {
-            Searcher::with_index(&IndexPath::Memory).expect("Unable to open search index")
+            Searcher::with_index(&IndexBackend::Memory, DocFields::as_schema(), false)
+                .expect("Unable to open search index")
         };
 
         let user_settings = if let Some(settings) = &self.user_settings {
@@ -199,6 +212,7 @@ impl AppStateBuilder {
             file_watcher: Arc::new(Mutex::new(None)),
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
+            readonly_mode: self.readonly_mode.unwrap_or_default(),
         }
     }
 
@@ -226,14 +240,24 @@ impl AppStateBuilder {
         self
     }
 
-    pub fn with_index(&mut self, index: &IndexPath) -> &mut Self {
-        if let IndexPath::LocalPath(path) = &index {
+    pub fn with_index(
+        &mut self,
+        index: &IndexBackend,
+        schema: Schema,
+        readonly: bool,
+    ) -> &mut Self {
+        if let IndexBackend::LocalPath(path) = &index {
             if !path.exists() {
                 let _ = std::fs::create_dir_all(path);
             }
         }
 
-        self.index = Some(Searcher::with_index(index).expect("Unable to open index"));
+        let searcher = Searcher::with_index(index, schema, readonly);
+        if let Err(error) = &searcher {
+            log::error!("Error connecting to index {index:?}. Error: {error:?}");
+        }
+
+        self.index = Some(searcher.expect("Unable to open index"));
         self
     }
 }

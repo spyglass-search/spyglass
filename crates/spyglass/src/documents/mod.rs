@@ -11,18 +11,17 @@ use entities::{
 use shared::config::LensConfig;
 use spyglass_plugin::TagModification;
 use std::{collections::HashMap, str::FromStr, time::Instant};
-use tantivy::DocAddress;
 
 use libnetrunner::parser::ParseResult;
 use url::Url;
 
-use crate::{
-    crawler::CrawlResult,
-    search::{self, DocumentUpdate, RetrievedDocument, Searcher},
-    state::AppState,
-};
+use crate::{crawler::CrawlResult, state::AppState};
 use entities::models::tag::TagType;
 use entities::sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use spyglass_searcher::{
+    schema::{DocumentUpdate, ToDocument},
+    RetrievedDocument, WriteTrait,
+};
 
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
@@ -54,12 +53,8 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
             .map(|x| x.to_owned())
             .collect::<Vec<String>>();
 
-        if let Err(err) = Searcher::delete_many_by_id(state, &doc_id_list, false).await {
+        if let Err(err) = state.index.delete_many_by_id(&doc_id_list).await {
             log::warn!("Unable to delete_many_by_id: {err}")
-        }
-
-        if let Err(err) = Searcher::save(state).await {
-            log::warn!("Unable to save searcher: {err}")
         }
 
         // now that the documents are deleted delete from the queue
@@ -121,8 +116,7 @@ pub async fn process_crawl_results(
     let doc_id_list = id_map.values().cloned().collect::<Vec<String>>();
 
     // Delete existing docs
-    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
-    let _ = Searcher::save(state).await;
+    let _ = state.index.delete_many_by_id(&doc_id_list).await;
 
     // Find/create the tags for this crawl.
     let mut tag_map: HashMap<String, Vec<i64>> = HashMap::new();
@@ -147,36 +141,38 @@ pub async fn process_crawl_results(
         let url = Url::parse(&crawl_result.url)?;
         let url_host = url.host_str().unwrap_or("");
         // Add document to index
-        if let Ok(mut index_writer) = state.index.writer.lock() {
-            let doc_id = Searcher::upsert_document(
-                &mut index_writer,
-                DocumentUpdate {
+        let doc_id = state
+            .index
+            .upsert(
+                &DocumentUpdate {
                     doc_id: id_map.get(&crawl_result.url).cloned(),
                     title: &crawl_result.title.clone().unwrap_or_default(),
-                    description: &crawl_result.description.clone().unwrap_or_default(),
                     domain: url_host,
                     url: url.as_str(),
                     content: &crawl_result.content.clone().unwrap_or_default(),
                     tags: &tags_for_crawl.clone(),
-                },
-            )?;
+                    published_at: None,
+                    last_modified: None,
+                }
+                .to_document(),
+            )
+            .await?;
 
-            if !id_map.contains_key(&doc_id) {
-                added_docs.push(url.to_string());
-                inserts.push(indexed_document::ActiveModel {
-                    domain: Set(url_host.to_string()),
-                    url: Set(url.to_string()),
-                    open_url: Set(crawl_result.open_url.clone()),
-                    doc_id: Set(doc_id),
-                    updated_at: Set(Utc::now()),
-                    ..Default::default()
-                });
-            } else if let Some(model) = model_map.get(&doc_id) {
-                // Touch the existing model so we know it's been checked recently.
-                let mut update: indexed_document::ActiveModel = model.to_owned().into();
-                update.updated_at = Set(Utc::now());
-                updates.push(update);
-            }
+        if !id_map.contains_key(&doc_id) {
+            added_docs.push(url.to_string());
+            inserts.push(indexed_document::ActiveModel {
+                domain: Set(url_host.to_string()),
+                url: Set(url.to_string()),
+                open_url: Set(crawl_result.open_url.clone()),
+                doc_id: Set(doc_id),
+                updated_at: Set(Utc::now()),
+                ..Default::default()
+            });
+        } else if let Some(model) = model_map.get(&doc_id) {
+            // Touch the existing model so we know it's been checked recently.
+            let mut update: indexed_document::ActiveModel = model.to_owned().into();
+            update.updated_at = Set(Utc::now());
+            updates.push(update);
         }
     }
 
@@ -187,7 +183,7 @@ pub async fn process_crawl_results(
     }
 
     tx.commit().await?;
-    let _ = Searcher::save(state).await;
+    let _ = state.index.save().await;
 
     // Find the recently added docs & apply the tags to them.
     let added_entries: Vec<indexed_document::Model> = indexed_document::Entity::find()
@@ -228,7 +224,7 @@ pub async fn process_records(
     state: &AppState,
     lens: &LensConfig,
     results: &mut Vec<ParseResult>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<indexed_document::Model>> {
     // get a list of all urls
     let parsed_urls = results
         .iter()
@@ -254,8 +250,7 @@ pub async fn process_records(
         .map(|x| x.to_owned())
         .collect::<Vec<String>>();
 
-    let _ = Searcher::delete_many_by_id(state, &doc_id_list, false).await;
-    let _ = Searcher::save(state).await;
+    let _ = state.index.delete_many_by_id(&doc_id_list).await;
 
     // Grab tags from the lens.
     let tags = lens
@@ -288,24 +283,25 @@ pub async fn process_records(
                     let url_host = url.host_str().unwrap_or("");
                     // Add document to index
                     let doc_id: Option<String> = {
-                        if let Ok(mut index_writer) = state.index.writer.lock() {
-                            match Searcher::upsert_document(
-                                &mut index_writer,
-                                DocumentUpdate {
+                        match state
+                            .index
+                            .upsert(
+                                &DocumentUpdate {
                                     doc_id: id_map.get(&canonical_url_str.clone()).cloned(),
                                     title: &crawl_result.title.clone().unwrap_or_default(),
-                                    description: &crawl_result.description.clone(),
                                     domain: url_host,
                                     url: url.as_str(),
                                     content: &crawl_result.content,
                                     tags: &tag_list,
-                                },
-                            ) {
-                                Ok(new_doc_id) => Some(new_doc_id),
-                                _ => None,
-                            }
-                        } else {
-                            None
+                                    published_at: None,
+                                    last_modified: None,
+                                }
+                                .to_document(),
+                            )
+                            .await
+                        {
+                            Ok(new_doc_id) => Some(new_doc_id),
+                            _ => None,
                         }
                     };
 
@@ -338,7 +334,7 @@ pub async fn process_records(
     // Save the data
     indexed_document::insert_many(&transaction, &updates).await?;
     transaction.commit().await?;
-    if let Ok(mut writer) = state.index.writer.lock() {
+    if let Ok(mut writer) = state.index.lock_writer() {
         let _ = writer.commit();
     }
 
@@ -356,7 +352,7 @@ pub async fn process_records(
         }
     }
 
-    Ok(())
+    Ok(added_entries)
 }
 
 /// Processes an update tags request for the specified documents
@@ -367,7 +363,7 @@ pub async fn process_records(
 /// 5. Updates the indexed document with the new tags (index)
 pub async fn update_tags(
     state: &AppState,
-    doc_ids: &[DocAddress],
+    documents: &[RetrievedDocument],
     tag_modifications: &TagModification,
 ) -> anyhow::Result<()> {
     let mut tag_cache: HashMap<String, i64> = HashMap::new();
@@ -380,18 +376,6 @@ pub async fn update_tags(
         Some(to_add) => _get_tag_ids_string(&state.db, to_add, &mut tag_cache).await,
         None => Vec::new(),
     };
-
-    let documents = doc_ids
-        .iter()
-        .filter_map(|addr| {
-            if let Ok(doc) = state.index.reader.searcher().doc(*addr) {
-                if let Ok(retrieved_doc) = search::document_to_struct(&doc) {
-                    return Some(retrieved_doc);
-                }
-            }
-            None
-        })
-        .collect::<Vec<RetrievedDocument>>();
 
     let document_ids = &documents
         .iter()
@@ -441,7 +425,7 @@ pub async fn update_tags(
                     tag_map.insert(
                         doc.doc_id.clone(),
                         (
-                            doc,
+                            doc.clone(),
                             ids.iter().map(|tag_id| tag_id.id).collect::<Vec<i64>>(),
                         ),
                     );
@@ -455,25 +439,26 @@ pub async fn update_tags(
             }
         }
 
-        let _ = Searcher::delete_many_by_id(state, document_ids, false).await;
-        let _ = Searcher::save(state).await;
+        let _ = state.index.delete_many_by_id(document_ids).await;
 
         log::debug!("Tag map generated {}", tag_map.len());
-        if let Ok(mut index_writer) = state.index.writer.lock() {
-            for (_, (doc, ids)) in tag_map.iter() {
-                let _doc_id = Searcher::upsert_document(
-                    &mut index_writer,
-                    DocumentUpdate {
+        for (_, (doc, ids)) in tag_map.iter() {
+            let _doc_id = state
+                .index
+                .upsert(
+                    &DocumentUpdate {
                         doc_id: Some(doc.doc_id.clone()),
                         title: &doc.title,
-                        description: &doc.description,
                         domain: &doc.domain,
                         url: &doc.url,
                         content: &doc.content,
                         tags: ids,
-                    },
-                )?;
-            }
+                        published_at: None,
+                        last_modified: None,
+                    }
+                    .to_document(),
+                )
+                .await?;
         }
     }
 

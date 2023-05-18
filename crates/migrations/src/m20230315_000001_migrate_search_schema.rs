@@ -4,14 +4,15 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use entities::models::schema::v3::SchemaReader;
-use entities::schema::DocFields;
 use sea_orm_migration::prelude::*;
 use tantivy::DateTime;
 use tantivy::{schema::*, IndexWriter};
 
-use entities::schema::{self, mapping_to_schema, SchemaMapping, SearchDocument};
 use entities::sea_orm::{ConnectionTrait, Statement};
 use shared::config::Config;
+use spyglass_searcher::schema::{
+    self, mapping_to_schema, DocFields, SchemaMapping, SearchDocument,
+};
 
 use crate::utils::migration_utils;
 pub struct Migration;
@@ -21,7 +22,8 @@ impl Migration {
     }
 
     pub fn after_writer(&self, path: &PathBuf) -> IndexWriter {
-        let index = schema::initialize_index(path).expect("Unable to open search index");
+        let index = schema::initialize_index(DocFields::as_schema(), path)
+            .expect("Unable to open search index");
         index.writer(50_000_000).expect("Unable to create writer")
     }
 

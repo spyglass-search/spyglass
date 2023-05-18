@@ -28,9 +28,9 @@ use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
 use crate::filesystem::audio;
-use crate::filesystem::extensions::SupportedExt;
-use crate::parser;
 use crate::state::{AppState, FetchLimitType};
+use spyglass_processor::parser;
+use spyglass_processor::utils::extensions::SupportedExt;
 
 pub mod archive;
 pub mod bootstrap;
@@ -593,7 +593,13 @@ async fn _process_file(
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
                 Ok(parsed) => {
-                    content = Some(parsed);
+                    content = Some(parsed.content);
+                    if let Some(parsed_author) = parsed.author {
+                        tags.push((TagType::Author, parsed_author))
+                    }
+                    if let Some(parsed_title) = parsed.title {
+                        title = Some(parsed_title);
+                    }
                 }
                 Err(err) => log::warn!("Unable to parse `{}`: {}", path.display(), err),
             },

@@ -6,10 +6,16 @@ members = [
     "crates/shared",
     "crates/spyglass",
     "crates/tauri",
-    # Publically published crates
+    "crates/ui-components",
+
+    "apps/web",
+
+    # Public published crates
     "crates/spyglass-plugin",
     "crates/spyglass-lens",
     "crates/spyglass-rpc",
+    "crates/spyglass-searcher",
+    "crates/spyglass-processor"
 ]
 
 [profile.release]

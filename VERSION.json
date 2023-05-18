@@ -12,7 +12,7 @@
       "url": "https://github.com/spyglass-search/spyglass/releases/download/v2023.4.1/Spyglass_universal.app.tar.gz"
     },
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYmdRb044enZ3SEFWaDdsQzhVYU52RDIzRmFVK1g5TGxGRW83VTZySFAvWjBGMW9ZMkRIeXhldEhWTnF3cGQzRnpINkJGaWxBdTZvdEkwUHlTUGJkUkFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjgwNjU1MTQ2CWZpbGU6c3B5Z2xhc3NfMjMuNC4xX2FtZDY0LkFwcEltYWdlLnRhci5negpJemd2d0VoZEJMUDJRKzVPeHJFalJjZUhoRzdHbUdvd21aVEpGSXBWRjI0ZURyZW9YK3VTVW1oVmJvMGdkWmpTdjBZWGZ4amhlbC9kU1ZoUzJSVmhCZz09Cg==",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRk9WYXdDUXphYnM2VDRla2k2VnBVY29zUlZ1b0k4ZkhWVGU1Q2tmMEpIQ0tFQ3RxUGEyRkFBZ3RtaUxLUGpqTThrcENaYnhEZE5OenorZHA3N2srb2QyZ0ZhTHhhZFFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjgwNzI1NjA3CWZpbGU6c3B5Z2xhc3NfMjMuNC4xX2FtZDY0LkFwcEltYWdlLnRhci5negp1MDZ2K3o3T2RNeUhpRHcyVXF6dnNxemo4dWZQMDNpT2R6TnhGOGdUSk5LNytWY0RSSzRNSThyVkV3VmphWGM4UlNlMm1mRnJGY1hhOGs5SW55MXlDUT09Cg==",
       "url": "https://github.com/spyglass-search/spyglass/releases/download/v2023.4.1/spyglass_23.4.1_amd64.AppImage.tar.gz"
     },
     "windows-x86_64": {
