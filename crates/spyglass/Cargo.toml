@@ -1,6 +1,6 @@
 [package]
 name = "spyglass"
-version = "23.4.1"
+version = "23.5.1"
 edition = "2021"
 default-run = "spyglass"
 
