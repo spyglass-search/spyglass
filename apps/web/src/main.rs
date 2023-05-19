@@ -15,7 +15,7 @@ mod components;
 mod metrics;
 mod pages;
 use components::nav::NavBar;
-use pages::{lens_edit::CreateLensPage, AppPage};
+use pages::{landing::LandingPage, lens_edit::CreateLensPage, AppPage};
 
 use crate::{client::ApiClient, pages::search::SearchPage};
 
@@ -230,7 +230,7 @@ impl Component for App {
             let link = link.clone();
             let uuid = self.session_uuid.clone();
             move |routes: Route| match &routes {
-                Route::Start => html! { <AppPage /> },
+                Route::Start => html! { <AppPage><LandingPage /></AppPage> },
                 Route::Edit { lens } => html! {
                     <AppPage>
                         <CreateLensPage lens={lens.clone()} onupdate={link.callback(|_| Msg::LoadLenses)} />
