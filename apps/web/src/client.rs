@@ -216,7 +216,7 @@ pub enum LensAddDocType {
     /// Token is used to download the document from GDrive.
     GDrive { token: String },
     /// Normal, web accessible URL.
-    WebUrl,
+    WebUrl { include_all_suburls: bool },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

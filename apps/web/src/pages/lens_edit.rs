@@ -69,8 +69,9 @@ pub struct CreateLensProps {
 }
 
 pub enum Msg {
-    AddUrl,
+    AddUrl { include_all: bool },
     AddUrlError(String),
+    ClearUrlError,
     FilePicked { token: String, url: String },
     Reload,
     ReloadSources(usize),
@@ -135,14 +136,16 @@ impl Component for CreateLensPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AddUrl => {
+            Msg::AddUrl { include_all } => {
                 if let Some(node) = self._url_input_ref.cast::<HtmlInputElement>() {
                     let url = node.value();
                     node.set_value("");
 
                     let new_source = LensAddDocument {
                         url,
-                        doc_type: LensAddDocType::WebUrl,
+                        doc_type: LensAddDocType::WebUrl {
+                            include_all_suburls: include_all,
+                        },
                     };
 
                     // Add to lens
@@ -160,8 +163,12 @@ impl Component for CreateLensPage {
                                 _ => link.send_message(Msg::AddUrlError(err.to_string())),
                             };
                         } else {
+                            link.send_message(Msg::ClearUrlError);
                             // Reload data if successful
-                            link.send_message(Msg::Reload);
+                            link.send_message_batch(vec![
+                                Msg::ClearUrlError,
+                                Msg::ReloadSources(0),
+                            ]);
                         }
                     });
                 }
@@ -169,6 +176,10 @@ impl Component for CreateLensPage {
             }
             Msg::AddUrlError(msg) => {
                 self.add_url_error = Some(msg);
+                true
+            }
+            Msg::ClearUrlError => {
+                self.add_url_error = None;
                 true
             }
             Msg::FilePicked { token, url } => {
@@ -363,7 +374,8 @@ impl Component for CreateLensPage {
                                 class="rounded p-2 text-sm text-neutral-800"
                                 placeholder="https://example.com"
                             />
-                            <Btn onclick={link.callback(|_| Msg::AddUrl)}>{"Add data from URL"}</Btn>
+                            <Btn onclick={link.callback(|_| Msg::AddUrl {include_all: false})}>{"Add data from URL"}</Btn>
+                            <Btn onclick={link.callback(|_| Msg::AddUrl {include_all: true} )}>{"Add all URLs from Site"}</Btn>
                             <div class="text-sm text-red-700">{self.add_url_error.clone()}</div>
                         </div>
                         <div><Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn></div>
