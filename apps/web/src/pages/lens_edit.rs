@@ -173,20 +173,18 @@ impl Component for CreateLensPage {
                                             node.set_value("");
                                             add_lens_source(&api, &new_source, &identifier, link)
                                                 .await;
+                                        } else if let Some(error_msg) = response.validation_msg {
+                                            link.send_message_batch(vec![
+                                                Msg::Processing(None),
+                                                Msg::AddUrlError(error_msg),
+                                            ])
                                         } else {
-                                            if let Some(error_msg) = response.validation_msg {
-                                                link.send_message_batch(vec![
-                                                    Msg::Processing(None),
-                                                    Msg::AddUrlError(error_msg),
-                                                ])
-                                            } else {
-                                                link.send_message_batch(vec![
-                                                    Msg::Processing(None),
-                                                    Msg::AddUrlError(
-                                                        "Unknown error adding url".to_string(),
-                                                    ),
-                                                ])
-                                            }
+                                            link.send_message_batch(vec![
+                                                Msg::Processing(None),
+                                                Msg::AddUrlError(
+                                                    "Unknown error adding url".to_string(),
+                                                ),
+                                            ])
                                         }
                                     }
                                     Err(error) => {
