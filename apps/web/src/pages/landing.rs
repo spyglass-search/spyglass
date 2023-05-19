@@ -1,5 +1,5 @@
+use ui_components::btn::{Btn, BtnSize, BtnType};
 use yew::prelude::*;
-use ui_components::btn::{Btn, BtnType, BtnSize};
 
 #[function_component(LandingPage)]
 pub fn landing_page() -> Html {

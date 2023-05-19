@@ -15,7 +15,7 @@ mod components;
 mod metrics;
 mod pages;
 use components::nav::NavBar;
-use pages::{lens_edit::CreateLensPage, AppPage, landing::LandingPage};
+use pages::{landing::LandingPage, lens_edit::CreateLensPage, AppPage};
 
 use crate::{client::ApiClient, pages::search::SearchPage};
 
