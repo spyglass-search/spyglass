@@ -35,8 +35,6 @@ use uuid::Uuid;
 use notify_debouncer_mini::{DebouncedEvent, DebouncedEventKind, Debouncer};
 
 use crate::documents;
-
-pub mod audio;
 pub mod utils;
 
 /// The lens name for indexed files

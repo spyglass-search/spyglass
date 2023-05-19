@@ -4,6 +4,7 @@ use std::{ffi::OsStr, path::Path};
 
 use crate::utils;
 
+pub mod audio;
 pub mod docx_parser;
 pub mod pdf_parser;
 pub mod xlsx_parser;

@@ -37,7 +37,6 @@ percent-encoding = "2.2"
 regex = "1"
 reqwest = { version = "0.11", features = ["stream", "json"] }
 ron = "0.8"
-rubato = "0.12.0"
 sentry = "0.31.0"
 sentry-tracing = "0.31.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -45,7 +44,6 @@ serde_json = "1.0"
 sha2 = "0.10"
 strum = "0.24"
 strum_macros = "0.24"
-symphonia = { version = "0.5.2", features = ["aac", "isomp4", "mp3", "mpa"] }
 tantivy = "0.19"
 tendril = "0.4.2"
 thiserror = "1.0.37"
@@ -62,7 +60,6 @@ warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"
 wasmer-wasi = "2.3.0"
-whisper-rs = { git = "https://github.com/tazz4843/whisper-rs", rev = "0859b41191dcbf176f9924eb82854262c3417b42" }
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dafb599bb24f505ce96d975e922bfadba6e2d1ff" }
