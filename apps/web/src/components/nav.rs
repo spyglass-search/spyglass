@@ -131,10 +131,8 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                 } else { html! {} }}
             </div>
             <div class="text-white hidden sm:block w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
-                <div class="mb-6">
-                    <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
-                        {"Spyglass"}
-                    </div>
+                <a href="/" class="cursor-pointer"><img src="/icons/logo@2x.png" class="w-12 h-12 mx-auto" /></a>
+                <div class="my-6">
                     {if auth_status.is_authenticated {
                         if let Some(profile) = auth_status.user_profile {
                             html! {
