@@ -216,7 +216,7 @@ pub enum LensAddDocType {
     /// Token is used to download the document from GDrive.
     GDrive { token: String },
     /// Normal, web accessible URL.
-    WebUrl,
+    WebUrl { include_all_suburls: bool },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -245,6 +245,15 @@ pub struct GetLensSourceResponse {
     pub num_items: usize,
     pub num_pages: usize,
     pub results: Vec<LensSource>,
+}
+
+#[derive(Deserialize)]
+pub struct SourceValidationResponse {
+    pub url: String,
+    pub url_count: u64,
+    pub has_sitemap: Option<bool>,
+    pub is_valid: bool,
+    pub validation_msg: Option<String>,
 }
 
 #[derive(Error, Debug)]
@@ -362,6 +371,39 @@ impl ApiClient {
                 }
             }
             None => Ok(()),
+        }
+    }
+
+    pub async fn validate_lens_source(
+        &self,
+        lens: &str,
+        request: &LensAddDocument,
+    ) -> Result<SourceValidationResponse, ApiError> {
+        match &self.token {
+            Some(token) => {
+                let resp = self
+                    .client
+                    .post(format!(
+                        "{}/user/lenses/{}/validate/source",
+                        self.endpoint, lens
+                    ))
+                    .bearer_auth(token)
+                    .json(request)
+                    .send()
+                    .await?;
+
+                match resp.error_for_status_ref() {
+                    Ok(_) => match resp.json::<SourceValidationResponse>().await {
+                        Ok(response) => Ok(response),
+                        Err(msg) => Err(ApiError::Other(msg.to_string())),
+                    },
+                    Err(err) => match resp.json::<ApiErrorMessage>().await {
+                        Ok(msg) => Err(ApiError::ClientError(msg)),
+                        Err(_) => Err(ApiError::RequestError(err)),
+                    },
+                }
+            }
+            None => Err(ApiError::Unauthorized),
         }
     }
 

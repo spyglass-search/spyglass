@@ -10,13 +10,14 @@ use wasm_bindgen::{
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
+use yew::html::Scope;
 use yew::prelude::*;
 use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
     client::{
-        ApiError, GetLensSourceResponse, Lens, LensAddDocType, LensAddDocument, LensDocType,
-        LensSource,
+        ApiClient, ApiError, GetLensSourceResponse, Lens, LensAddDocType, LensAddDocument,
+        LensDocType, LensSource,
     },
     AuthStatus,
 };
@@ -55,6 +56,7 @@ pub struct CreateLensPage {
 
     pub auth_status: AuthStatus,
     pub add_url_error: Option<String>,
+    pub processing_action: Option<Action>,
     pub _context_listener: ContextHandle<AuthStatus>,
     pub _query_debounce: Option<JsValue>,
     pub _name_input_ref: NodeRef,
@@ -68,9 +70,16 @@ pub struct CreateLensProps {
     pub onupdate: Callback<()>,
 }
 
+pub enum Action {
+    AddSingleUrl,
+    AddAllUrls,
+}
+
 pub enum Msg {
-    AddUrl,
+    AddUrl { include_all: bool },
     AddUrlError(String),
+    ClearUrlError,
+    Processing(Option<Action>),
     FilePicked { token: String, url: String },
     Reload,
     ReloadSources(usize),
@@ -106,6 +115,7 @@ impl Component for CreateLensPage {
             is_loading_lens_sources: false,
             auth_status,
             add_url_error: None,
+            processing_action: None,
             _context_listener: context_listener,
             _query_debounce: None,
             _name_input_ref: NodeRef::default(),
@@ -135,40 +145,81 @@ impl Component for CreateLensPage {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::AddUrl => {
+            Msg::AddUrl { include_all } => {
                 if let Some(node) = self._url_input_ref.cast::<HtmlInputElement>() {
                     let url = node.value();
-                    node.set_value("");
 
-                    let new_source = LensAddDocument {
-                        url,
-                        doc_type: LensAddDocType::WebUrl,
-                    };
+                    if let Err(_err) = url::Url::parse(&url) {
+                        link.send_message(Msg::AddUrlError("Invalid Url".to_string()));
+                    } else {
+                        let new_source = LensAddDocument {
+                            url,
+                            doc_type: LensAddDocType::WebUrl {
+                                include_all_suburls: include_all,
+                            },
+                        };
+                        // Add to lens
+                        let auth_status = self.auth_status.clone();
+                        let identifier = self.lens_identifier.clone();
+                        let link = link.clone();
 
-                    // Add to lens
-                    let auth_status = self.auth_status.clone();
-                    let identifier = self.lens_identifier.clone();
-                    let link = link.clone();
-                    spawn_local(async move {
-                        let api = auth_status.get_client();
-                        if let Err(err) = api.lens_add_source(&identifier, &new_source).await {
-                            log::error!("error adding url source: {err}");
-                            match err {
-                                ApiError::ClientError(msg) => {
-                                    link.send_message(Msg::AddUrlError(msg.message))
+                        if include_all {
+                            spawn_local(async move {
+                                link.send_message(Msg::Processing(Some(Action::AddAllUrls)));
+                                let api = auth_status.get_client();
+                                match api.validate_lens_source(&identifier, &new_source).await {
+                                    Ok(response) => {
+                                        if response.is_valid {
+                                            node.set_value("");
+                                            add_lens_source(&api, &new_source, &identifier, link)
+                                                .await;
+                                        } else if let Some(error_msg) = response.validation_msg {
+                                            link.send_message_batch(vec![
+                                                Msg::Processing(None),
+                                                Msg::AddUrlError(error_msg),
+                                            ])
+                                        } else {
+                                            link.send_message_batch(vec![
+                                                Msg::Processing(None),
+                                                Msg::AddUrlError(
+                                                    "Unknown error adding url".to_string(),
+                                                ),
+                                            ])
+                                        }
+                                    }
+                                    Err(error) => {
+                                        log::error!("Unknown error adding url {:?}", error);
+                                        link.send_message_batch(vec![
+                                            Msg::Processing(None),
+                                            Msg::AddUrlError(
+                                                "Unknown error adding url".to_string(),
+                                            ),
+                                        ])
+                                    }
                                 }
-                                _ => link.send_message(Msg::AddUrlError(err.to_string())),
-                            };
+                            })
                         } else {
-                            // Reload data if successful
-                            link.send_message(Msg::Reload);
+                            node.set_value("");
+                            spawn_local(async move {
+                                link.send_message(Msg::Processing(Some(Action::AddSingleUrl)));
+                                let api = auth_status.get_client();
+                                add_lens_source(&api, &new_source, &identifier, link).await;
+                            });
                         }
-                    });
+                    }
                 }
                 true
             }
             Msg::AddUrlError(msg) => {
                 self.add_url_error = Some(msg);
+                true
+            }
+            Msg::ClearUrlError => {
+                self.add_url_error = None;
+                true
+            }
+            Msg::Processing(action) => {
+                self.processing_action = action;
                 true
             }
             Msg::FilePicked { token, url } => {
@@ -331,6 +382,48 @@ impl Component for CreateLensPage {
             .map(|x| html! { <LensSourceComponent source={x.clone()} /> })
             .collect::<Html>();
 
+        let add_url_actions = if let Some(action) = &self.processing_action {
+            match action {
+                Action::AddAllUrls => {
+                    html! {
+                        <>
+                        <Btn disabled=true>{"Add data from URL"}</Btn>
+                        <Btn disabled=true>
+                          <icons::RefreshIcon
+                            classes="mr-1"
+                            width="w-3"
+                            height="h-3"
+                            animate_spin=true/>
+                            {"Add all URLs from Site"}
+                        </Btn>
+                        </>
+                    }
+                }
+                Action::AddSingleUrl => {
+                    html! {
+                        <>
+                        <Btn disabled=true>
+                          <icons::RefreshIcon
+                            classes="mr-1"
+                            width="w-3"
+                            height="h-3"
+                            animate_spin=true/>
+                          {"Add data from URL"}
+                        </Btn>
+                        <Btn disabled=true>{"Add all URLs from Site"}</Btn>
+                        </>
+                    }
+                }
+            }
+        } else {
+            html! {
+                <>
+                <Btn onclick={link.callback(|_| Msg::AddUrl {include_all: false})}>{"Add data from URL"}</Btn>
+                <Btn onclick={link.callback(|_| Msg::AddUrl {include_all: true} )}>{"Add all URLs from Site"}</Btn>
+                </>
+            }
+        };
+
         let is_loading_sources = self.is_loading_lens_sources;
         html! {
             <div>
@@ -363,7 +456,7 @@ impl Component for CreateLensPage {
                                 class="rounded p-2 text-sm text-neutral-800"
                                 placeholder="https://example.com"
                             />
-                            <Btn onclick={link.callback(|_| Msg::AddUrl)}>{"Add data from URL"}</Btn>
+                            {add_url_actions}
                             <div class="text-sm text-red-700">{self.add_url_error.clone()}</div>
                         </div>
                         <div><Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn></div>
@@ -450,5 +543,33 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
                 {status_icon}
             </div>
         </div>
+    }
+}
+
+async fn add_lens_source(
+    api: &ApiClient,
+    new_source: &LensAddDocument,
+    identifier: &str,
+    link: Scope<CreateLensPage>,
+) {
+    if let Err(err) = api.lens_add_source(identifier, new_source).await {
+        log::error!("error adding url source: {err}");
+        match err {
+            ApiError::ClientError(msg) => {
+                link.send_message_batch(vec![Msg::Processing(None), Msg::AddUrlError(msg.message)])
+            }
+            _ => link.send_message_batch(vec![
+                Msg::Processing(None),
+                Msg::AddUrlError(err.to_string()),
+            ]),
+        };
+    } else {
+        link.send_message(Msg::ClearUrlError);
+        // Reload data if successful
+        link.send_message_batch(vec![
+            Msg::Processing(None),
+            Msg::ClearUrlError,
+            Msg::ReloadSources(0),
+        ]);
     }
 }
