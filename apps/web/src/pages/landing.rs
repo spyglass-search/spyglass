@@ -40,7 +40,7 @@ pub fn landing_page() -> Html {
                     </div>
                 </div>
                 <div class="grid grid-rows-3 gap-4 px-8 md:px-16 align-top md:grid-cols-3">
-                    <a href="/lens/atp-fm" class="block border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
+                    <a href="/lens/atp-podcast" class="block border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
                         <div class="pb-2">{"💻 ATP: Accidental Tech Podcast"}</div>
                         <div class="text-sm text-neutral-400">
                             {"Search through the last 100 episodes of a podcast discussing tech, Apple, and programming."}
@@ -51,7 +51,7 @@ pub fn landing_page() -> Html {
                         </div>
                     </a>
 
-                    <a href="/lens/time-ferris" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
+                    <a href="/lens/tim-ferris" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
                         <div class="pb-2">{"🎙️ The Tim Ferriss Show"}</div>
                         <div class="text-sm text-neutral-400">
                             {"Ask Tim Ferriss anything! Tim Ferriss is an American entrepreneur, investor, author, podcaster, and lifestyle guru."}
