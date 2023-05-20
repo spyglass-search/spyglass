@@ -512,6 +512,9 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     let source = props.source.clone();
 
     let doc_type_icon = match source.doc_type {
+        LensDocType::Audio => html! {
+            <icons::FileExtIcon ext={"mp3"} class="h-4 w-4" />
+        },
         LensDocType::GDrive => html! { <icons::GDrive /> },
         LensDocType::Web => html! {
             <div class="flex flex-col items-center">

@@ -213,6 +213,7 @@ pub struct UserData {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum LensAddDocType {
+    Audio,
     /// Token is used to download the document from GDrive.
     GDrive { token: String },
     /// Normal, web accessible URL.
@@ -227,6 +228,7 @@ pub struct LensAddDocument {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum LensDocType {
+    Audio,
     GDrive,
     Web,
 }
