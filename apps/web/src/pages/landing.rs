@@ -40,7 +40,7 @@ pub fn landing_page() -> Html {
                     </div>
                 </div>
                 <div class="grid grid-rows-3 gap-4 px-8 md:px-16 align-top md:grid-cols-3">
-                    <a href="/lens/atp-podcast" class="block border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
+                    <a href="/lens/atp-podcast" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer hidden">
                         <div class="pb-2">{"💻 ATP: Accidental Tech Podcast"}</div>
                         <div class="text-sm text-neutral-400">
                             {"Search through the last 100 episodes of a podcast discussing tech, Apple, and programming."}
@@ -48,6 +48,18 @@ pub fn landing_page() -> Html {
                         <div class="pt-4 text-xs">
                             <span class="text-neutral-400">{"source: "}</span>
                             <span class="underline text-cyan-500">{"atp.fm"}</span>
+                        </div>
+                    </a>
+
+                    <a href="/lens/dnd" class="block border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
+                        <div class="pb-2">{"⚔️🐉 Dungeons & Dragons"}</div>
+                        <div class="text-sm text-neutral-400">
+                            {"Unsure about a rule? Search and ask questions about D&D 5E items, rules, monsters, and more."}
+                        </div>
+                        <div class="pt-4 text-xs">
+                            <span class="text-neutral-400">{"source: "}</span>
+                            <span class="underline text-cyan-500 mr-2">{"dndbeyond.fm"}</span>
+                            <span class="underline text-cyan-500">{"roll20.net"}</span>
                         </div>
                     </a>
 
