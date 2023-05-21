@@ -237,6 +237,7 @@ pub struct LensSource {
     pub doc_type: LensDocType,
     pub url: String,
     pub status: String,
+    pub doc_uuid: String,
 }
 
 #[derive(Deserialize)]
@@ -371,6 +372,32 @@ impl ApiClient {
                 }
             }
             None => Ok(()),
+        }
+    }
+
+    /// Deletes the specified lens source from the specified lens
+    pub async fn delete_lens_source(&self, lens: &str, source_uuid: &str) -> Result<(), ApiError> {
+        match &self.token {
+            Some(token) => {
+                let resp = self
+                    .client
+                    .delete(format!(
+                        "{}/user/lenses/{}/source/{}",
+                        self.endpoint, lens, source_uuid
+                    ))
+                    .bearer_auth(token)
+                    .send()
+                    .await?;
+
+                match resp.error_for_status_ref() {
+                    Ok(_) => Ok(()),
+                    Err(err) => match resp.json::<ApiErrorMessage>().await {
+                        Ok(msg) => Err(ApiError::ClientError(msg)),
+                        Err(_) => Err(ApiError::RequestError(err)),
+                    },
+                }
+            }
+            None => Err(ApiError::Unauthorized),
         }
     }
 

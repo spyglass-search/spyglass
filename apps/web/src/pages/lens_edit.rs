@@ -80,6 +80,7 @@ pub enum Msg {
     AddUrlError(String),
     ClearUrlError,
     Processing(Option<Action>),
+    DeleteLensSource(LensSource),
     FilePicked { token: String, url: String },
     Reload,
     ReloadSources(usize),
@@ -221,6 +222,29 @@ impl Component for CreateLensPage {
             Msg::Processing(action) => {
                 self.processing_action = action;
                 true
+            }
+            Msg::DeleteLensSource(source) => {
+                // Add to lens
+                let auth_status = self.auth_status.clone();
+                let identifier = self.lens_identifier.clone();
+                let link = link.clone();
+                let page = self
+                    .lens_source_paginator
+                    .as_ref()
+                    .map(|x| x.page)
+                    .unwrap_or(0);
+                spawn_local(async move {
+                    link.send_message(Msg::Processing(Some(Action::AddAllUrls)));
+                    let api = auth_status.get_client();
+                    if let Err(error) = api.delete_lens_source(&identifier, &source.doc_uuid).await
+                    {
+                        log::error!("error deleting lens source: {error}");
+                    } else {
+                        // Reload data if successful
+                        link.send_message(Msg::ReloadSources(page));
+                    }
+                });
+                false
             }
             Msg::FilePicked { token, url } => {
                 let new_source = LensAddDocument {
@@ -377,9 +401,13 @@ impl Component for CreateLensPage {
 
         let sources = self.lens_sources.as_ref().cloned().unwrap_or_default();
 
+        let delete_callback = {
+            let link = link.clone();
+            Callback::from(move |lens_source| link.send_message(Msg::DeleteLensSource(lens_source)))
+        };
         let source_html = sources
             .iter()
-            .map(|x| html! { <LensSourceComponent source={x.clone()} /> })
+            .map(|x| html! { <LensSourceComponent delete_callback={delete_callback.clone()} source={x.clone()} /> })
             .collect::<Html>();
 
         let add_url_actions = if let Some(action) = &self.processing_action {
@@ -505,11 +533,13 @@ impl Component for CreateLensPage {
 #[derive(Properties, PartialEq)]
 struct LensSourceComponentProps {
     source: LensSource,
+    delete_callback: Callback<LensSource>,
 }
 
 #[function_component(LensSourceComponent)]
 fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     let source = props.source.clone();
+    let callback = props.delete_callback.clone();
 
     let doc_type_icon = match source.doc_type {
         LensDocType::GDrive => html! { <icons::GDrive /> },
@@ -526,6 +556,11 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
         _ => html! { <icons::RefreshIcon animate_spin={true} /> },
     };
 
+    let delete = {
+        let source = source.clone();
+        Callback::from(move |_e: MouseEvent| callback.emit(source.clone()))
+    };
+
     html! {
         <div class="py-4 flex flex-row items-center gap-2">
             <div class="flex-none px-2">
@@ -537,11 +572,15 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
                         {source.display_name.clone()}
                     </a>
                 </div>
-                <div class="text-sm text-neutral-600">{source.url.clone()}</div>
+                <div class="text-sm ml-1 text-neutral-600">{source.url.clone()}</div>
             </div>
-            <div class="flex-none text-base ml-auto pr-4">
+            <div class="flex px-2 space-x-2 flex-row items-center text-base ml-auto">
                 {status_icon}
+                <Btn size={BtnSize::Xs} onclick={delete}>
+                  <icons::TrashIcon classes={classes!("text-neutral-400")} height="h-4" width="h-4" />
+                </Btn>
             </div>
+
         </div>
     }
 }
