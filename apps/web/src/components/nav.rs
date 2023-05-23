@@ -151,7 +151,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                         }
                     } else {
                         html! {
-                            <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_login} classes="w-full hidden">
+                            <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_login} classes="w-full">
                                 {"Sign In"}
                             </Btn>
                         }

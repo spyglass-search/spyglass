@@ -230,7 +230,9 @@ impl Component for App {
             let link = link.clone();
             let uuid = self.session_uuid.clone();
             move |routes: Route| match &routes {
-                Route::Start => html! { <AppPage><LandingPage /></AppPage> },
+                Route::Start => {
+                    html! { <AppPage><LandingPage session_uuid={uuid.clone()} /></AppPage> }
+                }
                 Route::Edit { lens } => html! {
                     <AppPage>
                         <CreateLensPage lens={lens.clone()} onupdate={link.callback(|_| Msg::LoadLenses)} />
