@@ -52,7 +52,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     </Btn>
                     <div class="pt-2 text-sm">
                         {"Already have an account?"}
-                        <a class="text-cyan-500 ml-2 font-semibold" onclick={auth_login}>
+                        <a class="text-cyan-500 ml-2 font-semibold cursor-pointer" onclick={auth_login}>
                             {"Sign in"}
                         </a>
                     </div>
