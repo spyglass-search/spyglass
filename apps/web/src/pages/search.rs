@@ -670,7 +670,7 @@ fn faq_component(props: &FAQComponentProps) -> Html {
         .collect::<Html>();
 
     html! {
-        <div>
+        <div class="col-span-2 mx-auto pt-4">
             <div class="text-xl text-white">{"Example Questions"}</div>
             <div class="text-neutral-500 text-base">
                 {"Not sure where to start? Try one of these questions"}
