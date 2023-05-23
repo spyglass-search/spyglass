@@ -671,7 +671,7 @@ fn faq_component(props: &FAQComponentProps) -> Html {
 
     html! {
         <div>
-            <div class="text-xl text-white">{"Frequently Asked Questions"}</div>
+            <div class="text-xl text-white">{"Example Questions"}</div>
             <div class="text-neutral-500 text-base">
                 {"Not sure where to start? Try one of these questions"}
             </div>
