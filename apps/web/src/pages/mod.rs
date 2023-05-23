@@ -13,7 +13,7 @@ pub struct AppPageProps {
 #[function_component]
 pub fn AppPage(props: &AppPageProps) -> Html {
     html! {
-        <div class="flex-col flex-1">
+        <div class="flex-col flex-1 min-h-screen">
             {props.children.clone()}
         </div>
     }

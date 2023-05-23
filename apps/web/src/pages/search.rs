@@ -354,7 +354,21 @@ impl Component for SearchPage {
     fn view(&self, ctx: &yew::Context<Self>) -> yew::Html {
         let link = ctx.link();
         if let Some(lens) = self.lens_data.clone() {
-            self.render_search(link, &lens)
+            html! {
+                <>
+                    {self.render_search(link, &lens)}
+                    <div class="sticky top-[100vh] mx-auto w-fit text-center pb-4">
+                        <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
+                            <img src="/icons/logo@2x.png" class="w-8" />
+                            <div class="ml-2 text-left">
+                                <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
+                                <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
+                            </div>
+                        </a>
+                        <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
+                    </div>
+                </>
+            }
         } else {
             html! {}
         }
@@ -390,7 +404,7 @@ impl SearchPage {
             .collect::<Vec<Html>>();
 
         html! {
-            <div ref={self.search_wrapper_ref.clone()} class="relative min-h-screen">
+            <div ref={self.search_wrapper_ref.clone()}>
                 <div class="py-6 px-8 flex flex-row">
                     <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
                     {if cfg!(debug_assertions) {
@@ -670,8 +684,8 @@ fn faq_component(props: &FAQComponentProps) -> Html {
         .collect::<Html>();
 
     html! {
-        <div>
-            <div class="text-xl text-white">{"Frequently Asked Questions"}</div>
+        <div class="col-span-2 mx-auto pt-4">
+            <div class="text-xl text-white">{"Example Questions"}</div>
             <div class="text-neutral-500 text-base">
                 {"Not sure where to start? Try one of these questions"}
             </div>

@@ -185,11 +185,6 @@ impl Component for App {
                         if let Ok(user_data) = api.get_user_data().await {
                             link.send_message(Msg::UpdateUserData(user_data));
                         }
-                    } else {
-                        log::info!("loading public data");
-                        if let Ok(user_data) = api.get_user_data().await {
-                            link.send_message(Msg::UpdateUserData(user_data));
-                        }
                     }
                 });
                 false
@@ -230,7 +225,9 @@ impl Component for App {
             let link = link.clone();
             let uuid = self.session_uuid.clone();
             move |routes: Route| match &routes {
-                Route::Start => html! { <AppPage><LandingPage /></AppPage> },
+                Route::Start => {
+                    html! { <AppPage><LandingPage session_uuid={uuid.clone()} /></AppPage> }
+                }
                 Route::Edit { lens } => html! {
                     <AppPage>
                         <CreateLensPage lens={lens.clone()} onupdate={link.callback(|_| Msg::LoadLenses)} />

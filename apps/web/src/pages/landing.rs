@@ -1,14 +1,36 @@
 use ui_components::btn::{Btn, BtnSize, BtnType};
-use yew::prelude::*;
+use yew::{platform::spawn_local, prelude::*};
+
+use crate::{
+    auth0_login,
+    metrics::{Metrics, WebClientEvent},
+};
+
+#[derive(Properties, PartialEq)]
+pub struct LandingPageProps {
+    pub session_uuid: String,
+}
 
 #[function_component(LandingPage)]
-pub fn landing_page() -> Html {
+pub fn landing_page(props: &LandingPageProps) -> Html {
+    let metrics = Metrics::new(false);
+    let uuid = props.session_uuid.clone();
+    let auth_login = Callback::from(move |e: MouseEvent| {
+        e.prevent_default();
+        let metrics = metrics.clone();
+        let uuid = uuid.clone();
+        spawn_local(async move {
+            metrics.track(WebClientEvent::Login, &uuid).await;
+            let _ = auth0_login().await;
+        });
+    });
+
     html! {
         <>
             <div class="p-16 text-center">
                 <h1 class="text-4xl md:text-6xl font-serif px-8">
                     {"Conversational search for your "}
-                    <span class="text-cyan-500">{"content"}</span>
+                    <span class="text-cyan-500">{"community"}</span>
                     {"."}
                 </h1>
                 <div class="text-neutral-400 text-xl">
@@ -28,6 +50,12 @@ pub fn landing_page() -> Html {
                     >
                         {"Join our waitlist"}
                     </Btn>
+                    <div class="pt-2 text-sm">
+                        {"Already have an account?"}
+                        <a class="text-cyan-500 ml-2 font-semibold cursor-pointer" onclick={auth_login}>
+                            {"Sign in"}
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="pt-8">
