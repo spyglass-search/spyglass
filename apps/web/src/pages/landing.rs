@@ -68,7 +68,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     </div>
                 </div>
                 <div class="grid grid-rows-3 gap-4 px-8 md:px-16 align-top md:grid-cols-3">
-                    <a href="/lens/atp-podcast" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer hidden">
+                    <a href="/lens/atp-podcast" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
                         <div class="pb-2">{"💻 ATP: Accidental Tech Podcast"}</div>
                         <div class="text-sm text-neutral-400">
                             {"Search through the last 100 episodes of a podcast discussing tech, Apple, and programming."}
