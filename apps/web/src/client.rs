@@ -463,13 +463,15 @@ impl ApiClient {
     pub async fn get_user_data(&self) -> Result<UserData, ApiError> {
         match &self.token {
             Some(token) => {
-                let request = self.client.get(format!("{}/user/lenses", self.endpoint))
+                let request = self
+                    .client
+                    .get(format!("{}/user/lenses", self.endpoint))
                     .bearer_auth(token)
                     .send()
                     .await?
                     .error_for_status()?
                     .json::<Vec<Lens>>()
-                        .await;
+                    .await;
 
                 let lenses = match request {
                     Ok(lenses) => lenses,
@@ -480,7 +482,7 @@ impl ApiClient {
                 };
 
                 Ok(UserData { lenses })
-            },
+            }
             None => {
                 log::error!("User is not logged in");
                 Ok(UserData { lenses: Vec::new() })
