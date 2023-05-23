@@ -461,26 +461,30 @@ impl ApiClient {
     }
 
     pub async fn get_user_data(&self) -> Result<UserData, ApiError> {
-        let mut request = self.client.get(format!("{}/user/lenses", self.endpoint));
-        if let Some(auth_token) = &self.token {
-            request = request.bearer_auth(auth_token);
-        }
+        match &self.token {
+            Some(token) => {
+                let request = self.client.get(format!("{}/user/lenses", self.endpoint))
+                    .bearer_auth(token)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json::<Vec<Lens>>()
+                        .await;
 
-        let lenses = request
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<Vec<Lens>>()
-            .await;
+                let lenses = match request {
+                    Ok(lenses) => lenses,
+                    Err(err) => {
+                        log::error!("Unable to get lenses: {}", err.to_string());
+                        Vec::new()
+                    }
+                };
 
-        let lenses = match lenses {
-            Ok(lenses) => lenses,
-            Err(err) => {
-                log::error!("Unable to get lenses: {}", err.to_string());
-                Vec::new()
+                Ok(UserData { lenses })
+            },
+            None => {
+                log::error!("User is not logged in");
+                Ok(UserData { lenses: Vec::new() })
             }
-        };
-
-        Ok(UserData { lenses })
+        }
     }
 }

@@ -30,7 +30,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
             <div class="p-16 text-center">
                 <h1 class="text-4xl md:text-6xl font-serif px-8">
                     {"Conversational search for your "}
-                    <span class="text-cyan-500">{"content"}</span>
+                    <span class="text-cyan-500">{"community"}</span>
                     {"."}
                 </h1>
                 <div class="text-neutral-400 text-xl">

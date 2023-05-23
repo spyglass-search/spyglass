@@ -124,7 +124,11 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                                 />
                             }
                         } else {
-                            html! {}
+                            html! {
+                                <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_login.clone()} classes="w-full">
+                                    {"Sign In"}
+                                </Btn>
+                            }
                         }}
                         </div>
                     }
@@ -168,7 +172,11 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                                 <span>{"Create Lens"}</span>
                             </Btn>
                         }
-                    } else { html! {} }}
+                    } else {
+                        html! {
+                            <div class="text-neutral-400 text-xs">{"Please login to see your lenses"}</div>
+                        }
+                    }}
                     {if let Some(user_data) = &user_data {
                         html!{
                             <LensList

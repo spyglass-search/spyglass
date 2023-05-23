@@ -185,11 +185,6 @@ impl Component for App {
                         if let Ok(user_data) = api.get_user_data().await {
                             link.send_message(Msg::UpdateUserData(user_data));
                         }
-                    } else {
-                        log::info!("loading public data");
-                        if let Ok(user_data) = api.get_user_data().await {
-                            link.send_message(Msg::UpdateUserData(user_data));
-                        }
                     }
                 });
                 false
