@@ -68,53 +68,66 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     </div>
                 </div>
                 <div class="grid grid-rows-3 gap-4 px-8 md:px-16 align-top md:grid-cols-3">
-                    <a href="/lens/atp-podcast" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
-                        <div class="pb-2">{"💻 ATP: Accidental Tech Podcast"}</div>
-                        <div class="text-sm text-neutral-400">
-                            {"Search through the last 100 episodes of a podcast discussing tech, Apple, and programming."}
-                        </div>
-                        <div class="pt-4 text-xs">
-                            <span class="text-neutral-400">{"source: "}</span>
-                            <span class="underline text-cyan-500">{"atp.fm"}</span>
-                        </div>
-                    </a>
+                    <PublicExample
+                        href="/lens/atp-podcast"
+                        name="💻 ATP: Accidental Tech Podcast"
+                        description="Search through the last 100 episodes of a podcast discussing tech, Apple, and programming."
+                        sources={vec!["atp.fm".into()]}
+                    />
 
-                    <a href="/lens/dnd" class="block border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
-                        <div class="pb-2">{"⚔️🐉 Dungeons & Dragons"}</div>
-                        <div class="text-sm text-neutral-400">
-                            {"Unsure about a rule? Search and ask questions about D&D 5E items, rules, monsters, and more."}
-                        </div>
-                        <div class="pt-4 text-xs">
-                            <span class="text-neutral-400">{"source: "}</span>
-                            <span class="underline text-cyan-500 mr-2">{"dndbeyond.fm"}</span>
-                            <span class="underline text-cyan-500">{"roll20.net"}</span>
-                        </div>
-                    </a>
+                    <PublicExample
+                        href="/lens/dnd"
+                        name="⚔️🐉 Dungeons & Dragons"
+                        description="Unsure about a rule? Search and ask questions about D&D 5E items, rules, monsters, and more."
+                        sources={vec!["dndbeyond.fm".into(),"roll20.net".into()]}
+                    />
 
-                    <a href="/lens/tim-ferris" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
-                        <div class="pb-2">{"🎙️ The Tim Ferriss Show"}</div>
-                        <div class="text-sm text-neutral-400">
-                            {"Ask Tim Ferriss anything! Tim Ferriss is an American entrepreneur, investor, author, podcaster, and lifestyle guru."}
-                        </div>
-                        <div class="pt-4 text-xs">
-                            <span class="text-neutral-400">{"source: "}</span>
-                            <span class="underline text-cyan-500">{"tim.blog"}</span>
-                        </div>
-                    </a>
+                    <PublicExample
+                        href="/lens/tim-ferris"
+                        name="🎙️ The Tim Ferriss Show"
+                        description="Ask Tim Ferriss anything! Tim Ferriss is an American entrepreneur, investor, author, podcaster, and lifestyle guru."
+                        sources={vec!["tim.blog".into()]}
+                    />
 
-                    <a href="/lens/wine-folly" class="border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer">
-                        <div class="pb-2">{"🍷 Wine Folly"}</div>
-                        <div class="text-sm text-neutral-400">
-                            {"Want to learn more about wine? Search through the Wine Folly guides and
-                            ask questions about your favorite wines."}
-                        </div>
-                        <div class="pt-4 text-xs">
-                            <span class="text-neutral-400">{"source: "}</span>
-                            <span class="underline text-cyan-500">{"winefolly.com"}</span>
-                        </div>
-                    </a>
+                    <PublicExample
+                        href="/lens/wine-folly"
+                        name="🍷 Wine Folly"
+                        description="Want to learn more about wine? Search through the Wine Folly guides and ask questions about your favorite wines."
+                        sources={vec!["winefolly.com".into()]}
+                    />
                 </div>
             </div>
         </>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct PublicExampleProps {
+    href: String,
+    name: String,
+    description: String,
+    sources: Vec<String>,
+}
+
+#[function_component(PublicExample)]
+fn pub_example(props: &PublicExampleProps) -> Html {
+    let sources = props.sources.iter()
+        .map(|source| html! {
+            <span class="ml-2 underline text-cyan-500">{source}</span>
+        })
+        .collect::<Html>();
+
+    html! {
+        <a
+            href={props.href.clone()}
+            class="flex flex-col justify-between border border-neutral-600 p-4 rounded-md hover:border-cyan-500 cursor-pointer"
+        >
+            <div class="pb-2">{props.name.clone()}</div>
+            <div class="text-sm text-neutral-400">{props.description.clone()}</div>
+            <div class="pt-4 text-xs mt-auto">
+                <span class="text-neutral-400">{"source:"}</span>
+                {sources}
+            </div>
+        </a>
     }
 }
