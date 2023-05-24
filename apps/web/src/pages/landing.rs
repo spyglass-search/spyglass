@@ -37,10 +37,8 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     {"AI-powered "}
                     <span class="text-white font-bold">{"search"}</span>
                     {" and "}
-                    <span class="text-white font-bold">{"answers."}</span>
-                    {" Across"}
-                    <span class="text-white font-bold">{" all "}</span>
-                    {"your content"}
+                    <span class="text-white font-bold">{"chat."}</span>
+                    {" Across all your content"}
                 </div>
                 <div class="mt-8 text-center w-fit mx-auto">
                     <Btn href="https://airtable.com/shrEW2xhITj3zf7sw"
@@ -61,10 +59,10 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
             <div class="pt-8">
                 <div class="text-center pb-4 px-8">
                     <h1 class="text-4xl font-serif px-8">
-                        {"Try it out on our public datasets"}
+                        {"Try it out!"}
                     </h1>
                     <div class="text-neutral-400 text-xl">
-                        {"Search, ask questions, and explore new topics in a completely new way."}
+                        {"Search, ask questions, and explore our featured communities."}
                     </div>
                 </div>
                 <div class="grid grid-rows-3 gap-4 px-8 md:px-16 align-top md:grid-cols-3">
