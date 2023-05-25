@@ -109,9 +109,13 @@ struct PublicExampleProps {
 
 #[function_component(PublicExample)]
 fn pub_example(props: &PublicExampleProps) -> Html {
-    let sources = props.sources.iter()
-        .map(|source| html! {
-            <span class="ml-2 underline text-cyan-500">{source}</span>
+    let sources = props
+        .sources
+        .iter()
+        .map(|source| {
+            html! {
+                <span class="ml-2 underline text-cyan-500">{source}</span>
+            }
         })
         .collect::<Html>();
 
