@@ -15,7 +15,7 @@ mod components;
 mod metrics;
 mod pages;
 use components::nav::NavBar;
-use pages::{dashboard::Dashboard, landing::LandingPage, lens_edit::CreateLensPage, AppPage};
+use pages::{dashboard::Dashboard, landing::LandingPage, lens_editor::CreateLensPage, AppPage};
 
 use crate::{client::ApiClient, pages::search::SearchPage};
 
@@ -244,7 +244,7 @@ impl Component for App {
                 }
                 Route::Edit { lens } => html! {
                     <AppPage>
-                        <CreateLensPage lens={lens.clone()} onupdate={link.callback(|_| Msg::LoadLenses)} />
+                        <CreateLensPage lens={lens.clone()} />
                     </AppPage>
                 },
                 Route::Search { lens } => {

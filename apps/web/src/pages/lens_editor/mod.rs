@@ -22,6 +22,9 @@ use crate::{
     AuthStatus,
 };
 
+mod add_source;
+use add_source::AddSourceComponent;
+
 const QUERY_DEBOUNCE_MS: u32 = 1_000;
 
 #[wasm_bindgen(module = "/public/gapi.js")]
@@ -66,8 +69,6 @@ pub struct CreateLensPage {
 #[derive(Properties, PartialEq)]
 pub struct CreateLensProps {
     pub lens: String,
-    #[prop_or_default]
-    pub onupdate: Callback<()>,
 }
 
 pub enum Action {
@@ -318,12 +319,10 @@ impl Component for CreateLensPage {
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
                 let link = link.clone();
-                let onupdate_callback = ctx.props().onupdate.clone();
                 spawn_local(async move {
                     let api = auth_status.get_client();
                     if api.lens_update(&identifier, &display_name).await.is_ok() {
                         link.send_message(Msg::Reload);
-                        onupdate_callback.emit(());
                     }
                 });
                 false
@@ -410,49 +409,6 @@ impl Component for CreateLensPage {
             .map(|x| html! { <LensSourceComponent delete_callback={delete_callback.clone()} source={x.clone()} /> })
             .collect::<Html>();
 
-        let add_url_actions = if let Some(action) = &self.processing_action {
-            match action {
-                Action::AddAllUrls => {
-                    html! {
-                        <>
-                        <Btn disabled=true>{"Add data from URL"}</Btn>
-                        <Btn disabled=true>
-                          <icons::RefreshIcon
-                            classes="mr-1"
-                            width="w-3"
-                            height="h-3"
-                            animate_spin=true/>
-                            {"Add all URLs from Site"}
-                        </Btn>
-                        </>
-                    }
-                }
-                Action::AddSingleUrl => {
-                    html! {
-                        <>
-                        <Btn disabled=true>
-                          <icons::RefreshIcon
-                            classes="mr-1"
-                            width="w-3"
-                            height="h-3"
-                            animate_spin=true/>
-                          {"Add data from URL"}
-                        </Btn>
-                        <Btn disabled=true>{"Add all URLs from Site"}</Btn>
-                        </>
-                    }
-                }
-            }
-        } else {
-            html! {
-                <>
-                <Btn onclick={link.callback(|_| Msg::AddUrl {include_all: false})}>{"Add data from URL"}</Btn>
-                <Btn onclick={link.callback(|_| Msg::AddUrl {include_all: true} )}>{"Add all URLs from Site"}</Btn>
-                </>
-            }
-        };
-
-        let is_loading_sources = self.is_loading_lens_sources;
         html! {
             <div>
                 <div class="flex flex-row items-center px-8 pt-6">
@@ -471,47 +427,34 @@ impl Component for CreateLensPage {
                         }
                     } else {
                         html! {
-                            <h2 class="bold text-xl ">{"Loading"}</h2>
+                            <h2 class="bold text-xl ">{"Loading..."}</h2>
                         }
                     }}
                     </div>
                 </div>
                 <div class="flex flex-col gap-8 px-8 py-4">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-row gap-4 items-center">
-                            <input ref={self._url_input_ref.clone()}
-                                type="text"
-                                class="rounded p-2 text-sm text-neutral-800"
-                                placeholder="https://example.com"
-                            />
-                            {add_url_actions}
-                            <div class="text-sm text-red-700">{self.add_url_error.clone()}</div>
-                        </div>
-                        <div><Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)}>{"Add data from Google Drive"}</Btn></div>
-                    </div>
+                    <AddSourceComponent />
                     {if let Some(paginator) = self.lens_source_paginator.clone() {
                         html! {
                             <div class="flex flex-col">
-                                <div class="flex flex-row mb-2 text-sm font-semibold uppercase text-cyan-500">
-                                    <div>{format!("Sources ({})", paginator.num_items)}</div>
-                                    <div class="ml-auto">
-                                        <Btn size={BtnSize::Sm} onclick={link.callback(move |_| Msg::ReloadSources(paginator.page))}>
-                                            <icons::RefreshIcon
-                                                classes="mr-1"
-                                                width="w-3"
-                                                height="h-3"
-                                                animate_spin={is_loading_sources}
-                                            />
-                                            {"Refresh"}
-                                        </Btn>
-                                    </div>
+                                <div class="flex flex-row items-center justify-between border-b border-neutral-700 pb-2">
+                                    <div class="font-bold">{format!("Sources ({})", paginator.num_items)}</div>
+                                    <Btn size={BtnSize::Sm} onclick={link.callback(move |_| Msg::ReloadSources(paginator.page))}>
+                                        <icons::RefreshIcon
+                                            classes="mr-1"
+                                            width="w-3"
+                                            height="h-3"
+                                            animate_spin={self.is_loading_lens_sources}
+                                        />
+                                        {"Refresh"}
+                                    </Btn>
                                 </div>
                                 <div class="flex flex-col">{source_html}</div>
                                 {if paginator.num_pages > 1 {
                                     html! {
                                         <div>
                                             <Paginator
-                                                disabled={is_loading_sources}
+                                                disabled={self.is_loading_lens_sources}
                                                 cur_page={paginator.page}
                                                 num_pages={paginator.num_pages}
                                                 on_select_page={link.callback(Msg::ReloadSources)}
@@ -529,6 +472,7 @@ impl Component for CreateLensPage {
         }
     }
 }
+
 
 #[derive(Properties, PartialEq)]
 struct LensSourceComponentProps {

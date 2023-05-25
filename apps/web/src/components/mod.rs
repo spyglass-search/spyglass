@@ -1,5 +1,5 @@
 use ui_components::{
-    btn::{Btn, BtnSize, BtnType},
+    btn::{Btn, BtnSize},
     icons,
 };
 use yew::prelude::*;
