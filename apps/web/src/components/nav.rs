@@ -1,4 +1,5 @@
 use ui_components::btn::{Btn, BtnSize, BtnType};
+use ui_components::icons;
 use yew::{platform::spawn_local, prelude::*};
 
 use crate::metrics::{Metrics, WebClientEvent};
@@ -82,7 +83,12 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                         <div class="w-full block flex-grow lg:flex lg:items-center lg:w-auto pt-4">
                         {if auth_status.is_authenticated {
                             html! {
-                                <a href="/">{"Home"}</a>
+                                <div>
+                                    <a href="/" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                                        <icons::HomeIcon />
+                                        <span>{"Home"}</span>
+                                    </a>
+                                </div>
                             }
                         } else {
                             html! {
@@ -97,7 +103,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
             </div>
             <div class="text-white hidden sm:block w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
                 <a href="/" class="cursor-pointer"><img src="/icons/logo@2x.png" class="w-12 h-12 mx-auto" /></a>
-                <div class="my-6">
+                <div>
                     {if auth_status.is_authenticated {
                         if let Some(profile) = auth_status.user_profile {
                             html! {
@@ -122,7 +128,14 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                         }
                     }}
                 </div>
-                <div class="mb-6">
+                <hr class="border border-neutral-700 mt-6 mb-4" />
+                <div>
+                    <a href="/" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                        <icons::HomeIcon />
+                        <span>{"Home"}</span>
+                    </a>
+                </div>
+                <div class="mt-4">
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"My Q&As"}
                     </div>
