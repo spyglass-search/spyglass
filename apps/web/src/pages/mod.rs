@@ -1,5 +1,6 @@
 use yew::prelude::*;
 
+pub mod dashboard;
 pub mod landing;
 pub mod lens_edit;
 pub mod search;

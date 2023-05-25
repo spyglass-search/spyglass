@@ -11,7 +11,6 @@ pub mod nav;
 
 #[derive(Properties, PartialEq)]
 pub struct LensListProps {
-    pub current: Option<String>,
     pub lenses: Option<Vec<Lens>>,
     #[prop_or_default]
     pub on_select: Callback<Lens>,
@@ -40,18 +39,10 @@ pub fn lens_list(props: &LensListProps) -> Html {
         props.class.clone(),
     );
 
-    let current_lens = props.current.clone().unwrap_or_default();
     let mut html = Vec::new();
     let lenses = props.lenses.clone();
     for lens in lenses.unwrap_or_default() {
-        let classes = classes!(
-            default_classes.clone(),
-            if current_lens == lens.name {
-                Some("bg-cyan-800")
-            } else {
-                None
-            }
-        );
+        let classes = classes!(default_classes.clone(),);
 
         let onclick = {
             let navi = navigator.clone();
@@ -90,22 +81,23 @@ pub fn lens_list(props: &LensListProps) -> Html {
             html! {}
         } else {
             html! {
-                <Btn size={BtnSize::Sm} _type={BtnType::Borderless} classes="ml-auto rounded" onclick={on_edit}>
+                <Btn size={BtnSize::Sm} classes="rounded" onclick={on_edit}>
                     <icons::PencilIcon height="h-3" width="w-3" />
+                    <span>{"Edit"}</span>
                 </Btn>
             }
         };
 
         html.push(html! {
-            <li class="mb-1 flex flex-row items-center">
+            <li class="flex flex-row items-center justify-between gap-4">
                 <a class={classes.clone()} {onclick}>
                     {icon}
-                    <div class="truncate text-ellipsis">{lens.display_name.clone()}</div>
-                    {edit_icon}
+                    <div class="truncate text-ellipsis text-lg">{lens.display_name.clone()}</div>
                 </a>
+                {edit_icon}
             </li>
         });
     }
 
-    html! { <ul>{html}</ul> }
+    html! { <ul class="flex flex-col gap-2">{html}</ul> }
 }

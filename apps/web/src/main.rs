@@ -15,7 +15,7 @@ mod components;
 mod metrics;
 mod pages;
 use components::nav::NavBar;
-use pages::{landing::LandingPage, lens_edit::CreateLensPage, AppPage};
+use pages::{dashboard::Dashboard, landing::LandingPage, lens_edit::CreateLensPage, AppPage};
 
 use crate::{client::ApiClient, pages::search::SearchPage};
 
@@ -224,9 +224,23 @@ impl Component for App {
         let switch = {
             let link = link.clone();
             let uuid = self.session_uuid.clone();
+            let is_authenticated = self.auth_status.is_authenticated;
             move |routes: Route| match &routes {
                 Route::Start => {
-                    html! { <AppPage><LandingPage session_uuid={uuid.clone()} /></AppPage> }
+                    if is_authenticated {
+                        html! {
+                            <AppPage>
+                                <Dashboard
+                                    session_uuid={uuid.clone()}
+                                    on_create_lens={handle_on_create_lens.clone()}
+                                    on_select_lens={link.callback(Msg::SetSelectedLens)}
+                                    on_edit_lens={link.callback(Msg::SetSelectedLens)}
+                                />
+                            </AppPage>
+                        }
+                    } else {
+                        html! { <AppPage><LandingPage session_uuid={uuid.clone()} /></AppPage> }
+                    }
                 }
                 Route::Edit { lens } => html! {
                     <AppPage>
@@ -255,10 +269,6 @@ impl Component for App {
                         <NavBar
                             current_lens={self.current_lens.clone()}
                             session_uuid={self.session_uuid.clone()}
-                            // Reload lenses after a new one is created.
-                            on_create_lens={handle_on_create_lens.clone()}
-                            on_select_lens={link.callback(Msg::SetSelectedLens)}
-                            on_edit_lens={link.callback(Msg::SetSelectedLens)}
                         />
                         <Switch<Route> render={switch} />
                     </div>
