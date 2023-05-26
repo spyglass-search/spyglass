@@ -40,7 +40,9 @@ pub struct CreateLensPage {
 
     pub lens_sources: Option<Vec<LensSource>>,
     pub lens_source_paginator: Option<LensSourcePaginator>,
+
     pub is_loading_lens_sources: bool,
+    pub is_saving_name: bool,
 
     pub auth_status: AuthStatus,
     pub add_url_error: Option<String>,
@@ -60,6 +62,7 @@ pub enum Msg {
     Reload,
     ReloadSources(usize),
     Save { display_name: String },
+    SaveDone,
     SetError(String),
     SetLensData(Lens),
     SetLensSources(GetLensSourceResponse),
@@ -86,6 +89,7 @@ impl Component for CreateLensPage {
             lens_data: None,
             lens_sources: None,
             lens_source_paginator: None,
+            is_saving_name: false,
             is_loading_lens_sources: false,
             auth_status,
             add_url_error: None,
@@ -192,16 +196,26 @@ impl Component for CreateLensPage {
                 true
             }
             Msg::Save { display_name } => {
-                let auth_status = self.auth_status.clone();
-                let identifier = self.lens_identifier.clone();
-                let link = link.clone();
-                spawn_local(async move {
-                    let api = auth_status.get_client();
-                    if api.lens_update(&identifier, &display_name).await.is_ok() {
-                        link.send_message(Msg::Reload);
-                    }
-                });
-                false
+                if let Some(lens_data) = &mut self.lens_data {
+                    let auth_status = self.auth_status.clone();
+                    let identifier = self.lens_identifier.clone();
+                    let link = link.clone();
+                    self.is_saving_name = true;
+                    lens_data.display_name = display_name.clone();
+                    spawn_local(async move {
+                        let api = auth_status.get_client();
+                        if api.lens_update(&identifier, &display_name).await.is_ok() {
+                            link.send_message(Msg::SaveDone);
+                        } else {
+                            link.send_message(Msg::Reload);
+                        }
+                    });
+                }
+                true
+            }
+            Msg::SaveDone => {
+                self.is_saving_name = false;
+                true
             }
             Msg::SetError(err) => {
                 self.error_msg = Some(err);
@@ -281,15 +295,29 @@ impl Component for CreateLensPage {
                 <div>
                 {if let Some(lens_data) = self.lens_data.as_ref() {
                     html! {
-                        <input
-                            class="border-b-4 border-neutral-600 pt-3 pb-1 bg-neutral-800 text-white text-2xl outline-none active:outline-none focus:outline-none caret-white"
-                            type="text"
-                            spellcheck="false"
-                            tabindex="-1"
-                            value={lens_data.display_name.to_string()}
-                            oninput={link.callback(|_| Msg::UpdateDisplayName)}
-                            ref={self._name_input_ref.clone()}
-                        />
+                        <div class="flex flex-row items-center">
+                            <input
+                                class="border-b-4 border-neutral-600 pt-3 pb-1 bg-neutral-800 text-white text-2xl outline-none active:outline-none focus:outline-none caret-white"
+                                type="text"
+                                spellcheck="false"
+                                tabindex="-1"
+                                value={lens_data.display_name.to_string()}
+                                oninput={link.callback(|_| Msg::UpdateDisplayName)}
+                                ref={self._name_input_ref.clone()}
+                            />
+                            {if self.is_saving_name {
+                                html! {
+                                    <icons::RefreshIcon
+                                        classes={"ml-2 text-cyan-500"}
+                                        width="w-6"
+                                        height="h-6"
+                                        animate_spin={true}
+                                    />
+                                }
+                            } else {
+                                html! {}
+                            }}
+                        </div>
                     }
                 } else {
                     html! {
