@@ -1,6 +1,6 @@
 use gloo::timers::callback::Timeout;
 use ui_components::{
-    btn::{Btn, BtnSize},
+    btn::{Btn, BtnSize, BtnType},
     icons,
     results::Paginator,
 };
@@ -332,6 +332,7 @@ struct LensSourceComponentProps {
 fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     let source = props.source.clone();
     let callback = props.on_delete.clone();
+    let is_deleting = use_state_eq(|| false);
 
     let doc_type_icon = match source.doc_type {
         LensDocType::Audio => html! {
@@ -346,9 +347,13 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
         _ => html! { <icons::RefreshIcon animate_spin={true} /> },
     };
 
-    let delete: Callback<MouseEvent> = {
+    let on_delete: Callback<MouseEvent> = {
         let source = source.clone();
-        Callback::from(move |_e: MouseEvent| callback.emit(source.clone()))
+        let is_deleting = is_deleting.clone();
+        Callback::from(move |_e: MouseEvent| {
+            is_deleting.set(true);
+            callback.emit(source.clone());
+        })
     };
 
     let cell_styles = classes!(
@@ -373,8 +378,14 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
             </td>
             <td class={cell_styles.clone()}>{status_icon}</td>
             <td class={cell_styles}>
-                <Btn size={BtnSize::Xs} onclick={delete}>
-                  <icons::TrashIcon classes={classes!("text-neutral-400")} height="h-4" width="h-4" />
+                <Btn size={BtnSize::Xs} onclick={on_delete} _type={BtnType::Danger} disabled={*is_deleting}>
+                    {if *is_deleting {
+                        html! {<icons::RefreshIcon height="h-4" width="h-4" animate_spin={true} />}
+                    } else {
+                        html! {
+                            <icons::TrashIcon height="h-4" width="h-4" />
+                        }
+                    }}
                 </Btn>
             </td>
         </tr>

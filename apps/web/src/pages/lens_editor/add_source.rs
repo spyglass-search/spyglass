@@ -144,7 +144,7 @@ impl Component for AddSourceComponent {
             }
             Msg::EmitUpdate => {
                 props.on_update.emit(());
-                false
+                true
             }
             Msg::FilePicked { token, url } => {
                 let new_source = LensAddDocument {
