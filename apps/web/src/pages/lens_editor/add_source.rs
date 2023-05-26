@@ -6,7 +6,7 @@ use web_sys::HtmlInputElement;
 use yew::{html::Scope, platform::spawn_local, prelude::*};
 
 use crate::{
-    client::{ApiClient, ApiError, LensAddDocType, LensAddDocument},
+    client::{ApiError, LensAddDocType, LensAddDocument},
     AuthStatus,
 };
 
@@ -30,13 +30,16 @@ pub struct AddSourceComponent {
     auth_status: AuthStatus,
     selected_tab: AddSourceTabs,
     _context_listener: ContextHandle<AuthStatus>,
+    _feed_input_ref: NodeRef,
     _url_input_ref: NodeRef,
     _url_crawl_ref: NodeRef,
 }
 
 pub enum Msg {
     AddUrl,
+    AddFeed,
     ChangeToTab(AddSourceTabs),
+    EmitError(String),
     EmitUpdate,
     FilePicked { token: String, url: String },
     OpenCloudFilePicker,
@@ -69,6 +72,7 @@ impl Component for AddSourceComponent {
             auth_status,
             selected_tab: AddSourceTabs::Website,
             _context_listener: context_listener,
+            _feed_input_ref: NodeRef::default(),
             _url_input_ref: NodeRef::default(),
             _url_crawl_ref: NodeRef::default(),
         }
@@ -79,19 +83,37 @@ impl Component for AddSourceComponent {
         let props = ctx.props();
 
         match msg {
+            Msg::AddFeed => {
+                if let Some(feed_input) = self._feed_input_ref.cast::<HtmlInputElement>() {
+                    let url = feed_input.value();
+                    let url = match url::Url::parse(&url) {
+                        Ok(url) => url,
+                        Err(_) => {
+                            link.send_message(Msg::EmitError("Invalid URL".into()));
+                            return false;
+                        }
+                    };
+
+                    let source = LensAddDocument {
+                        url: url.to_string(),
+                        doc_type: LensAddDocType::RssFeed,
+                    };
+                    self.add_source(&props.lens_identifier, source, link, false);
+                }
+                false
+            }
             Msg::AddUrl => {
                 if let (Some(url_input), Some(crawl_checkbox)) = (
                     self._url_input_ref.cast::<HtmlInputElement>(),
                     self._url_crawl_ref.cast::<HtmlInputElement>(),
                 ) {
-
                     let url = url_input.value();
                     let is_crawl = crawl_checkbox.checked();
 
                     let url = match url::Url::parse(&url) {
                         Ok(url) => url,
                         Err(_) => {
-                            props.on_error.emit("Invalid URL".to_string());
+                            link.send_message(Msg::EmitError("Invalid URL".into()));
                             return false;
                         }
                     };
@@ -103,38 +125,8 @@ impl Component for AddSourceComponent {
                         },
                     };
 
-                    // Add to lens
-                    let auth_status = self.auth_status.clone();
-                    let identifier = props.lens_identifier.clone();
                     let link = link.clone();
-
-                    let on_error = props.on_error.clone();
-                    spawn_local(async move {
-                        let api = auth_status.get_client();
-                        match api.validate_lens_source(&identifier, &new_source).await {
-                            Ok(response) => {
-                                if response.is_valid {
-                                    node.set_value("");
-                                    add_lens_source(
-                                        &api,
-                                        &new_source,
-                                        &identifier,
-                                        link,
-                                        on_error,
-                                    )
-                                    .await;
-                                } else if let Some(error_msg) = response.validation_msg {
-                                    on_error.emit(error_msg);
-                                } else {
-                                    on_error.emit("Unknown error adding url".to_string());
-                                }
-                            }
-                            Err(error) => {
-                                log::error!("Unknown error adding url {:?}", error);
-                                on_error.emit("Unknown error adding url".to_string());
-                            }
-                        }
-                    });
+                    self.add_source(&props.lens_identifier, new_source, &link, true);
                 }
 
                 true
@@ -142,6 +134,10 @@ impl Component for AddSourceComponent {
             Msg::ChangeToTab(new_tab) => {
                 self.selected_tab = new_tab;
                 true
+            }
+            Msg::EmitError(msg) => {
+                props.on_error.emit(msg);
+                false
             }
             Msg::EmitUpdate => {
                 props.on_update.emit(());
@@ -153,18 +149,8 @@ impl Component for AddSourceComponent {
                     doc_type: LensAddDocType::GDrive { token },
                 };
 
-                // Add to lens
-                let auth_status = self.auth_status.clone();
-                let identifier = props.lens_identifier.clone();
                 let link = link.clone();
-                spawn_local(async move {
-                    let api = auth_status.get_client();
-                    if let Err(err) = api.lens_add_source(&identifier, &new_source).await {
-                        log::error!("error adding gdrive source: {err}");
-                    } else {
-                        link.send_message(Msg::EmitUpdate);
-                    }
-                });
+                self.add_source(&props.lens_identifier, new_source, &link, false);
                 true
             }
             Msg::OpenCloudFilePicker => {
@@ -265,7 +251,7 @@ impl AddSourceComponent {
                             {"Add all pages"}
                         </label>
                     </div>
-                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={link.callback(|_| Msg::AddUrl {include_all: false})}>
+                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={link.callback(|_| Msg::AddUrl)}>
                         {"Fetch"}
                     </Btn>
                 </div>
@@ -281,12 +267,12 @@ impl AddSourceComponent {
                 </div>
                 <div class="flex flex-row gap-4 items-center">
                     <input
-                        ref={self._url_input_ref.clone()}
+                        ref={self._feed_input_ref.clone()}
                         type="text"
                         class="rounded p-2 text-sm text-neutral-800 flex-grow"
                         placeholder="https://example.com/feed.rss"
                     />
-                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={link.callback(|_| Msg::AddUrl {include_all: false})}>
+                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={link.callback(|_| Msg::AddFeed)}>
                         {"Add Podcast"}
                     </Btn>
                 </div>
@@ -303,22 +289,51 @@ impl AddSourceComponent {
             </div>
         }
     }
-}
 
-async fn add_lens_source(
-    api: &ApiClient,
-    new_source: &LensAddDocument,
-    identifier: &str,
-    link: Scope<AddSourceComponent>,
-    on_error: Callback<String>,
-) {
-    if let Err(err) = api.lens_add_source(identifier, new_source).await {
-        log::error!("error adding url source: {err}");
-        match err {
-            ApiError::ClientError(msg) => on_error.emit(msg.message),
-            _ => on_error.emit(err.to_string()),
-        };
-    } else {
-        link.send_message(Msg::EmitUpdate);
+    fn add_source(
+        &self,
+        lens: &str,
+        source: LensAddDocument,
+        link: &Scope<AddSourceComponent>,
+        validate: bool,
+    ) {
+        let auth_status = self.auth_status.clone();
+        let link: Scope<AddSourceComponent> = link.clone();
+        let lens = lens.to_string();
+        spawn_local(async move {
+            let api = auth_status.get_client();
+
+            let is_valid = if validate {
+                match api.validate_lens_source(&lens, &source).await {
+                    Ok(response) => {
+                        if response.is_valid {
+                            true
+                        } else {
+                            let error_msg = response
+                                .validation_msg
+                                .unwrap_or("Unknown error adding URL".to_string());
+                            link.send_message(Msg::EmitError(error_msg));
+                            false
+                        }
+                    }
+                    Err(error) => {
+                        link.send_message(Msg::EmitError(error.to_string()));
+                        false
+                    }
+                }
+            } else {
+                true
+            };
+
+            if is_valid {
+                match api.lens_add_source(&lens, &source).await {
+                    Ok(_) => link.send_message(Msg::EmitUpdate),
+                    Err(ApiError::ClientError(msg)) => {
+                        link.send_message(Msg::EmitError(msg.message))
+                    }
+                    Err(err) => link.send_message(Msg::EmitError(err.to_string())),
+                }
+            }
+        });
     }
 }

@@ -218,6 +218,7 @@ pub enum LensAddDocType {
     GDrive {
         token: String,
     },
+    RssFeed,
     /// Normal, web accessible URL.
     WebUrl {
         include_all_suburls: bool,
