@@ -28,7 +28,6 @@ pub enum AddSourceTabs {
 
 pub struct AddSourceComponent {
     auth_status: AuthStatus,
-    error_msg: Option<String>,
     selected_tab: AddSourceTabs,
     _context_listener: ContextHandle<AuthStatus>,
     _url_input_ref: NodeRef,
@@ -40,7 +39,6 @@ pub enum Msg {
     ChangeToTab(AddSourceTabs),
     EmitUpdate,
     FilePicked { token: String, url: String },
-    SetError(String),
     OpenCloudFilePicker,
     UpdateContext(AuthStatus),
 }
@@ -48,6 +46,8 @@ pub enum Msg {
 #[derive(Properties, PartialEq)]
 pub struct AddSourceComponentProps {
     pub lens_identifier: String,
+    #[prop_or_default]
+    pub on_error: Callback<String>,
     #[prop_or_default]
     pub on_update: Callback<()>,
 }
@@ -67,7 +67,6 @@ impl Component for AddSourceComponent {
 
         Self {
             auth_status,
-            error_msg: None,
             selected_tab: AddSourceTabs::Website,
             _context_listener: context_listener,
             _url_input_ref: NodeRef::default(),
@@ -85,7 +84,7 @@ impl Component for AddSourceComponent {
                     let url = node.value();
 
                     if let Err(_err) = url::Url::parse(&url) {
-                        link.send_message(Msg::SetError("Invalid Url".to_string()));
+                        props.on_error.emit("Invalid URL".to_string());
                     } else {
                         let new_source = LensAddDocument {
                             url,
@@ -99,35 +98,40 @@ impl Component for AddSourceComponent {
                         let link = link.clone();
 
                         if include_all {
+                            let on_error = props.on_error.clone();
                             spawn_local(async move {
                                 let api = auth_status.get_client();
                                 match api.validate_lens_source(&identifier, &new_source).await {
                                     Ok(response) => {
                                         if response.is_valid {
                                             node.set_value("");
-                                            add_lens_source(&api, &new_source, &identifier, link)
-                                                .await;
+                                            add_lens_source(
+                                                &api,
+                                                &new_source,
+                                                &identifier,
+                                                link,
+                                                on_error,
+                                            )
+                                            .await;
                                         } else if let Some(error_msg) = response.validation_msg {
-                                            link.send_message(Msg::SetError(error_msg));
+                                            on_error.emit(error_msg);
                                         } else {
-                                            link.send_message(Msg::SetError(
-                                                "Unknown error adding url".to_string(),
-                                            ));
+                                            on_error.emit("Unknown error adding url".to_string());
                                         }
                                     }
                                     Err(error) => {
                                         log::error!("Unknown error adding url {:?}", error);
-                                        link.send_message(Msg::SetError(
-                                            "Unknown error adding url".to_string(),
-                                        ));
+                                        on_error.emit("Unknown error adding url".to_string());
                                     }
                                 }
                             })
                         } else {
                             node.set_value("");
+                            let on_error = props.on_error.clone();
                             spawn_local(async move {
                                 let api = auth_status.get_client();
-                                add_lens_source(&api, &new_source, &identifier, link).await;
+                                add_lens_source(&api, &new_source, &identifier, link, on_error)
+                                    .await;
                             });
                         }
                     }
@@ -185,7 +189,6 @@ impl Component for AddSourceComponent {
                 self.auth_status = auth_status;
                 true
             }
-            _ => false,
         }
     }
 
@@ -221,13 +224,6 @@ impl Component for AddSourceComponent {
 
         html! {
             <div class="flex flex-col gap-4">
-                {if let Some(msg) = &self.error_msg {
-                    html! {
-                        <div class="bg-red-300 border border-red-700 text-red-700 rounded-lg text-sm p-2 font-bold">
-                            {msg}
-                        </div>
-                    }
-                } else { html! {} }}
                 <div>
                     <ul class="text-sm flex flex-row gap-8 w-full border-b-2 border-neutral-700 mb-4">
                         {tabs}
@@ -313,12 +309,13 @@ async fn add_lens_source(
     new_source: &LensAddDocument,
     identifier: &str,
     link: Scope<AddSourceComponent>,
+    on_error: Callback<String>,
 ) {
     if let Err(err) = api.lens_add_source(identifier, new_source).await {
         log::error!("error adding url source: {err}");
         match err {
-            ApiError::ClientError(msg) => link.send_message(Msg::SetError(msg.message)),
-            _ => link.send_message(Msg::SetError(err.to_string())),
+            ApiError::ClientError(msg) => on_error.emit(msg.message),
+            _ => on_error.emit(err.to_string()),
         };
     } else {
         link.send_message(Msg::EmitUpdate);
