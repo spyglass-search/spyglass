@@ -160,7 +160,10 @@ impl Component for CreateLensPage {
                 spawn_local(async move {
                     let api = auth_status.get_client();
                     match api.lens_retrieve(&identifier).await {
-                        Ok(lens) => link.send_message(Msg::SetLensData(lens)),
+                        Ok(lens) => link.send_message_batch(vec![
+                            Msg::SetLensData(lens),
+                            Msg::ReloadCurrentSources,
+                        ]),
                         Err(ApiError::ClientError(msg)) => {
                             // Unauthorized
                             if msg.code == 400 {
@@ -355,6 +358,7 @@ impl Component for CreateLensPage {
                 <div class="mt-4">
                     <AddSourceComponent
                         on_error={link.callback(Msg::SetError)}
+                        on_update={link.callback(|_| Msg::Reload)}
                         lens_identifier={self.lens_identifier.clone()}
                     />
                 </div>
@@ -399,6 +403,7 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
 
     let status_icon = match source.status.as_ref() {
         "Deployed" => html! { <icons::BadgeCheckIcon classes="fill-green-500" /> },
+        // todo: show error message in tooltip?
         "Failed" | "Unknown" => html! { <icons::Warning classes="text-yellow-500" /> },
         _ => html! { <icons::RefreshIcon animate_spin={true} /> },
     };

@@ -105,7 +105,7 @@ impl Component for AddSourceComponent {
                     self.adding_in_progress = true;
                     self.add_source(&props.lens_identifier, source, link, false);
                 }
-                false
+                true
             }
             Msg::AddUrl => {
                 if let (Some(url_input), Some(crawl_checkbox)) = (
