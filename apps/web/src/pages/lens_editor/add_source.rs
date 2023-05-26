@@ -1,6 +1,7 @@
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use ui_components::btn::{Btn, BtnSize, BtnType};
+use ui_components::icons;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::HtmlInputElement;
 use yew::{html::Scope, platform::spawn_local, prelude::*};
@@ -27,6 +28,7 @@ pub enum AddSourceTabs {
 }
 
 pub struct AddSourceComponent {
+    adding_in_progress: bool,
     auth_status: AuthStatus,
     selected_tab: AddSourceTabs,
     _context_listener: ContextHandle<AuthStatus>,
@@ -69,6 +71,7 @@ impl Component for AddSourceComponent {
             .expect("No Message Context Provided");
 
         Self {
+            adding_in_progress: false,
             auth_status,
             selected_tab: AddSourceTabs::Website,
             _context_listener: context_listener,
@@ -98,6 +101,8 @@ impl Component for AddSourceComponent {
                         url: url.to_string(),
                         doc_type: LensAddDocType::RssFeed,
                     };
+
+                    self.adding_in_progress = true;
                     self.add_source(&props.lens_identifier, source, link, false);
                 }
                 false
@@ -126,6 +131,7 @@ impl Component for AddSourceComponent {
                     };
 
                     let link = link.clone();
+                    self.adding_in_progress = true;
                     self.add_source(&props.lens_identifier, new_source, &link, true);
                 }
 
@@ -136,10 +142,12 @@ impl Component for AddSourceComponent {
                 true
             }
             Msg::EmitError(msg) => {
+                self.adding_in_progress = false;
                 props.on_error.emit(msg);
-                false
+                true
             }
             Msg::EmitUpdate => {
+                self.adding_in_progress = false;
                 props.on_update.emit(());
                 true
             }
@@ -150,6 +158,7 @@ impl Component for AddSourceComponent {
                 };
 
                 let link = link.clone();
+                self.adding_in_progress = true;
                 self.add_source(&props.lens_identifier, new_source, &link, false);
                 true
             }
@@ -251,8 +260,23 @@ impl AddSourceComponent {
                             {"Add all pages"}
                         </label>
                     </div>
-                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={link.callback(|_| Msg::AddUrl)}>
-                        {"Fetch"}
+                    <Btn
+                        size={BtnSize::Sm}
+                        _type={BtnType::Primary}
+                        onclick={link.callback(|_| Msg::AddUrl)}
+                        disabled={self.adding_in_progress}
+                    >
+                        {if self.adding_in_progress {
+                            html! {
+                                <icons::RefreshIcon
+                                    width="w-4"
+                                    height="h-4"
+                                    animate_spin={self.adding_in_progress}
+                                />
+                            }
+                        } else {
+                            html! { <div>{"Fetch"}</div> }
+                        }}
                     </Btn>
                 </div>
             </div>
@@ -272,8 +296,22 @@ impl AddSourceComponent {
                         class="rounded p-2 text-sm text-neutral-800 flex-grow"
                         placeholder="https://example.com/feed.rss"
                     />
-                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={link.callback(|_| Msg::AddFeed)}>
-                        {"Add Podcast"}
+                    <Btn
+                        disabled={self.adding_in_progress}
+                        size={BtnSize::Sm}
+                        _type={BtnType::Primary}
+                        onclick={link.callback(|_| Msg::AddFeed)}>
+                        {if self.adding_in_progress {
+                            html! {
+                                <icons::RefreshIcon
+                                    width="w-4"
+                                    height="h-4"
+                                    animate_spin={self.adding_in_progress}
+                                />
+                            }
+                        } else {
+                            html! { <div>{"Add Podcast"}</div> }
+                        }}
                     </Btn>
                 </div>
             </div>
@@ -283,8 +321,23 @@ impl AddSourceComponent {
     fn view_gdrive_tab(&self, link: &Scope<AddSourceComponent>) -> Html {
         html! {
             <div>
-                <Btn onclick={link.callback(|_| Msg::OpenCloudFilePicker)} _type={BtnType::Primary}>
-                    {"Select file from Google Drive"}
+                <Btn
+                    _type={BtnType::Primary}
+                    disabled={self.adding_in_progress}
+                    onclick={link.callback(|_| Msg::OpenCloudFilePicker)}
+                    size={BtnSize::Sm}
+                >
+                    {if self.adding_in_progress {
+                        html! {
+                            <icons::RefreshIcon
+                                width="w-4"
+                                height="h-4"
+                                animate_spin={self.adding_in_progress}
+                            />
+                        }
+                    } else {
+                        html! { <div>{"Select file from Google Drive"}</div> }
+                    }}
                 </Btn>
             </div>
         }
