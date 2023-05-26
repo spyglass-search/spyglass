@@ -1,4 +1,4 @@
-use gloo::timers::callback::Timeout;
+use gloo::timers::callback::{Interval, Timeout};
 use ui_components::{
     btn::{Btn, BtnSize, BtnType},
     icons,
@@ -19,6 +19,7 @@ mod add_source;
 use add_source::AddSourceComponent;
 
 const QUERY_DEBOUNCE_MS: u32 = 1_000;
+const REFRESH_INTERVAL_MS: u32 = 5_000;
 
 #[wasm_bindgen]
 extern "C" {
@@ -46,6 +47,8 @@ pub struct CreateLensPage {
 
     pub auth_status: AuthStatus,
     pub add_url_error: Option<String>,
+
+    pub _refresh_interval: Option<Interval>,
     pub _context_listener: ContextHandle<AuthStatus>,
     pub _query_debounce: Option<JsValue>,
     pub _name_input_ref: NodeRef,
@@ -60,6 +63,7 @@ pub enum Msg {
     ClearError,
     DeleteLensSource(LensSource),
     Reload,
+    ReloadCurrentSources,
     ReloadSources(usize),
     Save { display_name: String },
     SaveDone,
@@ -93,6 +97,7 @@ impl Component for CreateLensPage {
             is_loading_lens_sources: false,
             auth_status,
             add_url_error: None,
+            _refresh_interval: None,
             _context_listener: context_listener,
             _query_debounce: None,
             _name_input_ref: NodeRef::default(),
@@ -171,6 +176,12 @@ impl Component for CreateLensPage {
 
                 false
             }
+            Msg::ReloadCurrentSources => {
+                if let Some(paginator) = &self.lens_source_paginator {
+                    link.send_message(Msg::ReloadSources(paginator.page));
+                }
+                false
+            }
             Msg::ReloadSources(page) => {
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
@@ -232,6 +243,22 @@ impl Component for CreateLensPage {
                     num_items: sources.num_items,
                     num_pages: sources.num_pages,
                 });
+
+                let has_processing = sources
+                    .results
+                    .iter()
+                    .any(|x| x.status == "Processing");
+
+                if has_processing && self._refresh_interval.is_none() {
+                    let link = link.clone();
+                    let interval = Interval::new(REFRESH_INTERVAL_MS, move || {
+                        link.send_message(Msg::ReloadCurrentSources);
+                    });
+
+                    self._refresh_interval = Some(interval);
+                } else if !has_processing {
+                    self._refresh_interval = None;
+                }
 
                 self.lens_sources = Some(sources.results);
                 true
@@ -372,6 +399,7 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
 
     let status_icon = match source.status.as_ref() {
         "Deployed" => html! { <icons::BadgeCheckIcon classes="fill-green-500" /> },
+        "Failed" | "Unknown" => html! { <icons::Warning classes="text-yellow-500" /> },
         _ => html! { <icons::RefreshIcon animate_spin={true} /> },
     };
 
