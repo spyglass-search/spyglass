@@ -130,6 +130,7 @@ pub fn default_button(props: &DefaultBtnProps) -> Html {
         // Handle confirmation for danger buttons
         if btn_type == BtnType::Danger {
             if *confirmed_state {
+                confirmed_state.set(false);
                 prop_onclick.emit(evt);
             } else {
                 confirmed_state.set(true);

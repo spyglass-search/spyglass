@@ -1,7 +1,8 @@
 use yew::prelude::*;
 
+pub mod dashboard;
 pub mod landing;
-pub mod lens_edit;
+pub mod lens_editor;
 pub mod search;
 
 #[derive(Properties, PartialEq)]
