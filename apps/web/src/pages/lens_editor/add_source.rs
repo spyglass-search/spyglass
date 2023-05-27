@@ -148,6 +148,18 @@ impl Component for AddSourceComponent {
             }
             Msg::EmitUpdate => {
                 self.adding_in_progress = false;
+                // Reset form values
+                if let Some(input) = self._url_input_ref.cast::<HtmlInputElement>() {
+                    input.set_value("");
+                }
+                if let Some(input) = self._url_crawl_ref.cast::<HtmlInputElement>() {
+                    input.set_checked(false);
+                }
+
+                if let Some(input) = self._feed_input_ref.cast::<HtmlInputElement>() {
+                    input.set_value("");
+                }
+
                 props.on_update.emit(());
                 true
             }
