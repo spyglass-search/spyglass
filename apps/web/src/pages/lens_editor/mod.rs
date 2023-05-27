@@ -247,10 +247,7 @@ impl Component for CreateLensPage {
                     num_pages: sources.num_pages,
                 });
 
-                let has_processing = sources
-                    .results
-                    .iter()
-                    .any(|x| x.status == "Processing");
+                let has_processing = sources.results.iter().any(|x| x.status == "Processing");
 
                 if has_processing && self._refresh_interval.is_none() {
                     let link = link.clone();
