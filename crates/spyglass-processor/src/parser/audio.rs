@@ -250,6 +250,8 @@ pub fn transcibe_audio(
             res.metadata = Some(audio_file.metadata);
 
             let mut params = FullParams::new(SamplingStrategy::default());
+            // Also transcribe to original language
+            params.set_language(Some("auto"));
             params.set_max_len(segment_len);
             params.set_print_progress(false);
             params.set_token_timestamps(true);
