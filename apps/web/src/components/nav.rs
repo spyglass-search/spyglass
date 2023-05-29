@@ -81,14 +81,16 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                 { if *toggle_nav {
                     html! {
                         <div class="w-full block flex-grow lg:flex lg:items-center lg:w-auto pt-4">
+                            <a href="/" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                                <icons::HomeIcon />
+                                <span>{"Discover"}</span>
+                            </a>
                         {if auth_status.is_authenticated {
                             html! {
-                                <div>
-                                    <a href="/" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
-                                        <icons::HomeIcon />
-                                        <span>{"Home"}</span>
-                                    </a>
-                                </div>
+                                <a href="/" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                                    <icons::HomeIcon />
+                                    <span>{"Home"}</span>
+                                </a>
                             }
                         } else {
                             html! {
@@ -103,7 +105,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
             </div>
             <div class="text-white hidden sm:block w-48 xl:w-64 min-w-max bg-stone-900 p-4 top-0 left-0 z-40 sticky h-screen">
                 <a href="/" class="cursor-pointer"><img src="/icons/logo@2x.png" class="w-12 h-12 mx-auto" /></a>
-                <div>
+                <div class="pt-4">
                     {if auth_status.is_authenticated {
                         if let Some(profile) = auth_status.user_profile {
                             html! {
@@ -129,7 +131,11 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                     }}
                 </div>
                 <hr class="border border-neutral-700 mt-6 mb-4" />
-                <div>
+                <div class="flex flex-col gap-2">
+                    <a href="/discover" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                        <icons::GlobeIcon />
+                        <span>{"Discover"}</span>
+                    </a>
                     <a href="/" class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
                         <icons::HomeIcon />
                         <span>{"Home"}</span>

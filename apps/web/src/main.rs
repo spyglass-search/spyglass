@@ -15,7 +15,10 @@ mod components;
 mod metrics;
 mod pages;
 use components::nav::NavBar;
-use pages::{dashboard::Dashboard, landing::LandingPage, lens_editor::CreateLensPage, AppPage};
+use pages::{
+    dashboard::Dashboard, discover::DiscoverPage, landing::LandingPage,
+    lens_editor::CreateLensPage, AppPage,
+};
 
 use crate::{client::ApiClient, pages::search::SearchPage};
 
@@ -67,6 +70,8 @@ extern "C" {
 pub enum Route {
     #[at("/")]
     Start,
+    #[at("/discover")]
+    Discover,
     #[at("/edit/:lens")]
     Edit { lens: String },
     #[at("/lens/:lens")]
@@ -226,6 +231,7 @@ impl Component for App {
             let uuid = self.session_uuid.clone();
             let is_authenticated = self.auth_status.is_authenticated;
             move |routes: Route| match &routes {
+                Route::Discover => html! { <AppPage><DiscoverPage /></AppPage> },
                 Route::Start => {
                     if is_authenticated {
                         html! {
