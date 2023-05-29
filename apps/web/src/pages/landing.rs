@@ -65,7 +65,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                         {"Search, ask questions, and explore our featured communities."}
                     </div>
                 </div>
-                <div class="grid grid-rows-3 gap-4 px-8 md:px-16 align-top md:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 px-8 md:px-8 md:grid-cols-3">
                     <PublicExample
                         href="/lens/atp-podcast"
                         name="💻 ATP: Accidental Tech Podcast"
@@ -100,15 +100,15 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
 }
 
 #[derive(Properties, PartialEq)]
-struct PublicExampleProps {
-    href: String,
-    name: String,
-    description: String,
-    sources: Vec<String>,
+pub struct PublicExampleProps {
+    pub href: String,
+    pub name: String,
+    pub description: String,
+    pub sources: Vec<String>,
 }
 
 #[function_component(PublicExample)]
-fn pub_example(props: &PublicExampleProps) -> Html {
+pub fn pub_example(props: &PublicExampleProps) -> Html {
     let sources = props
         .sources
         .iter()
