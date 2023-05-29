@@ -29,7 +29,7 @@ pub fn discover_page(_: &DiscoverPageProps) -> Html {
                         {"Request on Twitter"}
                     </Btn>
                     <Btn
-                        href="web+mastodon://share?text=Hey%20@a5huynh%20can%20you%20add%20...%3F"
+                        href="https://mastodon.social/share?text=Hey%20@a5huynh%20can%20you%20add%20...%3F"
                         size={BtnSize::Sm}
                         _type={BtnType::Primary}
                     >
