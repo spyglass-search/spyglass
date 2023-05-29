@@ -59,7 +59,7 @@ pub fn discover_page(_: &DiscoverPageProps) -> Html {
 
                     <PublicExample
                         href="/lens/20minutevc"
-                        name="The 20 Minute VC"
+                        name="⏳ The 20 Minute VC"
                         description="Ask Tim Ferriss anything! Tim Ferriss is an American entrepreneur, investor, author, podcaster, and lifestyle guru."
                         sources={vec!["thetwentyminutevc.com".into()]}
                     />
