@@ -300,6 +300,10 @@ impl Component for SearchPage {
                                     source: HistorySource::Clippy,
                                     value: qna.response.clone(),
                                 });
+
+                                if let Some(doc_details) = &qna.document_details {
+                                    link.send_message(Msg::SetSearchResults(doc_details.clone()))
+                                }
                             }
                             self.current_query = first_question;
                         }

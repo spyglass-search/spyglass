@@ -222,6 +222,8 @@ pub struct QuestionAndAnswer {
     pub response: String,
     pub successful: bool,
     pub created_at: String,
+    pub documents: Vec<String>,
+    pub document_details: Option<Vec<SearchResult>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
