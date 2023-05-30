@@ -1,9 +1,13 @@
 use ui_components::btn::{Btn, BtnSize, BtnType};
 use ui_components::icons;
 use yew::{platform::spawn_local, prelude::*};
+use yew_router::prelude::use_navigator;
 
 use crate::metrics::{Metrics, WebClientEvent};
-use crate::{auth0_login, auth0_logout, AuthStatus};
+use crate::{auth0_login, auth0_logout, AuthStatus, Route};
+
+// Max character length for the chat history title
+const MAX_TITLE_LEN: usize = 20;
 
 #[derive(Properties, PartialEq)]
 pub struct NavBarProps {
@@ -17,6 +21,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
     let toggle_nav = use_state(|| false);
     let metrics = Metrics::new(false);
     let uuid = props.session_uuid.clone();
+    let navigator = use_navigator().unwrap();
 
     let metrics_client = metrics.clone();
     let auth_login = Callback::from(move |e: MouseEvent| {
@@ -68,6 +73,38 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
             toggle_nav_state.set(new_state);
         })
     };
+
+    let mut history_buttons: Vec<Html> = Vec::new();
+    if auth_status.is_authenticated {
+        if let Some(user_data) = &auth_status.user_data {
+            for history in &user_data.history {
+                if history.lenses.len() == 1 && history.qna.len() >= 1 {
+                    let mut title = history.qna.get(0).unwrap().question.clone();
+                    if title.len() > MAX_TITLE_LEN + 3 {
+                        title.truncate(MAX_TITLE_LEN);
+                        title.push_str("...");
+                    }
+                    let lens = history.lenses.get(0).unwrap().clone();
+                    let session_id = history.session_id.clone();
+
+                    let nav = navigator.clone();
+                    let session = session_id.clone();
+                    let onclick = Callback::from(move |_| {
+                        nav.push(&Route::SearchSession {
+                            lens: lens.clone(),
+                            chat_session: session.clone(),
+                        })
+                    });
+                    history_buttons.push(html! {
+                        <button key={session_id} {onclick} class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                            <icons::ChatBubbleLeftRight />
+                            <span>{title}</span>
+                        </button>
+                    });
+                }
+            }
+        }
+    }
 
     html! {
         <>
@@ -145,6 +182,8 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                     <div class="uppercase mb-2 text-xs text-gray-500 font-bold">
                         {"My Q&As"}
                     </div>
+                    {history_buttons}
+
                 </div>
                 <div class="absolute text-xs text-neutral-600 bottom-0 py-4 flex flex-col">
                     <div>
