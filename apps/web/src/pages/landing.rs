@@ -54,8 +54,8 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
     });
 
     html! {
-        <>
-            <div class="p-8 text-center">
+        <div class="flex flex-col gap-8 p-8">
+            <div class="text-center">
                 <h1 class="text-4xl md:text-6xl font-serif px-8">
                     <div>{"Conversational search"}</div>
                     <div>
@@ -87,7 +87,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     </div>
                 </div>
             </div>
-            <div class="flex place-content-center px-8">
+            <div class="flex place-content-center">
                 <iframe
                     class="rounded-lg"
                     width="560"
@@ -102,7 +102,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                 </iframe>
             </div>
             <div class="pt-8">
-                <div class="text-center pb-4 px-8">
+                <div class="text-center pb-4">
                     <h1 class="text-4xl font-serif px-8">
                         {"Try it out!"}
                     </h1>
@@ -110,7 +110,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                         {"Search, ask questions, and explore our featured communities."}
                     </div>
                 </div>
-                <div class="grid grid-cols-1 gap-4 px-8 md:px-8 md:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <PublicExample
                         href="/lens/atp-podcast"
                         name="💻 ATP: Accidental Tech Podcast"
@@ -140,7 +140,10 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     />
                 </div>
             </div>
-        </>
+            <div class="text-center">
+                <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
+            </div>
+        </div>
     }
 }
 
