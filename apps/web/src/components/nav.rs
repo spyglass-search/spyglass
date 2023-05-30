@@ -78,7 +78,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
     if auth_status.is_authenticated {
         if let Some(user_data) = &auth_status.user_data {
             for history in &user_data.history {
-                if history.lenses.len() == 1 && history.qna.len() >= 1 {
+                if history.lenses.len() == 1 && !history.qna.is_empty() {
                     let mut title = history.qna.get(0).unwrap().question.clone();
                     if title.len() > MAX_TITLE_LEN + 3 {
                         title.truncate(MAX_TITLE_LEN);

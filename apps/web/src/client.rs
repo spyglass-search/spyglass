@@ -212,6 +212,7 @@ pub struct ChatHistoryEntry {
     pub qna: Vec<QuestionAndAnswer>,
     pub lenses: Vec<String>,
     pub session_id: String,
+    pub last_updated_at: String,
 }
 
 /// Individual question and answer for a Chat

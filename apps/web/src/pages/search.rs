@@ -47,7 +47,7 @@ pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
     HandleSearch,
     Reload,
-    ReloadSavedSession,
+    ReloadSavedSession(bool),
     SetError(String),
     SetFinished,
     SetLensData(Lens),
@@ -108,7 +108,7 @@ impl Component for SearchPage {
             .expect("No Message Context Provided");
 
         if props.chat_session.is_some() {
-            ctx.link().send_message(Msg::ReloadSavedSession);
+            ctx.link().send_message(Msg::ReloadSavedSession(true));
         } else {
             ctx.link().send_message(Msg::Reload);
         }
@@ -154,7 +154,7 @@ impl Component for SearchPage {
             self.lens_identifier = new_lens;
             if chat_session_set && chat_session_changed {
                 self.chat_uuid = new_chat_session;
-                ctx.link().send_message(Msg::ReloadSavedSession);
+                ctx.link().send_message(Msg::ReloadSavedSession(true));
             } else {
                 ctx.link().send_message(Msg::Reload);
             }
@@ -162,7 +162,7 @@ impl Component for SearchPage {
         } else if chat_session_changed {
             if chat_session_set {
                 self.chat_uuid = new_chat_session;
-                ctx.link().send_message(Msg::ReloadSavedSession);
+                ctx.link().send_message(Msg::ReloadSavedSession(false));
             } else {
                 ctx.link().send_message(Msg::Reload);
             }
@@ -271,10 +271,15 @@ impl Component for SearchPage {
                 }
                 false
             }
-            Msg::ReloadSavedSession => {
+            Msg::ReloadSavedSession(full_reload) => {
                 if self.chat_uuid.is_some() {
                     let chat_uuid = self.chat_uuid.clone().unwrap();
-                    self.reload(link);
+                    if full_reload {
+                        self.reload(link);
+                    } else {
+                        self.reset_search();
+                    }
+
                     self.chat_uuid = Some(chat_uuid.clone());
                     if let Some(data) = &self.auth_status.user_data {
                         if let Some(history) = data
