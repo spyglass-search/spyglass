@@ -27,4 +27,5 @@ serde-wasm-bindgen = "0.5"
 uuid = { version = "1.0.0", features = ["v4"], default-features = false }
 web-sys = { version = "0.3.60", features = ["History", "Navigator", "VisibilityState"] }
 yew = { version = "0.20.0", features = ["csr"] }
+yew-hooks = "0.2"
 yew-router = "0.17"
