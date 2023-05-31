@@ -76,6 +76,8 @@ pub enum Route {
     Edit { lens: String },
     #[at("/lens/:lens")]
     Search { lens: String },
+    #[at("/lens/:lens/c/:chat_session")]
+    SearchSession { lens: String, chat_session: String },
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -84,7 +86,7 @@ pub enum Route {
 pub enum Msg {
     AuthenticateUser,
     CheckAuth,
-    LoadLenses,
+    LoadUserData,
     SetSelectedLens(Lens),
     UpdateAuth(AuthStatus),
     UpdateUserData(UserData),
@@ -162,7 +164,7 @@ impl Component for App {
                     if let Ok(details) = check_login().await {
                         // Not logged in, load lenses
                         if details.is_null() {
-                            link.send_message(Msg::LoadLenses);
+                            link.send_message(Msg::LoadUserData);
                         } else {
                             // Logged in!
                             match serde_wasm_bindgen::from_value::<AuthStatus>(details) {
@@ -172,7 +174,7 @@ impl Component for App {
                                         "Unable to parse user profile: {}",
                                         err.to_string()
                                     );
-                                    link.send_message(Msg::LoadLenses);
+                                    link.send_message(Msg::LoadUserData);
                                 }
                             }
                         }
@@ -180,7 +182,7 @@ impl Component for App {
                 });
                 false
             }
-            Msg::LoadLenses => {
+            Msg::LoadUserData => {
                 let link = link.clone();
                 let auth_status = self.auth_status.clone();
                 spawn_local(async move {
@@ -200,7 +202,7 @@ impl Component for App {
             }
             Msg::UpdateAuth(auth) => {
                 self.auth_status = auth;
-                link.send_message(Msg::LoadLenses);
+                link.send_message(Msg::LoadUserData);
                 true
             }
             Msg::UpdateUserData(user_data) => {
@@ -222,7 +224,7 @@ impl Component for App {
         let handle_on_create_lens = {
             let link = link.clone();
             Callback::from(move |lens| {
-                link.send_message_batch(vec![Msg::LoadLenses, Msg::SetSelectedLens(lens)])
+                link.send_message_batch(vec![Msg::LoadUserData, Msg::SetSelectedLens(lens)])
             })
         };
 
@@ -263,6 +265,25 @@ impl Component for App {
                     };
 
                     html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} /></AppPage> }
+                }
+                Route::SearchSession { lens, chat_session } => {
+                    let decoded_lens = if let Ok(Some(decoded)) =
+                        decode_uri_component(lens).map(|x| x.as_string())
+                    {
+                        decoded
+                    } else {
+                        lens.clone()
+                    };
+
+                    let decoded_chat = if let Ok(Some(decoded)) =
+                        decode_uri_component(chat_session).map(|x| x.as_string())
+                    {
+                        Some(decoded)
+                    } else {
+                        Some(chat_session.clone())
+                    };
+
+                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} chat_session={decoded_chat} /></AppPage> }
                 }
                 Route::NotFound => html! { <div>{"Not Found!"}</div> },
             }

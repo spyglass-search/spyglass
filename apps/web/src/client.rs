@@ -206,9 +206,30 @@ pub struct Lens {
     pub is_public: bool,
 }
 
+/// Chat history for a single chat session
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ChatHistoryEntry {
+    pub qna: Vec<QuestionAndAnswer>,
+    pub lenses: Vec<String>,
+    pub session_id: String,
+    pub last_updated_at: String,
+}
+
+/// Individual question and answer for a Chat
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct QuestionAndAnswer {
+    pub question: String,
+    pub response: String,
+    pub successful: bool,
+    pub created_at: String,
+    pub documents: Vec<String>,
+    pub document_details: Option<Vec<SearchResult>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserData {
     pub lenses: Vec<Lens>,
+    pub history: Vec<ChatHistoryEntry>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -482,11 +503,31 @@ impl ApiClient {
                     }
                 };
 
-                Ok(UserData { lenses })
+                let history_response = self
+                    .client
+                    .get(format!("{}/user/chat/history", self.endpoint))
+                    .bearer_auth(token)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json::<Vec<ChatHistoryEntry>>()
+                    .await;
+                let history = match history_response {
+                    Ok(history_val) => history_val,
+                    Err(err) => {
+                        log::error!("Unable to access chat history: {}", err.to_string());
+                        Vec::new()
+                    }
+                };
+
+                Ok(UserData { lenses, history })
             }
             None => {
                 log::error!("User is not logged in");
-                Ok(UserData { lenses: Vec::new() })
+                Ok(UserData {
+                    lenses: Vec::new(),
+                    history: Vec::new(),
+                })
             }
         }
     }

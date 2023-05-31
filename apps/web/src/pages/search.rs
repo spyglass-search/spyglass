@@ -1,6 +1,6 @@
 use crate::{
     client::{ApiError, Lens, SpyglassClient},
-    AuthStatus,
+    AuthStatus, Route,
 };
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
@@ -47,6 +47,7 @@ pub enum Msg {
     HandleKeyboardEvent(KeyboardEvent),
     HandleSearch,
     Reload,
+    ReloadSavedSession(bool),
     SetError(String),
     SetFinished,
     SetLensData(Lens),
@@ -63,6 +64,7 @@ pub enum Msg {
 pub struct SearchPageProps {
     pub lens: String,
     pub session_uuid: String,
+    pub chat_session: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -87,6 +89,7 @@ pub struct SearchPage {
     show_context: bool,
     chat_uuid: Option<String>,
     session_uuid: String,
+    historical_chat: bool,
     _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
     _context_listener: ContextHandle<AuthStatus>,
 }
@@ -97,15 +100,17 @@ impl Component for SearchPage {
 
     fn create(ctx: &yew::Context<Self>) -> Self {
         let props = ctx.props();
-        let link = ctx.link();
-        link.send_message(Msg::Reload);
 
         let (auth_status, context_listener) = ctx
             .link()
             .context(ctx.link().callback(Msg::UpdateContext))
             .expect("No Message Context Provided");
 
-        ctx.link().send_message(Msg::Reload);
+        if props.chat_session.is_some() {
+            ctx.link().send_message(Msg::ReloadSavedSession(true));
+        } else {
+            ctx.link().send_message(Msg::Reload);
+        }
 
         Self {
             client: Arc::new(Mutex::new(SpyglassClient::new(
@@ -126,8 +131,9 @@ impl Component for SearchPage {
             show_context: false,
             status_msg: None,
             tokens: None,
-            chat_uuid: None,
+            chat_uuid: props.chat_session.clone(),
             session_uuid: props.session_uuid.clone(),
+            historical_chat: props.chat_session.is_some(),
             _context_listener: context_listener,
             _worker_cmd: None,
         }
@@ -139,9 +145,30 @@ impl Component for SearchPage {
         }
 
         let new_lens = ctx.props().lens.clone();
-        if self.lens_identifier != new_lens {
+        let new_chat_session = ctx.props().chat_session.clone();
+        self.historical_chat = new_chat_session.is_some();
+
+        let lens_changed = self.lens_identifier != new_lens;
+        let chat_session_changed = self.chat_uuid != new_chat_session;
+        let chat_session_set = new_chat_session.is_some();
+
+        if lens_changed {
             self.lens_identifier = new_lens;
-            ctx.link().send_message(Msg::Reload);
+            if chat_session_set && chat_session_changed {
+                self.chat_uuid = new_chat_session;
+                ctx.link().send_message(Msg::ReloadSavedSession(true));
+            } else {
+                ctx.link().send_message(Msg::Reload);
+            }
+            true
+        } else if chat_session_changed {
+            if chat_session_set {
+                self.chat_uuid = new_chat_session;
+                ctx.link().send_message(Msg::ReloadSavedSession(false));
+            } else {
+                ctx.link().send_message(Msg::Reload);
+            }
+
             true
         } else {
             false
@@ -182,13 +209,7 @@ impl Component for SearchPage {
                     source: HistorySource::User,
                     value: question.clone(),
                 });
-
-                self.tokens = None;
-                self.status_msg = None;
                 self.context = None;
-                self.in_progress = true;
-
-                let link = link.clone();
                 let mut cur_history = self.history.clone();
                 // Add context to the beginning
                 if let Some(context) = &self.context {
@@ -200,6 +221,13 @@ impl Component for SearchPage {
                         },
                     );
                 }
+
+                self.tokens = None;
+                self.status_msg = None;
+                self.context = None;
+                self.in_progress = true;
+
+                let link = link.clone();
 
                 let cur_doc_context = self.results.clone();
                 let chat_uuid = self.chat_uuid.clone();
@@ -245,33 +273,50 @@ impl Component for SearchPage {
                 }
                 false
             }
-            Msg::Reload => {
-                self.reset_search();
-                self.client = Arc::new(Mutex::new(SpyglassClient::new(
-                    self.lens_identifier.clone(),
-                    self.session_uuid.clone(),
-                    self.auth_status.token.clone(),
-                )));
-
-                let auth_status = self.auth_status.clone();
-                let identifier = self.lens_identifier.clone();
-                let link = link.clone();
-                spawn_local(async move {
-                    let api = auth_status.get_client();
-                    match api.lens_retrieve(&identifier).await {
-                        Ok(lens) => link.send_message(Msg::SetLensData(lens)),
-                        Err(ApiError::ClientError(msg)) => {
-                            // Unauthorized
-                            if msg.code == 400 {
-                                let navi = link.navigator().expect("No navigator");
-                                navi.push(&crate::Route::Start);
-                            }
-                            log::error!("error retrieving lens: {msg}");
-                        }
-                        Err(err) => log::error!("error retrieving lens: {}", err),
+            Msg::ReloadSavedSession(full_reload) => {
+                if self.chat_uuid.is_some() {
+                    let chat_uuid = self.chat_uuid.clone().unwrap();
+                    if full_reload {
+                        self.reload(link);
+                    } else {
+                        self.reset_search();
                     }
-                });
 
+                    self.chat_uuid = Some(chat_uuid.clone());
+                    if let Some(data) = &self.auth_status.user_data {
+                        if let Some(history) = data
+                            .history
+                            .iter()
+                            .find(|history| history.session_id == chat_uuid)
+                        {
+                            let mut first_question = None;
+                            for qna in &history.qna {
+                                if first_question.is_none() {
+                                    first_question = Some(qna.question.clone());
+                                }
+                                self.history.push(HistoryItem {
+                                    source: HistorySource::User,
+                                    value: qna.question.clone(),
+                                });
+                                self.history.push(HistoryItem {
+                                    source: HistorySource::Clippy,
+                                    value: qna.response.clone(),
+                                });
+
+                                if let Some(doc_details) = &qna.document_details {
+                                    link.send_message(Msg::SetSearchResults(doc_details.clone()))
+                                }
+                            }
+                            self.current_query = first_question;
+                        }
+                    }
+                } else {
+                    self.reload(link);
+                }
+                true
+            }
+            Msg::Reload => {
+                self.reload(link);
                 true
             }
             Msg::SetError(err) => {
@@ -345,7 +390,11 @@ impl Component for SearchPage {
             }
             Msg::UpdateContext(auth) => {
                 self.auth_status = auth;
-                link.send_message(Msg::Reload);
+                if self.chat_uuid.is_some() {
+                    link.send_message(Msg::ReloadSavedSession(true))
+                } else {
+                    link.send_message(Msg::Reload);
+                }
                 false
             }
         }
@@ -403,6 +452,14 @@ impl SearchPage {
             })
             .collect::<Vec<Html>>();
 
+        let nav_link = link.clone();
+        let lens_id = self.lens_identifier.clone();
+        let nav_callback = Callback::from(move |_| {
+            nav_link.navigator().unwrap().push(&Route::Search {
+                lens: lens_id.clone(),
+            })
+        });
+
         html! {
             <div ref={self.search_wrapper_ref.clone()}>
                 <div class="py-6 px-8 flex flex-row">
@@ -417,41 +474,52 @@ impl SearchPage {
                         html! {}
                     }}
                 </div>
-                <div class="flex flex-nowrap w-full px-8">
-                    <input
-                        ref={self.search_input_ref.clone()}
-                        id="searchbox"
-                        type="text"
-                        class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
-                        placeholder={self.current_query.clone().unwrap_or(placeholder)}
-                        spellcheck="false"
-                        tabindex="-1"
-                        onkeyup={link.callback(Msg::HandleKeyboardEvent)}
-                    />
-                    {if self.in_progress {
-                        html! {
-                            <Btn
-                                _type={BtnType::Borderless}
-                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
-                                onclick={link.callback(|_| Msg::StopSearch)}
-                            >
-                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
-                                {"Stop"}
-                            </Btn>
-                        }
-                    } else {
-                        html! {
-                            <Btn
-                                _type={BtnType::Borderless}
-                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
-                                onclick={link.callback(|_| Msg::HandleSearch)}
-                            >
-                                <SearchIcon width="w-6" height="h-6" />
-                            </Btn>
+                {if !self.historical_chat {
+                    html! {
+                    <div class="flex flex-nowrap w-full px-8">
+                        <input
+                            ref={self.search_input_ref.clone()}
+                            id="searchbox"
+                            type="text"
+                            class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
+                            placeholder={self.current_query.clone().unwrap_or(placeholder)}
+                            spellcheck="false"
+                            tabindex="-1"
+                            onkeyup={link.callback(Msg::HandleKeyboardEvent)}
+                        />
+                        {if self.in_progress {
+                            html! {
+                                <Btn
+                                    _type={BtnType::Borderless}
+                                    classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                    onclick={link.callback(|_| Msg::StopSearch)}
+                                >
+                                    <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
+                                    {"Stop"}
+                                </Btn>
+                            }
+                        } else {
+                            html! {
+                                <Btn
+                                    _type={BtnType::Borderless}
+                                    classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                    onclick={link.callback(|_| Msg::HandleSearch)}
+                                >
+                                    <SearchIcon width="w-6" height="h-6" />
+                                </Btn>
 
-                        }
-                    }}
-                </div>
+                            }
+                        }}
+                    </div>
+                    }
+                }
+                else {
+                    html! {
+                        <Btn _type={BtnType::Primary} onclick={nav_callback} classes="mx-8 flex-1">
+                            {"New Chat"}
+                        </Btn>
+                    }
+                }}
                 {if self.show_context {
                     html! {
                         <div class="px-8 py-6">
@@ -515,6 +583,35 @@ impl SearchPage {
                 </div>
             </div>
         }
+    }
+
+    // Fully reloads and resets the search context. This is used when the lens has changed.
+    fn reload(&mut self, link: &Scope<SearchPage>) {
+        self.reset_search();
+        self.client = Arc::new(Mutex::new(SpyglassClient::new(
+            self.lens_identifier.clone(),
+            self.session_uuid.clone(),
+            self.auth_status.token.clone(),
+        )));
+
+        let auth_status = self.auth_status.clone();
+        let identifier = self.lens_identifier.clone();
+        let link = link.clone();
+        spawn_local(async move {
+            let api = auth_status.get_client();
+            match api.lens_retrieve(&identifier).await {
+                Ok(lens) => link.send_message(Msg::SetLensData(lens)),
+                Err(ApiError::ClientError(msg)) => {
+                    // Unauthorized
+                    if msg.code == 400 {
+                        let navi = link.navigator().expect("No navigator");
+                        navi.push(&crate::Route::Start);
+                    }
+                    log::error!("error retrieving lens: {msg}");
+                }
+                Err(err) => log::error!("error retrieving lens: {}", err),
+            }
+        });
     }
 }
 
