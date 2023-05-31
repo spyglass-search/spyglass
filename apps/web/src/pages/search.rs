@@ -41,6 +41,7 @@ pub struct HistoryItem {
 
 #[allow(dead_code)]
 pub enum Msg {
+    Focus,
     SetChatUuid(String),
     ContextAdded(String),
     HandleFollowup(String),
@@ -112,6 +113,14 @@ impl Component for SearchPage {
             ctx.link().send_message(Msg::Reload);
         }
 
+        {
+            let link = ctx.link().clone();
+            let timeout = gloo::timers::callback::Timeout::new(1_000, move || {
+                link.send_message(Msg::Focus)
+            });
+            timeout.forget();
+        }
+
         Self {
             client: Arc::new(Mutex::new(SpyglassClient::new(
                 props.lens.clone(),
@@ -178,6 +187,12 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::Focus => {
+                if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
+                    let _ = search_input.focus();
+                }
+                true
+            }
             Msg::SetChatUuid(uuid) => {
                 self.chat_uuid = Some(uuid);
                 false
