@@ -406,16 +406,20 @@ impl Component for SearchPage {
             html! {
                 <>
                     {self.render_search(link, &lens)}
-                    <div class="sticky top-[100vh] mx-auto w-fit text-center pb-4">
-                        <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
-                            <img src="/icons/logo@2x.png" class="w-8" />
-                            <div class="ml-2 text-left">
-                                <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
-                                <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
-                            </div>
-                        </a>
-                        <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
-                    </div>
+                    {if !self.auth_status.is_authenticated {
+                        html! {
+                        <div class="sticky top-[100vh] mx-auto w-fit text-center pb-4">
+                            <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
+                                <img src="/icons/logo@2x.png" class="w-8" />
+                                <div class="ml-2 text-left">
+                                    <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
+                                    <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
+                                </div>
+                            </a>
+                            <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
+                        </div>
+                        }
+                    } else { html! {} }}
                 </>
             }
         } else {
