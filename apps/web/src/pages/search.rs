@@ -437,7 +437,7 @@ impl SearchPage {
     }
 
     fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
-        let placeholder = format!("Ask anything related to {}", lens.display_name);
+        let placeholder = format!("Ask anything related to \"{}\"", lens.display_name);
 
         let results = self
             .results
@@ -462,17 +462,20 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()}>
-                <div class="py-6 px-8 flex flex-row">
-                    <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
-                    {if cfg!(debug_assertions) {
+                <div class="p-8 flex flex-row items-center gap-4">
+                    {if let Some(image) = lens.image.clone() {
                         html! {
-                            <Btn _type={BtnType::Primary} onclick={link.callback(|_| Msg::ToggleContext)} classes="ml-auto">
-                                {"Toggle Context"}
-                            </Btn>
+                            <div class="flex-none">
+                                <img class="rounded h-24 w-24"  src={image}/>
+                            </div>
                         }
-                    } else {
-                        html! {}
-                    }}
+                    } else { html! {} }}
+                    <div class="self-end py-2">
+                        <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
+                        {if let Some(desc) = lens.description.clone() {
+                            html! { <div class="text-sm text-neutral-400 w-3/4">{desc}</div> }
+                        } else { html! {} }}
+                    </div>
                 </div>
                 {if !self.historical_chat {
                     html! {
@@ -481,11 +484,12 @@ impl SearchPage {
                             ref={self.search_input_ref.clone()}
                             id="searchbox"
                             type="text"
-                            class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
+                            class="flex-1 overflow-hidden bg-white rounded-l p-4 text-2xl text-black placeholder-neutral-400 caret-black outline-none focus:outline-none active:outline-none"
                             placeholder={self.current_query.clone().unwrap_or(placeholder)}
                             spellcheck="false"
                             tabindex="-1"
                             onkeyup={link.callback(Msg::HandleKeyboardEvent)}
+                            autofocus={true}
                         />
                         {if self.in_progress {
                             html! {
