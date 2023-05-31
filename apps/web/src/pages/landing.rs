@@ -1,5 +1,6 @@
 use ui_components::btn::{Btn, BtnSize, BtnType};
 use yew::{platform::spawn_local, prelude::*};
+use yew_hooks::use_interval;
 
 use crate::{
     auth0_login,
@@ -11,8 +12,35 @@ pub struct LandingPageProps {
     pub session_uuid: String,
 }
 
+const WORDS: [&str; 6] = [
+    "community",
+    "podcast",
+    "developers",
+    "listeners",
+    "users",
+    "fandom",
+];
+
 #[function_component(LandingPage)]
 pub fn landing_page(props: &LandingPageProps) -> Html {
+    let word_swap = use_state_eq(|| "community");
+    let word_swap_idx = use_state_eq(|| 0);
+    {
+        let word_swap = word_swap.clone();
+        use_interval(
+            move || {
+                let mut idx = *word_swap_idx + 1;
+                if idx >= WORDS.len() {
+                    idx = 0;
+                }
+
+                word_swap.set(WORDS[idx]);
+                word_swap_idx.set(idx);
+            },
+            2_000,
+        );
+    }
+
     let metrics = Metrics::new(false);
     let uuid = props.session_uuid.clone();
     let auth_login = Callback::from(move |e: MouseEvent| {
@@ -26,12 +54,15 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
     });
 
     html! {
-        <>
-            <div class="p-16 text-center">
+        <div class="flex flex-col gap-8 p-8">
+            <div class="text-center">
                 <h1 class="text-4xl md:text-6xl font-serif px-8">
-                    {"Conversational search for your "}
-                    <span class="text-cyan-500">{"community"}</span>
-                    {"."}
+                    <div>{"Conversational search"}</div>
+                    <div>
+                        {"for your "}
+                        <span class="text-cyan-500">{*word_swap}</span>
+                        {"."}
+                    </div>
                 </h1>
                 <div class="text-neutral-400 text-xl">
                     {"AI-powered "}
@@ -56,8 +87,22 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     </div>
                 </div>
             </div>
+            <div class="flex place-content-center">
+                <iframe
+                    class="rounded-lg"
+                    width="560"
+                    height="315"
+                    src="https://www.youtube.com/embed/S0kxrb1oVM0"
+                    title="YouTube video player"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen={true}
+                >
+
+                </iframe>
+            </div>
             <div class="pt-8">
-                <div class="text-center pb-4 px-8">
+                <div class="text-center pb-4">
                     <h1 class="text-4xl font-serif px-8">
                         {"Try it out!"}
                     </h1>
@@ -65,7 +110,7 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                         {"Search, ask questions, and explore our featured communities."}
                     </div>
                 </div>
-                <div class="grid grid-cols-1 gap-4 px-8 md:px-8 md:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <PublicExample
                         href="/lens/atp-podcast"
                         name="💻 ATP: Accidental Tech Podcast"
@@ -95,7 +140,10 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     />
                 </div>
             </div>
-        </>
+            <div class="text-center">
+                <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
+            </div>
+        </div>
     }
 }
 
