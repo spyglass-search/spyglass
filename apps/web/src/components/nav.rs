@@ -6,9 +6,6 @@ use yew_router::prelude::use_navigator;
 use crate::metrics::{Metrics, WebClientEvent};
 use crate::{auth0_login, auth0_logout, AuthStatus, Route};
 
-// Max character length for the chat history title
-const MAX_TITLE_LEN: usize = 20;
-
 #[derive(Properties, PartialEq)]
 pub struct NavBarProps {
     pub current_lens: Option<String>,
@@ -79,11 +76,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
         if let Some(user_data) = &auth_status.user_data {
             for history in &user_data.history {
                 if history.lenses.len() == 1 && !history.qna.is_empty() {
-                    let mut title = history.qna.get(0).unwrap().question.clone();
-                    if title.len() > MAX_TITLE_LEN + 3 {
-                        title.truncate(MAX_TITLE_LEN);
-                        title.push_str("...");
-                    }
+                    let title = history.qna.get(0).unwrap().question.clone();
                     let lens = history.lenses.get(0).unwrap().clone();
                     let session_id = history.session_id.clone();
 
@@ -96,9 +89,12 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                         })
                     });
                     history_buttons.push(html! {
-                        <button key={session_id} {onclick} class="p-2 flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500">
+                        <button key={session_id} {onclick} class="p-3 w-full text-left flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500 overflow-clip group">
                             <icons::ChatBubbleLeftRight />
-                            <span>{title}</span>
+                            <div class="flex-1 text-ellipsis max-h-6 overflow-hidden break-all relative">
+                              {title}
+                              <div class="absolute inset-y-0 right-0 w-8 z-10 bg-gradient-to-l from-neutral-900 group-hover:from-neutral-500"></div>
+                            </div>
                         </button>
                     });
                 }
