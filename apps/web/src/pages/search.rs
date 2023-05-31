@@ -1,6 +1,6 @@
 use crate::{
     client::{ApiError, Lens, SpyglassClient},
-    AuthStatus,
+    AuthStatus, Route,
 };
 use futures::lock::Mutex;
 use shared::keyboard::KeyCode;
@@ -89,6 +89,7 @@ pub struct SearchPage {
     show_context: bool,
     chat_uuid: Option<String>,
     session_uuid: String,
+    historical_chat: bool,
     _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
     _context_listener: ContextHandle<AuthStatus>,
 }
@@ -99,8 +100,6 @@ impl Component for SearchPage {
 
     fn create(ctx: &yew::Context<Self>) -> Self {
         let props = ctx.props();
-        let link = ctx.link();
-        link.send_message(Msg::Reload);
 
         let (auth_status, context_listener) = ctx
             .link()
@@ -134,6 +133,7 @@ impl Component for SearchPage {
             tokens: None,
             chat_uuid: props.chat_session.clone(),
             session_uuid: props.session_uuid.clone(),
+            historical_chat: props.chat_session.is_some(),
             _context_listener: context_listener,
             _worker_cmd: None,
         }
@@ -146,6 +146,8 @@ impl Component for SearchPage {
 
         let new_lens = ctx.props().lens.clone();
         let new_chat_session = ctx.props().chat_session.clone();
+        self.historical_chat = new_chat_session.is_some();
+
         let lens_changed = self.lens_identifier != new_lens;
         let chat_session_changed = self.chat_uuid != new_chat_session;
         let chat_session_set = new_chat_session.is_some();
@@ -388,7 +390,11 @@ impl Component for SearchPage {
             }
             Msg::UpdateContext(auth) => {
                 self.auth_status = auth;
-                link.send_message(Msg::Reload);
+                if self.chat_uuid.is_some() {
+                    link.send_message(Msg::ReloadSavedSession(true))
+                } else {
+                    link.send_message(Msg::Reload);
+                }
                 false
             }
         }
@@ -446,6 +452,14 @@ impl SearchPage {
             })
             .collect::<Vec<Html>>();
 
+        let nav_link = link.clone();
+        let lens_id = self.lens_identifier.clone();
+        let nav_callback = Callback::from(move |_| {
+            nav_link.navigator().unwrap().push(&Route::Search {
+                lens: lens_id.clone(),
+            })
+        });
+
         html! {
             <div ref={self.search_wrapper_ref.clone()}>
                 <div class="py-6 px-8 flex flex-row">
@@ -460,41 +474,52 @@ impl SearchPage {
                         html! {}
                     }}
                 </div>
-                <div class="flex flex-nowrap w-full px-8">
-                    <input
-                        ref={self.search_input_ref.clone()}
-                        id="searchbox"
-                        type="text"
-                        class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
-                        placeholder={self.current_query.clone().unwrap_or(placeholder)}
-                        spellcheck="false"
-                        tabindex="-1"
-                        onkeyup={link.callback(Msg::HandleKeyboardEvent)}
-                    />
-                    {if self.in_progress {
-                        html! {
-                            <Btn
-                                _type={BtnType::Borderless}
-                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
-                                onclick={link.callback(|_| Msg::StopSearch)}
-                            >
-                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
-                                {"Stop"}
-                            </Btn>
-                        }
-                    } else {
-                        html! {
-                            <Btn
-                                _type={BtnType::Borderless}
-                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
-                                onclick={link.callback(|_| Msg::HandleSearch)}
-                            >
-                                <SearchIcon width="w-6" height="h-6" />
-                            </Btn>
+                {if !self.historical_chat {
+                    html! {
+                    <div class="flex flex-nowrap w-full px-8">
+                        <input
+                            ref={self.search_input_ref.clone()}
+                            id="searchbox"
+                            type="text"
+                            class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
+                            placeholder={self.current_query.clone().unwrap_or(placeholder)}
+                            spellcheck="false"
+                            tabindex="-1"
+                            onkeyup={link.callback(Msg::HandleKeyboardEvent)}
+                        />
+                        {if self.in_progress {
+                            html! {
+                                <Btn
+                                    _type={BtnType::Borderless}
+                                    classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                    onclick={link.callback(|_| Msg::StopSearch)}
+                                >
+                                    <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
+                                    {"Stop"}
+                                </Btn>
+                            }
+                        } else {
+                            html! {
+                                <Btn
+                                    _type={BtnType::Borderless}
+                                    classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                    onclick={link.callback(|_| Msg::HandleSearch)}
+                                >
+                                    <SearchIcon width="w-6" height="h-6" />
+                                </Btn>
 
-                        }
-                    }}
-                </div>
+                            }
+                        }}
+                    </div>
+                    }
+                }
+                else {
+                    html! {
+                        <Btn _type={BtnType::Primary} onclick={nav_callback} classes="mx-8 flex-1">
+                            {"New Chat"}
+                        </Btn>
+                    }
+                }}
                 {if self.show_context {
                     html! {
                         <div class="px-8 py-6">
