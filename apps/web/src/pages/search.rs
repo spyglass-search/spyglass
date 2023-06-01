@@ -503,7 +503,7 @@ impl SearchPage {
                             ref={self.search_input_ref.clone()}
                             id="searchbox"
                             type="text"
-                            class="flex-1 overflow-hidden bg-white rounded-l p-4 text-2xl text-black placeholder-neutral-400 caret-black outline-none focus:outline-none active:outline-none"
+                            class="flex-1 overflow-hidden bg-white rounded-l p-4 text-2xl text-black placeholder-neutral-300 caret-black outline-none focus:outline-none active:outline-none"
                             placeholder={self.current_query.clone().unwrap_or(placeholder)}
                             spellcheck="false"
                             tabindex="-1"
