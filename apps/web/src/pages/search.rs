@@ -9,7 +9,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum_macros::Display;
 use ui_components::{
-    btn::{Btn, BtnType},
+    btn::{Btn, BtnType, BtnSize},
     icons::{RefreshIcon, SearchIcon},
     results::{ResultPaginator, WebSearchResultItem},
 };
@@ -537,9 +537,11 @@ impl SearchPage {
                 }
                 else {
                     html! {
-                        <Btn _type={BtnType::Primary} onclick={nav_callback} classes="mx-8 flex-1">
-                            {"New Chat"}
-                        </Btn>
+                        <div class="place-content-center flex flex-row">
+                            <Btn _type={BtnType::Primary} onclick={nav_callback} size={BtnSize::Lg}>
+                                {"Start New Search"}
+                            </Btn>
+                        </div>
                     }
                 }}
                 {if self.show_context {
