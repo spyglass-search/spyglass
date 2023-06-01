@@ -115,9 +115,8 @@ impl Component for SearchPage {
 
         {
             let link = ctx.link().clone();
-            let timeout = gloo::timers::callback::Timeout::new(1_000, move || {
-                link.send_message(Msg::Focus)
-            });
+            let timeout =
+                gloo::timers::callback::Timeout::new(1_000, move || link.send_message(Msg::Focus));
             timeout.forget();
         }
 
