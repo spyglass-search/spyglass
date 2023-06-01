@@ -204,6 +204,8 @@ pub struct Lens {
     pub example_questions: Vec<String>,
     pub example_docs: Vec<String>,
     pub is_public: bool,
+    pub image: Option<String>,
+    pub description: Option<String>,
 }
 
 /// Chat history for a single chat session

@@ -41,6 +41,7 @@ pub struct HistoryItem {
 
 #[allow(dead_code)]
 pub enum Msg {
+    Focus,
     SetChatUuid(String),
     ContextAdded(String),
     HandleFollowup(String),
@@ -112,6 +113,13 @@ impl Component for SearchPage {
             ctx.link().send_message(Msg::Reload);
         }
 
+        {
+            let link = ctx.link().clone();
+            let timeout =
+                gloo::timers::callback::Timeout::new(1_000, move || link.send_message(Msg::Focus));
+            timeout.forget();
+        }
+
         Self {
             client: Arc::new(Mutex::new(SpyglassClient::new(
                 props.lens.clone(),
@@ -178,6 +186,12 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
+            Msg::Focus => {
+                if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
+                    let _ = search_input.focus();
+                }
+                true
+            }
             Msg::SetChatUuid(uuid) => {
                 self.chat_uuid = Some(uuid);
                 false
@@ -406,16 +420,20 @@ impl Component for SearchPage {
             html! {
                 <>
                     {self.render_search(link, &lens)}
-                    <div class="sticky top-[100vh] mx-auto w-fit text-center pb-4">
-                        <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
-                            <img src="/icons/logo@2x.png" class="w-8" />
-                            <div class="ml-2 text-left">
-                                <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
-                                <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
-                            </div>
-                        </a>
-                        <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
-                    </div>
+                    {if !self.auth_status.is_authenticated {
+                        html! {
+                        <div class="sticky top-[100vh] mx-auto w-fit text-center pb-4">
+                            <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
+                                <img src="/icons/logo@2x.png" class="w-8" />
+                                <div class="ml-2 text-left">
+                                    <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
+                                    <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
+                                </div>
+                            </a>
+                            <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
+                        </div>
+                        }
+                    } else { html! {} }}
                 </>
             }
         } else {
@@ -437,7 +455,7 @@ impl SearchPage {
     }
 
     fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
-        let placeholder = format!("Ask anything related to {}", lens.display_name);
+        let placeholder = format!("Ask anything related to \"{}\"", lens.display_name);
 
         let results = self
             .results
@@ -462,17 +480,20 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()}>
-                <div class="py-6 px-8 flex flex-row">
-                    <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
-                    {if cfg!(debug_assertions) {
+                <div class="p-8 flex flex-row items-center gap-4">
+                    {if let Some(image) = lens.image.clone() {
                         html! {
-                            <Btn _type={BtnType::Primary} onclick={link.callback(|_| Msg::ToggleContext)} classes="ml-auto">
-                                {"Toggle Context"}
-                            </Btn>
+                            <div class="flex-none">
+                                <img class="rounded h-24 w-24"  src={image}/>
+                            </div>
                         }
-                    } else {
-                        html! {}
-                    }}
+                    } else { html! {} }}
+                    <div class="self-end py-2">
+                        <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
+                        {if let Some(desc) = lens.description.clone() {
+                            html! { <div class="text-sm text-neutral-400 w-3/4">{desc}</div> }
+                        } else { html! {} }}
+                    </div>
                 </div>
                 {if !self.historical_chat {
                     html! {
@@ -481,11 +502,12 @@ impl SearchPage {
                             ref={self.search_input_ref.clone()}
                             id="searchbox"
                             type="text"
-                            class="flex-1 overflow-hidden bg-neutral-400 rounded-l p-4 text-2xl text-black placeholder-neutral-600 caret-black outline-none focus:outline-none active:outline-none"
+                            class="flex-1 overflow-hidden bg-white rounded-l p-4 text-2xl text-black placeholder-neutral-300 caret-black outline-none focus:outline-none active:outline-none"
                             placeholder={self.current_query.clone().unwrap_or(placeholder)}
                             spellcheck="false"
                             tabindex="-1"
                             onkeyup={link.callback(Msg::HandleKeyboardEvent)}
+                            autofocus={true}
                         />
                         {if self.in_progress {
                             html! {
