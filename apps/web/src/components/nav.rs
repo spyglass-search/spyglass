@@ -49,14 +49,6 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                 <span class="text-cyan-700 font-bold">{"SPYGLASS_BACKEND: "}</span>
                 <span>{dotenv!("SPYGLASS_BACKEND_DEV")}</span>
             </div>
-            <div>
-                <span class="text-cyan-700 font-bold">{"AUTH0_AUDIENCE: "}</span>
-                <span>{dotenv!("AUTH0_AUDIENCE")}</span>
-            </div>
-            <div>
-                <span class="text-cyan-700 font-bold">{"AUTH0_REDIRECT_URI: "}</span>
-                <span>{dotenv!("AUTH0_REDIRECT_URI")}</span>
-            </div>
         </>
     };
 
