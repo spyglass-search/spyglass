@@ -12,7 +12,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum_macros::Display;
 use ui_components::{
-    btn::{Btn, BtnType, BtnSize},
+    btn::{Btn, BtnSize, BtnType},
     icons::{RefreshIcon, SearchIcon},
     results::{ResultPaginator, WebSearchResultItem},
 };
