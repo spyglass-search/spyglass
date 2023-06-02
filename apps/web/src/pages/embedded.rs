@@ -10,7 +10,7 @@ use yew_router::prelude::*;
 
 pub enum Msg {
     Reload,
-    SetLensData(Lens),
+    SetLensData(Box<Lens>),
 }
 
 #[derive(Properties, PartialEq)]
@@ -65,7 +65,7 @@ impl Component for EmbeddedPage {
                 true
             }
             Msg::SetLensData(data) => {
-                self.lens_data = Some(data);
+                self.lens_data = Some(*data);
                 true
             }
         }
@@ -104,7 +104,7 @@ impl EmbeddedPage {
         spawn_local(async move {
             let api = ApiClient::new(None, true);
             match api.lens_retrieve(&identifier).await {
-                Ok(lens) => link.send_message(Msg::SetLensData(lens)),
+                Ok(lens) => link.send_message(Msg::SetLensData(Box::new(lens))),
                 Err(ApiError::ClientError(msg)) => {
                     log::error!("Got error! {:?}", msg);
                     // Unauthorized
