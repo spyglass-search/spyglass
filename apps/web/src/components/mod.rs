@@ -7,6 +7,7 @@ use yew_router::prelude::use_navigator;
 
 use crate::{client::Lens, Route};
 
+pub mod chat_bubble;
 pub mod nav;
 
 #[derive(Properties, PartialEq)]
