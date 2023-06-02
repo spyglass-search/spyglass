@@ -569,7 +569,7 @@ impl SearchPage {
                             id="searchbox"
                             type="text"
                             class="flex-1 overflow-hidden bg-white rounded-l p-2 md:p-4 text-base md:text-2xl text-black placeholder-neutral-300 caret-black outline-none focus:outline-none active:outline-none"
-                            placeholder={self.current_query.clone().unwrap_or(placeholder)}
+                            placeholder={placeholder}
                             spellcheck="false"
                             tabindex="-1"
                             onkeyup={link.callback(Msg::HandleKeyboardEvent)}
@@ -740,7 +740,7 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
         <div class="animate-fade-in col-span-1">
             <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
             <div class="flex flex-col text-sm md:text-base leading-relaxed">
-                <div class="flex flex-col min-h-[480px] gap-4">
+                <div class="flex flex-col gap-4">
                     <HistoryLog history={props.history.clone()} />
                     { if let Some(tokens) = &props.tokens {
                         html! { <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
@@ -750,7 +750,7 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
                         html! {}
                     }}
                 </div>
-                <form class="mt-2 flex flex-row px-2 md:px-8" onsubmit={on_ask_followup}>
+                <form class="flex flex-row" onsubmit={on_ask_followup}>
                     <textarea ref={ask_followup}
                         disabled={props.in_progress}
                         rows="3"
@@ -819,7 +819,13 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
     let item_classes = if props.source == HistorySource::User {
         classes!("text-white", "font-bold", "text-lg")
     } else {
-        classes!("prose", "prose-invert", "inline")
+        classes!(
+            "prose-sm",
+            "md:prose-base",
+            "prose",
+            "prose-invert",
+            "inline"
+        )
     };
 
     html! {
