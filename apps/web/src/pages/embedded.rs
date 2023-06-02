@@ -81,7 +81,7 @@ impl Component for EmbeddedPage {
             match prompt_style {
                 EmbeddedPromptStyle::Research => {
                     html! {
-                        <SearchPage lens={self.lens_identifier.clone()} lens_data={Some(lens.clone())} session_uuid={self.session_uuid.clone()} embedded=true/>
+                        <SearchPage lens={self.lens_identifier.clone()} lens_data={Some(lens.clone())} session_uuid={self.session_uuid.clone()} embedded={true} />
                     }
                 }
                 EmbeddedPromptStyle::Chat => {

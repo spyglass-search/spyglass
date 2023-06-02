@@ -443,7 +443,7 @@ impl Component for SearchPage {
                     {self.render_search(link, &lens)}
                     {if !self.auth_status.is_authenticated {
                         html! {
-                        <div class="sticky top-[100vh] mx-auto w-fit text-center pb-4">
+                        <div class="sticky top-[90vh] md:top-[100vh] mx-auto w-fit text-center pb-4">
                             <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
                                 <img src="/icons/logo@2x.png" class="w-8" />
                                 <div class="ml-2 text-left">
@@ -451,7 +451,7 @@ impl Component for SearchPage {
                                     <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
                                 </div>
                             </a>
-                            <div class="mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
+                            <div class="hidden md:block mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
                         </div>
                         }
                     } else { html! {} }}
@@ -542,58 +542,64 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()}>
-                <div class="p-8 flex flex-row items-center gap-4">
+                <div class="p-2 md:p-8 flex flex-row items-center gap-4 pb-10 md:pb-14">
                     {if let Some(image) = lens.image.clone() {
                         html! {
                             <div class="flex-none">
-                                <img class="rounded h-24 w-24"  src={image}/>
+                                <img class="rounded h-12 md:h-24 w-12 md:w-24"  src={image}/>
                             </div>
                         }
                     } else { html! {} }}
-                    <div class="self-end py-2">
-                        <div class="font-bold text-2xl">{lens.display_name.clone()}</div>
+                    <div class="self-start md:self-end py-0 md:py-2">
+                        <div class="font-bold text-base md:text-2xl">{lens.display_name.clone()}</div>
                         {if let Some(desc) = lens.description.clone() {
-                            html! { <div class="text-sm text-neutral-400 w-3/4">{desc}</div> }
+                            html! {
+                                <div class="text-xs md:text-sm text-neutral-400 w-full md:w-3/4 h-8 md:h-fit overflow-hidden">
+                                    {desc}
+                                </div>
+                            }
                         } else { html! {} }}
                     </div>
                 </div>
                 {if !self.historical_chat {
                     html! {
-                    <div class="flex flex-nowrap w-full px-8">
+                    <div class="flex flex-nowrap w-full px-4 md:px-8 -mt-6 md:-mt-8">
                         <input
                             ref={self.search_input_ref.clone()}
                             id="searchbox"
                             type="text"
-                            class="flex-1 overflow-hidden bg-white rounded-l p-4 text-2xl text-black placeholder-neutral-300 caret-black outline-none focus:outline-none active:outline-none"
+                            class="flex-1 overflow-hidden bg-white rounded-l p-2 md:p-4 text-base md:text-2xl text-black placeholder-neutral-300 caret-black outline-none focus:outline-none active:outline-none"
                             placeholder={self.current_query.clone().unwrap_or(placeholder)}
                             spellcheck="false"
                             tabindex="-1"
                             onkeyup={link.callback(Msg::HandleKeyboardEvent)}
                             autofocus={true}
                         />
-                        {if self.in_progress {
-                            html! {
-                                <Btn
-                                    _type={BtnType::Borderless}
-                                    classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
-                                    onclick={link.callback(|_| Msg::StopSearch)}
-                                >
-                                    <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
-                                    {"Stop"}
-                                </Btn>
-                            }
-                        } else {
-                            html! {
-                                <Btn
-                                    _type={BtnType::Borderless}
-                                    classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
-                                    onclick={link.callback(|_| Msg::HandleSearch)}
-                                >
-                                    <SearchIcon width="w-6" height="h-6" />
-                                </Btn>
+                        <div class="p-1 md:p-2 bg-white rounded-r">
+                            {if self.in_progress {
+                                html! {
+                                    <Btn
+                                        _type={BtnType::Borderless}
+                                        classes="rounded p-2 md:p-4 bg-cyan-600 hover:bg-cyan-800"
+                                        onclick={link.callback(|_| Msg::StopSearch)}
+                                    >
+                                        <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
+                                        {"Stop"}
+                                    </Btn>
+                                }
+                            } else {
+                                html! {
+                                    <Btn
+                                        _type={BtnType::Borderless}
+                                        classes="rounded p-2 md:p-4 bg-cyan-600 hover:bg-cyan-800"
+                                        onclick={link.callback(|_| Msg::HandleSearch)}
+                                    >
+                                        <SearchIcon width="w-6" height="h-6" />
+                                    </Btn>
 
-                            }
-                        }}
+                                }
+                            }}
+                        </div>
                     </div>
                     }
                 }
@@ -617,7 +623,7 @@ impl SearchPage {
                 {if let Some(query) = &self.current_query {
                     html! { <div class="mt-8 px-8 text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
-                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-8">
+                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-2 md:p-8">
                     { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
                         html! {
                             <AnswerSection
@@ -844,8 +850,10 @@ pub struct FAQComponentProps {
 fn faq_component(props: &FAQComponentProps) -> Html {
     let qa_classes = classes!(
         "text-cyan-500",
-        "text-lg",
-        "p-4",
+        "text-base",
+        "md:text-lg",
+        "p-2",
+        "md:p-4",
         "rounded",
         "border",
         "border-neutral-500",
@@ -873,8 +881,8 @@ fn faq_component(props: &FAQComponentProps) -> Html {
 
     html! {
         <div class="col-span-2 mx-auto pt-4">
-            <div class="text-xl text-white">{"Example Questions"}</div>
-            <div class="text-neutral-500 text-base">
+            <div class="text-base md:text-xl text-white font-semibold">{"Example Questions"}</div>
+            <div class="text-neutral-500 text-sm md:text-base">
                 {"Not sure where to start? Try one of these questions"}
             </div>
             <div class="flex flex-col gap-4 mt-4">

@@ -228,6 +228,7 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let search = window().location().search().unwrap_or_default();
         let link = ctx.link();
+        let embedded = is_embedded();
 
         // Handle auth callbacks
         if search.contains("state=") {
@@ -240,8 +241,6 @@ impl Component for App {
                 link.send_message_batch(vec![Msg::LoadUserData, Msg::SetSelectedLens(lens)])
             })
         };
-
-        let embedded = is_embedded();
 
         let switch_embedded = {
             let uuid = self.session_uuid.clone();
@@ -284,13 +283,13 @@ impl Component for App {
                 Route::Search { lens } => {
                     let decoded_lens = decode_string(lens);
 
-                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} embedded=false/></AppPage> }
+                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} embedded={false} /></AppPage> }
                 }
                 Route::SearchSession { lens, chat_session } => {
                     let decoded_lens = decode_string(lens);
                     let decoded_chat = decode_string(chat_session);
 
-                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} chat_session={decoded_chat} embedded=false /></AppPage> }
+                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} chat_session={decoded_chat} embedded={false} /></AppPage> }
                 }
                 Route::NotFound => html! { <div>{"Not Found!"}</div> },
             }
