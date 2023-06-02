@@ -542,7 +542,7 @@ impl SearchPage {
 
         html! {
             <div ref={self.search_wrapper_ref.clone()}>
-                <div class="p-2 md:p-8 flex flex-row items-center gap-4 pb-10 md:pb-14">
+                <div class="p-4 md:p-8 flex flex-row items-center gap-4 pb-10 md:pb-14">
                     {if let Some(image) = lens.image.clone() {
                         html! {
                             <div class="flex-none">
