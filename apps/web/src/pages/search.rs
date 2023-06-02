@@ -444,11 +444,11 @@ impl Component for SearchPage {
                     {if !self.auth_status.is_authenticated {
                         html! {
                         <div class="sticky top-[90vh] md:top-[100vh] mx-auto w-fit text-center pb-4">
-                            <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-4 py-2 hover:bg-cyan-900">
-                                <img src="/icons/logo@2x.png" class="w-8" />
-                                <div class="ml-2 text-left">
-                                    <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
-                                    <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
+                            <a href="/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-2 md:px-4 py-1 md:py-2 hover:bg-cyan-900">
+                                <img src="/icons/logo@2x.png" class="w-6 md:w-8" />
+                                <div class="ml-1 md:ml-2 text-left">
+                                    <div class="text-xs md:text-sm font-semibold md:font-bold">{"Powered by Spyglass"}</div>
+                                    <div class="hidden md:block text-xs text-cyan-200">{"Click to create your own"}</div>
                                 </div>
                             </a>
                             <div class="hidden md:block mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
