@@ -1,7 +1,9 @@
 use yew::prelude::*;
 
+pub mod chat;
 pub mod dashboard;
 pub mod discover;
+pub mod embedded;
 pub mod landing;
 pub mod lens_editor;
 pub mod search;

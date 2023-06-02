@@ -3,7 +3,6 @@ extern crate dotenv_codegen;
 
 use client::{Lens, UserData};
 use gloo::utils::{history, window};
-use js_sys::decode_uri_component;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
@@ -14,13 +13,19 @@ mod client;
 mod components;
 mod metrics;
 mod pages;
+mod schema;
+mod utils;
 use components::nav::NavBar;
 use pages::{
     dashboard::Dashboard, discover::DiscoverPage, landing::LandingPage,
     lens_editor::CreateLensPage, AppPage,
 };
 
-use crate::{client::ApiClient, pages::search::SearchPage};
+use crate::{
+    client::ApiClient,
+    pages::{embedded::EmbeddedPage, search::SearchPage},
+    utils::decode_string,
+};
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth0User {
@@ -44,7 +49,7 @@ pub struct AuthStatus {
 
 impl AuthStatus {
     pub fn get_client(&self) -> ApiClient {
-        ApiClient::new(self.token.clone())
+        ApiClient::new(self.token.clone(), false)
     }
 }
 
@@ -64,6 +69,12 @@ extern "C" {
 
     #[wasm_bindgen(catch)]
     pub async fn handle_login_callback() -> Result<JsValue, JsValue>;
+}
+
+#[derive(Clone, Routable, PartialEq)]
+pub enum EmbeddedRoute {
+    #[at("/lens/:lens/embedded")]
+    EmbeddedSearch { lens: String },
 }
 
 #[derive(Clone, Routable, PartialEq)]
@@ -121,7 +132,9 @@ impl Component for App {
         );
 
         // Check if user is logged in
-        ctx.link().send_message(Msg::CheckAuth);
+        if !is_embedded() {
+            ctx.link().send_message(Msg::CheckAuth);
+        }
 
         Self {
             auth_status: AuthStatus {
@@ -228,6 +241,19 @@ impl Component for App {
             })
         };
 
+        let embedded = is_embedded();
+
+        let switch_embedded = {
+            let uuid = self.session_uuid.clone();
+            move |routes: EmbeddedRoute| match &routes {
+                EmbeddedRoute::EmbeddedSearch { lens } => {
+                    let decoded_lens = decode_string(lens);
+
+                    html! { <AppPage><EmbeddedPage lens={decoded_lens} session_uuid={uuid.clone()} /></AppPage> }
+                }
+            }
+        };
+
         let switch = {
             let link = link.clone();
             let uuid = self.session_uuid.clone();
@@ -256,53 +282,57 @@ impl Component for App {
                     </AppPage>
                 },
                 Route::Search { lens } => {
-                    let decoded_lens = if let Ok(Some(decoded)) =
-                        decode_uri_component(lens).map(|x| x.as_string())
-                    {
-                        decoded
-                    } else {
-                        lens.clone()
-                    };
+                    let decoded_lens = decode_string(lens);
 
-                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} /></AppPage> }
+                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} embedded=false/></AppPage> }
                 }
                 Route::SearchSession { lens, chat_session } => {
-                    let decoded_lens = if let Ok(Some(decoded)) =
-                        decode_uri_component(lens).map(|x| x.as_string())
-                    {
-                        decoded
-                    } else {
-                        lens.clone()
-                    };
+                    let decoded_lens = decode_string(lens);
+                    let decoded_chat = decode_string(chat_session);
 
-                    let decoded_chat = if let Ok(Some(decoded)) =
-                        decode_uri_component(chat_session).map(|x| x.as_string())
-                    {
-                        Some(decoded)
-                    } else {
-                        Some(chat_session.clone())
-                    };
-
-                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} chat_session={decoded_chat} /></AppPage> }
+                    html! { <AppPage><SearchPage lens={decoded_lens} session_uuid={uuid.clone()} chat_session={decoded_chat} embedded=false /></AppPage> }
                 }
                 Route::NotFound => html! { <div>{"Not Found!"}</div> },
             }
         };
 
-        html! {
-            <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
-                <BrowserRouter>
-                    <div class="flex flex-col sm:flex-row">
-                        <NavBar
-                            current_lens={self.current_lens.clone()}
-                            session_uuid={self.session_uuid.clone()}
-                        />
-                        <Switch<Route> render={switch} />
-                    </div>
-                </BrowserRouter>
-            </ContextProvider<AuthStatus>>
+        if embedded {
+            log::error!("rendering embedded");
+            html! {
+                <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
+                    <BrowserRouter>
+                        <div class="flex flex-col sm:flex-row">
+                            <Switch<EmbeddedRoute> render={switch_embedded} />
+                        </div>
+                    </BrowserRouter>
+                </ContextProvider<AuthStatus>>
+            }
+        } else {
+            html! {
+                <ContextProvider<AuthStatus> context={self.auth_status.clone()}>
+                    <BrowserRouter>
+                        <div class="flex flex-col sm:flex-row">
+                            <NavBar
+                                current_lens={self.current_lens.clone()}
+                                session_uuid={self.session_uuid.clone()}
+                            />
+                            <Switch<Route> render={switch} />
+                        </div>
+                    </BrowserRouter>
+                </ContextProvider<AuthStatus>>
+            }
         }
     }
+}
+
+// Helper method used to identify if the page is an embedded link or not. The
+// url is checked to see if the page should be treated as embedded
+fn is_embedded() -> bool {
+    window()
+        .location()
+        .pathname()
+        .unwrap_or_default()
+        .ends_with("embedded")
 }
 
 fn main() {
