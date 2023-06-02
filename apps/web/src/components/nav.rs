@@ -49,14 +49,6 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                 <span class="text-cyan-700 font-bold">{"SPYGLASS_BACKEND: "}</span>
                 <span>{dotenv!("SPYGLASS_BACKEND_DEV")}</span>
             </div>
-            <div>
-                <span class="text-cyan-700 font-bold">{"AUTH0_AUDIENCE: "}</span>
-                <span>{dotenv!("AUTH0_AUDIENCE")}</span>
-            </div>
-            <div>
-                <span class="text-cyan-700 font-bold">{"AUTH0_REDIRECT_URI: "}</span>
-                <span>{dotenv!("AUTH0_REDIRECT_URI")}</span>
-            </div>
         </>
     };
 
@@ -89,8 +81,8 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                         })
                     });
                     history_buttons.push(html! {
-                        <button key={session_id} {onclick} class="p-3 w-full text-left flex flex-row text-lg items-center gap-2 rounded hover:bg-neutral-500 overflow-clip group">
-                            <icons::ChatBubbleLeftRight />
+                        <button key={session_id} {onclick} class="p-2 w-full text-left flex flex-row items-center gap-2 rounded hover:bg-neutral-500 overflow-clip group text-base">
+                            <icons::ChatBubbleLeftRight width="w-4" height="h-4" />
                             <div class="flex-1 text-ellipsis max-h-6 overflow-hidden break-all relative">
                               {title}
                               <div class="absolute inset-y-0 right-0 w-8 z-10 bg-gradient-to-l from-neutral-900 group-hover:from-neutral-500"></div>
@@ -179,7 +171,6 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                         {"My Q&As"}
                     </div>
                     {history_buttons}
-
                 </div>
                 <div class="absolute text-xs text-neutral-600 bottom-0 py-4 flex flex-col">
                     <div>
