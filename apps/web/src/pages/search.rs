@@ -621,9 +621,9 @@ impl SearchPage {
                     html! {}
                 }}
                 {if let Some(query) = &self.current_query {
-                    html! { <div class="mt-8 px-8 text-2xl font-semibold text-white">{query}</div> }
+                    html! { <div class="mt-6 md:mt-8 px-4 md:px-8 text-lg md:text-2xl font-semibold text-white">{query}</div> }
                 } else { html! {}}}
-                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-2 md:p-8">
+                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-4 md:p-8">
                     { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
                         html! {
                             <AnswerSection
@@ -739,18 +739,18 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
     html! {
         <div class="animate-fade-in col-span-1">
             <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
-            <div class="flex flex-col">
+            <div class="flex flex-col text-sm md:text-base leading-relaxed">
                 <div class="flex flex-col min-h-[480px] gap-4">
                     <HistoryLog history={props.history.clone()} />
                     { if let Some(tokens) = &props.tokens {
-                        html!{ <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
+                        html! { <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
                     } else if let Some(msg) = &props.status {
-                        html!{ <HistoryLogItem source={HistorySource::System} tokens={msg.clone()}  /> }
+                        html! { <HistoryLogItem source={HistorySource::System} tokens={msg.clone()}  /> }
                     } else {
                         html! {}
                     }}
                 </div>
-                <form class="mt-8 flex flex-row px-8" onsubmit={on_ask_followup}>
+                <form class="mt-2 flex flex-row px-2 md:px-8" onsubmit={on_ask_followup}>
                     <textarea ref={ask_followup}
                         disabled={props.in_progress}
                         rows="3"
