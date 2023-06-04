@@ -209,6 +209,14 @@ pub struct UserData {
     pub history: Vec<ChatHistoryEntry>,
 }
 
+#[allow(clippy::enum_variant_names)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PreferredModel {
+    WhisperSmall,
+    WhisperMedium,
+    WhisperLarge,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum LensAddDocType {
     Audio,
@@ -216,7 +224,9 @@ pub enum LensAddDocType {
     GDrive {
         token: String,
     },
-    RssFeed,
+    RssFeed {
+        preferred_model: PreferredModel,
+    },
     /// Normal, web accessible URL.
     WebUrl {
         include_all_suburls: bool,

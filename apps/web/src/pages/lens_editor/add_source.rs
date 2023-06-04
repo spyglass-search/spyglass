@@ -99,7 +99,9 @@ impl Component for AddSourceComponent {
 
                     let source = LensAddDocument {
                         url: url.to_string(),
-                        doc_type: LensAddDocType::RssFeed,
+                        doc_type: LensAddDocType::RssFeed {
+                            preferred_model: crate::client::PreferredModel::WhisperSmall,
+                        },
                     };
 
                     self.adding_in_progress = true;
