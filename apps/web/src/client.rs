@@ -13,7 +13,9 @@ use thiserror::Error;
 use yew::platform::pinned::mpsc::UnboundedReceiver;
 
 use crate::pages::search::{HistoryItem, HistorySource, WorkerCmd};
-use crate::schema::EmbedConfiguration;
+use crate::schema::{
+    EmbedConfiguration, GetLensSourceRequest, GetLensSourceResponse, LensSourceQueryFilter,
+};
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -256,14 +258,6 @@ pub struct LensSource {
 }
 
 #[derive(Deserialize)]
-pub struct GetLensSourceResponse {
-    pub page: usize,
-    pub num_items: usize,
-    pub num_pages: usize,
-    pub results: Vec<LensSource>,
-}
-
-#[derive(Deserialize)]
 pub struct SourceValidationResponse {
     pub url: String,
     pub url_count: u64,
@@ -352,12 +346,15 @@ impl ApiClient {
         &self,
         id: &str,
         page: usize,
+        filter: LensSourceQueryFilter,
     ) -> Result<GetLensSourceResponse, ApiError> {
+        let req = GetLensSourceRequest { page, filter };
+
         match &self.token {
             Some(token) => Ok(self
                 .client
                 .get(format!("{}/user/lenses/{}/sources", self.endpoint, id))
-                .query(&[("page".to_string(), page.to_string())])
+                .query(&req)
                 .bearer_auth(token)
                 .send()
                 .await?
