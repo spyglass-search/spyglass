@@ -263,7 +263,7 @@ impl Component for CreateLensPage {
                 if let Some(paginator) = &self.lens_source_paginator {
                     link.send_message(Msg::ReloadSources {
                         page: paginator.page,
-                        filter: self.source_filter
+                        filter: self.source_filter,
                     });
                 }
                 true
@@ -410,7 +410,7 @@ impl Component for CreateLensPage {
                                 on_delete={link.callback(Msg::DeleteLensSource)}
                                 on_refresh={link.callback(move |_| Msg::ReloadSources { page: paginator.page, filter })}
                                 on_select_page={link.callback(move |page| Msg::ReloadSources { page, filter })}
-                                on_select_filter={link.callback(move |filter| Msg::SetFilter(filter))}
+                                on_select_filter={link.callback(Msg::SetFilter)}
                             />
                         }
                     } else { html! {} }}
