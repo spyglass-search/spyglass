@@ -1,4 +1,5 @@
 use gloo::timers::callback::{Interval, Timeout};
+use strum::IntoEnumIterator;
 use ui_components::{
     btn::{Btn, BtnSize, BtnType},
     icons,
@@ -11,7 +12,8 @@ use yew::prelude::*;
 use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
-    client::{ApiError, GetLensSourceResponse, Lens, LensDocType, LensSource},
+    client::{ApiError, Lens, LensDocType, LensSource},
+    schema::{GetLensSourceResponse, LensSourceQueryFilter},
     AuthStatus,
 };
 
@@ -39,6 +41,7 @@ pub struct CreateLensPage {
     pub lens_identifier: String,
     pub lens_data: Option<Lens>,
 
+    pub source_filter: LensSourceQueryFilter,
     pub lens_sources: Option<Vec<LensSource>>,
     pub lens_source_paginator: Option<LensSourcePaginator>,
 
@@ -64,10 +67,16 @@ pub enum Msg {
     DeleteLensSource(LensSource),
     Reload,
     ReloadCurrentSources,
-    ReloadSources(usize),
-    Save { display_name: String },
+    ReloadSources {
+        page: usize,
+        filter: LensSourceQueryFilter,
+    },
+    Save {
+        display_name: String,
+    },
     SaveDone,
     SetError(String),
+    SetFilter(LensSourceQueryFilter),
     SetLensData(Lens),
     SetLensSources(GetLensSourceResponse),
     UpdateContext(AuthStatus),
@@ -84,8 +93,13 @@ impl Component for CreateLensPage {
             .context(ctx.link().callback(Msg::UpdateContext))
             .expect("No Message Context Provided");
 
-        ctx.link()
-            .send_message_batch(vec![Msg::Reload, Msg::ReloadSources(0)]);
+        ctx.link().send_message_batch(vec![
+            Msg::Reload,
+            Msg::ReloadSources {
+                page: 0,
+                filter: LensSourceQueryFilter::default(),
+            },
+        ]);
 
         Self {
             error_msg: None,
@@ -93,6 +107,7 @@ impl Component for CreateLensPage {
             lens_data: None,
             lens_sources: None,
             lens_source_paginator: None,
+            source_filter: LensSourceQueryFilter::default(),
             is_saving_name: false,
             is_loading_lens_sources: false,
             auth_status,
@@ -109,14 +124,19 @@ impl Component for CreateLensPage {
         if self.lens_identifier != new_lens {
             self.lens_identifier = new_lens;
 
-            let page = self
-                .lens_source_paginator
-                .as_ref()
-                .map(|x| x.page)
-                .unwrap_or(0);
+            let reload_msg = if let Some(paginator) = &self.lens_source_paginator {
+                Msg::ReloadSources {
+                    page: paginator.page,
+                    filter: self.source_filter,
+                }
+            } else {
+                Msg::ReloadSources {
+                    page: 0,
+                    filter: LensSourceQueryFilter::All,
+                }
+            };
 
-            ctx.link()
-                .send_message_batch(vec![Msg::Reload, Msg::ReloadSources(page)]);
+            ctx.link().send_message_batch(vec![Msg::Reload, reload_msg]);
             true
         } else {
             false
@@ -140,11 +160,11 @@ impl Component for CreateLensPage {
                     .as_ref()
                     .map(|x| x.page)
                     .unwrap_or(0);
-
+                let filter = self.source_filter;
                 spawn_local(async move {
                     let api = auth_status.get_client();
                     match api.delete_lens_source(&identifier, &source.doc_uuid).await {
-                        Ok(_) => link.send_message(Msg::ReloadSources(page)),
+                        Ok(_) => link.send_message(Msg::ReloadSources { page, filter }),
                         Err(err) => {
                             log::error!("Error deleting source: {err}");
                             link.send_message(Msg::SetError(err.to_string()));
@@ -181,18 +201,21 @@ impl Component for CreateLensPage {
             }
             Msg::ReloadCurrentSources => {
                 if let Some(paginator) = &self.lens_source_paginator {
-                    link.send_message(Msg::ReloadSources(paginator.page));
+                    link.send_message(Msg::ReloadSources {
+                        page: paginator.page,
+                        filter: self.source_filter,
+                    });
                 }
                 false
             }
-            Msg::ReloadSources(page) => {
+            Msg::ReloadSources { page, filter } => {
                 let auth_status = self.auth_status.clone();
                 let identifier = self.lens_identifier.clone();
                 let link = link.clone();
                 self.is_loading_lens_sources = true;
                 spawn_local(async move {
                     let api: crate::client::ApiClient = auth_status.get_client();
-                    match api.lens_retrieve_sources(&identifier, page).await {
+                    match api.lens_retrieve_sources(&identifier, page, filter).await {
                         Ok(lens) => link.send_message(Msg::SetLensSources(lens)),
                         Err(ApiError::ClientError(msg)) => {
                             // Unauthorized
@@ -235,6 +258,16 @@ impl Component for CreateLensPage {
                 self.error_msg = Some(err);
                 true
             }
+            Msg::SetFilter(filter) => {
+                self.source_filter = filter;
+                if let Some(paginator) = &self.lens_source_paginator {
+                    link.send_message(Msg::ReloadSources {
+                        page: paginator.page,
+                        filter: self.source_filter
+                    });
+                }
+                true
+            }
             Msg::SetLensData(lens_data) => {
                 self.lens_data = Some(lens_data);
                 true
@@ -270,7 +303,13 @@ impl Component for CreateLensPage {
                     .as_ref()
                     .map(|x| x.page)
                     .unwrap_or(0);
-                link.send_message_batch(vec![Msg::Reload, Msg::ReloadSources(page)]);
+                link.send_message_batch(vec![
+                    Msg::Reload,
+                    Msg::ReloadSources {
+                        page,
+                        filter: self.source_filter,
+                    },
+                ]);
                 true
             }
             Msg::UpdateDisplayName => {
@@ -361,14 +400,17 @@ impl Component for CreateLensPage {
                 </div>
                 <div class="mt-8">
                     {if let Some(paginator) = self.lens_source_paginator.clone() {
+                        let filter = self.source_filter;
                         html! {
                             <SourceTable
                                 sources={self.lens_sources.clone().unwrap_or_default()}
                                 paginator={paginator.clone()}
+                                selected_filter={self.source_filter}
                                 is_loading={self.is_loading_lens_sources}
                                 on_delete={link.callback(Msg::DeleteLensSource)}
-                                on_refresh={link.callback(move |_| Msg::ReloadSources(paginator.page))}
-                                on_select_page={link.callback(Msg::ReloadSources)}
+                                on_refresh={link.callback(move |_| Msg::ReloadSources { page: paginator.page, filter })}
+                                on_select_page={link.callback(move |page| Msg::ReloadSources { page, filter })}
+                                on_select_filter={link.callback(move |filter| Msg::SetFilter(filter))}
                             />
                         }
                     } else { html! {} }}
@@ -454,6 +496,7 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
 pub struct SourceTableProps {
     sources: Vec<LensSource>,
     paginator: LensSourcePaginator,
+    selected_filter: LensSourceQueryFilter,
     is_loading: bool,
     #[prop_or_default]
     on_delete: Callback<LensSource>,
@@ -461,14 +504,26 @@ pub struct SourceTableProps {
     on_refresh: Callback<MouseEvent>,
     #[prop_or_default]
     on_select_page: Callback<usize>,
+    #[prop_or_default]
+    on_select_filter: Callback<LensSourceQueryFilter>,
 }
 
 #[function_component(SourceTable)]
 pub fn source_table(props: &SourceTableProps) -> Html {
-    let source_html = props.sources
-        .iter()
-        .map(|x| html! { <LensSourceComponent on_delete={props.on_delete.clone()} source={x.clone()} /> })
-        .collect::<Html>();
+    let source_html = if props.sources.is_empty() {
+        html! {
+            <tr>
+                <td class="text-neutral-400 text-lg pt-8 text-center" colspan="4">
+                    {"Try a different filter or adding a source."}
+                </td>
+            </tr>
+        }
+    } else {
+        props.sources
+            .iter()
+            .map(|x| html! { <LensSourceComponent on_delete={props.on_delete.clone()} source={x.clone()} /> })
+            .collect::<Html>()
+    };
 
     let header_styles = classes!(
         "border-b",
@@ -480,10 +535,36 @@ pub fn source_table(props: &SourceTableProps) -> Html {
         "text-left"
     );
 
+    let filters = LensSourceQueryFilter::iter()
+        .map(|x| {
+            let btn_type = if x == props.selected_filter {
+                BtnType::Primary
+            } else {
+                BtnType::Default
+            };
+
+            let on_select = props.on_select_filter.clone();
+            let cb = Callback::from(move |_| on_select.emit(x));
+            html! {
+                <Btn
+                    size={BtnSize::Sm}
+                    _type={btn_type}
+                    onclick={cb}
+                >
+                    {x.to_string()}
+                </Btn>
+            }
+        })
+        .collect::<Html>();
+
     html! {
         <div class="flex flex-col">
-            <div class="flex flex-row items-center justify-between border-b border-neutral-700 pb-2">
+            <div class="flex flex-col gap-2 md:gap-0 md:flex-row items-center justify-between border-b border-neutral-700 pb-2">
                 <div class="font-bold">{format!("Data Sources ({})", props.paginator.num_items)}</div>
+                <div class="flex flex-row gap-2 items-center">
+                    <span class="text-sm font-semibold">{"Filter:"}</span>
+                    {filters}
+                </div>
                 <Btn size={BtnSize::Sm} onclick={props.on_refresh.clone()}>
                     <icons::RefreshIcon
                         classes="mr-1"
@@ -494,30 +575,46 @@ pub fn source_table(props: &SourceTableProps) -> Html {
                     {"Refresh"}
                 </Btn>
             </div>
-            <table class="table-auto text-sm border-collapse">
-                <thead>
-                    <tr>
-                        <th class={header_styles.clone()}></th>
-                        <th class={header_styles.clone()}>{"Document"}</th>
-                        <th class={header_styles.clone()}></th>
-                        <th class={header_styles}></th>
-                    </tr>
-                </thead>
-                <tbody>{source_html}</tbody>
-            </table>
-            {if props.paginator.num_pages > 1 {
+            {if props.is_loading {
                 html! {
-                    <div>
-                        <Paginator
-                            disabled={props.is_loading}
-                            cur_page={props.paginator.page}
-                            num_pages={props.paginator.num_pages}
-                            on_select_page={props.on_select_page.clone()}
+                    <div class="flex flex-row place-content-center mt-8">
+                        <icons::RefreshIcon
+                            width="w-8"
+                            height="h-8"
+                            animate_spin={props.is_loading}
                         />
                     </div>
                 }
             } else {
-                html! {}
+                html! {
+                    <>
+                        <table class="table-auto text-sm border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class={header_styles.clone()}></th>
+                                    <th class={header_styles.clone()}>{"Document"}</th>
+                                    <th class={header_styles.clone()}></th>
+                                    <th class={header_styles}></th>
+                                </tr>
+                            </thead>
+                            <tbody>{source_html}</tbody>
+                        </table>
+                        {if props.paginator.num_pages > 1 {
+                            html! {
+                                <div>
+                                    <Paginator
+                                        disabled={props.is_loading}
+                                        cur_page={props.paginator.page}
+                                        num_pages={props.paginator.num_pages}
+                                        on_select_page={props.on_select_page.clone()}
+                                    />
+                                </div>
+                            }
+                        } else {
+                            html! {}
+                        }}
+                    </>
+                }
             }}
         </div>
     }
