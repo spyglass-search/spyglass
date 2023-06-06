@@ -15,6 +15,8 @@ pub struct DashboardProps {
     pub on_select_lens: Callback<Lens>,
     #[prop_or_default]
     pub on_edit_lens: Callback<Lens>,
+    #[prop_or_default]
+    pub on_delete_lens: Callback<Lens>,
 }
 
 #[function_component(Dashboard)]
@@ -64,6 +66,7 @@ pub fn landing_page(props: &DashboardProps) -> Html {
                     lenses={user_data.lenses.clone()}
                     on_select={props.on_select_lens.clone()}
                     on_edit={props.on_edit_lens.clone()}
+                    on_delete={props.on_delete_lens.clone()}
                 />
             </div>
         }
