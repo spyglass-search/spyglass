@@ -99,6 +99,7 @@ pub enum Msg {
     CheckAuth,
     LoadUserData,
     SetSelectedLens(Lens),
+    LensDeleted(Lens),
     UpdateAuth(AuthStatus),
     UpdateUserData(UserData),
 }
@@ -213,6 +214,10 @@ impl Component for App {
                 self.current_lens = Some(lens.name);
                 true
             }
+            Msg::LensDeleted(_lens) => {
+                link.send_message(Msg::LoadUserData);
+                true
+            }
             Msg::UpdateAuth(auth) => {
                 self.auth_status = auth;
                 link.send_message(Msg::LoadUserData);
@@ -268,6 +273,7 @@ impl Component for App {
                                     on_create_lens={handle_on_create_lens.clone()}
                                     on_select_lens={link.callback(Msg::SetSelectedLens)}
                                     on_edit_lens={link.callback(Msg::SetSelectedLens)}
+                                    on_delete_lens={link.callback(Msg::LensDeleted)}
                                 />
                             </AppPage>
                         }

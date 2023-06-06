@@ -323,6 +323,19 @@ impl ApiClient {
         Ok(request.send().await?.json::<Lens>().await?)
     }
 
+    /// Deletes the specified lens. This will delete the lens and all associated
+    /// stored information
+    pub async fn lens_delete(&self, lens: &str) -> Result<Lens, ApiError> {
+        let mut request = self
+            .client
+            .delete(format!("{}/user/lenses/{}", self.endpoint, lens));
+        if let Some(auth_token) = &self.token {
+            request = request.bearer_auth(auth_token);
+        }
+
+        Ok(request.send().await?.json::<Lens>().await?)
+    }
+
     pub async fn lens_retrieve(&self, id: &str) -> Result<Lens, ApiError> {
         let url = if self.public_api {
             format!("{}/api/v1/lenses/{}", self.endpoint, id)
