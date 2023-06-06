@@ -87,6 +87,7 @@ impl LensConfig {
             match rule {
                 LensRule::LimitURLDepth { .. } => allowed.push(rule.to_regex()),
                 LensRule::SkipURL(_) => skipped.push(rule.to_regex()),
+                LensRule::SanitizeUrls(_, _) => {}
             }
         }
 
