@@ -92,8 +92,8 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     class="rounded-lg"
                     width="560"
                     height="315"
-                    src="https://www.youtube.com/embed/S0kxrb1oVM0"
-                    title="YouTube video player"
+                    src="https://www.youtube.com/embed/S0kxrb1oVM0?color=red&modestbranding=1&rel=0"
+                    title="Spyglass AI Demo"
                     frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowfullscreen={true}
