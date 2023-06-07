@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 pub use spyglass_lens::{
-    types::{LensFilters, LensRule, LensSource},
+    types::{LensFilters, LensRule, LensSource, UrlSanitizeConfig},
     LensConfig, PipelineConfiguration,
 };
 

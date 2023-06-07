@@ -1,4 +1,4 @@
-use regex::{RegexSet, RegexSetBuilder};
+use regex::{Regex, RegexBuilder, RegexSet, RegexSetBuilder};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
@@ -13,7 +13,7 @@ use super::crawl_tag;
 use super::indexed_document;
 use super::tag::{self, get_or_create, TagPair};
 use crate::BATCH_SIZE;
-use shared::config::{LensConfig, LensRule, Limit, UserSettings};
+use shared::config::{LensConfig, LensRule, Limit, UrlSanitizeConfig, UserSettings};
 use shared::regex::{regex_for_domain, regex_for_prefix};
 
 const MAX_RETRIES: u8 = 5;
@@ -258,6 +258,7 @@ fn create_ruleset_from_lens(lens: &LensConfig) -> LensRuleSets {
             LensRule::LimitURLDepth(_, _) => {
                 restrict_list.push(rule.to_regex());
             }
+            LensRule::SanitizeUrls(_, _) => {}
         }
     }
 
@@ -418,6 +419,7 @@ fn filter_urls(
     let mut allow_list: Vec<String> = Vec::new();
     let mut skip_list: Vec<String> = Vec::new();
     let mut restrict_list: Vec<String> = Vec::new();
+    let mut sanitize_rules: Vec<(Regex, UrlSanitizeConfig)> = Vec::new();
 
     for domain in settings.block_list.iter() {
         skip_list.push(regex_for_domain(domain));
@@ -428,6 +430,15 @@ fn filter_urls(
         allow_list.extend(ruleset.allow_list);
         skip_list.extend(ruleset.skip_list);
         restrict_list.extend(ruleset.restrict_list);
+
+        sanitize_rules.extend(lens.rules.iter().filter_map(|rule| {
+            if let LensRule::SanitizeUrls(_, config) = rule {
+                let regex = RegexBuilder::new(&rule.to_regex()).build().ok()?;
+                Some((regex, config.clone()))
+            } else {
+                None
+            }
+        }));
     }
 
     let allow_list = RegexSetBuilder::new(allow_list)
@@ -466,6 +477,12 @@ fn filter_urls(
             // https://wikipedia.org/Rust#Blah would be considered different than
             // https://wikipedia.org/Rust
             url.set_fragment(None);
+
+            for (regex, config) in &sanitize_rules {
+                if regex.is_match(url.as_str()) {
+                    sanitize_url(&mut url, config);
+                }
+            }
 
             let normalized = url.to_string();
             let no_end_slash = if normalized.ends_with('/') {
@@ -979,6 +996,14 @@ pub async fn copy_table(
             .await?;
     }
     Ok(())
+}
+
+// Helper method used to process the url sanitization configuration for
+// the provided url
+fn sanitize_url(url: &mut Url, config: &UrlSanitizeConfig) {
+    if config.remove_query_parameter {
+        url.set_query(None);
+    }
 }
 
 #[cfg(test)]

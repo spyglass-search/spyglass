@@ -6769,7 +6769,7 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
- "spyglass-lens 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spyglass-lens 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "url",
@@ -7070,7 +7070,7 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "blake2",
@@ -7082,9 +7082,9 @@ dependencies = [
 
 [[package]]
 name = "spyglass-lens"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e2ebbd0eff5a2ebf86cdc693c1b314722aee201702f9746b6309c43e4867f70"
+checksum = "56ce18cc1729a30ce56c6a0db4db63a7cf0d729e3bb7bfaf9f39feaa453628ce"
 dependencies = [
  "anyhow",
  "blake2",
@@ -7125,7 +7125,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sitemap",
- "spyglass-lens 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spyglass-lens 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "tendril",
  "texting_robots",
  "thiserror",
