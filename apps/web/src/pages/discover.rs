@@ -75,7 +75,7 @@ pub fn discover_page(_: &DiscoverPageProps) -> Html {
                     <PublicExample
                         href="/lens/golang"
                         name="Go Programming Language"
-                        description="Bootstrap is a powerful, feature-packed frontend toolkit. Build anything—from prototype to production—in minutes."
+                        description="Go is a statically typed, compiled high-level programming language designed at Google by Robert Griesemer, Rob Pike, and Ken Thompson."
                         sources={vec!["go.dev".into()]}
                     />
 
