@@ -41,6 +41,82 @@ pub fn discover_page(_: &DiscoverPageProps) -> Html {
 
             <div>
                 <h1 class="text-2xl py-4">
+                    {"Documentation"}
+                </h1>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <PublicExample
+                        href="/lens/adobe-experience-league"
+                        name="Adobe Experience League"
+                        description="Adobe Experience League is a vast library of learning content and courses for Adobe Enterprise products."
+                        sources={vec!["experience.adobe.com".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/ansible"
+                        name="Ansible"
+                        description="Ansible is a suite of software tools that enables infrastructure as code. It is open-source and the suite includes software provisioning, configuration management, and application deployment functionality."
+                        sources={vec!["ansible.com".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/bootstrap"
+                        name="Bootstrap"
+                        description="Bootstrap is a powerful, feature-packed frontend toolkit. Build anything—from prototype to production—in minutes."
+                        sources={vec!["getbootstrap.com".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/css"
+                        name="CSS"
+                        description="Cascading Style Sheets (CSS) is a stylesheet language used to describe the presentation of a document written in HTML."
+                        sources={vec!["developer.mozilla.org".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/golang"
+                        name="Go Programming Language"
+                        description="Bootstrap is a powerful, feature-packed frontend toolkit. Build anything—from prototype to production—in minutes."
+                        sources={vec!["go.dev".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/html"
+                        name="HTML"
+                        description="HTML (HyperText Markup Language) is the most basic building block of the Web. It defines the meaning and structure of web content."
+                        sources={vec!["developer.mozilla.org".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/java_se19"
+                        name="Java Programming Language"
+                        description="Java is a high-level, class-based, object-oriented programming language that is designed to have as few implementation dependencies as possible."
+                        sources={vec!["docs.oracle.com/en/java".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/rustlang"
+                        name="Rust Programming Language"
+                        description="Rust is a multi-paradigm, general-purpose programming language that emphasizes performance, type safety, and concurrency."
+                        sources={vec!["doc.rust-lang.org".into(), "docs.rs".into()]}
+                    />
+
+                    <PublicExample
+                        href="/lens/nix-docs"
+                        name="NixOS documentation"
+                        description="Nix is a powerful package manager for Linux and other Unix systems that makes package management reliable and reproducible."
+                        sources={vec![
+                            "nixos.org".into(),
+                            "nix.dev".into(),
+                            "nixos.wiki".into(),
+                            "any many more...".into()
+                        ]}
+                    />
+
+                </div>
+            </div>
+
+            <div>
+                <h1 class="text-2xl py-4">
                     {"Podcasts"}
                 </h1>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -69,32 +145,6 @@ pub fn discover_page(_: &DiscoverPageProps) -> Html {
                         name="🎙️ The Tim Ferriss Show"
                         description="Ask Tim Ferriss anything! Tim Ferriss is an American entrepreneur, investor, author, podcaster, and lifestyle guru."
                         sources={vec!["tim.blog".into()]}
-                    />
-                </div>
-            </div>
-
-            <div>
-                <h1 class="text-2xl py-4">
-                    {"Documentation"}
-                </h1>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <PublicExample
-                        href="/lens/nix-docs"
-                        name="NixOS documentation"
-                        description="Nix is a powerful package manager for Linux and other Unix systems that makes package management reliable and reproducible."
-                        sources={vec![
-                            "nixos.org".into(),
-                            "nix.dev".into(),
-                            "nixos.wiki".into(),
-                            "any many more...".into()
-                        ]}
-                    />
-
-                    <PublicExample
-                        href="/lens/adobe-experience-league"
-                        name="Adobe Experience League"
-                        description="Adobe Experience League is a vast library of learning content and courses for Adobe Enterprise products."
-                        sources={vec!["experience.adobe.com".into()]}
                     />
                 </div>
             </div>
