@@ -550,7 +550,7 @@ impl SearchPage {
                             </div>
                         }
                     } else { html! {} }}
-                    <div class="self-start md:self-end py-0 md:py-2">
+                    <div class="self-start md:self-end py-0 md:py-2 w-full">
                         <div class="font-bold text-base md:text-2xl">{lens.display_name.clone()}</div>
                         {if let Some(desc) = lens.description.clone() {
                             html! {
