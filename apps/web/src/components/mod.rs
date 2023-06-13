@@ -8,6 +8,7 @@ use yew_router::prelude::use_navigator;
 use crate::{client::Lens, AuthStatus, Route};
 
 pub mod chat_bubble;
+pub mod file_upload;
 pub mod nav;
 
 #[derive(Properties, PartialEq)]

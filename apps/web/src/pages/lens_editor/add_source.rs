@@ -6,6 +6,7 @@ use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::HtmlInputElement;
 use yew::{html::Scope, platform::spawn_local, prelude::*};
 
+use crate::components::file_upload::FileUpload;
 use crate::{
     client::{ApiError, LensAddDocType, LensAddDocument},
     AuthStatus,
@@ -25,6 +26,7 @@ pub enum AddSourceTabs {
     Website,
     Podcast,
     GDrive,
+    File,
 }
 
 pub struct AddSourceComponent {
@@ -204,6 +206,7 @@ impl Component for AddSourceComponent {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
+        let props = ctx.props();
 
         let tab_styles = classes!(
             "border-b-2",
@@ -243,6 +246,9 @@ impl Component for AddSourceComponent {
                             AddSourceTabs::Website => self.view_website_tab(link),
                             AddSourceTabs::Podcast => self.view_podcast_tab(link),
                             AddSourceTabs::GDrive => self.view_gdrive_tab(link),
+                            AddSourceTabs::File => html! {
+                                <FileUpload lens_identifier={props.lens_identifier.clone()} on_upload={ctx.link().callback(|_| Msg::EmitUpdate)}/>
+                            }
                         }}
                     </div>
                 </div>

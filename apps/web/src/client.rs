@@ -12,10 +12,12 @@ use shared::response::{ChatUpdate, SearchResult};
 use thiserror::Error;
 use yew::platform::pinned::mpsc::UnboundedReceiver;
 
+use crate::components::file_upload::FileDetails;
 use crate::pages::search::{HistoryItem, HistorySource, WorkerCmd};
 use crate::schema::{
     EmbedConfiguration, GetLensSourceRequest, GetLensSourceResponse, LensSourceQueryFilter,
 };
+use reqwest::multipart::Part;
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Error, Debug)]
@@ -246,6 +248,7 @@ pub enum LensDocType {
     Audio,
     GDrive,
     Web,
+    Upload,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -390,6 +393,43 @@ impl ApiClient {
                     .post(format!("{}/user/lenses/{}/source", self.endpoint, lens))
                     .bearer_auth(token)
                     .json(request)
+                    .send()
+                    .await?;
+
+                match resp.error_for_status_ref() {
+                    Ok(_) => Ok(()),
+                    Err(err) => match resp.json::<ApiErrorMessage>().await {
+                        Ok(msg) => Err(ApiError::ClientError(msg)),
+                        Err(_) => Err(ApiError::RequestError(err)),
+                    },
+                }
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Uploads a document source for the specified lens.
+    pub async fn upload_source_document(
+        &self,
+        lens: &str,
+        file_info: Box<FileDetails>,
+    ) -> Result<(), ApiError> {
+        match &self.token {
+            Some(token) => {
+                let data = file_info.data;
+                let name = file_info.name;
+                let file_type = file_info.file_type;
+                let mut part = Part::bytes(data);
+                part = part.file_name(name.clone());
+                part = part.mime_str(&file_type)?;
+
+                let form = reqwest::multipart::Form::new().part(name.clone(), part);
+
+                let resp = self
+                    .client
+                    .post(format!("{}/user/lenses/{}/upload", self.endpoint, lens))
+                    .bearer_auth(token)
+                    .multipart(form)
                     .send()
                     .await?;
 

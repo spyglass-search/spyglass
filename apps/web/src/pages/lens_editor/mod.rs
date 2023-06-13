@@ -431,13 +431,22 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     let source = props.source.clone();
     let callback = props.on_delete.clone();
     let is_deleting = use_state_eq(|| false);
-
+    let ext = props
+        .source
+        .display_name
+        .split('.')
+        .last()
+        .unwrap_or("")
+        .to_string();
     let doc_type_icon = match source.doc_type {
         LensDocType::Audio => html! {
             <icons::FileExtIcon ext={"mp3"} class="h-4 w-4" />
         },
         LensDocType::GDrive => html! { <icons::GDrive /> },
         LensDocType::Web => html! { <icons::GlobeIcon width="w-4" height="h-4" /> },
+        LensDocType::Upload => {
+            html! { <icons::FileExtIcon class={classes!("w-4", "h-4")} ext={ext} /> }
+        }
     };
 
     let status_icon = match source.status.as_ref() {
