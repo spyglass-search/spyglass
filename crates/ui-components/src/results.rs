@@ -336,8 +336,12 @@ pub fn web_search_result_component(props: &SearchResultProps) -> Html {
                     <span>{format!("{}", result.domain.clone())}</span>
                 </div>
                 <h2 class={classes!("text-base", "font-semibold")}>{result.title.clone()}</h2>
-                <div class="text-sm leading-relaxed text-neutral-400">
-                    {Html::from_html_unchecked(result.description.clone().into())}
+                <div class="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
+                    {if result.description.is_empty() {
+                        html! { <span class="text-neutral-400">{"No description available"}</span> }
+                    } else {
+                        html! { <span>{result.description.clone()}</span> }
+                    }}
                 </div>
                 {score}
             </div>
