@@ -651,14 +651,14 @@ impl SearchPage {
                         {if !results.is_empty() {
                             html! {
                                 <>
-                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
+                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Related"}</div>
                                     <ResultPaginator page_size={5}>{results}</ResultPaginator>
                                 </>
                             }
                         } else if self.current_query.is_some() {
                             html! {
                                 <>
-                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Sources"}</div>
+                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Related"}</div>
                                     <div class="text-sm text-neutral-500">
                                         {
                                             "We didn't find any relevant documents, but we
@@ -758,12 +758,12 @@ fn answer_section(props: &AnswerSectionProps) -> Html {
                         rows="3"
                         placeholder="Ask a followup question"
                         type="text"
-                        class="w-full flex-1 border-b-2 border-neutral-600 bg-neutral-700 text-base text-white caret-white outline-none placeholder:text-gray-300 focus:outline-none active:outline-none p-4"
+                        class="w-full resize-none flex-1 rounded-l-lg bg-neutral-700 text-base text-white caret-white outline-none placeholder:text-gray-300 focus:outline-none active:outline-none p-4"
                     ></textarea>
                     <button
                         disabled={props.in_progress}
                         type="submit"
-                        class="cursor-pointer items-center px-3 py-2 text-base font-semibold leading-5 bg-neutral-700 hover:bg-cyan-800"
+                        class="rounded-r-lg cursor-pointer items-center px-3 py-2 text-base font-semibold leading-5 bg-neutral-700 hover:bg-cyan-800"
                     >
                         <SearchIcon width="w-6" height="h-6" />
                     </button>
@@ -831,7 +831,7 @@ fn history_log_item(props: &HistoryLogItemProps) -> Html {
     };
 
     html! {
-        <div class="border-b border-neutral-600 pb-4">
+        <div class="pb-4">
             <p class={item_classes}>
                 {Html::from_html_unchecked(AttrValue::from(html))}
                 { if props.in_progress && props.source != HistorySource::User {
