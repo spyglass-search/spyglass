@@ -479,7 +479,6 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     );
 
     let url_link = if source.url.starts_with(DOWNLOAD_PREFIX) {
-        let status = auth_status.clone();
         let url = source
             .url
             .get(DOWNLOAD_PREFIX.len()..)
@@ -488,7 +487,7 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
         let name = source.display_name.clone();
         let download: Callback<MouseEvent> = Callback::from(move |evt: MouseEvent| {
             evt.prevent_default();
-            let client = status.get_client();
+            let client = auth_status.get_client();
             let url = url.clone();
             let name = name.clone();
             spawn_local(async move {
