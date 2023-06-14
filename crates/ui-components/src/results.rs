@@ -340,7 +340,7 @@ pub fn web_search_result_component(props: &SearchResultProps) -> Html {
                     {if result.description.is_empty() {
                         html! { <span class="text-neutral-400">{"No description available"}</span> }
                     } else {
-                        html! { <span>{result.description.clone()}</span> }
+                        html! { <span>{format!("…{}…", result.description.clone())}</span> }
                     }}
                 </div>
                 {score}
