@@ -71,6 +71,12 @@ extern "C" {
     pub async fn handle_login_callback() -> Result<JsValue, JsValue>;
 }
 
+#[wasm_bindgen(module = "/public/utils.js")]
+extern "C" {
+    #[wasm_bindgen]
+    pub fn download_file(url: &str, name: &str);
+}
+
 #[derive(Clone, Routable, PartialEq)]
 pub enum EmbeddedRoute {
     #[at("/lens/:lens/embedded")]

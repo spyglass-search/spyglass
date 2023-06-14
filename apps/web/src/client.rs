@@ -4,6 +4,7 @@ use std::time::Duration;
 use dotenv_codegen::dotenv;
 use futures::io::BufReader;
 use futures::{select, AsyncBufReadExt, FutureExt, StreamExt, TryStreamExt};
+use gloo::file::{Blob, ObjectUrl};
 use gloo::timers::future::sleep;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -324,6 +325,32 @@ impl ApiClient {
         }
 
         Ok(request.send().await?.json::<Lens>().await?)
+    }
+
+    /// Creates a local in memory object url that represent a downloaded file.
+    pub async fn download_file(&self, url: &str) -> Result<ObjectUrl, ApiError> {
+        let mut request = self
+            .client
+            .get(format!("{}/user/lenses{}", self.endpoint, url));
+
+        if let Some(auth_token) = &self.token {
+            request = request.bearer_auth(auth_token);
+        }
+
+        let response = request.send().await;
+        match response {
+            Ok(rsp) => {
+                let bytes = rsp.bytes().await.unwrap();
+                let byte_vec = bytes.to_vec();
+                let blob = Blob::new(byte_vec.as_slice());
+                let url = ObjectUrl::from(blob);
+                Ok(url)
+            }
+            Err(error) => {
+                log::error!("Error requesting download {:?}", error);
+                Err(ApiError::Unauthorized)
+            }
+        }
     }
 
     /// Deletes the specified lens. This will delete the lens and all associated

@@ -13,6 +13,7 @@ use yew_router::scope_ext::RouterScopeExt;
 
 use crate::{
     client::{ApiError, Lens, LensDocType, LensSource},
+    download_file,
     schema::{GetLensSourceResponse, LensSourceQueryFilter},
     AuthStatus,
 };
@@ -22,6 +23,8 @@ use add_source::AddSourceComponent;
 
 const QUERY_DEBOUNCE_MS: u32 = 1_000;
 const REFRESH_INTERVAL_MS: u32 = 5_000;
+
+const DOWNLOAD_PREFIX: &str = "https://search.spyglass.fyi/lens";
 
 #[wasm_bindgen]
 extern "C" {
@@ -431,6 +434,7 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
     let source = props.source.clone();
     let callback = props.on_delete.clone();
     let is_deleting = use_state_eq(|| false);
+    let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
     let ext = props
         .source
         .display_name
@@ -474,15 +478,52 @@ fn lens_source_comp(props: &LensSourceComponentProps) -> Html {
         "dark:text-neutral-400",
     );
 
+    let url_link = if source.url.starts_with(DOWNLOAD_PREFIX) {
+        let status = auth_status.clone();
+        let url = source
+            .url
+            .get(DOWNLOAD_PREFIX.len()..)
+            .unwrap_or("")
+            .to_string();
+        let name = source.display_name.clone();
+        let download: Callback<MouseEvent> = Callback::from(move |evt: MouseEvent| {
+            evt.prevent_default();
+            let client = status.get_client();
+            let url = url.clone();
+            let name = name.clone();
+            spawn_local(async move {
+                let response = client.download_file(&url).await;
+                match response {
+                    Ok(url) => {
+                        download_file(&url, &name);
+                    }
+                    Err(err) => {
+                        log::error!("Error requesting file download {:?}", err);
+                    }
+                }
+            });
+        });
+
+        html! {
+            <a onclick={download} href="" target="_blank" class="text-cyan-500 underline">
+                {source.display_name.clone()}
+            </a>
+        }
+    } else {
+        html! {
+            <a href={source.url.clone()} target="_blank" class="text-cyan-500 underline">
+                {source.display_name.clone()}
+            </a>
+        }
+    };
+
     html! {
         <tr>
             <td class={cell_styles.clone()}>
                 <div class="flex flex-row justify-center">{doc_type_icon}</div>
             </td>
             <td class={cell_styles.clone()}>
-                <a href={source.url.clone()} target="_blank" class="text-cyan-500 underline">
-                    {source.display_name.clone()}
-                </a>
+                {url_link}
                 <div class="text-sm text-neutral-600">{source.url.clone()}</div>
             </td>
             <td class={cell_styles.clone()}>{status_icon}</td>
