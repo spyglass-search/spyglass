@@ -365,9 +365,13 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
             if !is_registered {
                 log::info!("Registering {} as shortcut", &settings.shortcut);
                 let app_hand = app_handle.clone();
+                let should_hide_search_bar = !settings.close_search_bar.clone();
                 if let Err(e) = shortcuts.register(&settings.shortcut, move || {
                     let window = window::get_searchbar(&app_hand);
-                    if platform::is_visible(&window) {
+                    // `platform::is_visible()` returns `true` on Windows when
+                    // the search bar is built, so we cannot really know if the
+                    // window is visible when the `close_search_bar` setting is used.
+                    if should_hide_search_bar && platform::is_visible(&window) {
                         window::hide_search_bar(&window)
                     } else {
                         window::show_search_bar(&window);
