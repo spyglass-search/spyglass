@@ -1,6 +1,7 @@
 use crate::constants::{TabLocation, SETTINGS_WIN_NAME};
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
+use shared::config::Config;
 use shared::event::{ClientEvent, ModelStatusPayload};
 use shared::metrics::Metrics;
 use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
@@ -69,6 +70,15 @@ pub fn hide_search_bar(window: &Window) {
         if settings_window.is_visible().unwrap_or_default() {
             return;
         }
+    }
+
+    if let Some(config) = handle.try_state::<Config>() {
+        if config.user_settings.close_search_bar {
+            let _ = window.close();
+            return;
+        }
+    } else {
+        log::error!("Unable to get the `close_search_bar` settings");
     }
 
     platform::hide_search_bar(window);
