@@ -16,6 +16,7 @@ pub struct Metrics {
     disabled: bool,
 }
 
+#[allow(dead_code)]
 #[derive(AsRefStr, Display)]
 pub enum WebClientEvent {
     #[strum(serialize = "login")]
@@ -48,6 +49,7 @@ impl EventProps {
     }
 }
 
+#[allow(dead_code)]
 impl Metrics {
     pub fn new(disabled: bool) -> Self {
         let mut headers = header::HeaderMap::new();
