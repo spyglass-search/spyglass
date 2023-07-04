@@ -50,6 +50,10 @@ pub async fn save_user_settings(
                                         current_settings.disable_autolaunch =
                                             serde_json::from_str(value).unwrap_or_default();
                                     }
+                                    "close_search_bar" => {
+                                        current_settings.close_search_bar =
+                                            serde_json::from_str(value).unwrap_or_default();
+                                    }
                                     "disable_telemetry" => {
                                         current_settings.disable_telemetry =
                                             serde_json::from_str(value).unwrap_or_default();
