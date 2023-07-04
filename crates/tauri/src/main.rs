@@ -365,7 +365,7 @@ fn register_global_shortcut(window: &Window, app_handle: &AppHandle, settings: &
             if !is_registered {
                 log::info!("Registering {} as shortcut", &settings.shortcut);
                 let app_hand = app_handle.clone();
-                let should_hide_search_bar = !settings.close_search_bar.clone();
+                let should_hide_search_bar = !settings.close_search_bar;
                 if let Err(e) = shortcuts.register(&settings.shortcut, move || {
                     let window = window::get_searchbar(&app_hand);
                     // `platform::is_visible()` returns `true` on Windows when
