@@ -1,10 +1,8 @@
-use ui_components::btn::{Btn, BtnSize, BtnType};
 use ui_components::icons;
-use yew::{platform::spawn_local, prelude::*};
+use yew::prelude::*;
 use yew_router::prelude::use_navigator;
 
-use crate::metrics::{Metrics, WebClientEvent};
-use crate::{auth0_login, auth0_logout, AuthStatus, Route};
+use crate::{AuthStatus, Route};
 
 #[derive(Properties, PartialEq)]
 pub struct NavBarProps {
@@ -13,34 +11,10 @@ pub struct NavBarProps {
 }
 
 #[function_component(NavBar)]
-pub fn nav_bar_component(props: &NavBarProps) -> Html {
+pub fn nav_bar_component(_props: &NavBarProps) -> Html {
     let auth_status = use_context::<AuthStatus>().expect("Ctxt not set up");
     let toggle_nav = use_state(|| false);
-    let metrics = Metrics::new(false);
-    let uuid = props.session_uuid.clone();
     let navigator = use_navigator().unwrap();
-
-    let metrics_client = metrics.clone();
-    let auth_login = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        let metrics = metrics_client.clone();
-        let uuid = uuid.clone();
-        spawn_local(async move {
-            metrics.track(WebClientEvent::Login, &uuid).await;
-            let _ = auth0_login().await;
-        });
-    });
-
-    let uuid = props.session_uuid.clone();
-    let auth_logout = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        let metrics = metrics.clone();
-        let uuid = uuid.clone();
-        spawn_local(async move {
-            metrics.track(WebClientEvent::Logout, &uuid).await;
-            let _ = auth0_logout().await;
-        });
-    });
 
     #[cfg(debug_assertions)]
     let debug_vars = html! {
@@ -118,11 +92,7 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                                 </a>
                             }
                         } else {
-                            html! {
-                                <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_login.clone()} classes="w-full">
-                                    {"Sign In"}
-                                </Btn>
-                            }
+                            html! {}
                         }}
                         </div>
                     }
@@ -139,20 +109,13 @@ pub fn nav_bar_component(props: &NavBarProps) -> Html {
                                         <img src={profile.picture} class="flex-none w-6 h-6 rounded-full mx-auto" />
                                         <div class="flex-grow">{profile.name}</div>
                                     </div>
-                                    <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_logout} classes="w-full">
-                                        {"Logout"}
-                                    </Btn>
                                 </div>
                             }
                         } else {
-                            html !{}
+                            html! {}
                         }
                     } else {
-                        html! {
-                            <Btn size={BtnSize::Sm} _type={BtnType::Primary} onclick={auth_login} classes="w-full">
-                                {"Sign In"}
-                            </Btn>
-                        }
+                        html! {}
                     }}
                 </div>
                 <hr class="border border-neutral-700 mt-6 mb-4" />

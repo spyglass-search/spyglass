@@ -1,11 +1,5 @@
-use ui_components::btn::{Btn, BtnSize, BtnType};
-use yew::{platform::spawn_local, prelude::*};
+use yew::prelude::*;
 use yew_hooks::use_interval;
-
-use crate::{
-    auth0_login,
-    metrics::{Metrics, WebClientEvent},
-};
 
 #[derive(Properties, PartialEq)]
 pub struct LandingPageProps {
@@ -22,7 +16,7 @@ const WORDS: [&str; 6] = [
 ];
 
 #[function_component(LandingPage)]
-pub fn landing_page(props: &LandingPageProps) -> Html {
+pub fn landing_page(_props: &LandingPageProps) -> Html {
     let word_swap = use_state_eq(|| "community");
     let word_swap_idx = use_state_eq(|| 0);
     {
@@ -41,18 +35,6 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
         );
     }
 
-    let metrics = Metrics::new(false);
-    let uuid = props.session_uuid.clone();
-    let auth_login = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        let metrics = metrics.clone();
-        let uuid = uuid.clone();
-        spawn_local(async move {
-            metrics.track(WebClientEvent::Login, &uuid).await;
-            let _ = auth0_login().await;
-        });
-    });
-
     html! {
         <div class="flex flex-col gap-8 p-8">
             <div class="text-center">
@@ -70,21 +52,6 @@ pub fn landing_page(props: &LandingPageProps) -> Html {
                     {" and "}
                     <span class="text-white font-bold">{"chat."}</span>
                     {" Across all your content"}
-                </div>
-                <div class="mt-8 text-center w-fit mx-auto">
-                    <Btn href="https://airtable.com/shrEW2xhITj3zf7sw"
-                        _type={BtnType::Primary}
-                        size={BtnSize::Xl}
-                        classes={"inline-block"}
-                    >
-                        {"Join our waitlist"}
-                    </Btn>
-                    <div class="pt-2 text-sm">
-                        {"Already have an account?"}
-                        <a class="text-cyan-500 ml-2 font-semibold cursor-pointer" onclick={auth_login}>
-                            {"Sign in"}
-                        </a>
-                    </div>
                 </div>
             </div>
             <div class="flex place-content-center">

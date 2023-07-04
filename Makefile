@@ -85,7 +85,7 @@ setup-dev:
 	cd ./crates/client && npm install
 # Download whisper model used in development
 	mkdir -p assets/models;
-	curl -L --output whisper.base.en.bin https://huggingface.co/datasets/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
+	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
 	mv whisper.base.en.bin assets/models;
 
 # Specifically for debian based distros
