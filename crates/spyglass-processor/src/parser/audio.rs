@@ -259,15 +259,31 @@ pub fn transcibe_audio(
             state.full(params, &audio_file.samples)?;
             let num_segments = state.full_n_segments()?;
             log::debug!("Extracted {} segments", num_segments);
+            let mut token_buffer = Vec::new();
             for i in 0..num_segments {
                 let segment = match state.full_get_segment_text(i) {
-                    Ok(segment) => segment,
+                    Ok(segment) => {
+                        token_buffer.clear();
+                        Some(segment)
+                    }
                     Err(error) => {
                         match state.full_n_tokens(i) {
                             Ok(num) => {
                                 for j in 0..num {
                                     match state.full_get_token_data(i, j) {
                                         Ok(data) => {
+                                            let check_utf8 = !token_buffer.is_empty();
+                                            match ctx.token_to_cstr(data.tid) {
+                                                Ok(str) => {
+                                                    for b in str.to_bytes() {
+                                                        token_buffer.push(*b);
+                                                    }
+                                                }
+                                                Err(error) => {
+                                                    log::error!("Cannot convert token to c string");
+                                                }
+                                            }
+
                                             log::info!("Token data {:?}", data);
                                         }
                                         Err(error) => {
@@ -280,14 +296,30 @@ pub fn transcibe_audio(
                                 log::error!("Cant find the number");
                             }
                         }
+
                         log::error!("Error accessing segment text {:?}", error);
-                        "*Unknown Audio*".to_string()
+                        log::error!("Token buffer {:?}", token_buffer);
+                        match std::str::from_utf8(&token_buffer.clone()) {
+                            Ok(str) => {
+                                log::error!("Got a valid string {:?}", str);
+                                token_buffer.clear();
+                                Some(str.to_string())
+                            }
+                            Err(error) => {
+                                log::error!("Kind of expected");
+                                None
+                            }
+                        }
+
+                        // "*Unknown Audio*".to_string()
                     }
                 };
                 let start_timestamp = state.full_get_segment_t0(i)?;
                 let end_timestamp = state.full_get_segment_t1(i)?;
-                res.segments
-                    .push(Segment::new(start_timestamp, end_timestamp, &segment));
+                if let Some(seg) = segment {
+                    res.segments
+                        .push(Segment::new(start_timestamp, end_timestamp, &seg));
+                }
             }
         }
         Err(err) => {
