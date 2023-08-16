@@ -263,6 +263,23 @@ pub fn transcibe_audio(
                 let segment = match state.full_get_segment_text(i) {
                     Ok(segment) => segment,
                     Err(error) => {
+                        match state.full_n_tokens(i) {
+                            Ok(num) => {
+                                for j in 0..num {
+                                    match state.full_get_token_data(i, j) {
+                                        Ok(data) => {
+                                            log::info!("Token data {:?}", data);
+                                        }
+                                        Err(error) => {
+                                            log::error!("Cant get token data");
+                                        }
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                log::error!("Cant find the number");
+                            }
+                        }
                         log::error!("Error accessing segment text {:?}", error);
                         "*Unknown Audio*".to_string()
                     }
