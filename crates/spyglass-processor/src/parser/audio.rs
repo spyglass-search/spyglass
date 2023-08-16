@@ -260,9 +260,13 @@ pub fn transcibe_audio(
             let num_segments = state.full_n_segments()?;
             log::debug!("Extracted {} segments", num_segments);
             for i in 0..num_segments {
-                let segment = state
-                    .full_get_segment_text(i)
-                    .expect("failed to get segment");
+                let segment = match state.full_get_segment_text(i) {
+                    Ok(segment) => segment,
+                    Err(error) => {
+                        log::error!("Error accessing segment text {:?}", error);
+                        "*Unknown Audio*".to_string()
+                    }
+                };
                 let start_timestamp = state.full_get_segment_t0(i)?;
                 let end_timestamp = state.full_get_segment_t1(i)?;
                 res.segments
