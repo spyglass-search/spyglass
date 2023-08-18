@@ -260,15 +260,20 @@ pub fn transcribe_audio(
             let num_segments = state.full_n_segments()?;
             log::debug!("Extracted {} segments", num_segments);
             let mut token_buffer = Vec::new();
+            let mut start_time_stored: Option<i64> = None;
             for i in 0..num_segments {
                 let segment = match state.full_get_segment_text(i) {
                     Ok(segment) => {
                         token_buffer.clear();
+                        start_time_stored = None;
                         Some(segment)
                     }
                     Err(_error) => {
                         match state.full_get_segment_bytes(i) {
                             Ok(bytes) => {
+                                if start_time_stored.is_none() {
+                                    start_time_stored = Some(state.full_get_segment_t0(i)?);
+                                }
                                 token_buffer.extend(bytes);
                             }
                             Err(error) => {
@@ -285,9 +290,16 @@ pub fn transcribe_audio(
                         }
                     }
                 };
-                let start_timestamp = state.full_get_segment_t0(i)?;
+
+                let mut start_timestamp = state.full_get_segment_t0(i)?;
                 let end_timestamp = state.full_get_segment_t1(i)?;
                 if let Some(seg) = segment {
+                    // In the case we had to piece together segments to get a valid
+                    // utf8 string the start time might not be this segment, but a
+                    // previous one.
+                    if let Some(start) = start_time_stored {
+                        start_timestamp = start;
+                    }
                     res.segments
                         .push(Segment::new(start_timestamp, end_timestamp, &seg));
                 }
