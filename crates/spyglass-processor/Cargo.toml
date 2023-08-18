@@ -19,7 +19,7 @@ strum = "0.24"
 strum_macros = "0.24"
 symphonia = { version = "0.5.2", features = ["aac", "isomp4", "mp3", "mpa"] }
 uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
-whisper-rs = "0.8.0"
+whisper-rs = { git = "https://github.com/tazz4843/whisper-rs.git", rev = "24e6a0025e2714ff2bed5861b07af8735fb71d18"}
 
 # Internal spyglass libs
 shared = { path = "../shared" }
