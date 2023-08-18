@@ -220,7 +220,7 @@ pub struct TranscriptionResult {
 }
 
 /// Given a path to a wav file, transcribe it using our **shhhh** models.
-pub fn transcibe_audio(
+pub fn transcribe_audio(
     path: PathBuf,
     model_path: PathBuf,
     segment_len: i32,
@@ -259,14 +259,50 @@ pub fn transcibe_audio(
             state.full(params, &audio_file.samples)?;
             let num_segments = state.full_n_segments()?;
             log::debug!("Extracted {} segments", num_segments);
+            let mut token_buffer = Vec::new();
+            let mut start_time_stored: Option<i64> = None;
             for i in 0..num_segments {
-                let segment = state
-                    .full_get_segment_text(i)
-                    .expect("failed to get segment");
-                let start_timestamp = state.full_get_segment_t0(i)?;
+                let segment = match state.full_get_segment_text(i) {
+                    Ok(segment) => {
+                        token_buffer.clear();
+                        start_time_stored = None;
+                        Some(segment)
+                    }
+                    Err(_error) => {
+                        match state.full_get_segment_bytes(i) {
+                            Ok(bytes) => {
+                                if start_time_stored.is_none() {
+                                    start_time_stored = Some(state.full_get_segment_t0(i)?);
+                                }
+                                token_buffer.extend(bytes);
+                            }
+                            Err(error) => {
+                                log::error!("Error accessing bytes for segment {:?}", error);
+                            }
+                        }
+
+                        match std::str::from_utf8(&token_buffer.clone()) {
+                            Ok(str) => {
+                                token_buffer.clear();
+                                Some(str.to_string())
+                            }
+                            Err(_error) => None,
+                        }
+                    }
+                };
+
+                let mut start_timestamp = state.full_get_segment_t0(i)?;
                 let end_timestamp = state.full_get_segment_t1(i)?;
-                res.segments
-                    .push(Segment::new(start_timestamp, end_timestamp, &segment));
+                if let Some(seg) = segment {
+                    // In the case we had to piece together segments to get a valid
+                    // utf8 string the start time might not be this segment, but a
+                    // previous one.
+                    if let Some(start) = start_time_stored {
+                        start_timestamp = start;
+                    }
+                    res.segments
+                        .push(Segment::new(start_timestamp, end_timestamp, &seg));
+                }
             }
         }
         Err(err) => {
@@ -282,14 +318,14 @@ pub fn transcibe_audio(
 #[cfg(test)]
 mod test {
     const MODEL_PATH: &str = "../../assets/models/whisper.base.en.bin";
-    use super::transcibe_audio;
+    use super::transcribe_audio;
 
     #[test]
     fn test_wav_transcription() {
         // Use the sample from whisper.cpp as a baseline test.
         let expected = include_str!("../../../../fixtures/audio/jfk.txt");
         let path = "../../fixtures/audio/jfk.wav".into();
-        let res = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let res = transcribe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
         let segments = res.segments;
         assert!(segments.len() > 0);
 
@@ -305,7 +341,7 @@ mod test {
     fn test_ogg_transcription() {
         let expected = include_str!("../../../../fixtures/audio/armstrong.txt");
         let path = "../../fixtures/audio/armstrong.ogg".into();
-        let res = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let res = transcribe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
         let segments = res.segments;
         assert!(segments.len() > 0);
         let combined = segments
@@ -322,7 +358,7 @@ mod test {
     fn test_mp3_transcription() {
         let expected = include_str!("../../../../fixtures/audio/count_of_monte_cristo.txt");
         let path = "../../fixtures/audio/count_of_monte_cristo.mp3".into();
-        let res = transcibe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
+        let res = transcribe_audio(path, MODEL_PATH.into(), 1).expect("Unable to transcribe");
         let segments = res.segments;
         assert!(segments.len() > 0);
         let combined = segments

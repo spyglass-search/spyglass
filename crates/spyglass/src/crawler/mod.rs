@@ -555,7 +555,7 @@ async fn _process_file(
                     log::warn!("whisper model not installed, skipping transcription");
                     content = None;
                 } else {
-                    match parser::audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
+                    match parser::audio::transcribe_audio(path.to_path_buf(), model_path, 0) {
                         Ok(result) => {
                             // Update crawl result with appropriate title/stuff
                             if let Some(metadata) = result.metadata {
