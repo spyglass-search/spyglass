@@ -88,7 +88,7 @@ setup-dev:
 	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
 	mv whisper.base.en.bin assets/models;
 # Check if .env exists and if not create it
-	cp -n .env.template .env
+	test -f .env || cp .env.template .env
 # Check if /dist folder exists for Tauri and if not create it
 	mkdir -p ./crates/tauri/dist
 
