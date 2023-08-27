@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use tantivy::collector::TopDocs;
+use tantivy::directory::error::LockError;
 use tantivy::query::TermQuery;
-use tantivy::schema::*;
+use tantivy::{schema::*, TantivyError};
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
 use uuid::Uuid;
 
@@ -191,11 +192,13 @@ impl Searcher {
         let writer = if readonly {
             None
         } else {
-            Some(Arc::new(Mutex::new(
-                index
-                    .writer(50_000_000)
-                    .expect("Unable to create index_writer"),
-            )))
+            Some(Arc::new(Mutex::new(match index.writer(50_000_000) {
+                Ok(writer) => writer,
+                Err(TantivyError::LockFailure(LockError::LockBusy, _)) => {
+                    panic!("Failed to acquire index lock. You are probably already running a spyglass instance.")
+                }
+                Err(e) => panic!("Unable to create index_writer: {e:?}"),
+            })))
         };
 
         // For a search server you will typically create on reader for the entire
