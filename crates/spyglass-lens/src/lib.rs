@@ -126,7 +126,7 @@ impl LensConfig {
         for cat in self.categories.iter() {
             tags.push(("category".into(), cat.clone()));
         }
-        tags.extend(self.tags.clone().into_iter());
+        tags.extend(self.tags.clone());
 
         tags
     }
