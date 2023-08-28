@@ -87,6 +87,8 @@ setup-dev:
 	mkdir -p assets/models;
 	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
 	mv whisper.base.en.bin assets/models;
+# Build backend to copy binaries for Tauri
+	make build-backend
 
 # Specifically for debian based distros
 setup-dev-linux:
@@ -101,6 +103,9 @@ setup-dev-linux:
 		cmake \
 		libsdl2-dev \
 		clang
+
+run-backend-dev:
+	cargo run -p spyglass
 
 run-client-dev:
 	cargo tauri dev
