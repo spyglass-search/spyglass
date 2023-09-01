@@ -1,0 +1,112 @@
+[config]
+default_to_workspace = false
+reduce_output = false
+skip_git_env_info = true
+
+[env]
+SPYGLASS_CLIENT_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/client"
+
+[tasks.setup]
+dependencies = [
+    "setup-linux",
+    "install-client-npm",
+    "setup-tauri",
+    "download-whisper",
+    "prepare-env-file",
+    "build-backend",
+    "copy-backend-binaries",
+    "copy-pdftotext-binaries",
+]
+
+###################
+# Private Helpers #
+###################
+
+[tasks.build-backend]
+private = true
+script = '''cargo build -p spyglass'''
+script_runner = "@shell"
+
+# TODO: test on windows based on composite paths
+[tasks.copy-backend-binaries]
+private = true
+script = '''
+mkdir -p crates/tauri/binaries
+cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}
+cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}
+'''
+script_runner = "@shell"
+
+# TODO: test on windows based on composite paths
+[tasks.copy-pdftotext-binaries]
+private = true
+script_runner = "@shell"
+[tasks.copy-pdftotext-binaries.linux]
+script = '''cp utils/linux/pdftotext crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
+[tasks.copy-pdftotext-binaries.mac]
+script = '''cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
+[tasks.copy-pdftotext-binaries.windows]
+script = '''cp utils/win/pdftotext.exe crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe'''
+
+[tasks.download-whisper]
+private = true
+script = '''
+mkdir -p assets/models
+curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+mv whisper.base.en.bin assets/models
+'''
+script_runner = "@shell"
+
+[tasks.install-client-npm]
+cwd = "${SPYGLASS_CLIENT_DIR}"
+private = true
+script = "npm -s install"
+script_runner = "@shell"
+
+[tasks.install-tauri-cli]
+install_crate = "tauri-cli"
+private = true
+
+[tasks.install-trunk]
+install_crate = "trunk"
+private = true
+
+[tasks.install-wasm32-unknown]
+args = ["target", "add", "wasm32-unknown-unknown"]
+command = "rustup"
+private = true
+
+[tasks.install-wasm32-wasi]
+args = ["target", "add", "wasm32-wasi"]
+command = "rustup"
+private = true
+
+[tasks.setup-linux]
+condition = { platforms = ["linux"] }
+install_script = '''
+sudo apt install libwebkit2gtk-4.0-dev \
+    build-essential \
+    curl \
+    wget \
+    libssl-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev
+'''
+private = true
+
+[tasks.setup-tauri]
+dependencies = [
+    "install-tauri-cli",
+    "install-trunk",
+    "install-wasm32-unknown",
+    "install-wasm32-wasi",
+]
+private = true
+script = '''mkdir -p ./crates/tauri/dist'''
+script_runner = "@shell"
+
+[tasks.prepare-env-file]
+private = true
+script = '''test -f .env || cp .env.template .env'''
+script_runner = "@shell"
