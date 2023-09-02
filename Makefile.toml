@@ -5,6 +5,20 @@ skip_git_env_info = true
 
 [env]
 SPYGLASS_CLIENT_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/client"
+TAURI_DEV_CONFIG = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/tauri/tauri.dev.conf.json"
+
+[tasks.run]
+args = ["cargo make run-backend", "cargo make run-client"]
+command = "mprocs"
+install_crate = { crate_name = "mprocs" }
+
+[tasks.run-backend]
+args = ["run", "-p", "spyglass", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+command = "cargo"
+
+[tasks.run-client]
+args = ["tauri", "dev", "--config", "${TAURI_DEV_CONFIG}"]
+command = "cargo"
 
 [tasks.setup]
 dependencies = [
