@@ -6,6 +6,7 @@ skip_git_env_info = true
 [env]
 SPYGLASS_CLIENT_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/client"
 TAURI_DEV_CONFIG = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/tauri/tauri.dev.conf.json"
+EXECUTABLE_EXTENSION = { source = "${CARGO_MAKE_RUST_TARGET_OS}", mapping = { "windows" = ".exe" } }
 
 [tasks.run]
 args = ["cargo make run-backend", "cargo make run-client"]
@@ -41,17 +42,15 @@ private = true
 script = '''cargo build -p spyglass'''
 script_runner = "@shell"
 
-# TODO: test on windows based on composite paths
 [tasks.copy-backend-binaries]
+dependencies = ["create-binary-directory"]
 private = true
 script = '''
-mkdir -p crates/tauri/binaries
-cp target/debug/spyglass crates/tauri/binaries/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}
-cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}
+cp target/debug/spyglass${EXECUTABLE_EXTENSION} crates/tauri/binaries/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}${EXECUTABLE_EXTENSION} 
+cp target/debug/spyglass-debug${EXECUTABLE_EXTENSION} crates/tauri/binaries/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}${EXECUTABLE_EXTENSION} 
 '''
 script_runner = "@shell"
 
-# TODO: test on windows based on composite paths
 [tasks.copy-pdftotext-binaries]
 private = true
 script_runner = "@shell"
@@ -61,6 +60,13 @@ script = '''cp utils/linux/pdftotext crates/tauri/binaries/pdftotext-${CARGO_MAK
 script = '''cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
 [tasks.copy-pdftotext-binaries.windows]
 script = '''cp utils/win/pdftotext.exe crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe'''
+
+[tasks.create-binary-directory]
+private = true
+script = '''mkdir -p crates/tauri/binaries'''
+script_runner = "@shell"
+[tasks.create-binary-directory.windows]
+script = '''IF NOT EXIST .\crates\tauri\binaries mkdir .\crates\tauri\binaries'''
 
 [tasks.download-whisper]
 private = true
@@ -119,8 +125,12 @@ dependencies = [
 private = true
 script = '''mkdir -p ./crates/tauri/dist'''
 script_runner = "@shell"
+[tasks.setup-tauri.windows]
+script = '''IF NOT EXIST .\crates\tauri\dist mkdir .\crates\tauri\dist'''
 
 [tasks.prepare-env-file]
 private = true
 script = '''test -f .env || cp .env.template .env'''
 script_runner = "@shell"
+[tasks.prepare-env-file.windows]
+script = '''IF NOT EXIST .env COPY .env.template .env'''
