@@ -46,8 +46,8 @@ script_runner = "@shell"
 dependencies = ["create-binary-directory"]
 private = true
 script = '''
-cp target/debug/spyglass${EXECUTABLE_EXTENSION} crates/tauri/binaries/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}${EXECUTABLE_EXTENSION} 
-cp target/debug/spyglass-debug${EXECUTABLE_EXTENSION} crates/tauri/binaries/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}${EXECUTABLE_EXTENSION} 
+cp ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/debug/spyglass${EXECUTABLE_EXTENSION} crates/tauri/binaries/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}${EXECUTABLE_EXTENSION} 
+cp ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/debug/spyglass-debug${EXECUTABLE_EXTENSION} crates/tauri/binaries/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}${EXECUTABLE_EXTENSION} 
 '''
 script_runner = "@shell"
 
