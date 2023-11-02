@@ -67,7 +67,7 @@ private = true
 
 [tasks.set-platform-specific-variables.windows]
 # Only needed for these kinds of path-building, composite environment variables.
-env = { SPYGLASS_BACKEND_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\debug\spyglass.exe''', SPYGLASS_BACKEND_DEBUG_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\debug\spyglass-debug.exe''', SPYGLASS_TAURI_DIR = '''${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\crates\tauri\binaries''', SPYGLASS_BACKEND_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''', SPYGLASS_BACKEND_DEBUG_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''' }
+env = { SPYGLASS_BACKEND_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\debug\spyglass.exe''', SPYGLASS_BACKEND_DEBUG_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\debug\spyglass-debug.exe''', SPYGLASS_TAURI_DIR = '''${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\crates\tauri\binaries''', SPYGLASS_BACKEND_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''', SPYGLASS_BACKEND_DEBUG_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''' }
 private = true
 
 [tasks.copy-pdftotext-binaries]
