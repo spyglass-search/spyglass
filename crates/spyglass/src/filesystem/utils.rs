@@ -119,7 +119,7 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
             if let Some(time) =
                 NaiveDateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
             {
-                DateTime::<Utc>::from_utc(time, Utc)
+                time.and_utc()
             } else {
                 Utc::now()
             }
