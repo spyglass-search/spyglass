@@ -49,8 +49,8 @@ dependencies = [
 
 [tasks.build-backend]
 private = true
-script = '''cargo build -p spyglass'''
-script_runner = "@shell"
+args = ["build", "-p", "spyglass", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+command = "cargo"
 
 [tasks.copy-backend-binaries]
 dependencies = ["create-binary-directory", "set-platform-specific-variables"]
@@ -62,12 +62,12 @@ cp "${SPYGLASS_BACKEND_DEBUG_BIN}" "${SPYGLASS_BACKEND_DEBUG_TAURI_BIN}"
 script_runner = "@shell"
 
 [tasks.set-platform-specific-variables]
-env = {SPYGLASS_BACKEND_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/debug/spyglass", SPYGLASS_BACKEND_DEBUG_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/debug/spyglass-debug", SPYGLASS_TAURI_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/tauri/binaries", SPYGLASS_BACKEND_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}", SPYGLASS_BACKEND_DEBUG_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}" }
+env = {SPYGLASS_BACKEND_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_CARGO_PROFILE}/spyglass", SPYGLASS_BACKEND_DEBUG_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_CARGO_PROFILE}/spyglass-debug", SPYGLASS_TAURI_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/tauri/binaries", SPYGLASS_BACKEND_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}", SPYGLASS_BACKEND_DEBUG_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}" }
 private = true
 
 [tasks.set-platform-specific-variables.windows]
 # Only needed for these kinds of path-building, composite environment variables.
-env = { SPYGLASS_BACKEND_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\debug\spyglass.exe''', SPYGLASS_BACKEND_DEBUG_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\debug\spyglass-debug.exe''', SPYGLASS_TAURI_DIR = '''${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\crates\tauri\binaries''', SPYGLASS_BACKEND_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''', SPYGLASS_BACKEND_DEBUG_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''' }
+env = { SPYGLASS_BACKEND_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\${CARGO_MAKE_CARGO_PROFILE}\spyglass.exe''', SPYGLASS_BACKEND_DEBUG_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\${CARGO_MAKE_CARGO_PROFILE}\spyglass-debug.exe''', SPYGLASS_TAURI_DIR = '''${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\crates\tauri\binaries''', SPYGLASS_BACKEND_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''', SPYGLASS_BACKEND_DEBUG_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''' }
 private = true
 
 [tasks.copy-pdftotext-binaries]
