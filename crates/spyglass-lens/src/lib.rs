@@ -87,6 +87,7 @@ impl LensConfig {
             match rule {
                 LensRule::LimitURLDepth { .. } => allowed.push(rule.to_regex()),
                 LensRule::SkipURL(_) => skipped.push(rule.to_regex()),
+                LensRule::SanitizeUrls(_, _) => {}
             }
         }
 
@@ -125,7 +126,7 @@ impl LensConfig {
         for cat in self.categories.iter() {
             tags.push(("category".into(), cat.clone()));
         }
-        tags.extend(self.tags.clone().into_iter());
+        tags.extend(self.tags.clone());
 
         tags
     }

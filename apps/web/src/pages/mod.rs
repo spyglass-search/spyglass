@@ -1,6 +1,11 @@
 use yew::prelude::*;
 
-pub mod lens_edit;
+pub mod chat;
+pub mod dashboard;
+pub mod discover;
+pub mod embedded;
+pub mod landing;
+pub mod lens_editor;
 pub mod search;
 
 #[derive(Properties, PartialEq)]
@@ -12,7 +17,7 @@ pub struct AppPageProps {
 #[function_component]
 pub fn AppPage(props: &AppPageProps) -> Html {
     html! {
-        <div class="flex-col flex-1">
+        <div class="flex-col flex-1 min-h-screen">
             {props.children.clone()}
         </div>
     }

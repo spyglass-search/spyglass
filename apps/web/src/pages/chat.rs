@@ -1,6 +1,10 @@
 use crate::{
     client::{ApiClient, ApiError, Lens, SpyglassClient},
-    AuthStatus, Route,
+    components::chat_bubble::{self, ChatBubble},
+    pages::search::{HistorySource, WorkerCmd},
+    schema::Theme,
+    utils::validate_hex_color,
+    AuthStatus,
 };
 use futures::lock::Mutex;
 use shared::response::SearchResult;
@@ -10,11 +14,9 @@ use shared::{
 };
 use std::str::FromStr;
 use std::sync::Arc;
-use strum_macros::Display;
 use ui_components::{
-    btn::{Btn, BtnSize, BtnType},
+    btn::{Btn, BtnType},
     icons::{RefreshIcon, SearchIcon},
-    results::{ResultPaginator, WebSearchResultItem},
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
@@ -22,29 +24,13 @@ use yew::platform::pinned::mpsc;
 use yew::{html::Scope, platform::pinned::mpsc::UnboundedSender, prelude::*};
 use yew_router::prelude::*;
 
+use super::search::HistoryItem;
+
 // make sure we only have one connection per client
 type Client = Arc<Mutex<SpyglassClient>>;
 
-#[derive(Clone, PartialEq, Eq, Display)]
-pub enum HistorySource {
-    #[strum(serialize = "assistant")]
-    Clippy,
-    #[strum(serialize = "user")]
-    User,
-    #[strum(serialize = "system")]
-    System,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct HistoryItem {
-    /// who "wrote" this response
-    pub source: HistorySource,
-    pub value: String,
-}
-
 #[allow(dead_code)]
 pub enum Msg {
-    Focus,
     SetChatUuid(String),
     ContextAdded(String),
     HandleFollowup(String),
@@ -65,20 +51,14 @@ pub enum Msg {
 }
 
 #[derive(Properties, PartialEq)]
-pub struct SearchPageProps {
+pub struct ChatPageProps {
     pub lens: String,
     pub session_uuid: String,
     pub chat_session: Option<String>,
-    pub embedded: bool,
     pub lens_data: Option<Lens>,
 }
 
-#[derive(Clone, Debug)]
-pub enum WorkerCmd {
-    Stop,
-}
-
-pub struct SearchPage {
+pub struct ChatPage {
     client: Client,
     lens_identifier: String,
     lens_data: Option<Lens>,
@@ -88,7 +68,6 @@ pub struct SearchPage {
     in_progress: bool,
     results: Vec<SearchResult>,
     search_input_ref: NodeRef,
-    search_wrapper_ref: NodeRef,
     status_msg: Option<String>,
     tokens: Option<String>,
     context: Option<String>,
@@ -96,14 +75,13 @@ pub struct SearchPage {
     chat_uuid: Option<String>,
     session_uuid: String,
     historical_chat: bool,
-    embedded: bool,
     _worker_cmd: Option<UnboundedSender<WorkerCmd>>,
     _context_listener: ContextHandle<AuthStatus>,
 }
 
-impl Component for SearchPage {
+impl Component for ChatPage {
     type Message = Msg;
-    type Properties = SearchPageProps;
+    type Properties = ChatPageProps;
 
     fn create(ctx: &yew::Context<Self>) -> Self {
         let props = ctx.props();
@@ -119,21 +97,13 @@ impl Component for SearchPage {
             ctx.link().send_message(Msg::Reload);
         }
 
-        {
-            let link = ctx.link().clone();
-            let timeout =
-                gloo::timers::callback::Timeout::new(1_000, move || link.send_message(Msg::Focus));
-            timeout.forget();
-        }
-
         Self {
             client: Arc::new(Mutex::new(SpyglassClient::new(
                 props.lens.clone(),
                 props.session_uuid.clone(),
                 auth_status.token.clone(),
-                props.embedded,
+                true,
             ))),
-            embedded: props.embedded,
             auth_status,
             context: None,
             current_query: None,
@@ -143,7 +113,6 @@ impl Component for SearchPage {
             lens_identifier: props.lens.clone(),
             results: Vec::new(),
             search_input_ref: Default::default(),
-            search_wrapper_ref: Default::default(),
             show_context: false,
             status_msg: None,
             tokens: None,
@@ -194,12 +163,6 @@ impl Component for SearchPage {
     fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         let link = ctx.link();
         match msg {
-            Msg::Focus => {
-                if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
-                    let _ = search_input.focus();
-                }
-                true
-            }
             Msg::SetChatUuid(uuid) => {
                 self.chat_uuid = Some(uuid);
                 false
@@ -291,9 +254,12 @@ impl Component for SearchPage {
             }
             Msg::HandleSearch => {
                 if let Some(search_input) = self.search_input_ref.cast::<HtmlInputElement>() {
-                    self.reset_search();
                     let query = search_input.value();
-                    link.send_message(Msg::SetQuery(query));
+                    if self.current_query.is_some() {
+                        link.send_message(Msg::HandleFollowup(query))
+                    } else {
+                        link.send_message(Msg::SetQuery(query));
+                    }
                     search_input.set_value("");
                 }
                 false
@@ -439,23 +405,9 @@ impl Component for SearchPage {
         let link = ctx.link();
         if let Some(lens) = self.lens_data.clone() {
             html! {
-                <>
-                    {self.render_search(link, &lens)}
-                    {if !self.auth_status.is_authenticated {
-                        html! {
-                        <div class="sticky top-[90vh] md:top-[100vh] mx-auto w-fit text-center pb-4">
-                            <a href="/" target="_blank" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-2 md:px-4 py-1 md:py-2 hover:bg-cyan-900">
-                                <img src="/icons/logo@2x.png" class="w-6 md:w-8" />
-                                <div class="ml-1 md:ml-2 text-left">
-                                    <div class="text-xs md:text-sm font-semibold md:font-bold">{"Powered by Spyglass"}</div>
-                                    <div class="hidden md:block text-xs text-cyan-200">{"Click to create your own"}</div>
-                                </div>
-                            </a>
-                            <div class="hidden md:block mt-4 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
-                        </div>
-                        }
-                    } else { html! {} }}
-                </>
+                <div class="h-screen w-full">
+                  {self.render_search(link, &lens)}
+                </div>
             }
         } else {
             html! {}
@@ -463,7 +415,7 @@ impl Component for SearchPage {
     }
 }
 
-fn process_update(update: ChatUpdate, link: &Scope<SearchPage>) {
+fn process_update(update: ChatUpdate, link: &Scope<ChatPage>) {
     match update {
         ChatUpdate::ChatStart(uuid) => {
             log::info!("ChatUpdate::ChatStart");
@@ -504,7 +456,7 @@ fn process_update(update: ChatUpdate, link: &Scope<SearchPage>) {
     }
 }
 
-impl SearchPage {
+impl ChatPage {
     fn reset_search(&mut self) {
         self.context = None;
         self.current_query = None;
@@ -516,188 +468,178 @@ impl SearchPage {
         self.chat_uuid = None;
     }
 
-    fn render_search(&self, link: &Scope<SearchPage>, lens: &Lens) -> Html {
-        let placeholder = format!("Ask anything related to \"{}\"", lens.display_name);
+    fn render_search(&self, link: &Scope<ChatPage>, lens: &Lens) -> Html {
+        let placeholder = format!("Ask anything related to {}", lens.display_name);
 
-        let results = self
-            .results
+        let mut chats = Vec::new();
+        let mut header_color = String::from("#454545");
+        let bot_bubble_color = lens
+            .embedded_configuration
+            .as_ref()
+            .map(|cfg| cfg.bot_bubble_color.clone())
+            .unwrap_or_default();
+        let user_bubble_color = lens
+            .embedded_configuration
+            .as_ref()
+            .map(|cfg| cfg.user_bubble_color.clone())
+            .unwrap_or_default();
+        let mut theme = "dark-mode";
+        let mut header_title = lens.display_name.clone();
+        let add_initial: bool = lens
+            .embedded_configuration
+            .as_ref()
+            .map(|cfg| cfg.initial_chat.is_empty())
+            .unwrap_or(true);
+
+        if add_initial {
+            chats.push(html! {
+                <ChatBubble background={bot_bubble_color.clone()} align={chat_bubble::ChatAlign::Left} text={placeholder.clone()}/>
+            });
+        }
+
+        if let Some(embedding_config) = &lens.embedded_configuration {
+            // Add initial chat messages
+            for initial in &embedding_config.initial_chat {
+                chats.push(html! {
+                    <ChatBubble background={bot_bubble_color.clone()} align={chat_bubble::ChatAlign::Left} text={initial.clone()}/>
+                });
+            }
+
+            if let Some(color) = &embedding_config.header_color {
+                if validate_hex_color(color).is_ok() {
+                    header_color = format!("#{}", color);
+                }
+            }
+
+            if let Some(title) = &embedding_config.header_title {
+                header_title = title.clone();
+            }
+
+            theme = match &embedding_config.theme {
+                Theme::LightMode => "light-mode",
+                Theme::DarkMode => "dark-mode",
+            }
+        }
+
+        log::error!("history {:?}", self.history.len());
+
+        chats.extend(self
+            .history
             .iter()
-            .map(|result| {
-                html! {
-                    <WebSearchResultItem
-                        id={format!("result-{}", result.doc_id)}
-                        result={result.clone()}
-                    />
-                }
+            .filter_map(|history| match history.source {
+                HistorySource::Clippy => Some(html! {
+                    <ChatBubble background={bot_bubble_color.clone()} align={chat_bubble::ChatAlign::Left} text={history.value.clone()}/>
+                }),
+                HistorySource::User => Some(html! {
+                    <ChatBubble background={user_bubble_color.clone()} align={chat_bubble::ChatAlign::Right} text={history.value.clone()}/>
+                }),
+                _ => None,
             })
-            .collect::<Vec<Html>>();
+            .collect::<Vec<Html>>());
 
-        let nav_link = link.clone();
-        let lens_id = self.lens_identifier.clone();
-        let nav_callback = Callback::from(move |_| {
-            nav_link.navigator().unwrap().push(&Route::Search {
-                lens: lens_id.clone(),
-            })
-        });
+        // TODO configure justify and background color
+        let justify = classes!("justify-center", "flex", "items-center", "mb-4", "p-4");
 
+        let chat_display = classes!(theme, "h-full");
+        // TODO configurable product icon, bot image, user image, etc
         html! {
-            <div ref={self.search_wrapper_ref.clone()}>
-                <div class="p-4 md:p-8 flex flex-row items-center gap-4 pb-10 md:pb-14">
-                    {if let Some(image) = lens.image.clone() {
-                        html! {
-                            <div class="flex-none">
-                                <img class="rounded h-12 md:h-24 w-12 md:w-24"  src={image}/>
-                            </div>
-                        }
-                    } else { html! {} }}
-                    <div class="self-start md:self-end py-0 md:py-2 w-full">
-                        <div class="font-bold text-base md:text-2xl">{lens.display_name.clone()}</div>
-                        {if let Some(desc) = lens.description.clone() {
-                            html! {
-                                <div class="text-xs md:text-sm text-neutral-400 w-full md:w-3/4 h-8 md:h-fit overflow-hidden">
-                                    {desc}
-                                </div>
-                            }
-                        } else { html! {} }}
-                    </div>
-                </div>
-                {if !self.historical_chat {
-                    html! {
-                    <div class="flex flex-nowrap w-full px-4 md:px-8 -mt-6 md:-mt-8">
-                        <input
-                            ref={self.search_input_ref.clone()}
-                            id="searchbox"
-                            type="text"
-                            class="flex-1 overflow-hidden bg-white rounded-l p-2 md:p-4 text-base md:text-2xl text-black placeholder-neutral-300 caret-black outline-none focus:outline-none active:outline-none"
-                            placeholder={placeholder}
-                            spellcheck="false"
-                            tabindex="-1"
-                            onkeyup={link.callback(Msg::HandleKeyboardEvent)}
-                            autofocus={true}
-                        />
-                        <div class="p-1 md:p-2 bg-white rounded-r">
-                            {if self.in_progress {
-                                html! {
-                                    <Btn
-                                        _type={BtnType::Borderless}
-                                        classes="rounded p-2 md:p-4 bg-cyan-600 hover:bg-cyan-800"
-                                        onclick={link.callback(|_| Msg::StopSearch)}
-                                    >
-                                        <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
-                                        {"Stop"}
-                                    </Btn>
-                                }
-                            } else {
-                                html! {
-                                    <Btn
-                                        _type={BtnType::Borderless}
-                                        classes="rounded p-2 md:p-4 bg-cyan-600 hover:bg-cyan-800"
-                                        onclick={link.callback(|_| Msg::HandleSearch)}
-                                    >
-                                        <SearchIcon width="w-6" height="h-6" />
-                                    </Btn>
+            <div class={chat_display}>
+                <div class="bg-[var(--spy-primary-background)] shadow rounded-lg flex flex-col h-full">
+                  <div class={justify} style={header_color}>
+                      <div class="ml-2">
+                        <h2 class="text-lg font-bold">{header_title}</h2>
+                        //   <!-- p class="text-sm text-gray-500" -->{"Online"}</p -->
+                      </div>
+                  </div>
+                <div class="flex-grow overflow-y-auto p-4">
+                  <div class="flex flex-col space-y-2">
+                  {chats}
+                   { if self.history.is_empty() {
+                      if let Some(query) = &self.current_query {
+                         html!{ <ChatBubble background={user_bubble_color.clone()} align={chat_bubble::ChatAlign::Right} text={query.clone()}  /> }
+                       } else {
+                        html! {}
+                       }
+                    } else {
+                        html! {}
 
-                                }
-                            }}
-                        </div>
-                    </div>
-                    }
-                }
-                else {
-                    html! {
-                        <div class="place-content-center flex flex-row">
-                            <Btn _type={BtnType::Primary} onclick={nav_callback} size={BtnSize::Lg}>
-                                {"Start New Search"}
-                            </Btn>
-                        </div>
-                    }
-                }}
-                {if self.show_context {
-                    html! {
-                        <div class="px-8 py-6">
-                            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Context"}</div>
-                            <pre class="text-sm">{self.context.clone()}</pre>
-                        </div>
-                    }
-                } else {
-                    html! {}
-                }}
-                {if let Some(query) = &self.current_query {
-                    html! { <div class="mt-6 md:mt-8 px-4 md:px-8 text-lg md:text-2xl font-semibold text-white">{query}</div> }
-                } else { html! {}}}
-                <div class="lg:grid lg:grid-cols-2 flex flex-col w-full gap-8 p-4 md:p-8">
-                    { if !self.history.is_empty() || self.tokens.is_some() || self.status_msg.is_some() {
-                        html! {
-                            <AnswerSection
-                                history={self.history.clone()}
-                                tokens={self.tokens.clone()}
-                                status={self.status_msg.clone()}
-                                in_progress={self.in_progress}
-                                on_followup={link.callback(Msg::HandleFollowup)}
-                            />
-                        }
-                    } else if !lens.example_questions.is_empty() {
-                        html! {
-                            <FAQComponent
-                                questions={lens.example_questions.clone()}
-                                onclick={link.callback(Msg::SetQuery)}
-                            />
-                        }
+                    }}
+                    { if let Some(tokens) = &self.tokens {
+                        html!{ <ChatBubble background={bot_bubble_color.clone()} align={chat_bubble::ChatAlign::Left} text={tokens.clone()}  /> }
+                    } else if let Some(msg) = &self.status_msg {
+                        html!{ <ChatBubble background={bot_bubble_color.clone()} align={chat_bubble::ChatAlign::Left} text={msg.clone()}  /> }
                     } else {
                         html! {}
                     }}
+                  </div>
+                </div>
+                <div class="mt-4 p-4">
+                    <div class="flex rounded-lg shadow-sm">
+                    <input
+                        ref={self.search_input_ref.clone()}
+                        id="searchbox"
+                        type="text"
+                        placeholder="Type your message..."
+                        class="text-black flex-1 border-gray-200 rounded-l-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        placeholder={self.current_query.clone().unwrap_or(placeholder)}
+                        spellcheck="false"
+                        tabindex="-1"
+                        onkeyup={link.callback(Msg::HandleKeyboardEvent)}/>
+                    {if self.in_progress {
+                        html! {
+                            <Btn
+                                _type={BtnType::Borderless}
+                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                onclick={link.callback(|_| Msg::StopSearch)}
+                            >
+                                <RefreshIcon animate_spin={true} height="h-5" width="w-5" classes={"text-white mr-2"} />
+                                {"Stop"}
+                            </Btn>
+                        }
+                    } else {
 
-                    <div class="animate-fade-in col-span-1">
-                        {if !results.is_empty() {
-                            html! {
-                                <>
-                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Related"}</div>
-                                    <ResultPaginator page_size={5}>{results}</ResultPaginator>
-                                </>
-                            }
-                        } else if self.current_query.is_some() {
-                            html! {
-                                <>
-                                    <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Related"}</div>
-                                    <div class="text-sm text-neutral-500">
-                                        {
-                                            "We didn't find any relevant documents, but we
-                                            will try to answer the question to the best of our ability
-                                            without any additional context"
-                                        }
-                                    </div>
-                                </>
-                            }
-                        } else {
-                            html! {}
-                        }}
+                        html! {
+                            <Btn
+                                _type={BtnType::Borderless}
+                                classes="rounded-r px-8 bg-cyan-600 hover:bg-cyan-800"
+                                onclick={link.callback(|_| Msg::HandleSearch)}
+                            >
+                                <SearchIcon width="w-6" height="h-6" />
+                            </Btn>
+
+                        }
+                    }}
+                </div>
+                </div>
+                <div class="mx-auto w-fit text-center pb-2">
+                        <a href="https://search.spyglass.fyi/" class="flex cursor-pointer flex-row items-center rounded-full bg-cyan-700 px-2 py-1 hover:bg-cyan-900">
+                            <img src="/icons/logo@2x.png" class="w-4" />
+                            <div class="ml-2 text-left">
+                                <div class="text-sm font-bold">{"Powered by Spyglass"}</div>
+                                <div class="text-xs text-cyan-200">{"Click to create your own"}</div>
+                            </div>
+                        </a>
+                        <div class="mt-2 text-sm text-neutral-500">{"Made with ☕️ in SF/SD"}</div>
                     </div>
                 </div>
-            </div>
+          </div>
         }
     }
 
     // Fully reloads and resets the search context. This is used when the lens has changed.
-    fn reload(&mut self, link: &Scope<SearchPage>) {
+    fn reload(&mut self, link: &Scope<ChatPage>) {
         self.reset_search();
         self.client = Arc::new(Mutex::new(SpyglassClient::new(
             self.lens_identifier.clone(),
             self.session_uuid.clone(),
             self.auth_status.token.clone(),
-            self.embedded,
+            true,
         )));
 
-        let auth_status = self.auth_status.clone();
         let identifier = self.lens_identifier.clone();
         let link = link.clone();
-        let embedded = self.embedded;
         spawn_local(async move {
-            let api = if embedded {
-                ApiClient::new(None, true)
-            } else {
-                auth_status.get_client()
-            };
-
+            let api = ApiClient::new(None, true);
             match api.lens_retrieve(&identifier).await {
                 Ok(lens) => link.send_message(Msg::SetLensData(lens)),
                 Err(ApiError::ClientError(msg)) => {
@@ -711,191 +653,5 @@ impl SearchPage {
                 Err(err) => log::error!("error retrieving lens: {}", err),
             }
         });
-    }
-}
-
-#[derive(Properties, PartialEq)]
-struct AnswerSectionProps {
-    pub history: Vec<HistoryItem>,
-    pub tokens: Option<String>,
-    pub status: Option<String>,
-    #[prop_or_default]
-    pub in_progress: bool,
-    #[prop_or_default]
-    pub on_followup: Callback<String>,
-}
-
-#[function_component(AnswerSection)]
-fn answer_section(props: &AnswerSectionProps) -> Html {
-    let ask_followup = use_node_ref();
-    let ask_followup_handle = ask_followup.clone();
-    let on_followup_cb = props.on_followup.clone();
-    let on_ask_followup = Callback::from(move |event: SubmitEvent| {
-        event.prevent_default();
-        if let Some(node) = ask_followup_handle.cast::<HtmlInputElement>() {
-            on_followup_cb.emit(node.value());
-            node.set_value("");
-        }
-    });
-
-    html! {
-        <div class="animate-fade-in col-span-1">
-            <div class="mb-2 text-sm font-semibold uppercase text-cyan-500">{"Answer"}</div>
-            <div class="flex flex-col text-sm md:text-base leading-relaxed">
-                <div class="flex flex-col gap-4">
-                    <HistoryLog history={props.history.clone()} />
-                    { if let Some(tokens) = &props.tokens {
-                        html! { <HistoryLogItem source={HistorySource::Clippy} tokens={tokens.clone()} in_progress={props.in_progress} /> }
-                    } else if let Some(msg) = &props.status {
-                        html! { <HistoryLogItem source={HistorySource::System} tokens={msg.clone()}  /> }
-                    } else {
-                        html! {}
-                    }}
-                </div>
-                <form class="flex flex-row" onsubmit={on_ask_followup}>
-                    <textarea ref={ask_followup}
-                        disabled={props.in_progress}
-                        rows="3"
-                        placeholder="Ask a followup question"
-                        type="text"
-                        class="w-full resize-none flex-1 rounded-l-lg bg-neutral-700 text-base text-white caret-white outline-none placeholder:text-gray-300 focus:outline-none active:outline-none p-4"
-                    ></textarea>
-                    <button
-                        disabled={props.in_progress}
-                        type="submit"
-                        class="rounded-r-lg cursor-pointer items-center px-3 py-2 text-base font-semibold leading-5 bg-neutral-700 hover:bg-cyan-800"
-                    >
-                        <SearchIcon width="w-6" height="h-6" />
-                    </button>
-                </form>
-            </div>
-        </div>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-struct HistoryLogProps {
-    pub history: Vec<HistoryItem>,
-}
-
-#[function_component(HistoryLog)]
-fn history_log(props: &HistoryLogProps) -> Html {
-    let html = props
-        .history
-        .iter()
-        // Skip the initial question, we already show this at the top.
-        .skip(1)
-        .map(|item| {
-            html! {
-                <HistoryLogItem
-                    source={item.source.clone()}
-                    tokens={item.value.clone()}
-                />
-            }
-        })
-        .collect::<Html>();
-    html! { <>{html}</> }
-}
-
-#[derive(Properties, PartialEq)]
-struct HistoryLogItemProps {
-    pub source: HistorySource,
-    pub tokens: String,
-    // Is this a item currently generating tokens?
-    #[prop_or_default]
-    pub in_progress: bool,
-}
-
-#[function_component(HistoryLogItem)]
-fn history_log_item(props: &HistoryLogItemProps) -> Html {
-    let user_icon = match props.source {
-        HistorySource::Clippy | HistorySource::System => html! {<>{"🔭"}</>},
-        HistorySource::User => html! {<>{"🧙‍♂️"}</>},
-    };
-
-    let html = markdown::to_html(&props.tokens.clone());
-    let html = html.trim_start_matches("<p>").to_string();
-    let html = html.trim_end_matches("</p>").to_string();
-    let html = format!("<span>{}</span>", html);
-
-    let item_classes = if props.source == HistorySource::User {
-        classes!("text-white", "font-bold", "text-lg")
-    } else {
-        classes!(
-            "prose-sm",
-            "md:prose-base",
-            "prose",
-            "prose-invert",
-            "inline"
-        )
-    };
-
-    html! {
-        <div class="pb-4">
-            <p class={item_classes}>
-                {Html::from_html_unchecked(AttrValue::from(html))}
-                { if props.in_progress && props.source != HistorySource::User {
-                    html! { <div class="inline-block h-5 w-2 animate-pulse-fast bg-cyan-600 mb-[-4px]"></div> }
-                } else { html! {} }}
-            </p>
-            { if !props.in_progress && props.source != HistorySource::User {
-                html! { <div class="mt-2">{user_icon}</div>}
-            } else {
-                html! {}
-            }}
-        </div>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct FAQComponentProps {
-    questions: Vec<String>,
-    #[prop_or_default]
-    onclick: Callback<String>,
-}
-
-#[function_component(FAQComponent)]
-fn faq_component(props: &FAQComponentProps) -> Html {
-    let qa_classes = classes!(
-        "text-cyan-500",
-        "text-base",
-        "md:text-lg",
-        "p-2",
-        "md:p-4",
-        "rounded",
-        "border",
-        "border-neutral-500",
-        "underline",
-        "cursor-pointer",
-        "hover:bg-neutral-700",
-        "text-left",
-    );
-
-    let onclick = props.onclick.clone();
-    let questions = props
-        .questions
-        .iter()
-        .map(|q| {
-            let onclick = onclick.clone();
-            let question = q.clone();
-            let callback = Callback::from(move |_| {
-                onclick.emit(question.clone());
-            });
-            html! {
-                <button class={qa_classes.clone()} onclick={callback}>{q.clone()}</button>
-            }
-        })
-        .collect::<Html>();
-
-    html! {
-        <div class="col-span-2 mx-auto pt-4">
-            <div class="text-base md:text-xl text-white font-semibold">{"Example Questions"}</div>
-            <div class="text-neutral-500 text-sm md:text-base">
-                {"Not sure where to start? Try one of these questions"}
-            </div>
-            <div class="flex flex-col gap-4 mt-4">
-                {questions}
-            </div>
-        </div>
     }
 }

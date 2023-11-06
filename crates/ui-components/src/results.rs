@@ -336,8 +336,12 @@ pub fn web_search_result_component(props: &SearchResultProps) -> Html {
                     <span>{format!("{}", result.domain.clone())}</span>
                 </div>
                 <h2 class={classes!("text-base", "font-semibold")}>{result.title.clone()}</h2>
-                <div class="text-sm leading-relaxed text-neutral-400">
-                    {Html::from_html_unchecked(result.description.clone().into())}
+                <div class="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
+                    {if result.description.is_empty() {
+                        html! { <span class="text-neutral-400">{"No description available"}</span> }
+                    } else {
+                        html! { <span>{format!("…{}…", result.description.clone())}</span> }
+                    }}
                 </div>
                 {score}
             </div>
@@ -411,7 +415,8 @@ pub fn paginator_component(props: &PaginatorProps) -> Html {
         "dark:hover:text-white"
     );
 
-    for page_num in 0..props.num_pages {
+    let num_pages = props.num_pages;
+    for page_num in 0..num_pages.min(5) {
         // Highlight the current page
         let mut classes = component_classes.clone();
         if props.cur_page == page_num {
@@ -427,6 +432,32 @@ pub fn paginator_component(props: &PaginatorProps) -> Html {
                     onclick={move |_| on_select_page.emit(page_num)}
                 >
                     {page_num + 1}
+                </button>
+            </li>
+        });
+    }
+
+    // For paginating huge lists, only show the first couple pages & the last one
+    if num_pages >= 5 {
+        // Highlight the current page
+        let mut classes = component_classes.clone();
+        if props.cur_page == num_pages {
+            classes.push("bg-cyan-500");
+        }
+
+        let on_select_page = props.on_select_page.clone();
+        pages_html.push(html! {
+            <li>{"..."}</li>
+        });
+
+        pages_html.push(html! {
+            <li>
+                <button
+                    disabled={props.disabled}
+                    class={classes}
+                    onclick={move |_| on_select_page.emit(num_pages + 1)}
+                >
+                    {num_pages + 1}
                 </button>
             </li>
         });

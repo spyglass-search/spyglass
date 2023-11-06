@@ -30,8 +30,8 @@ pub fn path_string_to_uri(path_str: String) -> String {
     // Fixes issues handling windows drive letters
     let path_str = path_str.replace(':', "%3A");
     // Fixes an issue where DirEntry adds too many escapes.
-    let path_str = path_str.replace(r#"\\\\"#, r#"\"#);
-    let path_str = path_str.replace(r#"\\"#, r#"\"#);
+    let path_str = path_str.replace(r"\\\\", r"\");
+    let path_str = path_str.replace(r"\\", r"\");
 
     new_url.set_path(&path_str);
     new_url.to_string()
@@ -119,7 +119,7 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
             if let Some(time) =
                 NaiveDateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
             {
-                DateTime::<Utc>::from_utc(time, Utc)
+                time.and_utc()
             } else {
                 Utc::now()
             }

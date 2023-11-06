@@ -1,4 +1,4 @@
-use chrono::{DateTime, ParseResult, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use entities::models::lens;
 use entities::sea_orm::DatabaseConnection;
 use std::path::PathBuf;
@@ -109,9 +109,9 @@ async fn store_cache(
         if let Some(last_mod_date) = last_mod {
             let date_str_result = last_mod_date.to_str();
             if let Ok(date) = date_str_result {
-                let result: ParseResult<DateTime<Utc>> =
-                    Utc.datetime_from_str(date, HEADER_DATE_FMT);
+                let result = DateTime::parse_from_str(date, HEADER_DATE_FMT);
                 if let Ok(date_obj) = result {
+                    let date_obj = date_obj.with_timezone(&Utc);
                     let _ = lens::update_cache_time(lens, date_obj, database_connection).await;
                 }
             }

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 pub use spyglass_lens::{
-    types::{LensFilters, LensRule, LensSource},
+    types::{LensFilters, LensRule, LensSource, UrlSanitizeConfig},
     LensConfig, PipelineConfiguration,
 };
 
@@ -98,6 +98,8 @@ pub struct UserSettings {
     pub allow_list: Vec<String>,
     /// Domains explicitly blocked from crawling.
     pub block_list: Vec<String>,
+    /// Close search bar instead of hiding it
+    pub close_search_bar: bool,
     /// Search bar activation hot key
     #[serde(default = "UserSettings::default_shortcut")]
     pub shortcut: String,
@@ -179,6 +181,13 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
                 restart_required: false,
                 help_text: Some("Prevents Spyglass from automatically launching when your computer first starts up.".into())
             }),
+            ("_.close_search_bar".into(), SettingOpts {
+                label: "Close search bar window".into(),
+                value: serde_json::to_string(&settings.close_search_bar).expect("Unable to set close_search_bar value"),
+                form_type: FormType::Bool,
+                restart_required: true,
+                help_text: Some("Close the search bar window instead of minimizing it. Note that using this setting will make it impossible to close the search bar using the shortcut to open it, so you will need to use `Escape` instead. This will require a restart.".into())
+            }),
             ("_.shortcut".into(), SettingOpts {
                 label: "Global Shortcut".into(),
                 value: settings.shortcut.clone(),
@@ -251,6 +260,7 @@ impl Default for UserSettings {
             run_wizard: false,
             allow_list: Vec::new(),
             block_list: vec!["web.archive.org".to_string()],
+            close_search_bar: false,
             // Activation shortcut
             shortcut: UserSettings::default_shortcut(),
             // Where to store the metadata & index

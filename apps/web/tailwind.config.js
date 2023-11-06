@@ -47,6 +47,7 @@ module.exports = {
             "3xl": "1.5rem",
             "4xl": "1.875rem",
             "5xl": "2rem",
+            "6xl": "3rem",
         }
     },
     plugins: [

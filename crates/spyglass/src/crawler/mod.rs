@@ -27,8 +27,8 @@ use url::{Host, Url};
 use crate::connection::load_connection;
 use crate::crawler::bootstrap::create_archive_url;
 use crate::filesystem;
-use crate::filesystem::audio;
 use crate::state::{AppState, FetchLimitType};
+
 use spyglass_processor::parser;
 use spyglass_processor::utils::extensions::SupportedExt;
 
@@ -555,7 +555,7 @@ async fn _process_file(
                     log::warn!("whisper model not installed, skipping transcription");
                     content = None;
                 } else {
-                    match audio::transcibe_audio(path.to_path_buf(), model_path, 0) {
+                    match parser::audio::transcribe_audio(path.to_path_buf(), model_path, 0) {
                         Ok(result) => {
                             // Update crawl result with appropriate title/stuff
                             if let Some(metadata) = result.metadata {
