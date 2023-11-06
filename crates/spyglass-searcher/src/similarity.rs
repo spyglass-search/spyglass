@@ -136,7 +136,7 @@ pub async fn generate_similarity_context_for_doc(
             }
         },
         Err(err) => {
-            log::error!("Error sending request {:?}", err);
+            log::warn!("Error sending request {:?}", err);
             None
         }
     }
