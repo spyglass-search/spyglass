@@ -131,7 +131,7 @@ fn build_tag_map(all_tags: &[QueryResult]) -> HashMap<i64, Vec<u64>> {
         .collect::<Vec<(i64, i64)>>();
 
     for (k, v) in tuples {
-        tag_map.entry(k).or_insert_with(Vec::new).push(v as u64);
+        tag_map.entry(k).or_default().push(v as u64);
     }
 
     tag_map
