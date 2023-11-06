@@ -397,13 +397,6 @@ pub(crate) fn plugin_cmd(env: &PluginEnv) {
         Ok(cmd) => {
             // Handle the plugin command as a separate async task
             let rt = tokio::runtime::Handle::current();
-
-            #[cfg(feature = "tokio-console")]
-            tokio::task::Builder::new()
-                .name("Plugin Request")
-                .spawn_on(handle_plugin_cmd(cmd, env.clone()), &rt);
-
-            #[cfg(not(feature = "tokio-console"))]
             rt.spawn(handle_plugin_cmd(cmd, env.clone()));
         }
         Err(error) => {
