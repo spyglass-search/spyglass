@@ -114,7 +114,7 @@ impl WatchPath {
                     // Send all valid updates to the listener
                     if !valid_events.is_empty() {
                         if let Err(error) = tx.send(valid_events).await {
-                            log::error!("Error sending event {:?}", error);
+                            log::warn!("Error sending event {:?}", error);
                             return Err(anyhow::Error::from(error));
                         }
                     }
@@ -123,7 +123,7 @@ impl WatchPath {
                     // With no extension filter send all updates to the
                     // listener
                     if let Err(error) = tx.send(events).await {
-                        log::error!("Error sending event {:?}", error);
+                        log::warn!("Error sending event {:?}", error);
                         return Err(anyhow::Error::from(error));
                     }
                 }
@@ -222,7 +222,7 @@ async fn notify_watchers(events: Vec<DebouncedEvent>, watch_list: &Vec<WatchPath
     for watcher in watch_list {
         let rslt = watcher.send_notify(events.clone()).await;
         if let Err(error) = rslt {
-            log::error!("Error sending notify {:?}", error);
+            log::warn!("Error sending notify {:?}", error);
         }
     }
 }
