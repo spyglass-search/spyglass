@@ -45,7 +45,7 @@ dependencies = [
 
 [tasks.build]
 command = "cargo"
-args = ["build", "-p", "spyglass-client", "-p", "spyglass-app", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+args = ["tauri", "build", "--config", "${TAURI_DEV_CONFIG}"]
 dependencies = [
     "build-backend",
     "copy-backend-binaries",
@@ -59,6 +59,7 @@ dependencies = [
 [tasks.build-backend]
 args = ["build", "-p", "spyglass", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
 command = "cargo"
+private = true
 
 [tasks.copy-backend-binaries]
 dependencies = ["create-binary-directory", "set-platform-specific-variables"]
