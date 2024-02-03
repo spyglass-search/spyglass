@@ -1,11 +1,19 @@
 {
-    "tauri": {
-      "bundle": {
-        "externalBin": [
-          "binaries/spyglass-server",
-          "binaries/spyglass-debug",
-          "binaries/pdftotext"
-        ]
+  "tauri": {
+    "bundle": {
+      "externalBin": [
+        "binaries/spyglass-server",
+        "binaries/spyglass-debug",
+        "binaries/pdftotext"
+      ],
+      "windows": {
+        "certificateThumbprint": "40156DEE669BFE79B4DE33A77917991B80E2C4D8",
+        "digestAlgorithm": "sha256",
+        "timestampUrl": "http://timestamp.comodoca.com",
+        "webviewInstallMode": {
+          "type": "embedBootstrapper"
+        }
       }
     }
   }
+}

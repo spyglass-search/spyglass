@@ -40,14 +40,6 @@
         "signingIdentity": "Developer ID Application: Andrew Huynh (D436KBE6J9)",
         "entitlements": "entitlements.plist",
         "providerShortName": "AndrewHuynh1092684215"
-      },
-      "windows": {
-        "certificateThumbprint": "40156DEE669BFE79B4DE33A77917991B80E2C4D8",
-        "digestAlgorithm": "sha256",
-        "timestampUrl": "http://timestamp.comodoca.com",
-        "webviewInstallMode": {
-          "type": "embedBootstrapper"
-        }
       }
     },
     "updater": {
