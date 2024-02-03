@@ -1,0 +1,11 @@
+{
+    "tauri": {
+      "bundle": {
+        "externalBin": [
+          "binaries/spyglass-server",
+          "binaries/spyglass-debug",
+          "binaries/pdftotext"
+        ]
+      }
+    }
+  }

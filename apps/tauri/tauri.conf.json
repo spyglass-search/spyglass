@@ -26,11 +26,6 @@
       "resources": [
         "../../assets/*"
       ],
-      "externalBin": [
-        "binaries/spyglass-server",
-        "binaries/spyglass-debug",
-        "binaries/pdftotext"
-      ],
       "copyright": "(C) 2023 Spyglass Search, Inc.",
       "category": "DeveloperTool",
       "shortDescription": "",
