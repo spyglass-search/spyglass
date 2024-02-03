@@ -1,26 +1,23 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/client",
-    "crates/entities",
-    "crates/migrations",
-    "crates/shared",
-    "crates/spyglass",
-    "crates/tauri",
-    "crates/ui-components",
+    "crates/*",
 
+    # This requires a .env file to be set up.
     "apps/web",
 
-    # Public published crates
-    "crates/spyglass-plugin",
-    "crates/spyglass-lens",
-    "crates/spyglass-rpc",
-    "crates/spyglass-searcher",
-    "crates/spyglass-processor"
+    # This requires `tauri build` and depends on a few other binaries, so it is not part of the workspace.
+    "apps/tauri"
+]
+
+# Exclude the crates under `apps/` because they require special steps to be completed before
+# they can be built.
+default-members = [
+    "crates/*"
 ]
 
 [profile.release]
-codegen-units = 1
+# codegen-units = 1
 lto = true
 incremental = false
 opt-level = "s"

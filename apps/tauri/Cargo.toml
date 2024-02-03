@@ -20,7 +20,7 @@ auto-launch = "0.4.0"
 diff-struct = "0.5.1"
 jsonrpsee = { version = "0.16.2", features = ["ws-client"] }
 log = "0.4"
-migration = { path = "../migrations" }
+migration = { path = "../../crates/migrations" }
 num-format = "0.4"
 open = "3"
 reqwest = { version = "0.11", features = ["json"] }
@@ -29,8 +29,8 @@ sentry = "0.30.0"
 sentry-tracing = "0.30.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-shared = { path = "../shared", features = ["metrics"] }
-spyglass-rpc = { path = "../spyglass-rpc" }
+shared = { path = "../../crates/shared", features = ["metrics"] }
+spyglass-rpc = { path = "../../crates/spyglass-rpc" }
 strum = "0.24"
 strum_macros = "0.24"
 tauri = { version = "1.2.4", features = ["api-all", "clipboard", "devtools", "macos-private-api", "notification", "system-tray", "updater"] }

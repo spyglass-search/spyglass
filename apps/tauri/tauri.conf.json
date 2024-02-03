@@ -4,10 +4,10 @@
     "version": "23.11.1"
   },
   "build": {
-    "distDir": "../client/dist",
+    "distDir": "../../crates/client/dist",
     "devPath": "http://localhost:8080",
-    "beforeDevCommand": "cd client && trunk serve",
-    "beforeBuildCommand": "cd client && trunk build",
+    "beforeDevCommand": "cd ../crates/client && trunk serve",
+    "beforeBuildCommand": "cd ../crates/client && trunk build",
     "withGlobalTauri": true
   },
   "tauri": {
