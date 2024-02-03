@@ -19,6 +19,10 @@ PROFILE = "${CARGO_MAKE_CARGO_PROFILE}"
 WORKSPACE_TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 
 [tasks.run]
+dependencies = [
+    "build-crates"
+]
+
 args = ["cargo make run-backend", "cargo make run-client"]
 command = "mprocs"
 install_crate = { crate_name = "mprocs" }
@@ -45,7 +49,7 @@ dependencies = [
 
 [tasks.build]
 command = "cargo"
-args = ["tauri", "build", "--config", "${TAURI_DEV_CONFIG}", "--release"]
+args = ["tauri", "build", "--config", "${TAURI_DEV_CONFIG}"]
 dependencies = [
     "build-crates",
     "copy-backend-binaries",
