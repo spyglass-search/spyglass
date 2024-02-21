@@ -1,4 +1,4 @@
-FROM rust:1.68 AS builder
+FROM rust:1.76 AS builder
 
 WORKDIR /usr/src
 # Need for a successful whisper-rs build for some reason...
