@@ -1,0 +1,67 @@
+{
+  "package": {
+    "productName": "Spyglass",
+    "version": "23.11.1"
+  },
+  "build": {
+    "distDir": "../../crates/client/dist",
+    "devPath": "http://localhost:8080",
+    "beforeDevCommand": "cd ../crates/client && trunk serve",
+    "beforeBuildCommand": "cd ../crates/client && trunk build",
+    "withGlobalTauri": true
+  },
+  "tauri": {
+    "macOSPrivateApi": true,
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.athlabs.spyglass",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": [
+        "../../assets/*"
+      ],
+      "copyright": "(C) 2023 Spyglass Search, Inc.",
+      "category": "DeveloperTool",
+      "shortDescription": "",
+      "longDescription": "",
+      "deb": {
+        "depends": []
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "",
+        "exceptionDomain": "",
+        "signingIdentity": "Developer ID Application: Andrew Huynh (D436KBE6J9)",
+        "entitlements": "entitlements.plist",
+        "providerShortName": "AndrewHuynh1092684215"
+      }
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://update.spyglass.fyi/VERSION.json",
+        "https://spyglass-update-check.spyglass.workers.dev",
+        "https://raw.githubusercontent.com/spyglass-search/spyglass/main/VERSION.json"
+      ],
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFREEwQzA5QjA1NjM5NDUKUldSRk9WYXdDUXphYm5keUUvY2V3VUh2cjl3YlB0MlBuV1NJd3VjUnk5ektjVTExY3JKVGdRNHUK"
+    },
+    "allowlist": {
+      "all": true
+    },
+    "windows": [],
+    "security": {
+      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'self'; script-src 'unsafe-eval'"
+    },
+    "systemTray": {
+      "iconPath": "icons/tray-icon.png",
+      "iconAsTemplate": true
+    }
+  }
+}

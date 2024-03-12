@@ -8,5 +8,4 @@ Makefile.dev
 target
 **/target
 node_modules
-dist
 binaries

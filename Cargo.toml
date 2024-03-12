@@ -1,26 +1,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/client",
-    "crates/entities",
-    "crates/migrations",
-    "crates/shared",
-    "crates/spyglass",
-    "crates/tauri",
-    "crates/ui-components",
+    "crates/*",
 
     "apps/web",
-
-    # Public published crates
-    "crates/spyglass-plugin",
-    "crates/spyglass-lens",
-    "crates/spyglass-rpc",
-    "crates/spyglass-searcher",
-    "crates/spyglass-processor"
+    "apps/tauri"
 ]
 
 [profile.release]
-codegen-units = 1
+# codegen-units = 1
 lto = true
 incremental = false
 opt-level = "s"

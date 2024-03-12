@@ -3,7 +3,7 @@
 -include Makefile.dev
 
 .PHONY: build-backend build-client build-plugins-dev build-plugins-release \
-	build-styles build-release check clippy fmt test test-with-ignored \
+	build-release check clippy fmt test test-with-ignored \
 	setup-dev setup-dev-linux run-client-dev
 
 TARGET_ARCH := $(shell rustc -Vv | grep host | awk '{print $$2 " "}')
@@ -28,9 +28,6 @@ endif
 build-client:
 	cargo build -p spyglass-client -p spyglass-app
 
-build-styles:
-	cd ./crates/client && npx tailwindcss -i ./public/input.css -o ./public/main.css
-
 build-plugins-dev:
 ifeq ("$(PLUGINS_DEV_FOLDER)","")
 		@echo "Error: Please set the PLUGINS_DEV_FOLDER variable in your Makefile before continuing";
@@ -53,7 +50,7 @@ build-plugins-release:
 		cp target/wasm32-wasi/release/$$plugin.wasm assets/plugins/$$plugin/main.wasm; \
 	done
 
-build-release: build-backend build-styles build-plugins-release
+build-release: build-backend build-plugins-release
 	cargo tauri build
 
 check:

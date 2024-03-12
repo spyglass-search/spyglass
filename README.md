@@ -114,3 +114,9 @@ better search.
 
 > See [Building from source](https://docs.spyglass.fyi/build.html) to get started
 > building & contributing to Spyglass.
+
+TL;DR: If you want to build and run Spyglass from source, you can simply run this command:
+```
+cargo make run
+```
+
