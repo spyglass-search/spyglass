@@ -48,7 +48,6 @@ async fn try_connect(endpoint: &str) -> anyhow::Result<WsClient> {
         }
         Err(e) => {
             log::warn!("error connecting: {:?}", e);
-            sentry::capture_error(&e);
             Err(anyhow::anyhow!(e.to_string()))
         }
     }
@@ -164,10 +163,6 @@ impl SpyglassServerClient {
             while let Some(event) = rx.recv().await {
                 match event {
                     CommandEvent::Error(message) => {
-                        sentry::capture_error(&std::io::Error::new(
-                            std::io::ErrorKind::BrokenPipe,
-                            message.clone(),
-                        ));
                         log::error!("sidecar error: {}", message);
                         return;
                     }

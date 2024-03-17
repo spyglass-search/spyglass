@@ -73,8 +73,6 @@ async fn run_and_check_backend(app_handle: AppHandle) {
     log::info!("Running migrations");
     progress.set("Running migrations...");
     if let Err(err) = Migrator::run_migrations().await {
-        // Ruh-oh something went wrong
-        sentry::capture_error(&err);
         log::error!("Unable to migrate database - {}", err.to_string());
         progress.set(&format!("Unable to migrate database: {}", &err.to_string()));
 
