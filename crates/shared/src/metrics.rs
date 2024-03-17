@@ -178,7 +178,7 @@ impl Metrics {
             }
         }
 
-        #[cfg(not(debug_assertions))]
-        let _ = self.client.post(ENDPOINT).json(&vec![data]).send().await;
+        // #[cfg(not(debug_assertions))]
+        // let _ = self.client.post(ENDPOINT).json(&vec![data]).send().await;
     }
 }
