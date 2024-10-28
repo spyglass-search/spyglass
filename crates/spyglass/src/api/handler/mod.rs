@@ -530,17 +530,14 @@ pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Resu
         let _ = updated.update(&state.db).await;
 
         let mut cmd_tx = state.plugin_cmd_tx.lock().await;
-        match &mut *cmd_tx {
-            Some(cmd_tx) => {
-                let cmd = if enabled {
-                    PluginCommand::EnablePlugin(plugin.name)
-                } else {
-                    PluginCommand::DisablePlugin(plugin.name)
-                };
+        if let Some(cmd_tx) = &mut *cmd_tx {
+            let cmd = if enabled {
+                PluginCommand::EnablePlugin(plugin.name)
+            } else {
+                PluginCommand::DisablePlugin(plugin.name)
+            };
 
-                let _ = cmd_tx.send(cmd).await;
-            }
-            None => {}
+            let _ = cmd_tx.send(cmd).await;
         }
     }
 
