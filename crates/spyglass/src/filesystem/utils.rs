@@ -116,8 +116,7 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards");
 
-            if let Some(time) =
-                DateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
+            if let Some(time) = DateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
             {
                 time
             } else {

@@ -78,9 +78,9 @@ jobs:
       run: |
         cargo build -p spyglass --verbose --release
 
-        cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-        cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
-        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
+        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
     - name: build sidecar (macos)
       if: matrix.platform == 'macos-latest'
       run: |
@@ -89,22 +89,22 @@ jobs:
         # the ARM build ourselves as part of the repo.
         cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
 
-        cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
-        # cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+        cp target/x86_64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-x86_64-apple-darwin;
+        # cp target/aarch64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
 
-        cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
-        cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
+        cp target/x86_64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
+        cp target/aarch64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
 
         # There's no build specifically for ARM macs, so lets use the same one for both.
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-aarch64-apple-darwin;
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-x86_64-apple-darwin;
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-universal-apple-darwin;
+        cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-aarch64-apple-darwin;
+        cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-x86_64-apple-darwin;
+        cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-universal-apple-darwin;
 
-        lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
+        lipo -create -output apps/tauri/binaries/spyglass-server-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass \
-          crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+          apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
 
-        lipo -create -output crates/tauri/binaries/spyglass-debug-universal-apple-darwin \
+        lipo -create -output apps/tauri/binaries/spyglass-debug-universal-apple-darwin \
           target/x86_64-apple-darwin/release/spyglass-debug \
           target/aarch64-apple-darwin/release/spyglass-debug;
 

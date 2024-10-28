@@ -84,9 +84,9 @@ jobs:
     # build front & tauri app
     - name: copy sidebar
       run: |
-        cp target/sentry/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-        cp target/sentry/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
-        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/sentry/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+        cp target/sentry/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
+        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
     - name: build frontend
       run: cd crates/client && trunk build
     - name: build tauri app

@@ -14,15 +14,15 @@ default: fmt clippy
 
 build-backend:
 	cargo build -p spyglass
-	mkdir -p crates/tauri/binaries
-	cp target/debug/spyglass crates/tauri/binaries/spyglass-server-$(TARGET_ARCH)
-	cp target/debug/spyglass-debug crates/tauri/binaries/spyglass-debug-$(TARGET_ARCH)
+	mkdir -p apps/tauri/binaries
+	cp target/debug/spyglass apps/tauri/binaries/spyglass-server-$(TARGET_ARCH)
+	cp target/debug/spyglass-debug apps/tauri/binaries/spyglass-debug-$(TARGET_ARCH)
 ifneq ($(strip $(findstring windows,$(TARGET_ARCH))),)
-	cp utils/win/pdftotext.exe crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH)).exe
+	cp utils/win/pdftotext.exe apps/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH)).exe
 else ifneq ($(strip $(findstring mac,$(TARGET_ARCH))),)
-	cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
+	cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
 else
-	cp utils/linux/pdftotext crates/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
+	cp utils/linux/pdftotext apps/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
 endif
 
 build-client:
@@ -56,7 +56,7 @@ build-release: build-backend build-plugins-release
 check:
 	cargo check --all
 
-clippy:
+clippy: fmt
 	cargo clippy --all
 
 fmt:
@@ -87,7 +87,7 @@ setup-dev:
 # Check if .env exists and if not create it
 	test -f .env || cp .env.template .env
 # Check if /dist folder exists for Tauri and if not create it
-	mkdir -p ./crates/tauri/dist
+	mkdir -p ./apps/tauri/dist
 # Build backend to copy binaries for Tauri
 	make build-backend
 
@@ -109,7 +109,7 @@ run-backend-dev:
 	cargo run -p spyglass
 
 run-client-dev:
-	cargo tauri dev --config ./crates/tauri/tauri.dev.conf.json
+	cargo tauri dev --config ./apps/tauri/tauri.dev.conf.json
 
 run-client-headless:
 	cd ./crates/client && HEADLESS_CLIENT=true trunk serve
@@ -118,8 +118,8 @@ upload-debug-symbols-windows:
 	cargo build -p spyglass --profile sentry
 	npx sentry-cli difutil check target/sentry/spyglass.exe
 	npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass.exe
-	mkdir -p crates/tauri/binaries
-	cp target/sentry/spyglass.exe crates/tauri/binaries/spyglass-server-x86_64-pc-windows-msvc.exe
+	mkdir -p apps/tauri/binaries
+	cp target/sentry/spyglass.exe apps/tauri/binaries/spyglass-server-x86_64-pc-windows-msvc.exe
 	cd crates/client && trunk build
 	cargo build -p spyglass-app --profile sentry
 	npx sentry-cli difutil check target/sentry/spyglass-app.exe

@@ -6,13 +6,13 @@ default-run = "spyglass"
 
 [dependencies]
 addr = "0.15.3"
-anyhow = "1.0"
+anyhow = { workspace = true }
 arc-swap = "1.6.0"
 bytes = "1.2.1"
-chrono = { version = "0.4.23", features = ["serde"] }
+chrono = { workspace = true }
 clap = { version = "4.0.32", features = ["derive"] }
-console-subscriber = { version = "0.1.8", optional = true }
-dashmap = "5.2"
+console-subscriber = { version = "0.4", optional = true }
+dashmap = "6.1"
 diff-struct = "0.5.1"
 digest = "0.10"
 directories = "5.0.1"
@@ -21,7 +21,7 @@ futures = "0.3"
 glob = "0.3.1"
 governor = "0.5.1"
 hex = "0.4"
-http = "0.2"
+http = "1.1"
 ignore = "0.4"
 jsonrpsee = { version = "0.16.2", features = ["server"] }
 lnk = "0.5.1"
@@ -32,28 +32,28 @@ nonzero_ext = "0.3.0"
 notify = { version = "5.1.0", default-features = false, features = ["serde", "macos_fsevent"] }
 notify-debouncer-mini = { version = "0.2", default-features = false }
 num-format = "0.4"
-open = "4.1"
+open = "5.3"
 percent-encoding = "2.2"
 regex = "1"
-reqwest = { version = "0.11", features = ["stream", "json"] }
+reqwest = { workspace = true }
 ron = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = "0.10"
-strum = "0.24"
-strum_macros = "0.24"
+strum = { workspace = true }
+strum_macros = { workspace = true }
 tantivy = "0.19"
 tendril = "0.4.2"
 thiserror = "1.0.37"
 tokio = { version = "1", features = ["full"] }
 tokio-retry = "0.3"
 tower = { version = "0.4", features = ["full"] }
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-appender = "0.2"
-tracing-log = "0.1.3"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
+tracing-log = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "std"]}
 url = "2.2"
-uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
+uuid = { workspace =true, features = ["serde", "v4"], default-features = false }
 warc = "0.3"
 warp = "0.3"
 wasmer = "2.3.0"

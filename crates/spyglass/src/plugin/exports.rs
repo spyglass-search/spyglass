@@ -4,11 +4,11 @@ use entities::models::indexed_document;
 use entities::models::tag;
 use entities::models::tag::TagPair;
 use entities::models::tag::TagType;
-use http::header::InvalidHeaderName;
-use http::header::InvalidHeaderValue;
-use http::HeaderMap;
-use http::HeaderName;
-use http::HeaderValue;
+use entities::sea_orm::ColumnTrait;
+use entities::sea_orm::EntityTrait;
+use entities::sea_orm::ModelTrait;
+use entities::sea_orm::QueryFilter;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use spyglass_plugin::Authentication;
 use spyglass_plugin::DocumentUpdate;
@@ -22,14 +22,8 @@ use url::Url;
 use wasmer::{Exports, Function, Store};
 use wasmer_wasi::WasiEnv;
 
-use entities::sea_orm::ColumnTrait;
-use entities::sea_orm::EntityTrait;
-use entities::sea_orm::ModelTrait;
-use entities::sea_orm::QueryFilter;
-
 use super::{wasi_read, wasi_read_string, PluginCommand, PluginConfig, PluginEnv, PluginId};
 use crate::state::AppState;
-use reqwest::header::USER_AGENT;
 
 use entities::models::crawl_queue::{enqueue_all, EnqueueSettings};
 use spyglass_plugin::{DocumentQuery, PluginCommandRequest};
@@ -218,15 +212,15 @@ async fn handle_plugin_cmd_request(
 }
 
 // Converts local method enum and http method enum
-fn convert_method(method: &HttpMethod) -> http::Method {
+fn convert_method(method: &HttpMethod) -> reqwest::Method {
     match method {
-        HttpMethod::GET => http::Method::GET,
-        HttpMethod::DELETE => http::Method::DELETE,
-        HttpMethod::POST => http::Method::POST,
-        HttpMethod::PUT => http::Method::PUT,
-        HttpMethod::PATCH => http::Method::PATCH,
-        HttpMethod::HEAD => http::Method::HEAD,
-        HttpMethod::OPTIONS => http::Method::OPTIONS,
+        HttpMethod::GET => reqwest::Method::GET,
+        HttpMethod::DELETE => reqwest::Method::DELETE,
+        HttpMethod::POST => reqwest::Method::POST,
+        HttpMethod::PUT => reqwest::Method::PUT,
+        HttpMethod::PATCH => reqwest::Method::PATCH,
+        HttpMethod::HEAD => reqwest::Method::HEAD,
+        HttpMethod::OPTIONS => reqwest::Method::OPTIONS,
     }
 }
 
@@ -235,12 +229,12 @@ fn build_headermap(headers: &Vec<(String, String)>, plugin: &str) -> HeaderMap {
     let mut header_map = HeaderMap::new();
 
     header_map.append(
-        USER_AGENT,
+        reqwest::header::USER_AGENT,
         format!("Spyglass-Plugin-{plugin}").parse().unwrap(),
     );
     for (key, val) in headers {
-        let header_val: Result<HeaderValue, InvalidHeaderValue> = HeaderValue::from_str(val);
-        let header_name: Result<HeaderName, InvalidHeaderName> = HeaderName::from_str(key);
+        let header_val = HeaderValue::from_str(val);
+        let header_name = HeaderName::from_str(key);
         if let (Ok(header_val), Ok(header_name)) = (header_val, header_name) {
             header_map.append(header_name, header_val);
         }

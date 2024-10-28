@@ -10,3 +10,18 @@ members = [
 lto = true
 incremental = false
 opt-level = "s"
+
+[workspace.dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+reqwest = { version = "0.11.7", features = ["json", "stream", "multipart"] }
+ron = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+strum = "0.26.3"
+strum_macros = "0.26.4"
+tracing = "0.1"
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
+uuid = { version = "1.11.0", features = ["serde", "v4", "v5", "js"], default-features = false }

@@ -178,11 +178,11 @@ pub async fn check_resource_rules(db: &DatabaseConnection, client: &Client, url:
         }
         Ok(res) => {
             let headers = res.headers();
-            if !headers.contains_key(http::header::CONTENT_TYPE) {
+            if !headers.contains_key(reqwest::header::CONTENT_TYPE) {
                 return false;
             } else {
                 let value = headers
-                    .get(http::header::CONTENT_TYPE)
+                    .get(reqwest::header::CONTENT_TYPE)
                     .and_then(|header| header.to_str().ok());
 
                 if let Some(value) = value {

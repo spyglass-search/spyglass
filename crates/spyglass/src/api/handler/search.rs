@@ -147,13 +147,10 @@ pub async fn search_docs(
     // Send cleanup task for any missing docs
     if !missing.is_empty() {
         let mut cmd_tx = state.manager_cmd_tx.lock().await;
-        match &mut *cmd_tx {
-            Some(cmd_tx) => {
-                let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
-                    missing_docs: missing,
-                }));
-            }
-            None => {}
+        if let Some(cmd_tx) = &mut *cmd_tx {
+            let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
+                missing_docs: missing,
+            }));
         }
     }
 
