@@ -6,16 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-log = "0.4"
+anyhow = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
 regex = "1"
 sea-orm = { version = "0.11", features = ["macros", "sqlx-sqlite", "sqlx-postgres", "runtime-tokio-rustls", "with-chrono", "with-json"], default-features = false }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 shared = { path = "../shared" }
-strum = "0.24"
-strum_macros = "0.24"
+strum = { workspace = true }
+strum_macros = { workspace = true }
 tantivy_18 = { package="tantivy", version="0.18" }
 tantivy = "0.19"
 thiserror = "1.0.38"

@@ -6,19 +6,19 @@ description = "Content processing functionality"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = { workspace = true }
 bytes = "1.2.1"
 calamine = "0.19.1"
 docx =  { git = "https://github.com/spyglass-search/docx-rs", branch = "master"}
-log = "0.4"
+log = { workspace = true }
 mime = "0.3.16"
 new_mime_guess = "4.0.1"
 pdf = "0.8.1"
 rubato = "0.12.0"
-strum = "0.24"
-strum_macros = "0.24"
+strum = { workspace = true }
+strum_macros = { workspace = true }
 symphonia = { version = "0.5.2", features = ["aac", "isomp4", "mp3", "mpa"] }
-uuid = { version = "1.0.0", features = ["serde", "v4"], default-features = false }
+uuid = { workspace =true, features = ["serde", "v4"], default-features = false }
 whisper-rs = { git = "https://github.com/tazz4843/whisper-rs.git", rev = "24e6a0025e2714ff2bed5861b07af8735fb71d18"}
 
 # Internal spyglass libs
