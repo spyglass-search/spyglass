@@ -5,7 +5,6 @@ use libspyglass::pipeline;
 use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
-use sentry::ClientInitGuard;
 use shared::config::{self, Config};
 use std::io;
 use std::net::IpAddr;
@@ -64,23 +63,7 @@ pub fn setup_logging(_config: &Config) -> (Option<WorkerGuard>, Option<ClientIni
 }
 
 #[cfg(not(feature = "tokio-console"))]
-pub fn setup_logging(config: &Config) -> (Option<WorkerGuard>, Option<ClientInitGuard>) {
-    #[cfg(not(debug_assertions))]
-    let sentry_guard = if config.user_settings.disable_telemetry {
-        None
-    } else {
-        Some(sentry::init((
-            "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                traces_sample_rate: 0.1,
-                ..Default::default()
-            },
-        )))
-    };
-    #[cfg(debug_assertions)]
-    let sentry_guard = None;
-
+pub fn setup_logging(config: &Config) -> Option<WorkerGuard> {
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
     let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);
 
@@ -103,11 +86,10 @@ pub fn setup_logging(config: &Config) -> (Option<WorkerGuard>, Option<ClientInit
                 .add_directive("docx=WARN".parse().expect("Invalid EnvFilter")),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
-        .with(sentry_tracing::layer());
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
 
-    (Some(tracing_guard), sentry_guard)
+    Some(tracing_guard)
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -115,7 +97,7 @@ async fn main() -> Result<(), ()> {
     let mut config = Config::new();
     let args = CliArgs::parse();
 
-    let (_trace_guard, _sentry_guard) = setup_logging(&config);
+    let _trace_guard = setup_logging(&config);
     LogTracer::init().expect("Unable to initialize LogTracer");
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());

@@ -2,8 +2,6 @@
 resolver = "2"
 members = [
     "crates/*",
-
-    "apps/web",
     "apps/tauri"
 ]
 
@@ -12,7 +10,3 @@ members = [
 lto = true
 incremental = false
 opt-level = "s"
-
-[profile.sentry]
-inherits = "dev"
-debug = true

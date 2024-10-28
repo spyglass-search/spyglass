@@ -90,8 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_thread_names(true)
                 .with_writer(io::stdout),
         )
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
-        .with(sentry_tracing::layer());
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
 
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
     LogTracer::init()?;

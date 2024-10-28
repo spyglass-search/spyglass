@@ -37,8 +37,6 @@ percent-encoding = "2.2"
 regex = "1"
 reqwest = { version = "0.11", features = ["stream", "json"] }
 ron = "0.8"
-sentry = "0.31.0"
-sentry-tracing = "0.31.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"

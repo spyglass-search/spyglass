@@ -134,20 +134,22 @@ impl SpyglassClient {
             .into_async_read();
 
         let mut reader = BufReader::new(res);
-        let mut buf = String::new();
-
+        let mut running_buffer = String::new();
         loop {
-            let mut read_line = reader.read_line(&mut buf).fuse();
+            let mut line = String::new();
+            let mut read_line = reader.read_line(&mut line).fuse();
+            running_buffer.push_str(&line);
+
             select! {
                 res = read_line => {
                     if res.is_err() {
                         break;
                     }
 
-                    let line = buf.trim_end_matches(|c| c == '\r' || c == '\n');
+                    let line = running_buffer.trim_end_matches(|c| c == '\r' || c == '\n');
                     let line = line.strip_prefix("data:").unwrap_or(line);
                     if line.is_empty() {
-                        buf.clear();
+                        running_buffer.clear();
                         continue;
                     }
 
@@ -159,13 +161,13 @@ impl SpyglassClient {
                         }
                         _ => ()
                     }
-                    buf.clear();
+
+                    running_buffer.clear();
                     // give ui thread a chance to do something
                     sleep(Duration::from_millis(50)).await;
                 }
                 _ = channel.next() => {
                     // aborting response generation
-                    drop(reader);
                     break;
                 }
             }

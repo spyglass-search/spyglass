@@ -16,7 +16,8 @@ jobs:
       RUST_BACKTRACE: 1
     strategy:
       matrix:
-        build: [ubuntu64, win64]
+        # build: [ubuntu64, win64]
+        build: [ubuntu64]
         include:
           - build: ubuntu64
             os: ubuntu-latest

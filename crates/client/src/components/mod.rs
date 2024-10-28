@@ -69,8 +69,8 @@ pub fn header(props: &HeaderProps) -> Html {
 
 #[derive(Debug)]
 pub struct TabEvent {
-    pub tab_idx: usize,
-    pub tab_name: String,
+    pub _tab_idx: usize,
+    pub _tab_name: String,
 }
 
 #[derive(PartialEq, Properties)]
@@ -100,8 +100,8 @@ pub fn tabs(props: &TabsProps) -> Html {
     use_effect_with_deps(
         move |updated| {
             onchange.emit(TabEvent {
-                tab_idx: **updated,
-                tab_name: tabs[**updated].clone(),
+                _tab_idx: **updated,
+                _tab_name: tabs[**updated].clone(),
             });
             || {}
         },

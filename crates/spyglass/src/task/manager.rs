@@ -89,11 +89,7 @@ pub async fn check_for_jobs(state: &AppState, queue: &mpsc::Sender<WorkerCommand
         started_task = Some(true);
     }
 
-    if let Some(ret) = started_task {
-        ret
-    } else {
-        false
-    }
+    started_task.unwrap_or_default()
 }
 
 #[cfg(test)]

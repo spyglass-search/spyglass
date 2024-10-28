@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use sea_orm::{
     entity::prelude::*,
     sea_query::{Expr, Func},
@@ -83,9 +85,9 @@ fn string_to_tag_type(v: &str) -> TagType {
 }
 
 // Allows the TagType to be converted into a string
-impl ToString for TagType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for TagType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
             Self::Favorited => "favorited",
             Self::MimeType => "mimetype",
             Self::Type => "type",
@@ -98,8 +100,9 @@ impl ToString for TagType {
             Self::FileExt => "fileext",
             Self::Category => "category",
             Self::Other(label) => label.as_str(),
-        }
-        .to_owned()
+        };
+
+        f.write_str(string)
     }
 }
 
