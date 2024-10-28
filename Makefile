@@ -56,7 +56,7 @@ build-release: build-backend build-plugins-release
 check:
 	cargo check --all
 
-clippy:
+clippy: fmt
 	cargo clippy --all
 
 fmt:
