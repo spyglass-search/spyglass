@@ -25,3 +25,6 @@ yew = { version = "0.20", features = ["csr"] }
 yew-router = "0.17"
 ui-components = { path = "../ui-components" }
 url = "2.2.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(headless)']}

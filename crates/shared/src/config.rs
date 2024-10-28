@@ -316,8 +316,9 @@ impl Config {
         // convert local-filesystem-config to user settings filesystem config
         let mut modified: bool = false;
         for setting in LEGACY_PLUGIN_SETTINGS {
-            let res = settings.plugin_settings.remove(&setting.to_string());
-            if setting == &"local-file-importer" {
+            let setting = setting.to_string();
+            let res = settings.plugin_settings.remove(&setting);
+            if setting == "local-file-importer" {
                 if let Some(local_file_settings) = res {
                     modified = true;
 

@@ -51,7 +51,7 @@ pub enum Msg {
     HandleError(String),
     SetCurrentActions(UserActionSettings),
     OpenResult(SearchResult),
-    UserActionComplete(String),
+    UserActionComplete,
     UserActionSelected(UserActionDefinition),
     ToggleShowActions,
     SearchDocs,
@@ -143,14 +143,14 @@ impl SearchPage {
             let link = link.clone();
             let selected = selected.clone();
             spawn_local(async move {
-                let label = action_def.label.clone();
+                let _label = action_def.label.clone();
                 components::user_action_list::execute_action(selected, action_def).await;
 
                 // The action is asynchronous making the firing of UserActionComplete instantly after
                 // the execute_action is set. To allow the user to see a status change that indicates
                 // something actually happened we need to delay it for a little bit.
                 Timeout::new(250, move || {
-                    link.send_message(Msg::UserActionComplete(label));
+                    link.send_message(Msg::UserActionComplete);
                 })
                 .forget();
             });
@@ -434,7 +434,7 @@ impl Component for SearchPage {
                     true
                 }
             }
-            Msg::UserActionComplete(_) => {
+            Msg::UserActionComplete => {
                 self.executed_action = None;
                 true
             }

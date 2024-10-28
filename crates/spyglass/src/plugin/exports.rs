@@ -443,12 +443,12 @@ fn _handle_sync_file(env: &PluginEnv, dst: &str, src: &str) {
     }
 }
 
-fn handle_plugin_enqueue(env: &PluginEnv, urls: &Vec<String>) {
+fn handle_plugin_enqueue(env: &PluginEnv, urls: &[String]) {
     log::info!("{} enqueuing {} urls", env.name, urls.len());
     let state = env.app_state.clone();
     // Grab a handle to the plugin manager runtime
     let rt = tokio::runtime::Handle::current();
-    let urls = urls.clone();
+    let urls = urls.to_owned();
 
     rt.spawn(async move {
         let state = state.clone();
