@@ -4,9 +4,11 @@ use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
-use tauri::api::dialog::FileDialogBuilder;
-use tauri::State;
-use tauri::{ClipboardManager, Manager};
+use tauri::Manager;
+use tauri::{Emitter, State};
+use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_updater::UpdaterExt;
 
 use crate::constants::TabLocation;
 use crate::current_version;
@@ -37,17 +39,17 @@ pub async fn authorize_connection(win: tauri::Window, id: String) -> Result<(), 
 
 #[tauri::command]
 pub async fn choose_folder(win: tauri::Window) -> Result<(), String> {
-    FileDialogBuilder::new().pick_folder(move |folder_path| {
-        if let Some(folder_path) = folder_path {
-            let _ = win.emit(ClientEvent::FolderChosen.as_ref(), folder_path);
-        }
-    });
+    let app = win.app_handle();
+    let folder_path = app.dialog().file().blocking_pick_folder();
+    if let Some(folder_path) = folder_path {
+        let _ = win.emit(ClientEvent::FolderChosen.as_ref(), folder_path);
+    }
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn escape(window: tauri::Window) -> Result<(), String> {
+pub async fn escape(window: tauri::WebviewWindow) -> Result<(), String> {
     window::hide_search_bar(&window);
     Ok(())
 }
@@ -116,11 +118,7 @@ pub async fn open_result(
 
 #[tauri::command]
 pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), String> {
-    if let Err(error) = win
-        .app_handle()
-        .clipboard_manager()
-        .write_text(String::from(txt))
-    {
+    if let Err(error) = win.app_handle().clipboard().write_text(String::from(txt)) {
         log::warn!("Error copying content to clipboard {:?}", error);
         return Err(error.to_string());
     }
@@ -138,7 +136,7 @@ pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub async fn resize_window(window: tauri::Window, height: f64) {
+pub async fn resize_window(window: tauri::WebviewWindow, height: f64) {
     window::resize_window(&window, height).await;
 }
 
@@ -279,16 +277,56 @@ pub async fn list_connections(
 }
 
 #[tauri::command]
+<<<<<<< HEAD
 pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
-    let app_handle = window.app_handle();
-    if let Ok(updater) = app_handle.updater().check().await {
-        log::info!("downloading new update...");
-        if let Err(e) = updater.download_and_install().await {
-            window::alert(&window, "Unable to update", &e.to_string());
-        } else {
-            log::info!("completed update, restarting!");
-            app_handle.restart();
+=======
+pub async fn list_plugins(win: tauri::Window) -> Result<Vec<response::PluginResult>, String> {
+    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        match rpc.client.list_plugins().await {
+            Ok(plugins) => Ok(plugins),
+            Err(err) => {
+                log::error!("list_plugins err: {}", err.to_string());
+                Ok(Vec::new())
+            }
         }
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+#[tauri::command]
+pub async fn toggle_plugin(window: tauri::Window, name: &str, enabled: bool) -> Result<(), String> {
+    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
+        let rpc = rpc.lock().await;
+        let _ = rpc.client.toggle_plugin(name.to_string(), enabled).await;
+        let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_and_restart(window: tauri::WebviewWindow) -> Result<(), String> {
+>>>>>>> 861cb936 (tauri 2.0 migration, everything is working so far except the global shortcut)
+    let app_handle = window.app_handle();
+    if let Ok(Some(update)) = app_handle
+        .updater()
+        .map_err(|err| err.to_string())?
+        .check()
+        .await
+    {
+        log::info!("downloading new update...");
+        update
+            .download_and_install(
+                |_chunk_length, _content_length| {},
+                || {
+                    log::info!("completed update, restarting!");
+                    app_handle.restart();
+                },
+            )
+            .await
+            .map_err(|err| err.to_string())?;
     }
     Ok(())
 }
@@ -365,10 +403,10 @@ pub async fn wizard_finished(
     }
 
     // close wizard window
-    if let Some(window) = win.get_window(crate::constants::WIZARD_WIN_NAME) {
+    if let Some(window) = win.get_webview_window(crate::constants::WIZARD_WIN_NAME) {
         let _ = window.close();
         navigate_to_tab(
-            &window.app_handle(),
+            window.app_handle(),
             &crate::constants::TabLocation::Discover,
         );
     }
@@ -430,7 +468,7 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
 #[tauri::command]
 pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
     if let Ok(tab_loc) = TabLocation::from_str(&page) {
-        super::window::navigate_to_tab(&win.app_handle(), &tab_loc);
+        super::window::navigate_to_tab(win.app_handle(), &tab_loc);
     }
 
     Ok(())

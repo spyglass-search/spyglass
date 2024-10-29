@@ -3,12 +3,10 @@ use std::sync::{
     atomic::{AtomicU8, Ordering},
     Arc,
 };
-use tauri::api::dialog::blocking::message;
 use tauri::async_runtime::JoinHandle;
-use tauri::{
-    api::process::{Command, CommandEvent},
-    AppHandle,
-};
+use tauri::AppHandle;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 use tokio::sync::{broadcast, Mutex};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -16,7 +14,7 @@ use tokio_retry::Retry;
 use shared::config::Config;
 use spyglass_rpc::RpcClient;
 
-use crate::{window, AppEvent};
+use crate::AppEvent;
 
 pub type RpcMutex = Arc<Mutex<SpyglassServerClient>>;
 
@@ -94,16 +92,14 @@ impl SpyglassServerClient {
         let client = match try_connect(&endpoint).await {
             Ok(client) => Some(client),
             Err(err) => {
-                let window = window::get_searchbar(app_handle);
                 // Let users know something has gone dreadfully wrong.
-                message(
-                    Some(&window),
-                    "Unable to start search backend",
-                    format!(
-                        "Error: {}\nPlease file a bug report!\nThe application will exit now.",
-                        &err.to_string()
-                    ),
-                );
+                app_handle
+                    .dialog()
+                    .message(format!(
+                        "Error: {err}\nPlease file a bug report!\nThe application will exit now."
+                    ))
+                    .title("Unable to start search backend")
+                    .kind(MessageDialogKind::Error);
 
                 app_handle.exit(0);
                 None
@@ -126,11 +122,12 @@ impl SpyglassServerClient {
         // Attempt to reconnect
         if let Some(sidecar) = &self.sidecar_handle {
             log::info!("child process killed");
-            tauri::api::process::kill_children();
             sidecar.abort();
 
             log::info!("Attempting to restart backend");
-            self.sidecar_handle = Some(SpyglassServerClient::check_and_start_backend());
+            self.sidecar_handle = Some(SpyglassServerClient::check_and_start_backend(
+                &self.app_handle,
+            ));
         }
 
         log::info!("reconnecting to {}", self.endpoint);
@@ -139,26 +136,29 @@ impl SpyglassServerClient {
                 self.client = client;
             }
             Err(err) => {
-                let window = window::get_searchbar(&self.app_handle);
                 // Let users know something has gone dreadfully wrong.
-                message(
-                    Some(&window),
-                    "Unable to start search backend",
-                    format!(
+                self.app_handle
+                    .dialog()
+                    .message(format!(
                         "Error: {}\nPlease file a bug report!\nThe application will exit now.",
                         &err.to_string()
-                    ),
-                );
+                    ))
+                    .title("Unable to start search backend")
+                    .kind(MessageDialogKind::Error);
             }
         }
     }
 
-    pub fn check_and_start_backend() -> JoinHandle<()> {
+    pub fn check_and_start_backend(app: &AppHandle) -> JoinHandle<()> {
+        let app = app.clone();
         tauri::async_runtime::spawn(async move {
-            let (mut rx, _) = Command::new_sidecar("spyglass-server")
+            let app = app.clone();
+            let shell = app.shell();
+            let (mut rx, _) = shell
+                .sidecar("spyglass-server")
                 .expect("failed to create `spyglass-server` binary command")
                 .spawn()
-                .expect("Failed to spawn sidecar");
+                .expect("failed to spawn sidecar");
 
             while let Some(event) = rx.recv().await {
                 match event {
