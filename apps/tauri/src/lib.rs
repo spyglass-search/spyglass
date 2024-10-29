@@ -5,17 +5,18 @@
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use auto_launch::AutoLaunchBuilder;
+use constants::SEARCH_WIN_NAME;
 use rpc::RpcMutex;
 use tauri::image::Image;
-use tauri::path::{BaseDirectory, PathResolver};
 use tauri::process::current_binary;
 use tauri::tray::TrayIconBuilder;
 use tauri::{include_image, AppHandle, Env, Manager, PackageInfo, RunEvent, Window, Wry};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -102,11 +103,27 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // handle deep-lining with _args
             // app_handle_clone.trigger_any("scheme-request-received", Some(request));
             let _ = app
-                .get_webview_window("main")
+                .get_webview_window(SEARCH_WIN_NAME)
                 .expect("no main window")
                 .set_focus();
         }))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        let window = window::get_searchbar(app);
+                        // `platform::is_visible()` returns `true` on Windows when
+                        // the search bar is built, so we cannot really know if the
+                        // window is visible when the `close_search_bar` setting is used.
+                        if platform::is_visible(&window) {
+                            window::hide_search_bar(&window)
+                        } else {
+                            window::show_search_bar(&window);
+                        }
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
@@ -152,6 +169,13 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         .menu(menu::get_app_menu)
         .setup(move |app| {
             let app_handle = app.app_handle();
+            app.manage(config.clone());
+            app.manage(Arc::new(PauseState::new(false)));
+            app.manage(shared::metrics::Metrics::new(
+                &Config::machine_identifier(),
+                config.user_settings.disable_telemetry,
+            ));
+
             let _startup_win = window::show_startup_window(app_handle);
 
             let (appevent_channel, _) = broadcast::channel::<AppEvent>(1);
@@ -186,14 +210,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app_handle.clone(),
             ));
 
-            let _ = get_searchbar(app_handle);
-
-            app.manage(config.clone());
-            app.manage(Arc::new(PauseState::new(false)));
-            app.manage(shared::metrics::Metrics::new(
-                &Config::machine_identifier(),
-                config.user_settings.disable_telemetry,
-            ));
+            let bar = get_searchbar(app_handle);
+            bar.show()?;
 
             if let Err(err) = register_global_shortcut(app_handle, &config.user_settings) {
                 dbg!(err);
@@ -273,16 +291,6 @@ pub fn configuration_updated(
 
     if diff.shortcut.is_some() {
         let _ = register_global_shortcut(window.app_handle(), &new_configuration);
-        // if let Err(error) = window
-        //     .app_handle()
-        //     .tray_handle()
-        //     .set_menu(menu::get_tray_menu(
-        //         window.app_handle().package_info(),
-        //         &new_configuration,
-        //     ))
-        // {
-        //     log::error!("Error updating system tray {:?}", error);
-        // }
     }
 }
 
@@ -299,29 +307,10 @@ fn register_global_shortcut(app_handle: &AppHandle, settings: &UserSettings) -> 
         log::warn!("Unable to unregister all shortcuts {}", error.to_string());
     }
 
-    let hotkey = Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+    let hotkey = Shortcut::from_str(&settings.shortcut)?;
     if !shortcuts.is_registered(hotkey) {
         log::info!("Registering {} as shortcut", &settings.shortcut);
-        let should_hide_search_bar = !settings.close_search_bar;
-        if let Err(err) = app_handle.plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, _shortcut, _event| {
-                    dbg!(_shortcut);
-                    dbg!(_event);
-                    // let window = window::get_searchbar(app);
-                    // // `platform::is_visible()` returns `true` on Windows when
-                    // // the search bar is built, so we cannot really know if the
-                    // // window is visible when the `close_search_bar` setting is used.
-                    // if should_hide_search_bar && platform::is_visible(&window) {
-                    //     window::hide_search_bar(&window)
-                    // } else {
-                    //     window::show_search_bar(&window);
-                    // }
-                })
-                .build(),
-        ) {
-            dbg!(err);
-        };
+        shortcuts.register(hotkey)?;
     }
 
     Ok(())

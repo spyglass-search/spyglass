@@ -210,14 +210,19 @@ pub fn get_app_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
         ],
     )?;
     app_menu.append(&menu)?;
-    app_menu.append(&Submenu::with_items(app, "Edit", true, &[
+    app_menu.append(&Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
             // Currently we need to include these so that the shortcuts for these
             // actions work.
             &PredefinedMenuItem::copy(app, None)?,
             &PredefinedMenuItem::paste(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::select_all(app, None)?,
-    ])?)?;
+        ],
+    )?)?;
 
     Ok(app_menu)
 }
