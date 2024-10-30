@@ -277,38 +277,7 @@ pub async fn list_connections(
 }
 
 #[tauri::command]
-<<<<<<< HEAD
-pub async fn update_and_restart(window: tauri::Window) -> Result<(), String> {
-=======
-pub async fn list_plugins(win: tauri::Window) -> Result<Vec<response::PluginResult>, String> {
-    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        match rpc.client.list_plugins().await {
-            Ok(plugins) => Ok(plugins),
-            Err(err) => {
-                log::error!("list_plugins err: {}", err.to_string());
-                Ok(Vec::new())
-            }
-        }
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-#[tauri::command]
-pub async fn toggle_plugin(window: tauri::Window, name: &str, enabled: bool) -> Result<(), String> {
-    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        let _ = rpc.client.toggle_plugin(name.to_string(), enabled).await;
-        let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn update_and_restart(window: tauri::WebviewWindow) -> Result<(), String> {
->>>>>>> 861cb936 (tauri 2.0 migration, everything is working so far except the global shortcut)
     let app_handle = window.app_handle();
     if let Ok(Some(update)) = app_handle
         .updater()

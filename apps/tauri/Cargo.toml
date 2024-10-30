@@ -18,7 +18,7 @@ tauri-build = { version = "2", features = ["config-json5"] }
 anyhow = { workspace = true }
 auto-launch = "0.4.0"
 diff-struct = "0.5.1"
-jsonrpsee = { version = "0.16.2", features = ["ws-client"] }
+jsonrpsee = { workspace = true, features = ["ws-client"] }
 log = { workspace = true }
 migration = { path = "../../crates/migrations" }
 num-format = "0.4"

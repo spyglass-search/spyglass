@@ -15,7 +15,7 @@ use rpc::RpcMutex;
 use tauri::image::Image;
 use tauri::process::current_binary;
 use tauri::tray::TrayIconBuilder;
-use tauri::{include_image, AppHandle, Env, Manager, PackageInfo, RunEvent, Window, Wry};
+use tauri::{include_image, AppHandle, Env, Manager, PackageInfo, RunEvent, Window};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::broadcast;
@@ -213,7 +213,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             // Spawn a version checking background task. Check every couple hours
             // for a new version.
-            tauri::async_runtime::spawn(check_version_interval(current_version, app_handle.clone()));
+            tauri::async_runtime::spawn(check_version_interval(
+                current_version,
+                app_handle.clone(),
+            ));
 
             Ok(())
         })

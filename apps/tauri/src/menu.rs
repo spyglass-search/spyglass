@@ -71,24 +71,6 @@ pub fn get_tray_menu(
         ],
     )?;
 
-<<<<<<< HEAD
-    let settings_menu = SystemTrayMenu::new()
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_CONNECTION_MANAGER.to_string(),
-            "Connections",
-        ))
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_SETTINGS_MANAGER.to_string(),
-            "User settings",
-        ));
-
-    tray = tray
-        .add_item(show)
-        .add_item(pause)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
-        .add_item(CustomMenuItem::new(
-=======
     tray.append_items(&[
         &MenuItem::with_id(
             app,
@@ -114,7 +96,6 @@ pub fn get_tray_menu(
         )?,
         &MenuItem::with_id(
             app,
->>>>>>> 861cb936 (tauri 2.0 migration, everything is working so far except the global shortcut)
             MenuID::DISCOVER.to_string(),
             "Discover Lenses",
             true,

@@ -270,6 +270,7 @@ pub fn show_wizard_window(app: &AppHandle) {
     show_window(&window);
 }
 
+#[allow(dead_code)]
 pub fn alert(window: &WebviewWindow, title: &str, message: &str) {
     let app_handle = window.app_handle();
     app_handle
