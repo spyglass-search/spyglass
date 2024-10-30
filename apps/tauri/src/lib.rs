@@ -98,6 +98,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     LogTracer::init()?;
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             log::info!("single instance triggered");
             // handle deep-lining with _args
@@ -176,10 +177,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 config.user_settings.disable_telemetry,
             ));
 
-            let _startup_win = window::show_startup_window(app_handle);
-
             let (appevent_channel, _) = broadcast::channel::<AppEvent>(1);
             app.manage(appevent_channel);
+
+            let _ = window::show_startup_window(app_handle);
 
             let config = Config::new();
             log::info!("Loading prefs from: {:?}", Config::prefs_dir());
@@ -203,19 +204,16 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             //     log::error!("Unable to copy default plugins: {}", e);
             // }
 
-            // Spawn a version checking background task. Check every couple hours
-            // for a new version.
-            tauri::async_runtime::spawn(check_version_interval(
-                current_version,
-                app_handle.clone(),
-            ));
-
             let bar = get_searchbar(app_handle);
             bar.show()?;
 
             if let Err(err) = register_global_shortcut(app_handle, &config.user_settings) {
                 dbg!(err);
             }
+
+            // Spawn a version checking background task. Check every couple hours
+            // for a new version.
+            tauri::async_runtime::spawn(check_version_interval(current_version, app_handle.clone()));
 
             Ok(())
         })
@@ -393,7 +391,6 @@ fn open_folder(folder: PathBuf) {
 async fn check_version_interval(current_version: String, app_handle: AppHandle) {
     let mut interval =
         tokio::time::interval(Duration::from_secs(constants::VERSION_CHECK_INTERVAL_S));
-
     let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
     let mut shutdown = shutdown_tx.subscribe();
     let metrics = app_handle.try_state::<Metrics>();

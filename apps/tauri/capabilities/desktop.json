@@ -7,7 +7,9 @@
     "windows",
     "linux"
   ],
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
