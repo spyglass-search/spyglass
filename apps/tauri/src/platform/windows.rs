@@ -1,12 +1,12 @@
 use crate::window;
 use shared::event::ClientEvent;
-use tauri::Window;
+use tauri::{Emitter, WebviewWindow};
 use url::Url;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowPlacement;
 use windows::Win32::UI::WindowsAndMessaging::{SHOW_WINDOW_CMD, WINDOWPLACEMENT};
 
-pub fn is_visible(window: &Window) -> bool {
+pub fn is_visible(window: &WebviewWindow) -> bool {
     if let Ok(handle) = window.hwnd() {
         let mut lpwndpl = WINDOWPLACEMENT::default();
         unsafe {
@@ -19,14 +19,14 @@ pub fn is_visible(window: &Window) -> bool {
     false
 }
 
-pub fn show_search_bar(window: &Window) {
+pub fn show_search_bar(window: &WebviewWindow) {
     let _ = window.show();
     let _ = window.unminimize();
     window::center_search_bar(window);
     let _ = window.set_focus();
 }
 
-pub fn hide_search_bar(window: &Window) {
+pub fn hide_search_bar(window: &WebviewWindow) {
     let _ = window.minimize();
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
