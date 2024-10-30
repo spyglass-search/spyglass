@@ -10,7 +10,7 @@ anyhow = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
 regex = "1"
-sea-orm = { version = "0.11", features = ["macros", "sqlx-sqlite", "sqlx-postgres", "runtime-tokio-rustls", "with-chrono", "with-json"], default-features = false }
+sea-orm = { version = "1.1.0", features = ["macros", "sqlx-sqlite", "sqlx-postgres", "runtime-tokio-rustls", "with-chrono", "with-json"], default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shared = { path = "../shared" }

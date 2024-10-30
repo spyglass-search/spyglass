@@ -2,7 +2,8 @@ use regex::{Regex, RegexBuilder, RegexSet, RegexSetBuilder};
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query::{OnConflict, Query, SqliteQueryBuilder};
 use sea_orm::{
-    sea_query, ConnectionTrait, FromQueryResult, InsertResult, QueryTrait, Set, Statement,
+    sea_query, ConnectionTrait, FromJsonQueryResult, FromQueryResult, InsertResult, QueryTrait,
+    Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -27,7 +28,7 @@ pub enum EnqueueError {
 }
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, Eq)]
-#[sea_orm(rs_type = "String", db_type = "String(None)")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
 pub enum TaskErrorType {
     #[sea_orm(string_value = "Collect")]
     Collect,
@@ -48,7 +49,7 @@ pub struct TaskError {
 }
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
-#[sea_orm(rs_type = "String", db_type = "String(None)")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
 pub enum CrawlStatus {
     #[sea_orm(string_value = "Initial")]
     Initial,
@@ -63,7 +64,7 @@ pub enum CrawlStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq, Default)]
-#[sea_orm(rs_type = "String", db_type = "String(None)")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
 pub enum CrawlType {
     #[sea_orm(string_value = "API")]
     Api,
