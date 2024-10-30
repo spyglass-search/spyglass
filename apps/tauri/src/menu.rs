@@ -167,38 +167,38 @@ pub fn get_tray_menu(
 }
 
 pub fn get_app_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
-    #[cfg(target_os = "linux")]
-    return Menu::new(app);
+    if cfg!(target_os = "linux") {
+        Menu::new(app)
+    } else {
+        let app_menu = Menu::new(app)?;
+        let menu = Submenu::with_items(
+            app,
+            "Spyglass",
+            true,
+            &[
+                &PredefinedMenuItem::about(app, Some("Spyglass"), Default::default())?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::hide(app, None)?,
+                &PredefinedMenuItem::quit(app, None)?,
+            ],
+        )?;
+        app_menu.append(&menu)?;
+        app_menu.append(&Submenu::with_items(
+            app,
+            "Edit",
+            true,
+            &[
+                // Currently we need to include these so that the shortcuts for these
+                // actions work.
+                &PredefinedMenuItem::copy(app, None)?,
+                &PredefinedMenuItem::paste(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::select_all(app, None)?,
+            ],
+        )?)?;
 
-    #[cfg(not(target_os = "linux"))]
-    let app_menu = Menu::new(app)?;
-    let menu = Submenu::with_items(
-        app,
-        "Spyglass",
-        true,
-        &[
-            &PredefinedMenuItem::about(app, Some("Spyglass"), Default::default())?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::hide(app, None)?,
-            &PredefinedMenuItem::quit(app, None)?,
-        ],
-    )?;
-    app_menu.append(&menu)?;
-    app_menu.append(&Submenu::with_items(
-        app,
-        "Edit",
-        true,
-        &[
-            // Currently we need to include these so that the shortcuts for these
-            // actions work.
-            &PredefinedMenuItem::copy(app, None)?,
-            &PredefinedMenuItem::paste(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::select_all(app, None)?,
-        ],
-    )?)?;
-
-    Ok(app_menu)
+        Ok(app_menu)
+    }
 }
 
 pub fn handle_tray_icon_events(tray: &TrayIcon, event: TrayIconEvent) {
