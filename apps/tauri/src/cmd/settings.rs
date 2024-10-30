@@ -30,78 +30,74 @@ pub async fn save_user_settings(
     for (key, value) in settings.iter() {
         // Update spyglass or plugin settings?
         if let Some((parent, field)) = key.split_once('.') {
-            match parent {
+            if parent == "_" {
                 // Hacky way to update user settings directly.
-                "_" => {
-                    if let Some(opt) = setting_configs.get(key) {
-                        match opt.form_type.validate(value) {
-                            Ok(val) => {
-                                fields_updated += 1;
-                                match field {
-                                    "data_directory" => {
-                                        current_settings.data_directory = PathBuf::from(val);
-                                    }
-                                    "shortcut" => {
-                                        current_settings.shortcut = val;
-                                    }
-                                    "disable_autolaunch" => {
-                                        current_settings.disable_autolaunch =
-                                            serde_json::from_str(value).unwrap_or_default();
-                                    }
-                                    "close_search_bar" => {
-                                        current_settings.close_search_bar =
-                                            serde_json::from_str(value).unwrap_or_default();
-                                    }
-                                    "disable_telemetry" => {
-                                        current_settings.disable_telemetry =
-                                            serde_json::from_str(value).unwrap_or_default();
-                                    }
-                                    "inflight_crawl_limit" => {
-                                        let limit: u32 = serde_json::from_str(value).unwrap_or(10);
-                                        current_settings.inflight_crawl_limit =
-                                            Limit::Finite(limit);
-                                    }
-                                    "inflight_domain_limit" => {
-                                        let limit: u32 = serde_json::from_str(value).unwrap_or(2);
-                                        current_settings.inflight_domain_limit =
-                                            Limit::Finite(limit);
-                                    }
-                                    "port" => {
-                                        current_settings.port = serde_json::from_str(value)
-                                            .unwrap_or_else(|_| UserSettings::default_port());
-                                    }
-                                    "filesystem_settings.watched_paths" => {
-                                        current_settings.filesystem_settings.watched_paths =
-                                            serde_json::from_str(value).unwrap_or_else(|_| {
-                                                FileSystemSettings::default().watched_paths
-                                            })
-                                    }
-                                    "filesystem_settings.supported_extensions" => {
-                                        current_settings.filesystem_settings.supported_extensions =
-                                            serde_json::from_str(value).unwrap_or_else(|_| {
-                                                FileSystemSettings::default().supported_extensions
-                                            })
-                                    }
-                                    "filesystem_settings.enable_filesystem_scanning" => {
-                                        current_settings
-                                            .filesystem_settings
-                                            .enable_filesystem_scanning =
-                                            serde_json::from_str(value).unwrap_or_default()
-                                    }
-                                    "audio_settings.enable_audio_transcription" => {
-                                        current_settings.audio_settings.enable_audio_transcription =
-                                            serde_json::from_str(value).unwrap_or_default()
-                                    }
-                                    _ => {}
+
+                if let Some(opt) = setting_configs.get(key) {
+                    match opt.form_type.validate(value) {
+                        Ok(val) => {
+                            fields_updated += 1;
+                            match field {
+                                "data_directory" => {
+                                    current_settings.data_directory = PathBuf::from(val);
                                 }
+                                "shortcut" => {
+                                    current_settings.shortcut = val;
+                                }
+                                "disable_autolaunch" => {
+                                    current_settings.disable_autolaunch =
+                                        serde_json::from_str(value).unwrap_or_default();
+                                }
+                                "close_search_bar" => {
+                                    current_settings.close_search_bar =
+                                        serde_json::from_str(value).unwrap_or_default();
+                                }
+                                "disable_telemetry" => {
+                                    current_settings.disable_telemetry =
+                                        serde_json::from_str(value).unwrap_or_default();
+                                }
+                                "inflight_crawl_limit" => {
+                                    let limit: u32 = serde_json::from_str(value).unwrap_or(10);
+                                    current_settings.inflight_crawl_limit = Limit::Finite(limit);
+                                }
+                                "inflight_domain_limit" => {
+                                    let limit: u32 = serde_json::from_str(value).unwrap_or(2);
+                                    current_settings.inflight_domain_limit = Limit::Finite(limit);
+                                }
+                                "port" => {
+                                    current_settings.port = serde_json::from_str(value)
+                                        .unwrap_or_else(|_| UserSettings::default_port());
+                                }
+                                "filesystem_settings.watched_paths" => {
+                                    current_settings.filesystem_settings.watched_paths =
+                                        serde_json::from_str(value).unwrap_or_else(|_| {
+                                            FileSystemSettings::default().watched_paths
+                                        })
+                                }
+                                "filesystem_settings.supported_extensions" => {
+                                    current_settings.filesystem_settings.supported_extensions =
+                                        serde_json::from_str(value).unwrap_or_else(|_| {
+                                            FileSystemSettings::default().supported_extensions
+                                        })
+                                }
+                                "filesystem_settings.enable_filesystem_scanning" => {
+                                    current_settings
+                                        .filesystem_settings
+                                        .enable_filesystem_scanning =
+                                        serde_json::from_str(value).unwrap_or_default()
+                                }
+                                "audio_settings.enable_audio_transcription" => {
+                                    current_settings.audio_settings.enable_audio_transcription =
+                                        serde_json::from_str(value).unwrap_or_default()
+                                }
+                                _ => {}
                             }
-                            Err(err) => {
-                                errors.insert(key.to_string(), err);
-                            }
+                        }
+                        Err(err) => {
+                            errors.insert(key.to_string(), err);
                         }
                     }
                 }
-                &_ => {}
             }
         }
     }
