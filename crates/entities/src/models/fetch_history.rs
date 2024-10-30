@@ -4,7 +4,7 @@ use serde::Serialize;
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum, Serialize, Eq)]
-#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(1))")]
 pub enum FetchProtocol {
     #[sea_orm(string_value = "HTTP")]
     Http,

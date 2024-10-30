@@ -227,7 +227,7 @@ impl GithubConnection {
         //  - An issue being closed.
         //  - A repo no longer being starred.
         let unsynced = indexed_document::Entity::find()
-            .filter(indexed_document::Column::Url.like(&format!(
+            .filter(indexed_document::Column::Url.like(format!(
                 "api://{}@{}%",
                 self.user,
                 Self::id()

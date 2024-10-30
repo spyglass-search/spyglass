@@ -1,4 +1,5 @@
-use entities::{models::lens, sea_orm::Statement};
+use entities::models::lens;
+use sea_orm::Statement;
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::{ConnectionTrait, TransactionTrait};
 pub struct Migration;
@@ -31,12 +32,12 @@ impl MigrationTrait for Migration {
             .query_all(Statement::from_string(
                 manager.get_database_backend(),
                 r#"with url_counts as (
-                select count(*) as cnt,url 
-                from indexed_document 
+                select count(*) as cnt,url
+                from indexed_document
                 group by url
-            ) 
+            )
             select * from url_counts where cnt > 1"#
-                    .into(),
+                    .to_string(),
             ))
             .await?;
 
@@ -60,15 +61,15 @@ impl MigrationTrait for Migration {
                     manager.get_database_backend(),
                     r#"with id_list as (
                         select id
-                        from indexed_document where url = ? 
+                        from indexed_document where url = ?
                         order by updated_at desc
                         ),
                      id_keep as (
                         select id
-                        from indexed_document where url = ? 
+                        from indexed_document where url = ?
                         order by updated_at desc limit 1
                         )
-                    delete from document_tag where indexed_document_id in id_list and indexed_document_id not in id_keep"#, 
+                    delete from document_tag where indexed_document_id in id_list and indexed_document_id not in id_keep"#,
                     vec![url.clone().into()])).await?;
 
                 // delete indexed documents
@@ -76,12 +77,12 @@ impl MigrationTrait for Migration {
                     manager.get_database_backend(),
                     r#"with id_list as (
                         select id
-                        from indexed_document where url = ? 
+                        from indexed_document where url = ?
                         order by updated_at desc
                         ),
                      id_keep as (
                         select id
-                        from indexed_document where url = ? 
+                        from indexed_document where url = ?
                         order by updated_at desc limit 1
                         )
                     delete from indexed_document where id in id_list and id not in id_keep"#,

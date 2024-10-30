@@ -8,7 +8,7 @@ use serde::Serialize;
 use shared::config::LensConfig;
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
-#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(1))")]
 pub enum LensType {
     // A simple lens with URLs & rules that acts as a "filter"
     #[sea_orm(string_value = "Simple")]

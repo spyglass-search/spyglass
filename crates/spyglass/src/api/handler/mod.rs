@@ -9,14 +9,13 @@ use entities::models::{
     bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
     lens,
 };
-use entities::sea_orm::{prelude::*, sea_query, Set};
+use entities::sea_orm::{prelude::*, sea_query};
 use jsonrpsee::core::Error;
 use libnetrunner::parser::html::html_to_text;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::crawler::CrawlResult;
 use libspyglass::documents::process_crawl_results;
 use libspyglass::filesystem;
-use libspyglass::plugin::PluginCommand;
 use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
@@ -510,35 +509,6 @@ pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error>
         } else {
             AppPause::Run
         });
-    }
-
-    Ok(())
-}
-
-#[instrument(skip(state))]
-pub async fn toggle_plugin(state: AppState, name: String, enabled: bool) -> Result<(), Error> {
-    // Find the plugin
-    let plugin = lens::Entity::find()
-        .filter(lens::Column::Name.eq(name))
-        .filter(lens::Column::LensType.eq(LensType::Plugin))
-        .one(&state.db)
-        .await;
-
-    if let Ok(Some(plugin)) = plugin {
-        let mut updated: lens::ActiveModel = plugin.clone().into();
-        updated.is_enabled = Set(enabled);
-        let _ = updated.update(&state.db).await;
-
-        let mut cmd_tx = state.plugin_cmd_tx.lock().await;
-        if let Some(cmd_tx) = &mut *cmd_tx {
-            let cmd = if enabled {
-                PluginCommand::EnablePlugin(plugin.name)
-            } else {
-                PluginCommand::DisablePlugin(plugin.name)
-            };
-
-            let _ = cmd_tx.send(cmd).await;
-        }
     }
 
     Ok(())

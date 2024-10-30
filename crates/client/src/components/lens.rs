@@ -79,9 +79,7 @@ fn lens_action_bar(props: &LensActionBarProps) -> Html {
                     }
                     LensType::Plugin => {
                         let onclick = Callback::from(move |_| {
-                            navigator.push(&Route::SettingsPage {
-                                tab: pages::Tab::PluginsManager,
-                            })
+                            //noop
                         });
                         html! { <Btn {onclick} size={BtnSize::Xs}>{label}</Btn> }
                     }

@@ -56,8 +56,6 @@ url = "2.2"
 uuid = { workspace =true, features = ["serde", "v4"], default-features = false }
 warc = "0.3"
 warp = "0.3"
-wasmer = "2.3.0"
-wasmer-wasi = "2.3.0"
 
 # Spyglass libs
 auth_core = { git = "https://github.com/spyglass-search/third-party-apis", rev = "dafb599bb24f505ce96d975e922bfadba6e2d1ff" }
@@ -69,7 +67,6 @@ entities = { path = "../entities" }
 migration = { path = "../migrations" }
 shared = { path = "../shared", features = ["metrics"] }
 spyglass-netrunner = "0.2.11"
-spyglass-plugin = { path = "../spyglass-plugin" }
 spyglass-processor = { path = "../spyglass-processor" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 spyglass-searcher = { path = "../spyglass-searcher" }

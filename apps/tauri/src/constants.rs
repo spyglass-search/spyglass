@@ -27,8 +27,6 @@ pub enum TabLocation {
     Discover,
     #[strum(serialize = "/settings/library")]
     Library,
-    #[strum(serialize = "/settings/plugins")]
-    PluginSettings,
     #[strum(serialize = "/settings/user")]
     UserSettings,
 }

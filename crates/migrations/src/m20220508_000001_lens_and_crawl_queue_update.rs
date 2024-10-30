@@ -1,7 +1,8 @@
 use entities::{
     models::crawl_queue,
-    sea_orm::{ConnectionTrait, DbBackend, Statement},
+    sea_orm::{ConnectionTrait, Statement},
 };
+use sea_orm::DbBackend;
 use sea_orm_migration::prelude::*;
 
 pub struct Migration;

@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect, Set};
+use sea_orm::{FromJsonQueryResult, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 
 use super::{crawl_queue, indexed_document};

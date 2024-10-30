@@ -39,7 +39,7 @@ tokio-retry = "0.3"
 tracing = { workspace = true }
 tracing-appender = "0.2"
 tracing-log = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter", "std"]}
+tracing-subscriber = { workspace = true, features = ["env-filter", "std"] }
 url = "2.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]

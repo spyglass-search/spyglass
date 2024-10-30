@@ -28,29 +28,7 @@ endif
 build-client:
 	cargo build -p spyglass-client -p spyglass-app
 
-build-plugins-dev:
-ifeq ("$(PLUGINS_DEV_FOLDER)","")
-		@echo "Error: Please set the PLUGINS_DEV_FOLDER variable in your Makefile before continuing";
-else
-	@for plugin in $(PLUGINS); do \
-		echo "-> building $${plugin}"; \
-		mkdir -p "assets/plugins/$${plugin}"; \
-		cargo build -p $$plugin --target wasm32-wasi; \
-		cp target/wasm32-wasi/debug/$$plugin.wasm assets/plugins/$$plugin/main.wasm; \
-	done
-	mkdir -p $(PLUGINS_DEV_FOLDER);
-	cp -r assets/plugins $(PLUGINS_DEV_FOLDER);
-endif
-
-build-plugins-release:
-	@for plugin in $(PLUGINS); do \
-		echo "-> building $${plugin}"; \
-		mkdir -p "assets/plugins/$${plugin}"; \
-		cargo build -p $$plugin --target wasm32-wasi --release; \
-		cp target/wasm32-wasi/release/$$plugin.wasm assets/plugins/$$plugin/main.wasm; \
-	done
-
-build-release: build-backend build-plugins-release
+build-release: build-backend
 	cargo tauri build
 
 check:

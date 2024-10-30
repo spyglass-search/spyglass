@@ -207,7 +207,7 @@ pub async fn config_task(mut state: AppState) {
                                     let audio_exts = AudioExt::iter().map(|x| x.to_string()).collect::<Vec<String>>();
                                     let mut condition = Condition::any();
                                     for ext in audio_exts {
-                                        condition = condition.add(crawl_queue::Column::Url.ends_with(&format!(".{}", ext)));
+                                        condition = condition.add(crawl_queue::Column::Url.ends_with(format!(".{}", ext)));
                                     }
 
                                     let _ = crawl_queue::Entity::update_many()

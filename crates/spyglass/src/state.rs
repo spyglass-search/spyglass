@@ -15,7 +15,6 @@ use crate::filesystem::SpyglassFileWatcher;
 use crate::task::{AppShutdown, UserSettingsChange};
 use crate::{
     pipeline::PipelineCommand,
-    plugin::{PluginCommand, PluginManager},
     task::{AppPause, ManagerCommand},
 };
 use shared::config::{Config, LensConfig, PipelineConfiguration, UserSettings};
@@ -72,9 +71,6 @@ pub struct AppState {
     pub rpc_events: Arc<std::sync::Mutex<broadcast::Sender<RpcEvent>>>,
     // Pause/unpause worker pool.
     pub pause_cmd_tx: Arc<Mutex<Option<broadcast::Sender<AppPause>>>>,
-    // Plugin command/control
-    pub plugin_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PluginCommand>>>>,
-    pub plugin_manager: Arc<Mutex<PluginManager>>,
     // Pipeline command/control
     pub pipeline_cmd_tx: Arc<Mutex<Option<mpsc::Sender<PipelineCommand>>>>,
     pub file_watcher: Arc<Mutex<Option<SpyglassFileWatcher>>>,
@@ -204,8 +200,6 @@ impl AppStateBuilder {
             pause_cmd_tx: Arc::new(Mutex::new(None)),
             pipeline_cmd_tx: Arc::new(Mutex::new(None)),
             pipelines: Arc::new(pipelines),
-            plugin_cmd_tx: Arc::new(Mutex::new(None)),
-            plugin_manager: Arc::new(Mutex::new(PluginManager::new())),
             rpc_events: Arc::new(std::sync::Mutex::new(rpc_events)),
             shutdown_cmd_tx: Arc::new(Mutex::new(shutdown_tx)),
             config_cmd_tx: Arc::new(Mutex::new(config_tx)),

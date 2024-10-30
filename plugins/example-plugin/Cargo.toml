@@ -10,5 +10,4 @@ path = "src/main.rs"
 
 [dependencies]
 serde_json = { workspace = true }
-spyglass-plugin = { path = "../../crates/spyglass-plugin" }
 url = "2.2"

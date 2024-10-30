@@ -176,7 +176,7 @@ pub async fn search_lenses(
         .column_as(lens::Column::Author, "author")
         .column_as(lens::Column::Description, "description")
         .filter(tag::Column::Label.eq(TagType::Lens.to_string()))
-        .filter(tag::Column::Value.like(&format!("%{}%", &param.query)))
+        .filter(tag::Column::Value.like(format!("%{}%", &param.query)))
         // Pull in lens metadata
         .join_rev(
             JoinType::LeftJoin,

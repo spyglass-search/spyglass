@@ -65,15 +65,6 @@ pub async fn open_lens_folder(_: tauri::Window, config: State<'_, Config>) -> Re
 }
 
 #[tauri::command]
-pub async fn open_plugins_folder(
-    _: tauri::Window,
-    config: State<'_, Config>,
-) -> Result<(), String> {
-    open_folder(config.plugins_dir());
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn open_settings_folder(_: tauri::Window) -> Result<(), String> {
     open_folder(Config::prefs_dir());
     Ok(())
@@ -285,33 +276,6 @@ pub async fn list_connections(
     } else {
         Err("Unable to communicate w/ backend".to_string())
     }
-}
-
-#[tauri::command]
-pub async fn list_plugins(win: tauri::Window) -> Result<Vec<response::PluginResult>, String> {
-    if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        match rpc.client.list_plugins().await {
-            Ok(plugins) => Ok(plugins),
-            Err(err) => {
-                log::error!("list_plugins err: {}", err.to_string());
-                Ok(Vec::new())
-            }
-        }
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-#[tauri::command]
-pub async fn toggle_plugin(window: tauri::Window, name: &str, enabled: bool) -> Result<(), String> {
-    if let Some(rpc) = window.app_handle().try_state::<rpc::RpcMutex>() {
-        let rpc = rpc.lock().await;
-        let _ = rpc.client.toggle_plugin(name.to_string(), enabled).await;
-        let _ = window.emit(ClientEvent::RefreshPluginManager.as_ref(), true);
-    }
-
-    Ok(())
 }
 
 #[tauri::command]

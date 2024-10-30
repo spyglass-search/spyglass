@@ -13,8 +13,8 @@ use auto_launch::AutoLaunchBuilder;
 use rpc::RpcMutex;
 use tauri::api::process::current_binary;
 use tauri::{
-    AppHandle, Env, GlobalShortcutManager, Manager, PackageInfo, PathResolver, RunEvent,
-    SystemTray, SystemTrayEvent, Window,
+    AppHandle, Env, GlobalShortcutManager, Manager, PackageInfo, RunEvent, SystemTray,
+    SystemTrayEvent, Window,
 };
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -58,22 +58,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let current_version = current_version(ctx.package_info());
     let config = Config::new();
 
-    #[cfg(not(debug_assertions))]
-    let _guard = if config.user_settings.disable_telemetry {
-        None
-    } else {
-        Some(sentry::init((
-            "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
-            sentry::ClientOptions {
-                release: Some(std::borrow::Cow::from(
-                    ctx.package_info().version.to_string(),
-                )),
-                traces_sample_rate: 0.1,
-                ..Default::default()
-            },
-        )))
-    };
-
     update_auto_launch(&config.user_settings);
 
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "client.log");
@@ -111,14 +95,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::get_library_stats,
             cmd::get_shortcut,
             cmd::list_connections,
-            cmd::list_plugins,
             cmd::load_action_settings,
             cmd::load_user_settings,
             cmd::navigate,
             cmd::network_change,
             cmd::open_folder_path,
             cmd::open_lens_folder,
-            cmd::open_plugins_folder,
             cmd::open_result,
             cmd::open_settings_folder,
             cmd::recrawl_domain,
@@ -128,7 +110,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,
-            cmd::toggle_plugin,
             cmd::update_and_restart,
             cmd::wizard_finished,
         ])
@@ -146,11 +127,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let config = Config::new();
             log::info!("Loading prefs from: {:?}", Config::prefs_dir());
-
-            // Copy default plugins to data directory to be picked up by the backend
-            if let Err(e) = copy_plugins(&config, app.path_resolver()) {
-                log::error!("Unable to copy default plugins: {}", e);
-            }
 
             // Spawn a version checking background task. Check every couple hours
             // for a new version.
@@ -209,12 +185,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                             MenuID::OPEN_LENS_MANAGER => {
                                 navigate_to_tab(app, &crate::constants::TabLocation::Library);
-                            }
-                            MenuID::OPEN_PLUGIN_MANAGER => {
-                                navigate_to_tab(
-                                    app,
-                                    &crate::constants::TabLocation::PluginSettings,
-                                );
                             }
                             MenuID::OPEN_LOGS_FOLDER => open_folder(config.logs_dir()),
                             MenuID::OPEN_SETTINGS_MANAGER => {
@@ -488,30 +458,4 @@ async fn check_version_interval(current_version: String, app_handle: AppHandle) 
             }
         }
     }
-}
-
-fn copy_plugins(config: &Config, resolver: PathResolver) -> anyhow::Result<()> {
-    // Copy default plugins to data directory to be picked up by the backend
-    let plugin_path = resolver.resolve_resource("../../assets/plugins");
-    let base_plugin_dir = config.plugins_dir();
-
-    if let Some(plugin_path) = plugin_path {
-        for entry in std::fs::read_dir(plugin_path)? {
-            let path = entry?.path();
-            if path.is_dir() {
-                let plugin_name = path.file_name().expect("Unable to parse folder");
-                let plugin_dir = base_plugin_dir.join(plugin_name);
-                // Create folder for plugin
-                std::fs::create_dir_all(plugin_dir.clone())?;
-                // Copy plugin contents to folder
-                for file in std::fs::read_dir(path)? {
-                    let file = file?;
-                    let new_file_path = plugin_dir.join(file.file_name());
-                    std::fs::copy(file.path(), new_file_path)?;
-                }
-            }
-        }
-    }
-
-    Ok(())
 }

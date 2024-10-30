@@ -59,8 +59,6 @@ pub enum ClientInvoke {
     ResyncConnection,
     #[strum(serialize = "revoke_connection")]
     RevokeConnection,
-    #[strum(serialize = "toggle_plugin")]
-    TogglePlugin,
     #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
     #[strum(serialize = "open_folder_path")]
