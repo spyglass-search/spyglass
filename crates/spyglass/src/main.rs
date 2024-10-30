@@ -1,11 +1,10 @@
 extern crate notify;
 use clap::Parser;
-use entities::models::{self, crawl_queue, lens};
+use entities::models::{crawl_queue, lens};
 use libspyglass::pipeline;
-use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
-use shared::config::{self, Config};
+use shared::config::Config;
 use std::io;
 use std::net::IpAddr;
 use tokio::signal;
@@ -94,7 +93,7 @@ pub fn setup_logging(config: &Config) -> Option<WorkerGuard> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), ()> {
-    let mut config = Config::new();
+    let config = Config::new();
     let args = CliArgs::parse();
 
     let _trace_guard = setup_logging(&config);
@@ -132,27 +131,6 @@ async fn main() -> Result<(), ()> {
 
         if migration_status.is_err() {
             return Ok(());
-        }
-    }
-
-    {
-        // migrate plugin settings
-        let db = models::create_connection(&config, false)
-            .await
-            .expect("Unable to connect to db");
-
-        // state.user_settings
-        if let Ok(Some(model)) = lens::find_by_name(config::LEGACY_FILESYSTEM_PLUGIN, &db).await {
-            let mut new_settings = config.user_settings.clone();
-            new_settings.filesystem_settings.enable_filesystem_scanning = model.is_enabled;
-            let _ = Config::save_user_settings(&new_settings);
-            if let Ok(settings) = Config::load_user_settings() {
-                config.user_settings = settings;
-            }
-
-            if let Err(err) = lens::delete_by_id(model.id, &db).await {
-                log::error!("Error deleting filesystem plugin lens {:?}", err);
-            }
         }
     }
 
@@ -203,8 +181,6 @@ async fn start_backend(state: AppState, config: Config) {
 
     // Channel for scheduler commands
     let (manager_cmd_tx, manager_cmd_rx) = mpsc::unbounded_channel::<ManagerCommand>();
-    // Channel for plugin commands
-    let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
 
     // Channel for pipeline commands
     let (pipeline_cmd_tx, pipeline_cmd_rx) = mpsc::channel(16);
@@ -219,14 +195,6 @@ async fn start_backend(state: AppState, config: Config) {
 
     {
         state.pause_cmd_tx.lock().await.replace(pause_tx.clone());
-    }
-
-    {
-        state
-            .plugin_cmd_tx
-            .lock()
-            .await
-            .replace(plugin_cmd_tx.clone());
     }
 
     {
@@ -275,14 +243,6 @@ async fn start_backend(state: AppState, config: Config) {
         state.file_watcher.lock().await.replace(watcher);
     }
 
-    // Plugin server
-    let pm_handle = tokio::spawn(plugin::plugin_event_loop(
-        state.clone(),
-        config.clone(),
-        plugin_cmd_tx.clone(),
-        plugin_cmd_rx,
-    ));
-
     state
         .metrics
         .track(shared::metrics::Event::SpyglassStarted)
@@ -317,7 +277,6 @@ async fn start_backend(state: AppState, config: Config) {
     let _ = tokio::join!(
         manager_handle,
         worker_handle,
-        pm_handle,
         lens_watcher_handle,
         config_handle
     );

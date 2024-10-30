@@ -682,11 +682,9 @@ mod test {
     use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
-    use spyglass_plugin::utils::path_to_uri;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
     use crate::state::AppState;
-    use std::path::Path;
     use url::Url;
 
     #[tokio::test]

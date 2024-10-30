@@ -1,10 +1,10 @@
 use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 use entities::models::{self, indexed_document::DocumentIdentifier, tag::check_query_for_tags};
+use libspyglass::documents::DocumentQuery;
 use libspyglass::state::AppState;
 use ron::ser::PrettyConfig;
 use shared::config::Config;
-use spyglass_plugin::DocumentQuery;
 use std::{path::PathBuf, process::ExitCode};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};

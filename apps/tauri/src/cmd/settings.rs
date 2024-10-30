@@ -24,8 +24,6 @@ pub async fn save_user_settings(
     let setting_configs: HashMap<String, SettingOpts> = config_list.into_iter().collect();
     let mut errors: HashMap<String, String> = HashMap::new();
 
-    let plugin_configs = config.load_plugin_config();
-
     let mut fields_updated: usize = 0;
     // Loop through each updated settings value sent from the front-end and
     // validate the values.
@@ -103,30 +101,7 @@ pub async fn save_user_settings(
                         }
                     }
                 }
-                plugin_name => {
-                    // Load plugin settings configurations
-                    if let Some(plugin_config) = plugin_configs.get(plugin_name) {
-                        let to_update = current_settings
-                            .plugin_settings
-                            .entry(plugin_name.to_string())
-                            .or_default();
-
-                        if let Some(field_opts) = plugin_config.user_settings.get(field) {
-                            // Validate & serialize value into something we can save.
-                            match field_opts.form_type.validate(value) {
-                                Ok(val) => {
-                                    fields_updated += 1;
-                                    to_update.insert(field.into(), val);
-                                }
-                                Err(err) => {
-                                    errors.insert(key.to_string(), err);
-                                }
-                            }
-                        }
-                    } else {
-                        errors.insert(key.to_string(), format!("Config not found for {key}"));
-                    }
-                }
+                &_ => {}
             }
         }
     }
@@ -167,33 +142,13 @@ pub async fn load_action_settings(
 #[tauri::command]
 pub async fn load_user_settings(
     window: tauri::Window,
-    config: State<'_, Config>,
+    _config: State<'_, Config>,
 ) -> Result<Vec<(String, SettingOpts)>, String> {
     let current_settings = crate::cmd::user_settings(window)
         .await
         .expect("Unable to read user settings");
 
-    let plugin_configs = config.load_plugin_config();
-    let mut list: Vec<(String, SettingOpts)> = current_settings.clone().into();
-
-    let current_plug_settings = current_settings.plugin_settings;
-    for (pname, pconfig) in plugin_configs {
-        for (setting_name, setting_opts) in pconfig.user_settings {
-            let mut opts = setting_opts.clone();
-
-            let value = current_plug_settings
-                .get(&pname)
-                .and_then(|settings| settings.get(&setting_name))
-                // Reverse backslash escaping
-                .map(|value| value.to_string().replace("\\\\", "\\"));
-
-            if let Some(value) = value {
-                opts.value = value.to_string();
-            }
-
-            list.push((format!("{pname}.{setting_name}"), opts));
-        }
-    }
+    let list: Vec<(String, SettingOpts)> = current_settings.clone().into();
 
     Ok(list)
 }

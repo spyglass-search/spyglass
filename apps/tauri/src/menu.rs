@@ -16,7 +16,6 @@ pub enum MenuID {
     OPEN_CONNECTION_MANAGER,
     OPEN_LENS_MANAGER,
     OPEN_LOGS_FOLDER,
-    OPEN_PLUGIN_MANAGER,
     OPEN_SETTINGS_MANAGER,
     OPEN_WIZARD,
     QUIT,
@@ -49,10 +48,6 @@ pub fn get_tray_menu(package_info: &PackageInfo, user_settings: &UserSettings) -
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_CONNECTION_MANAGER.to_string(),
             "Connections",
-        ))
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_PLUGIN_MANAGER.to_string(),
-            "Plugins",
         ))
         .add_item(CustomMenuItem::new(
             MenuID::OPEN_SETTINGS_MANAGER.to_string(),

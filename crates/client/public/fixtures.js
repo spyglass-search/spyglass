@@ -367,24 +367,7 @@ export let invoke = async (func_name, params) => {
     window.setTimeout(() => {
       CALLBACKS["RefreshLensLibrary"]();
     }, 5000);
-  } else if (func_name == "list_plugins") {
-    return [
-      {
-        author: "a5huynh",
-        title: "chrome-exporter",
-        description:
-          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-        is_enabled: true,
-      },
-      {
-        author: "a5huynh",
-        title: "local-file-indexer",
-        description:
-          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam et vulputate urna, sit amet semper metus.",
-        is_enabled: false,
-      },
-    ];
-  } else if (func_name == "crawl_stats") {
+  }  else if (func_name == "crawl_stats") {
     return {
       by_domain: [
         [
@@ -418,7 +401,7 @@ export let invoke = async (func_name, params) => {
           form_type: "Path",
           restart_required: true,
           help_text:
-            "The data directory is where your index, lenses, plugins, and logs are stored. This will require a restart.",
+            "The data directory is where your index, lenses, and logs are stored. This will require a restart.",
         },
       ],
       [

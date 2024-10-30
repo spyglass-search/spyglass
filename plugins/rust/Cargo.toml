@@ -10,5 +10,4 @@ path = "src/main.rs"
 
 [dependencies]
 cargo_toml = "0.15.2"
-spyglass-plugin = { path = "../../crates/spyglass-plugin" }
 url = "2.2"

@@ -8,8 +8,8 @@ use entities::{
     sea_orm::{ActiveModelTrait, DatabaseConnection},
     BATCH_SIZE,
 };
+use serde::{Deserialize, Serialize};
 use shared::config::LensConfig;
-use spyglass_plugin::TagModification;
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use libnetrunner::parser::ParseResult;
@@ -22,6 +22,32 @@ use spyglass_searcher::{
     schema::{DocumentUpdate, ToDocument},
     RetrievedDocument, WriteTrait,
 };
+
+pub type Tag = (String, String);
+
+/// Defines a Tag modification request. Tags can be added or deleted
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct TagModification {
+    pub add: Option<Vec<Tag>>,
+    pub remove: Option<Vec<Tag>>,
+}
+
+/// Defines a document query.
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct DocumentQuery {
+    /// Will match against the urls. Since a single document can only
+    /// have one url these fields are or'd together
+    pub urls: Option<Vec<String>>,
+    /// With match against the document id. Since a single document can
+    /// only have one document id these fields are or'd together
+    pub ids: Option<Vec<String>>,
+    /// Matches only documents that have the specified tags. These entries
+    /// are and'd together
+    pub has_tags: Option<Vec<Tag>>,
+    /// Matches only documents that do not have the specified tags. These
+    /// entries are and'd together
+    pub exclude_tags: Option<Vec<Tag>>,
+}
 
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
