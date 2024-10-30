@@ -678,12 +678,15 @@ fn is_html_content(content_type: &str) -> bool {
 
 #[cfg(test)]
 mod test {
+    use std::path::Path;
+
     use entities::models::crawl_queue::CrawlType;
     use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
+    use crate::filesystem::utils::path_to_uri;
     use crate::state::AppState;
     use url::Url;
 
