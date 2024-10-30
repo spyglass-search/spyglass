@@ -56,13 +56,6 @@ pub fn get_tray_menu(
             )?,
             &MenuItem::with_id(
                 app,
-                MenuID::OPEN_PLUGIN_MANAGER.to_string(),
-                "Plugins",
-                true,
-                None::<&str>,
-            )?,
-            &MenuItem::with_id(
-                app,
                 MenuID::OPEN_SETTINGS_MANAGER.to_string(),
                 "User settings",
                 true,
@@ -241,9 +234,6 @@ pub fn handle_tray_menu_events(app: &AppHandle, event: MenuEvent) {
         }
         MenuID::OPEN_LENS_MANAGER => {
             window::navigate_to_tab(app, &crate::constants::TabLocation::Library);
-        }
-        MenuID::OPEN_PLUGIN_MANAGER => {
-            window::navigate_to_tab(app, &crate::constants::TabLocation::PluginSettings);
         }
         // MenuID::OPEN_LOGS_FOLDER => window::open_folder(config.logs_dir()),
         MenuID::OPEN_SETTINGS_MANAGER => {

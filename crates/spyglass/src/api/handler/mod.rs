@@ -8,7 +8,7 @@ use entities::models::{
     bootstrap_queue, connection::get_all_connections, crawl_queue, fetch_history, indexed_document,
     lens,
 };
-use entities::sea_orm::{prelude::*, sea_query, Set};
+use entities::sea_orm::{prelude::*, sea_query};
 use jsonrpsee::core::RpcResult;
 use libnetrunner::parser::html::html_to_text;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};

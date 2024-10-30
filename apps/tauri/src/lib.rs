@@ -146,14 +146,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             cmd::get_library_stats,
             cmd::get_shortcut,
             cmd::list_connections,
-            cmd::list_plugins,
             cmd::load_action_settings,
             cmd::load_user_settings,
             cmd::navigate,
             cmd::network_change,
             cmd::open_folder_path,
             cmd::open_lens_folder,
-            cmd::open_plugins_folder,
             cmd::open_result,
             cmd::open_settings_folder,
             cmd::recrawl_domain,
@@ -163,7 +161,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             cmd::save_user_settings,
             cmd::search_docs,
             cmd::search_lenses,
-            cmd::toggle_plugin,
             cmd::update_and_restart,
             cmd::wizard_finished,
         ])
@@ -239,6 +236,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Handle custom scheme requests (spyglass:// urls).
+/// TODO: readd support for app URLs
+#[allow(dead_code)]
 async fn on_custom_scheme_request(app_handle: AppHandle, event: tauri::Event) {
     if let Ok(request) = url::Url::parse(event.payload()) {
         log::debug!("Received custom uri request: {}", &request);
@@ -417,28 +416,4 @@ async fn check_version_interval(current_version: String, app_handle: AppHandle) 
             }
         }
     }
-}
-
-fn copy_plugins(config: &Config, resolver: &PathResolver<Wry>) -> Result<(), tauri::Error> {
-    // Copy default plugins to data directory to be picked up by the backend
-    let plugin_path = resolver.resolve("../../assets/plugins", BaseDirectory::Executable)?;
-    let base_plugin_dir = config.plugins_dir();
-
-    for entry in std::fs::read_dir(plugin_path)? {
-        let path = entry?.path();
-        if path.is_dir() {
-            let plugin_name = path.file_name().expect("Unable to parse folder");
-            let plugin_dir = base_plugin_dir.join(plugin_name);
-            // Create folder for plugin
-            std::fs::create_dir_all(plugin_dir.clone())?;
-            // Copy plugin contents to folder
-            for file in std::fs::read_dir(path)? {
-                let file = file?;
-                let new_file_path = plugin_dir.join(file.file_name());
-                std::fs::copy(file.path(), new_file_path)?;
-            }
-        }
-    }
-
-    Ok(())
 }
