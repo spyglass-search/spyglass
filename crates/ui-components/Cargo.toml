@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../shared" }
-js-sys = "0.3.61"
+js-sys = "0.3"
 url = "2.3.1"
-wasm-bindgen-futures = "0.4.33"
-yew = { version = "0.20", features = ["csr"] }
+wasm-bindgen-futures = "0.4"
+yew = { version = "0.21", features = ["csr"] }

@@ -38,7 +38,7 @@
     "beforeDevCommand": "cd ../../crates/client && trunk serve",
     "beforeBuildCommand": "cd ../../crates/client && trunk build"
   },
-"productName": "Spyglass",
+  "productName": "Spyglass",
   "mainBinaryName": "Spyglass",
   "version": "23.11.1",
   "identifier": "com.athlabs.spyglass",
