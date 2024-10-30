@@ -10,6 +10,7 @@ use tauri::{
     WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_notification::NotificationExt;
 
 /// Try and detect which monitor the window is on so that we can determine the
 /// screen size
@@ -282,32 +283,12 @@ pub fn alert(window: &WebviewWindow, title: &str, message: &str) {
         .show(|_| {});
 }
 
-pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        let title = title.to_string();
-        let body = body.to_string();
-        tauri::async_runtime::spawn(async move {
-            // osascript -e 'display notification "hello world!" with title "test"'
-            Command::new("osascript")
-                .arg("-e")
-                .arg(format!(
-                    "display notification \"{body}\" with title \"{title}\""
-                ))
-                .spawn()
-                .expect("Failed to send message");
-        });
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        use tauri::api::notification::Notification;
-        let _ = Notification::new(&_app.config().tauri.bundle.identifier)
-            .title(title)
-            .body(body)
-            .show();
-    }
+pub fn notify(app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()?;
 
     Ok(())
 }
