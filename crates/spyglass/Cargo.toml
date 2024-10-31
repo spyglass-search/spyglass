@@ -23,7 +23,7 @@ governor = "0.5.1"
 hex = "0.4"
 http = "1.1"
 ignore = "0.4"
-jsonrpsee = { version = "0.16.2", features = ["server"] }
+jsonrpsee = { workspace = true, features = ["server"] }
 lnk = "0.5.1"
 log = "0.4"
 mime = "0.3.16"

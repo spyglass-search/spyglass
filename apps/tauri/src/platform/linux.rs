@@ -1,14 +1,15 @@
 use crate::window;
 use shared::event::ClientEvent;
-use tauri::api::process::current_binary;
-use tauri::{Env, Window};
+use std::process::Command;
+use tauri::process::current_binary;
+use tauri::{Emitter, Env, WebviewWindow};
 use url::Url;
 
-pub fn is_visible(window: &Window) -> bool {
+pub fn is_visible(window: &WebviewWindow) -> bool {
     window.is_visible().unwrap_or_default()
 }
 
-pub fn show_search_bar(window: &Window) {
+pub fn show_search_bar(window: &WebviewWindow) {
     let _ = window.show();
     let _ = window.unminimize();
     window::center_search_bar(window);
@@ -16,7 +17,7 @@ pub fn show_search_bar(window: &Window) {
     let _ = window.set_always_on_top(true);
 }
 
-pub fn hide_search_bar(window: &Window) {
+pub fn hide_search_bar(window: &WebviewWindow) {
     let _ = window.minimize();
     let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
 }
@@ -41,7 +42,7 @@ pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {
         None => String::from("xdg-open"),
     };
 
-    match tauri::api::process::Command::new(app)
+    match Command::new(app)
         .args(vec![open_url])
         .current_dir(parent)
         .output()

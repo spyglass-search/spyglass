@@ -97,16 +97,13 @@ pub fn tabs(props: &TabsProps) -> Html {
 
     let onchange = props.onchange.clone();
     let tabs = props.tabs.clone();
-    use_effect_with_deps(
-        move |updated| {
-            onchange.emit(TabEvent {
-                _tab_idx: **updated,
-                _tab_name: tabs[**updated].clone(),
-            });
-            || {}
-        },
-        active_idx.clone(),
-    );
+    use_effect_with(active_idx.clone(), move |updated| {
+        onchange.emit(TabEvent {
+            _tab_idx: **updated,
+            _tab_name: tabs[**updated].clone(),
+        });
+        || {}
+    });
 
     html! {
         <ul class="flex flex-row list-none gap-4">

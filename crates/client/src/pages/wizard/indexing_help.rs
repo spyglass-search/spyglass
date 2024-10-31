@@ -31,27 +31,22 @@ pub fn index_files_help(props: &IndexFilesHelpProps) -> Html {
     let paths: UseStateHandle<Vec<String>> = use_state(Vec::new);
     {
         let paths_state = paths.clone();
-        use_effect_with_deps(
-            move |_| {
-                spawn_local(async move {
-                    match tauri_invoke::<_, DefaultIndices>(ClientInvoke::DefaultIndices, "").await
-                    {
-                        Ok(result) => {
-                            let mut sorted = result.file_paths;
-                            sorted.sort();
-                            paths_state
-                                .set(sorted.iter().map(|p| p.display().to_string()).collect());
-                        }
-                        Err(err) => {
-                            log::info!("error: {}", err);
-                        }
+        use_effect_with((), move |_| {
+            spawn_local(async move {
+                match tauri_invoke::<_, DefaultIndices>(ClientInvoke::DefaultIndices, "").await {
+                    Ok(result) => {
+                        let mut sorted = result.file_paths;
+                        sorted.sort();
+                        paths_state.set(sorted.iter().map(|p| p.display().to_string()).collect());
                     }
-                });
+                    Err(err) => {
+                        log::info!("error: {}", err);
+                    }
+                }
+            });
 
-                || ()
-            },
-            (),
-        );
+            || ()
+        });
     }
 
     let toggle_fs = SettingOpts {

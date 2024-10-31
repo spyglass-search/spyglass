@@ -2,7 +2,7 @@ let CALLBACKS = {};
 
 // This is used to mock endpoints when running the client headless via
 // make run-headless-client
-export let invoke = async (func_name, params) => {
+export let invoke = async (func_name, params, opts) => {
   console.log(`calling: ${func_name} w/`, params);
 
   if (func_name == "search_docs") {

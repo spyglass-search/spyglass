@@ -1,4 +1,5 @@
 use strum_macros::{Display, EnumString};
+use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
@@ -37,7 +38,7 @@ pub struct WizardProps {
 
 #[function_component(WizardPage)]
 pub fn wizard_page(props: &WizardProps) -> Html {
-    let nav = use_navigator().expect("History not available in this browser");
+    let nav = use_navigator().expect_throw("History not available in this browser");
     let toggle_file_indexer = use_state(|| false);
     let toggle_audio_transcription = use_state(|| false);
 

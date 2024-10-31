@@ -7,6 +7,7 @@ use crate::{
 };
 use num_format::{Buffer, Locale};
 use shared::response::{InstallStatus, LensResult, LensType};
+use wasm_bindgen::UnwrapThrowExt;
 use yew::function_component;
 use yew::prelude::*;
 use yew_router::prelude::*;
@@ -28,7 +29,7 @@ struct LensActionBarProps {
 
 #[function_component(LensActionBar)]
 fn lens_action_bar(props: &LensActionBarProps) -> Html {
-    let navigator = use_navigator().unwrap();
+    let navigator = use_navigator().expect_throw("Unable to get navigator");
     let result = &props.result;
     let lens_name = result.name.clone();
     let onclick = props.onclick.clone();
@@ -235,7 +236,7 @@ pub fn lens_component(props: &LensProps) -> Html {
                     html! {
                         <div class="text-base mt-2 flex flex-row items-center gap-1">
                             <icons::BookOpen width="w-4" height="h-4" classes="text-neutral-400" />
-                            <span class="text-white">{num_docs_buffer}</span>
+                            <span class="text-white">{num_docs_buffer.to_string()}</span>
                             <span class="text-neutral-400">{" docs"}</span>
                         </div>
                     }

@@ -1,10 +1,14 @@
+use std::str::FromStr;
+
 use shared::config::UserSettings;
 use strum_macros::{Display, EnumString};
 use tauri::{
-    CustomMenuItem, Menu, PackageInfo, SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu,
+    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
+    tray::{TrayIcon, TrayIconEvent},
+    AppHandle, PackageInfo,
 };
-#[cfg(not(target_os = "linux"))]
-use tauri::{MenuItem, Submenu};
+
+use crate::{pause_crawler, platform::os_open, window};
 
 #[derive(Display, Debug, EnumString)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -26,98 +30,248 @@ pub enum MenuID {
     INSTALL_FIREFOX_EXT,
 }
 
-pub fn get_tray_menu(package_info: &PackageInfo, user_settings: &UserSettings) -> SystemTrayMenu {
-    let show = CustomMenuItem::new(MenuID::SHOW_SEARCHBAR.to_string(), "Show search")
-        .accelerator(user_settings.shortcut.clone());
-
-    let pause = CustomMenuItem::new(MenuID::CRAWL_STATUS.to_string(), "⏸ Pause indexing");
-    let quit = CustomMenuItem::new(MenuID::QUIT.to_string(), "Quit");
-
-    let open_logs_folder =
-        CustomMenuItem::new(MenuID::OPEN_LOGS_FOLDER.to_string(), "Open logs folder");
-
+pub fn get_tray_menu(
+    app: &AppHandle,
+    package_info: &PackageInfo,
+    user_settings: &UserSettings,
+) -> Result<Menu<tauri::Wry>, tauri::Error> {
     let app_version: String = if cfg!(debug_assertions) {
         "🚧 dev-build 🚧".into()
     } else {
         format!("v20{}", package_info.version)
     };
 
-    let mut tray = SystemTrayMenu::new();
+    let tray = Menu::with_id(app, "tray-menu")?;
+    let settings_menu = Submenu::with_items(
+        app,
+        "Settings",
+        true,
+        &[
+            &MenuItem::with_id(
+                app,
+                MenuID::OPEN_CONNECTION_MANAGER.to_string(),
+                "Connections",
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(
+                app,
+                MenuID::OPEN_SETTINGS_MANAGER.to_string(),
+                "User settings",
+                true,
+                None::<&str>,
+            )?,
+        ],
+    )?;
 
-    let settings_menu = SystemTrayMenu::new()
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_CONNECTION_MANAGER.to_string(),
-            "Connections",
-        ))
-        .add_item(CustomMenuItem::new(
-            MenuID::OPEN_SETTINGS_MANAGER.to_string(),
-            "User settings",
-        ));
-
-    tray = tray
-        .add_item(show)
-        .add_item(pause)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(MenuID::VERSION.to_string(), app_version).disabled())
-        .add_item(CustomMenuItem::new(
+    tray.append_items(&[
+        &MenuItem::with_id(
+            app,
+            MenuID::SHOW_SEARCHBAR.to_string(),
+            "Show search",
+            true,
+            Some(user_settings.shortcut.clone()),
+        )?,
+        &MenuItem::with_id(
+            app,
+            MenuID::CRAWL_STATUS.to_string(),
+            "⏸ Pause indexing",
+            true,
+            None::<&str>,
+        )?,
+        &PredefinedMenuItem::separator(app)?,
+        &MenuItem::with_id(
+            app,
+            MenuID::VERSION.to_string(),
+            app_version,
+            false,
+            None::<&str>,
+        )?,
+        &MenuItem::with_id(
+            app,
             MenuID::DISCOVER.to_string(),
             "Discover Lenses",
-        ))
-        .add_item(CustomMenuItem::new(
+            true,
+            None::<&str>,
+        )?,
+        &MenuItem::with_id(
+            app,
             MenuID::OPEN_LENS_MANAGER.to_string(),
             "My Library",
-        ))
-        .add_submenu(SystemTraySubmenu::new("Settings", settings_menu))
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(open_logs_folder);
+            true,
+            None::<&str>,
+        )?,
+        &settings_menu,
+        &MenuItem::with_id(
+            app,
+            MenuID::OPEN_LOGS_FOLDER.to_string(),
+            "Open logs folder",
+            true,
+            None::<&str>,
+        )?,
+    ])?;
 
     // Add dev utils
     if cfg!(debug_assertions) {
-        tray = tray
-            .add_native_item(SystemTrayMenuItem::Separator)
-            .add_item(CustomMenuItem::new(
-                MenuID::DEV_SHOW_CONSOLE.to_string(),
-                "Open dev console",
-            ));
+        tray.append(&PredefinedMenuItem::separator(app)?)?;
+        tray.append(&MenuItem::with_id(
+            app,
+            MenuID::DEV_SHOW_CONSOLE.to_string(),
+            "Open dev console",
+            true,
+            None::<&str>,
+        )?)?;
     }
 
-    tray.add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new(
+    tray.append(&PredefinedMenuItem::separator(app)?)?;
+    tray.append_items(&[
+        &MenuItem::with_id(
+            app,
             MenuID::OPEN_WIZARD.to_string(),
             "Getting Started Wizard",
-        ))
-        .add_item(CustomMenuItem::new(
+            true,
+            None::<&str>,
+        )?,
+        &MenuItem::with_id(
+            app,
             MenuID::JOIN_DISCORD.to_string(),
             "Join our Discord",
-        ))
-        .add_item(CustomMenuItem::new(
+            true,
+            None::<&str>,
+        )?,
+        &MenuItem::with_id(
+            app,
             MenuID::INSTALL_CHROME_EXT.to_string(),
             "Install Chrome Extension",
-        ))
-        .add_item(CustomMenuItem::new(
+            true,
+            None::<&str>,
+        )?,
+        &MenuItem::with_id(
+            app,
             MenuID::INSTALL_FIREFOX_EXT.to_string(),
             "Install Firefox Extension",
-        ))
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit)
+            true,
+            None::<&str>,
+        )?,
+    ])?;
+    tray.append(&PredefinedMenuItem::separator(app)?)?;
+    tray.append(&MenuItem::with_id(
+        app,
+        MenuID::QUIT.to_string(),
+        "Quit",
+        true,
+        None::<&str>,
+    )?)?;
+
+    Ok(tray)
 }
 
-pub fn get_app_menu() -> Menu {
-    #[cfg(target_os = "linux")]
-    return Menu::new();
+pub fn get_app_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
+    if cfg!(target_os = "linux") {
+        Menu::new(app)
+    } else {
+        let app_menu = Menu::new(app)?;
+        let menu = Submenu::with_items(
+            app,
+            "Spyglass",
+            true,
+            &[
+                &PredefinedMenuItem::about(app, Some("Spyglass"), Default::default())?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::hide(app, None)?,
+                &PredefinedMenuItem::quit(app, None)?,
+            ],
+        )?;
+        app_menu.append(&menu)?;
+        app_menu.append(&Submenu::with_items(
+            app,
+            "Edit",
+            true,
+            &[
+                // Currently we need to include these so that the shortcuts for these
+                // actions work.
+                &PredefinedMenuItem::copy(app, None)?,
+                &PredefinedMenuItem::paste(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::select_all(app, None)?,
+            ],
+        )?)?;
 
-    #[cfg(not(target_os = "linux"))]
-    Menu::new().add_submenu(Submenu::new(
-        "Spyglass".to_string(),
-        Menu::new()
-            .add_native_item(MenuItem::About("Spyglass".to_string(), Default::default()))
-            // Currently we need to include these so that the shortcuts for these
-            // actions work.
-            .add_native_item(MenuItem::Copy)
-            .add_native_item(MenuItem::Paste)
-            .add_native_item(MenuItem::SelectAll)
-            .add_native_item(MenuItem::Separator)
-            .add_native_item(MenuItem::Hide)
-            .add_native_item(MenuItem::Quit),
-    ))
+        Ok(app_menu)
+    }
+}
+
+pub fn handle_tray_icon_events(tray: &TrayIcon, event: TrayIconEvent) {
+    // Only occurs on Windows.
+    if let TrayIconEvent::DoubleClick { .. } = event {
+        let window = window::get_searchbar(tray.app_handle());
+        window::show_search_bar(&window);
+    }
+}
+
+pub fn handle_tray_menu_events(app: &AppHandle, event: MenuEvent) {
+    let menu_id = if let Ok(menu_id) = MenuID::from_str(event.id.as_ref()) {
+        menu_id
+    } else {
+        return;
+    };
+
+    match menu_id {
+        MenuID::CRAWL_STATUS => {
+            // Don't block main thread when pausing the crawler.
+            tauri::async_runtime::spawn(pause_crawler(app.clone(), menu_id.to_string()));
+            // if let Some(tray) = app.tray_by_id("main-tray") {
+            //     let _ = item_handle.set_title("Handling request...");
+            //     let _ = item_handle.set_enabled(false);
+            //     tauri::async_runtime::spawn(pause_crawler(app.clone(), menu_id.to_string()));
+            // }
+        }
+        MenuID::DISCOVER => {
+            window::navigate_to_tab(app, &crate::constants::TabLocation::Discover);
+        }
+        MenuID::OPEN_CONNECTION_MANAGER => {
+            window::navigate_to_tab(app, &crate::constants::TabLocation::Connections);
+        }
+        MenuID::OPEN_LENS_MANAGER => {
+            window::navigate_to_tab(app, &crate::constants::TabLocation::Library);
+        }
+        // MenuID::OPEN_LOGS_FOLDER => window::open_folder(config.logs_dir()),
+        MenuID::OPEN_SETTINGS_MANAGER => {
+            window::navigate_to_tab(app, &crate::constants::TabLocation::UserSettings);
+        }
+        MenuID::OPEN_WIZARD => {
+            window::show_wizard_window(app);
+        }
+        MenuID::SHOW_SEARCHBAR => {
+            let window = window::get_searchbar(app);
+            window::show_search_bar(&window);
+        }
+        MenuID::QUIT => app.exit(0),
+        MenuID::DEV_SHOW_CONSOLE => {
+            let window = window::get_searchbar(app);
+            window.open_devtools();
+        }
+        MenuID::JOIN_DISCORD => {
+            let _ = os_open(
+                &url::Url::parse(shared::constants::DISCORD_JOIN_URL).expect("Invalid Discord URL"),
+                None,
+            );
+        }
+        MenuID::INSTALL_CHROME_EXT => {
+            let _ = os_open(
+                &url::Url::parse(shared::constants::CHROME_EXT_LINK)
+                    .expect("Invalid Chrome extension URL"),
+                None,
+            );
+        }
+        MenuID::INSTALL_FIREFOX_EXT => {
+            let _ = os_open(
+                &url::Url::parse(shared::constants::FIREFOX_EXT_LINK)
+                    .expect("Invalid Firefox extension URL"),
+                None,
+            );
+        }
+        // Just metainfo
+        _ => {}
+    }
 }

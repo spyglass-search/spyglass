@@ -9,3 +9,4 @@ target
 **/target
 node_modules
 binaries
+apps/tauri/gen/*
