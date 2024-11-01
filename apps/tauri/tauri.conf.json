@@ -33,10 +33,10 @@
     "createUpdaterArtifacts": "v1Compatible"
   },
   "build": {
-    "devUrl": "http://localhost:8080",
-    "frontendDist": "../../crates/client/dist",
-    "beforeDevCommand": "cd ../../crates/client && trunk serve",
-    "beforeBuildCommand": "cd ../../crates/client && trunk build"
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../dist && npm run build",
+    "beforeDevCommand": "cd ../desktop-client && npm run dev",
+    "beforeBuildCommand": "cd ../desktop-client && npm run build"
   },
   "productName": "Spyglass",
   "mainBinaryName": "Spyglass",
