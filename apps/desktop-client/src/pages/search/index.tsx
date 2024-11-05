@@ -22,10 +22,6 @@ enum ResultDisplay {
   Lenses,
 }
 
-// result_display: ResultDisplay::None,
-// query_debounce: None,
-// blur_timeout: None,
-// action_settings: None,
 // pressed_key: None,
 // executed_key: None,
 // executed_action: None,

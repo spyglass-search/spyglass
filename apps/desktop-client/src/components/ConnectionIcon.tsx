@@ -28,21 +28,3 @@ export function ConnectionIcon({ connection, className }: Props) {
       return <ShareIcon className={className} />;
   }
 }
-// pub fn connection_icon(id: &str, height: &str, width: &str, classes: Classes) -> Html {
-//     let height = height.to_string();
-//     let width = width.to_string();
-
-//     if id == "calendar.google.com" {
-//         html! { <GoogleCalendar {height} {width} {classes} /> }
-//     } else if id == "drive.google.com" {
-//         html! { <GDrive {height} {width} {classes} /> }
-//     } else if id == "mail.google.com" {
-//         html! { <Gmail {height} {width} {classes} /> }
-//     } else if id == "api.github.com" {
-//         html! { <GitHub {height} {width} {classes} /> }
-//     } else if id == "oauth.reddit.com" {
-//         html! { <Reddit {height} {width} {classes} /> }
-//     } else {
-//         html! { <ShareIcon {height} {width} {classes} /> }
-//     }
-// }
