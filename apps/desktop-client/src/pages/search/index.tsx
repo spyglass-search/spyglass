@@ -6,6 +6,7 @@ import { SearchResults } from "../../bindings/SearchResults";
 import { SearchMeta } from "../../bindings/SearchMeta";
 import { SearchResult } from "../../bindings/SearchResult";
 import { SelectedLenses } from "./SelectedLens";
+import { SearchStatus } from "./SearchStatus";
 
 const LENS_SEARCH_PREFIX: string = '/';
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -40,12 +41,12 @@ export function SearchPage() {
   const [lensResults, setLensResults] = useState<LensResult[]>([]);
   const [resultMode, setResultMode] = useState<ResultDisplay>(ResultDisplay.None);
 
+  const [isThinking, setIsThinking] = useState<boolean>(false);
   const [_showActions, setShowActions] = useState<boolean>(false);
   const [_selectedActionIdx, setSelectedActionIdx] = useState<number>(0);
-  const [_searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
+  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
 
   const [query, setQuery] = useState<string>("");
-  // const [isSearching, setIsSearching] = useState<boolean>(false);
 
   const requestResize = async () => {
     if (searchWrapperRef.current) {
@@ -177,7 +178,7 @@ export function SearchPage() {
         setLensResults(results);
       } else if (query.length >= SEARCH_MIN_CHARS) {
         // search docs
-        let resp = await invoke<SearchResults>("search_docs", { query });
+        let resp = await invoke<SearchResults>("search_docs", { query, lenses: selectedLenses });
         setResultMode(ResultDisplay.Documents);
         setDocResults(resp.results);
         setSearchMeta(resp.meta);
@@ -250,7 +251,7 @@ export function SearchPage() {
       }
       <div className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
         <div className="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
-          {"search_meta"}
+          <SearchStatus meta={searchMeta} isThinking={isThinking} />
         </div>
         {/* <ActionListBtn
                     show={self.search_meta.is_some()}

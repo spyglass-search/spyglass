@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.1.5",
     "@tauri-apps/api": "^2.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
