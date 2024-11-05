@@ -76,7 +76,7 @@ export function SearchPage() {
   };
 
   // Clear search results
-  const clearResults = () => {
+  const clearResults = async () => {
     setResultMode(ResultDisplay.None);
     setSelectedIdx(0);
     setDocResults([]);
@@ -84,6 +84,7 @@ export function SearchPage() {
     setShowActions(false);
     setSelectedActionIdx(0);
     setSearchMeta(null);
+    await requestResize();
   };
 
   const moveSelectionUp = () => {
@@ -152,6 +153,7 @@ export function SearchPage() {
         case "Escape":
           // handle escape
           clearQuery();
+          await invoke("escape");
           break;
         case "Backspace":
           // handle clearing lenses
@@ -212,9 +214,7 @@ export function SearchPage() {
   }, [query, selectedLenses]);
 
   useEffect(() => {
-    if (docResults.length > 0 || lensResults.length > 0) {
-      requestResize();
-    }
+    requestResize();
   }, [docResults, lensResults]);
 
   // Scroll to the current selected result.
