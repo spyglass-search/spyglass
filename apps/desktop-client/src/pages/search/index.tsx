@@ -1,4 +1,4 @@
-import { act, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { invoke, listen } from "../../glue";
 import { UserActionDefinition } from "../../bindings/UserActionDefinition";
 import { LensResult } from "../../bindings/LensResult";
@@ -10,7 +10,8 @@ import { SearchStatus } from "./SearchStatus";
 import { DocumentResultItem } from "./DocumentResultItem";
 import { LensResultItem } from "./LensResultItem";
 import { UserActionSettings } from "../../bindings/UserActionSettings";
-import { ActionListButton, ActionsList, DEFAULT_ACTION } from "./ActionsList";
+import { ActionListButton, ActionsList } from "./ActionsList";
+import { DEFAULT_ACTION } from "./constants";
 import Handlebars from "handlebars";
 
 const LENS_SEARCH_PREFIX: string = "/";
@@ -61,19 +62,8 @@ export function SearchPage() {
     }
   };
 
-  // Clear search queries & results
-  const clearQuery = async () => {
-    setQuery("");
-    await clearResults();
-
-    if (searchInput.current) {
-      searchInput.current.value = "";
-    }
-    await requestResize();
-  };
-
   // Clear search results
-  const clearResults = async () => {
+  const clearResults = useCallback(async () => {
     setResultMode(ResultDisplay.None);
     setSelectedIdx(0);
     setDocResults([]);
@@ -82,12 +72,23 @@ export function SearchPage() {
     setSelectedActionIdx(0);
     setSearchMeta(null);
     await requestResize();
-  };
+  }, []);
+
+  // Clear search queries & results
+  const clearQuery = useCallback(async () => {
+    setQuery("");
+    await clearResults();
+
+    if (searchInput.current) {
+      searchInput.current.value = "";
+    }
+    await requestResize();
+  }, [clearResults, searchInput]);
 
   const moveSelectionUp = () => {
     if (showActions) {
       // Actions start at idx 1 since the default action (open) is always 0
-      setSelectedActionIdx(idx => idx > 0 ? idx - 1 : idx);
+      setSelectedActionIdx((idx) => (idx > 0 ? idx - 1 : idx));
     } else {
       // notihng to do
       if (resultMode === ResultDisplay.None) {
@@ -100,8 +101,8 @@ export function SearchPage() {
   const moveSelectionDown = () => {
     if (showActions) {
       // default + number of actions
-      let max = 1 + (userActions.length - 1);
-      setSelectedActionIdx(idx => idx < max ? idx + 1 : max);
+      const max = 1 + (userActions.length - 1);
+      setSelectedActionIdx((idx) => (idx < max ? idx + 1 : max));
     } else {
       let max = 0;
       if (resultMode === ResultDisplay.Documents) {
@@ -109,7 +110,7 @@ export function SearchPage() {
       } else if (resultMode === ResultDisplay.Lenses) {
         max = lensResults.length - 1;
       }
-      setSelectedIdx(idx => idx < max ? idx + 1 : max);
+      setSelectedIdx((idx) => (idx < max ? idx + 1 : max));
     }
   };
 
@@ -137,9 +138,10 @@ export function SearchPage() {
           // do action or handle selection
           if (showActions) {
             // handle whichever action is selected.
-            const action = selectedActionIdx === 0
-              ? DEFAULT_ACTION
-              : userActions[selectedActionIdx - 1];
+            const action =
+              selectedActionIdx === 0
+                ? DEFAULT_ACTION
+                : userActions[selectedActionIdx - 1];
             handleSelectedAction(action);
           } else {
             if (resultMode === ResultDisplay.Documents) {
@@ -158,7 +160,7 @@ export function SearchPage() {
           // Close action menu if we're in it.
           if (showActions) {
             setShowActions(false);
-          // otherwise close the window.
+            // otherwise close the window.
           } else {
             clearQuery();
             await invoke("escape");
@@ -176,7 +178,7 @@ export function SearchPage() {
             const selected = lensResults[selectedIdx];
             setSelectedLenses((lenses) => [...lenses, selected.label]);
             clearQuery();
-          // Jump to action menu
+            // Jump to action menu
           } else if (resultMode === ResultDisplay.Documents) {
             setShowActions(true);
           }
@@ -188,15 +190,15 @@ export function SearchPage() {
   };
 
   const handleSelectedAction = async (action: UserActionDefinition) => {
-    console.debug('handling action: ', action);
+    console.debug("handling action: ", action);
     // Get the context for the action execution
-    let selectedDoc = docResults[selectedIdx];
+    const selectedDoc = docResults[selectedIdx];
     // open in application
     if ("OpenApplication" in action.action) {
       const url = selectedDoc.url;
-      const [app, _appArgs] = action.action.OpenApplication;
+      const [app] = action.action.OpenApplication;
       await invoke("open_result", { url, application: app });
-    // Open url
+      // Open url
     } else if ("OpenUrl" in action.action) {
       const url = action.action.OpenUrl;
       await invoke("open_result", { url, application: null });
@@ -248,7 +250,7 @@ export function SearchPage() {
       }
     }, QUERY_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [query, selectedLenses]);
+  }, [query, selectedLenses, clearQuery, clearResults]);
 
   useEffect(() => {
     requestResize();
@@ -263,9 +265,6 @@ export function SearchPage() {
   }, [selectedIdx]);
 
   useEffect(() => {
-    clearQuery();
-    clearResults();
-
     // get_action_list
     const fetchUserActions = async () => {
       const userActions = await invoke<UserActionSettings>(
@@ -280,7 +279,7 @@ export function SearchPage() {
         console.log("refreshsearchresults received");
       });
       await listen("ClearSearch", () => {
-        console.log("ClearSearch received");
+        clearResults();
       });
       await listen("FocusWindow", () => {
         searchInput.current?.focus();
@@ -289,7 +288,7 @@ export function SearchPage() {
       await fetchUserActions();
     };
     initialize().catch(console.error);
-  }, []);
+  });
 
   return (
     <div

@@ -1,13 +1,7 @@
 import { BookOpenIcon } from "@heroicons/react/16/solid";
 import { UserActionDefinition } from "../../bindings/UserActionDefinition";
 import { KeyComponent } from "../../components/KeyComponent";
-
-export const DEFAULT_ACTION: UserActionDefinition = {
-    action: { "OpenApplication": ["default", ""] },
-    key_binding: "Enter",
-    label: "Open with default app",
-    status_msg: "OpenDefaultApplication"
-};
+import { DEFAULT_ACTION } from "./constants";
 
 interface ActionListButtonProps {
   isActive: boolean;
@@ -73,11 +67,11 @@ export function ActionsList({
     <div className={classes.join(" ")}>
       <div className="overflow-y-auto">
         <UserActionComponent
-            key={`useraction-0`}
-            actionId={`useraction-0`}
-            action={DEFAULT_ACTION}
-            isSelected={selectedActionIdx === 0}
-            onClick={() => onClick(defaultAction)}
+          key={`useraction-0`}
+          actionId={`useraction-0`}
+          action={DEFAULT_ACTION}
+          isSelected={selectedActionIdx === 0}
+          onClick={() => onClick(DEFAULT_ACTION)}
         />
         {actions.map((action, idx) => (
           <UserActionComponent
@@ -100,7 +94,11 @@ interface UserActionProps {
   onClick?: () => void;
 }
 
-function UserActionComponent({ action, isSelected, onClick = () => {} }: UserActionProps) {
+function UserActionComponent({
+  action,
+  isSelected,
+  onClick = () => {},
+}: UserActionProps) {
   const classes = [
     "flex",
     "flex-col",
