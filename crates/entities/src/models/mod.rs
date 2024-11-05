@@ -6,6 +6,7 @@ pub mod connection;
 pub mod crawl_queue;
 pub mod crawl_tag;
 pub mod document_tag;
+pub mod embedding_queue;
 pub mod fetch_history;
 pub mod indexed_document;
 pub mod lens;
