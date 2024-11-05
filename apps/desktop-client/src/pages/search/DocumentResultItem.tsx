@@ -41,9 +41,10 @@ export function DocumentResultItem({ id, onClick, result, isSelected }: Props) {
         <h2 className="text-base truncate font-semibold w-[30rem]">
           {result.title}
         </h2>
-        <div className="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
-          {result.description}
-        </div>
+        <div
+          className="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden"
+          dangerouslySetInnerHTML={{ __html: result.description }}
+        />
         <DocumentMeta result={result} />
       </div>
     </a>
