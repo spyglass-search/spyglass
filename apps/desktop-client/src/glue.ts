@@ -21,9 +21,9 @@ export async function invoke<T>(
 }
 
 // Some wrappers around tauri functions to make them more type aware.
-export async function listen(
+export async function listen<T>(
   event: ClientEvent,
-  handler: EventCallback<any>,
+  handler: EventCallback<T>,
   opts?: Options,
 ): Promise<UnlistenFn> {
   return tauriListen(event, handler, opts);

@@ -55,7 +55,7 @@ export function SearchPage() {
 
   const requestResize = async () => {
     if (searchWrapperRef.current) {
-      let height = searchWrapperRef.current.offsetHeight;
+      const height = searchWrapperRef.current.offsetHeight;
       await invoke("resize_window", { height });
     }
   };
@@ -85,18 +85,22 @@ export function SearchPage() {
 
   const moveSelectionUp = () => {
     if (showActions) {
+      // Actions start at idx 1 since the default action (open) is always 0
+      setSelectedActionIdx(idx => idx > 0 ? idx - 1 : idx);
     } else {
       // notihng to do
       if (resultMode === ResultDisplay.None) {
         return;
       }
-
       setSelectedIdx((idx) => (idx > 0 ? idx - 1 : idx));
     }
   };
 
   const moveSelectionDown = () => {
     if (showActions) {
+      // default + number of actions
+      let max = 1 + (userActions.length - 1);
+      setSelectedActionIdx(idx => idx < max ? idx + 1 : max);
     } else {
       let max = 0;
       if (resultMode === ResultDisplay.Documents) {
@@ -104,10 +108,7 @@ export function SearchPage() {
       } else if (resultMode === ResultDisplay.Lenses) {
         max = lensResults.length - 1;
       }
-
-      setSelectedIdx((idx) => {
-        return idx === max ? max : idx + 1;
-      });
+      setSelectedIdx(idx => idx < max ? idx + 1 : max);
     }
   };
 
@@ -134,6 +135,7 @@ export function SearchPage() {
         case "Enter":
           // do action or handle selection
           if (showActions) {
+            // handle whichever action is selected.
           } else {
             if (resultMode === ResultDisplay.Documents) {
               const selected = docResults[selectedIdx];
@@ -148,9 +150,14 @@ export function SearchPage() {
           }
           break;
         case "Escape":
-          // handle escape
-          clearQuery();
-          await invoke("escape");
+          // Close action menu if we're in it.
+          if (showActions) {
+            setShowActions(false);
+          // otherwise close the window.
+          } else {
+            clearQuery();
+            await invoke("escape");
+          }
           break;
         case "Backspace":
           // handle clearing lenses
@@ -158,10 +165,17 @@ export function SearchPage() {
             setSelectedLenses([]);
           }
           break;
-        default:
-        // if (searchInput.current) {
-        // setQuery(searchInput.current.value);
-        // }
+        case "Tab":
+          // Handle tab completion for len search/results
+          if (resultMode === ResultDisplay.Lenses) {
+            const selected = lensResults[selectedIdx];
+            setSelectedLenses((lenses) => [...lenses, selected.label]);
+            clearQuery();
+          // Jump to action menu
+          } else if (resultMode === ResultDisplay.Documents) {
+            setShowActions(true);
+          }
+          break;
       }
     } else if (event.type === "keyup") {
       // handle keyup events.

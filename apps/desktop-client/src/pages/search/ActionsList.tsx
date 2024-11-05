@@ -62,15 +62,29 @@ export function ActionsList({
     "p-1",
   ];
 
+  const defaultAction: UserActionDefinition = {
+    action: { "OpenApplication": ["default", ""] },
+    key_binding: "Enter",
+    label: "Open with default app",
+    status_msg: "OpenDefaultApplication"
+  };
+
   return (
     <div className={classes.join(" ")}>
       <div className="overflow-y-auto">
+        <UserActionComponent
+            key={`useraction-0`}
+            actionId={`useraction-0`}
+            action={defaultAction}
+            isSelected={selectedActionIdx === 0}
+            onClick={onClick}
+        />
         {actions.map((action, idx) => (
           <UserActionComponent
-            key={`useraction-${idx}`}
-            actionId={`useraction-${idx}`}
+            key={`useraction-${idx + 1}`}
+            actionId={`useraction-${idx + 1}`}
             action={action}
-            isSelected={selectedActionIdx === idx}
+            isSelected={selectedActionIdx === idx + 1}
             onClick={onClick}
           />
         ))}
