@@ -1,0 +1,28 @@
+name: Frontend build check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  frontend-check:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout source code
+      - uses: actions/checkout@v3
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
+          cache: 'npm'
+      - name: Install dependencies
+        working-directory: ./apps/desktop-client
+        run: npm install
+      - name: Lint
+        working-directory: ./apps/desktop-client
+        run: npm run lint
+      - name: Build
+        working-directory: ./apps/desktop-client
+        run: npm run build
