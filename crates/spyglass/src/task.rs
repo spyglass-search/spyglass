@@ -202,7 +202,7 @@ pub async fn config_task(mut state: AppState) {
                                 // any listening clients
                                 let state_clone = state.clone();
                                 tokio::spawn(async move {
-                                    let _ = download_model(&state_clone, "Audio Transcription Model", model_path).await;
+                                    let _ = download_model(&state_clone, "Audio Transcription Model", model_path, shared::constants::WHISPER_MODEL).await;
                                     // Once we're done downloading the model, recrawl any audio files
                                     let audio_exts = AudioExt::iter().map(|x| x.to_string()).collect::<Vec<String>>();
                                     let mut condition = Condition::any();
@@ -215,6 +215,22 @@ pub async fn config_task(mut state: AppState) {
                                         .filter(condition)
                                         .exec(&state_clone.db)
                                         .await;
+                                });
+                            }
+                        }
+
+                        if new_settings.embedding_settings.enable_embeddings {
+                            let model_path = state.config.embedding_model_dir().join("model.safetensors");
+                            let tokenizer_path = state.config.embedding_model_dir().join("tokenizer.json");
+                            let model_config_path = state.config.embedding_model_dir().join("config.json");
+                            if !model_path.exists() || !tokenizer_path.exists() || !model_config_path.exists() {
+                                let state_clone = state.clone();
+                                tokio::spawn(async move {
+                                    let _ = download_model(&state_clone, "Embedding Model", model_path, shared::constants::EMBEDDING_MODEL).await;
+                                    let _ = download_model(&state_clone, "Embedding Model Config", tokenizer_path, shared::constants::EMBEDDING_MODEL_CONFIG).await;
+                                    let _ = download_model(&state_clone, "Embedding Model Tokenizer", model_config_path, shared::constants::EMBEDDING_MODEL_TOKENIZER).await;
+
+                                    //TODO Embed current documents
                                 });
                             }
                         }
@@ -234,9 +250,10 @@ async fn download_model(
     state: &AppState,
     model_name: &str,
     model_path: PathBuf,
+    model_url: &str,
 ) -> anyhow::Result<()> {
     // Currently we only have the audio model :)
-    match reqwest::get(shared::constants::WHISPER_MODEL).await {
+    match reqwest::get(model_url).await {
         Ok(res) => {
             let total_size = res.content_length().expect("Unable to get content length");
             let mut file = File::create(model_path).or(Err(anyhow!("Failed to create file")))?;

@@ -352,6 +352,10 @@ impl Config {
         self.data_dir().join("models")
     }
 
+    pub fn embedding_model_dir(&self) -> PathBuf {
+        self.model_dir().join("embeddings")
+    }
+
     pub fn prefs_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier())
             .expect("Unable to find a suitable settings directory");
