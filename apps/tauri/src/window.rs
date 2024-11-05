@@ -97,7 +97,7 @@ pub fn get_searchbar(app: &AppHandle) -> WebviewWindow {
                 .title("Spyglass")
                 .decorations(false)
                 .transparent(true)
-                .visible(false)
+                .visible(true)
                 // .disable_file_drop_handler()
                 .inner_size(640.0, 108.0)
                 .build()

@@ -4,8 +4,7 @@ interface Props {
 }
 
 export function FileExtIcon({ className, filePath }: Props) {
-  let ext = filePath.split(".").pop() ?? "txt";
-
+  const ext = filePath.split(".").pop() ?? "txt";
   // audio files
   if (
     ["aac", "avi", "flac", "m4a", "mp3", "ogg", "wav", "webm"].includes(ext)

@@ -8,6 +8,9 @@ import { SearchResult } from "../../bindings/SearchResult";
 import { SelectedLenses } from "./SelectedLens";
 import { SearchStatus } from "./SearchStatus";
 import { DocumentResultItem } from "./DocumentResultItem";
+import { LensResultItem } from "./LensResultItem";
+import { UserActionSettings } from "../../bindings/UserActionSettings";
+import { ActionListButton, ActionsList } from "./ActionsList";
 
 const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -45,40 +48,36 @@ export function SearchPage() {
   );
 
   const [isThinking, setIsThinking] = useState<boolean>(false);
-  const [_showActions, setShowActions] = useState<boolean>(false);
-  const [_selectedActionIdx, setSelectedActionIdx] = useState<number>(0);
+  const [showActions, setShowActions] = useState<boolean>(false);
+
+  const [userActions, setUserActions] = useState<UserActionDefinition[]>([]);
+
+  const [selectedActionIdx, setSelectedActionIdx] = useState<number>(0);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
 
   const [query, setQuery] = useState<string>("");
 
   const requestResize = async () => {
     if (searchWrapperRef.current) {
-      console.debug(
-        `resizing window to: ${searchWrapperRef.current.offsetHeight}`,
-      );
-      // let height = searchWrapperRef.current.offsetHeight;
-      // await invoke("resize_window", { height });
+      let height = searchWrapperRef.current.offsetHeight;
+      await invoke("resize_window", { height });
     }
   };
-  const clearFilters = () => {
-    setSelectedLenses([]);
-  };
 
+  // Clear search queries & results
   const clearQuery = async () => {
-    setSelectedIdx(0);
-    setDocResults([]);
-    setLensResults([]);
-    setShowActions(false);
-    setSelectedActionIdx(0);
-    setSearchMeta(null);
     setQuery("");
+    await clearResults();
+
     if (searchInput.current) {
       searchInput.current.value = "";
     }
     await requestResize();
   };
 
+  // Clear search results
   const clearResults = () => {
+    setResultMode(ResultDisplay.None);
     setSelectedIdx(0);
     setDocResults([]);
     setLensResults([]);
@@ -88,7 +87,7 @@ export function SearchPage() {
   };
 
   const moveSelectionUp = () => {
-    if (_showActions) {
+    if (showActions) {
     } else {
       // notihng to do
       if (resultMode === ResultDisplay.None) {
@@ -100,13 +99,13 @@ export function SearchPage() {
   };
 
   const moveSelectionDown = () => {
-    if (_showActions) {
+    if (showActions) {
     } else {
       let max = 0;
       if (resultMode === ResultDisplay.Documents) {
-        max = docResults.length;
+        max = docResults.length - 1;
       } else if (resultMode === ResultDisplay.Lenses) {
-        max = lensResults.length;
+        max = lensResults.length - 1;
       }
 
       setSelectedIdx((idx) => {
@@ -117,7 +116,7 @@ export function SearchPage() {
 
   const handleKeyEvent = async (event: KeyboardEvent) => {
     if (event.type === "keydown") {
-      let key = event.key;
+      const key = event.key;
       if (
         // ArrowXX: Prevent cursor from moving around
         key === "ArrowUp" ||
@@ -137,14 +136,14 @@ export function SearchPage() {
           break;
         case "Enter":
           // do action or handle selection
-          if (_showActions) {
+          if (showActions) {
           } else {
             if (resultMode === ResultDisplay.Documents) {
-              let selected = docResults[selectedIdx];
+              const selected = docResults[selectedIdx];
               await invoke("open_result", { url: selected.url });
-              clearResults();
+              clearQuery();
             } else if (resultMode === ResultDisplay.Lenses) {
-              let selected = lensResults[selectedIdx];
+              const selected = lensResults[selectedIdx];
               setSelectedLenses((lenses) => [...lenses, selected.label]);
               clearQuery();
             }
@@ -178,43 +177,64 @@ export function SearchPage() {
 
   // when the query changes shoot it over to the server.
   useEffect(() => {
+    if (query.length === 0) {
+      clearResults();
+    }
+
     const timer = setTimeout(async () => {
       if (query.startsWith(LENS_SEARCH_PREFIX)) {
+        setIsThinking(true);
         // search lenses.
-        let trimmedQuery = query.substring(
+        const trimmedQuery = query.substring(
           LENS_SEARCH_PREFIX.length,
           query.length,
         );
-        let results = await invoke<LensResult[]>("search_lenses", {
+        const results = await invoke<LensResult[]>("search_lenses", {
           query: trimmedQuery,
         });
         setResultMode(ResultDisplay.Lenses);
         setLensResults(results);
+        setIsThinking(false);
       } else if (query.length >= SEARCH_MIN_CHARS) {
+        setIsThinking(true);
         // search docs
-        let resp = await invoke<SearchResults>("search_docs", {
+        const resp = await invoke<SearchResults>("search_docs", {
           query,
           lenses: selectedLenses,
         });
         setResultMode(ResultDisplay.Documents);
         setDocResults(resp.results);
         setSearchMeta(resp.meta);
+        setIsThinking(false);
       }
     }, QUERY_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, selectedLenses]);
 
   useEffect(() => {
-    clearFilters();
+    if (docResults.length > 0 || lensResults.length > 0) {
+      requestResize();
+    }
+  }, [docResults, lensResults]);
+
+  // Scroll to the current selected result.
+  useEffect(() => {
+    const element = document.getElementById(`result-${selectedIdx}`);
+    if (element) {
+      element.scrollIntoView(true);
+    }
+  }, [selectedIdx]);
+
+  useEffect(() => {
     clearQuery();
     clearResults();
 
     // get_action_list
     const fetchUserActions = async () => {
-      const userActions = await invoke<UserActionDefinition[]>(
+      const userActions = await invoke<UserActionSettings>(
         "load_action_settings",
       );
-      console.log(userActions);
+      setUserActions(userActions.actions);
     };
 
     const initialize = async () => {
@@ -262,7 +282,7 @@ export function SearchPage() {
             {docResults.map((doc, idx) => (
               <DocumentResultItem
                 key={doc.doc_id}
-                id={doc.doc_id}
+                id={`result-${idx}`}
                 onClick={() => {}}
                 result={doc}
                 isSelected={selectedIdx === idx}
@@ -277,6 +297,7 @@ export function SearchPage() {
             {lensResults.map((lens, idx) => (
               <LensResultItem
                 key={lens.name}
+                id={`result-${idx}`}
                 lens={lens}
                 isSelected={selectedIdx === idx}
               />
@@ -285,39 +306,20 @@ export function SearchPage() {
         </div>
       ) : null}
       <div className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
-        <div className="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
-          <SearchStatus meta={searchMeta} isThinking={isThinking} />
-        </div>
-        {/* <ActionListBtn
-                    show={self.search_meta.is_some()}
-                    is_active={self.action_menu_button_selected || self.show_actions}
-                    onClick={link.callback(|_| Msg::ToggleShowActions)}
-                /> */}
+        <SearchStatus meta={searchMeta} isThinking={isThinking} />
+        {searchMeta ? (
+          <ActionListButton
+            isActive={showActions}
+            onClick={() => setShowActions((val) => !val)}
+          />
+        ) : null}
       </div>
-      {/* <ActionsList
-                show={self.show_actions}
-                actions={self.get_action_list()}
-                selected_action={self.selected_action_idx}
-                onClick={link.callback(Msg::UserActionSelected)}
-            /> */}
-    </div>
-  );
-}
-
-interface LensResultItemProps {
-  lens: LensResult;
-  isSelected: boolean;
-}
-
-function LensResultItem({ lens, isSelected }: LensResultItemProps) {
-  return (
-    <div
-      className={` flex flex-col p-2 mt-2 text-white rounded scroll-mt-2 ${isSelected ? "bg-cyan-900" : "bg-neutral-800"}`}
-    >
-      <h2 className="text-2xl truncate py-1">{lens.label}</h2>
-      <div className="text-sm leading-relaxed text-neutral-400">
-        {lens.description}
-      </div>
+      {showActions ? (
+        <ActionsList
+          actions={userActions}
+          selectedActionIdx={selectedActionIdx}
+        />
+      ) : null}
     </div>
   );
 }

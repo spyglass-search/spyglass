@@ -14,7 +14,7 @@ interface Props {
 
 export function DocumentResultItem({ id, onClick, result, isSelected }: Props) {
   const url = new URL(result.crawl_uri);
-  let styles = [
+  const styles = [
     "flex",
     "flex-row",
     "gap-4",
@@ -88,15 +88,15 @@ function DocumentIcon({ result }: { result: SearchResult }) {
 }
 
 function DocumentMeta({ result }: { result: SearchResult }) {
-  let priorityTags: ReactNode[] = [];
-  let normalTags: ReactNode[] = [];
+  const priorityTags: ReactNode[] = [];
+  const normalTags: ReactNode[] = [];
 
-  let types = result.tags.flatMap(([label, value]) =>
+  const types = result.tags.flatMap(([label, value]) =>
     label.toLowerCase() === "type" ? [value] : [],
   );
 
   result.tags.forEach(([label, value]) => {
-    let tag = label.toLowerCase();
+    const tag = label.toLowerCase();
     if (tag === "source" || tag === "mimetype") {
       return;
     }
@@ -108,7 +108,9 @@ function DocumentMeta({ result }: { result: SearchResult }) {
       return;
     }
 
-    let tagComponent = <DocumentTag key={`${label}:${value}`} label={label} value={value} />;
+    const tagComponent = (
+      <DocumentTag key={`${label}:${value}`} label={label} value={value} />
+    );
     if (tag === "favorited") {
       priorityTags.push(tagComponent);
     } else {
@@ -132,7 +134,7 @@ function DocumentTag({ label, value }: { label: string; value: string }) {
     );
   }
 
-  let tagLabel =
+  const tagLabel =
     label === "lens" ? (
       <MagnifyingGlassCircleIcon className="w-4" />
     ) : (

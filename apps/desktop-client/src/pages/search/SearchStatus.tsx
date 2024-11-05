@@ -27,7 +27,7 @@ export function SearchStatus({ meta, isThinking }: Props) {
 
   if (meta) {
     return (
-      <div className="flex flex-row justify-between w-full items-center align-middle">
+      <div className="grow text-neutral-500 text-sm pl-3 flex flex-row items-center justify-between">
         <div>
           {"Searched "}
           <span className="text-cyan-600">{meta.num_docs}</span>
