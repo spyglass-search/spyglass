@@ -44,7 +44,7 @@ struct CliArgs {
 }
 
 #[cfg(feature = "tokio-console")]
-pub fn setup_logging(_config: &Config) -> (Option<WorkerGuard>, Option<ClientInitGuard>) {
+pub fn setup_logging(_config: &Config) -> Option<WorkerGuard> {
     let subscriber = tracing_subscriber::registry()
         .with(
             EnvFilter::from_default_env()
@@ -58,7 +58,7 @@ pub fn setup_logging(_config: &Config) -> (Option<WorkerGuard>, Option<ClientIni
         );
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
 
-    (None, None)
+    None
 }
 
 #[cfg(not(feature = "tokio-console"))]
@@ -208,13 +208,15 @@ async fn start_backend(state: AppState, config: Config) {
     // Work scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
-        worker_cmd_tx,
+        worker_cmd_tx.clone(),
         manager_cmd_tx.clone(),
         manager_cmd_rx,
     ));
 
     // Config change detection
     let config_handle = tokio::spawn(task::config_task(state.clone()));
+
+    let embedding_handler = tokio::spawn(task::embedding_task(state.clone(), worker_cmd_tx));
 
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
@@ -278,6 +280,7 @@ async fn start_backend(state: AppState, config: Config) {
         manager_handle,
         worker_handle,
         lens_watcher_handle,
-        config_handle
+        config_handle,
+        embedding_handler,
     );
 }

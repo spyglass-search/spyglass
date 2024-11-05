@@ -23,6 +23,7 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(unique, indexed)]
     pub document_id: String,
+    pub content: Option<String>,
     pub status: QueueStatus,
     pub errors: Option<String>,
     pub indexed_document_id: i64,
@@ -70,6 +71,7 @@ pub async fn enqueue<C>(
     db: &C,
     document_id: &str,
     indexed_document_id: i64,
+    content: &str,
 ) -> Result<InsertResult<ActiveModel>, DbErr>
 where
     C: ConnectionTrait,
@@ -77,6 +79,7 @@ where
     let mut model = ActiveModel::new();
     model.document_id = Set(document_id.to_string());
     model.indexed_document_id = Set(indexed_document_id);
+    model.content = Set(Some(content.to_string()));
 
     Entity::insert(model)
         .on_conflict(
@@ -109,23 +112,32 @@ pub struct Job {
 }
 
 pub async fn check_for_embedding_jobs(db: &DatabaseConnection) -> Result<Option<Job>, DbErr> {
+    let count = Entity::find()
+        .filter(Column::Status.eq(QueueStatus::Processing))
+        .count(db)
+        .await?;
+
+    if count >= 3 {
+        log::debug!("Waiting for previous embedding tasks to finish");
+        return Ok(None);
+    }
+
     let query = Statement::from_string(
         db.get_database_backend(),
         r#"
-            UPDATE embedding_queue AS eq
+           UPDATE embedding_queue AS eq
         SET
             status = 'Processing',
-            updated_at = NOW()
-        WHERE eq.id IN (
+            updated_at = DATETIME('now')
+        WHERE id IN (
             SELECT
-                eq_in.id
-            FROM embedding_queue AS eq_in
-            WHERE eq_in.status = 'Queued'
-            ORDER By eq_in.created_at
+                id
+            FROM embedding_queue
+            WHERE status = 'Queued'
+            ORDER By created_at
             LIMIT 1
-            FOR UPDATE
         )
-        RETURNING eq.id"#
+        RETURNING id"#
             .to_string(),
     );
 
@@ -136,6 +148,7 @@ pub async fn mark_done(db: &DatabaseConnection, id: i64) {
     if let Ok(Some(embedding)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = embedding.clone().into();
         updated.status = Set(QueueStatus::Completed);
+        updated.content = Set(None);
         let _ = updated.update(db).await;
     }
 }
@@ -144,6 +157,7 @@ pub async fn mark_failed(db: &DatabaseConnection, id: i64, error: Option<String>
     if let Ok(Some(embedding)) = Entity::find_by_id(id).one(db).await {
         let mut updated: ActiveModel = embedding.clone().into();
         updated.status = Set(QueueStatus::Failed);
+        updated.content = Set(None);
         updated.errors = Set(error);
         let _ = updated.update(db).await;
     }

@@ -6,17 +6,12 @@ use entities::{
         tag::{self, TagPair},
         vec_documents,
     },
-    sea_orm::{ActiveModelTrait, DatabaseConnection, DatabaseTransaction},
+    sea_orm::{ActiveModelTrait, DatabaseConnection},
     BATCH_SIZE,
 };
 use serde::{Deserialize, Serialize};
 use shared::config::LensConfig;
-use spyglass_model_interface::embedding_api::EmbeddingContentType;
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-    time::Instant,
-};
+use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use libnetrunner::parser::ParseResult;
 use url::Url;
@@ -28,6 +23,8 @@ use spyglass_searcher::{
     schema::{DocumentUpdate, ToDocument},
     RetrievedDocument, WriteTrait,
 };
+
+pub mod embeddings;
 
 pub type Tag = (String, String);
 
@@ -158,7 +155,7 @@ pub async fn process_crawl_results(
     // Find/create the tags for this crawl.
     let mut tag_map: HashMap<String, Vec<i64>> = HashMap::new();
     let mut tag_cache = HashMap::new();
-    let mut embedding_set: HashSet<String> = HashSet::new();
+    let mut embedding_map: HashMap<String, String> = HashMap::new();
 
     // Grab tags that applies to all crawl results.
     let global_tids = _get_tag_ids(&state.db, global_tags, &mut tag_cache).await;
@@ -197,10 +194,8 @@ pub async fn process_crawl_results(
             )
             .await?;
 
-        if let Some(content) = &crawl_result.content {
-            if state.embedding_api.lock().await.as_ref().is_some() {
-                embedding_set.insert(doc_id.clone());
-            }
+        if crawl_result.content.is_some() && state.embedding_api.lock().await.as_ref().is_some() {
+            embedding_map.insert(doc_id.clone(), crawl_result.content.clone().unwrap());
         }
 
         if !model_map.contains_key(&doc_id) {
@@ -227,8 +222,10 @@ pub async fn process_crawl_results(
         let mut updated = update.save(&tx).await;
         if let Ok(updated) = updated.as_mut() {
             if let (Some(doc_id), Some(id)) = (updated.doc_id.take(), updated.id.take()) {
-                if embedding_set.contains(&doc_id) {
-                    embedding_queue::enqueue(&tx, &doc_id, id).await;
+                if let Some(content) = embedding_map.get(&doc_id) {
+                    if let Err(err) = embedding_queue::enqueue(&tx, &doc_id, id, content).await {
+                        log::warn!("Error enqueuing document embedding task. {:?}", err);
+                    }
                 }
             }
         }
@@ -247,8 +244,12 @@ pub async fn process_crawl_results(
     let tx = state.db.begin().await?;
     let num_entries = added_entries.len();
     for added in added_entries {
-        if embedding_set.contains(&added.doc_id) {
-            embedding_queue::enqueue(&tx, &added.doc_id, added.id).await;
+        if let Some(content) = embedding_map.get(&added.doc_id) {
+            if let Err(error) =
+                embedding_queue::enqueue(&tx, &added.doc_id, added.id, content).await
+            {
+                log::warn!("Error enqueuing document embedding task. {:?}", error);
+            }
         }
 
         if let Some(tag_ids) = tag_map.get(&added.url) {

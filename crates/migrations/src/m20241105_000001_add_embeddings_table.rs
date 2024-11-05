@@ -14,6 +14,7 @@ enum EmbeddingQueue {
     IndexedDocumentId,
     CreatedAt,
     UpdatedAt,
+    Content,
 }
 
 #[async_trait::async_trait]
@@ -34,8 +35,10 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(EmbeddingQueue::DocumentId)
                             .string()
+                            .unique_key()
                             .not_null(),
                     )
+                    .col(ColumnDef::new(EmbeddingQueue::Content).string().null())
                     .col(ColumnDef::new(EmbeddingQueue::Status).string().not_null())
                     .col(ColumnDef::new(EmbeddingQueue::Errors).string().null())
                     .col(

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use entities::models::crawl_queue::CrawlStatus;
-use entities::models::{bootstrap_queue, connection, crawl_queue};
+use entities::models::{bootstrap_queue, connection, crawl_queue, embedding_queue};
 use entities::sea_orm::{sea_query::Expr, ColumnTrait, Condition, EntityTrait, QueryFilter};
 use futures::StreamExt;
 use notify::event::ModifyKind;
@@ -18,6 +18,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::connection::{api_id_to_label, load_connection};
 use crate::crawler::bootstrap;
+use crate::documents::embeddings;
 use crate::filesystem;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
@@ -81,15 +82,23 @@ pub enum WorkerCommand {
     CommitIndex,
     /// Fetch, parses, & indexes a URI
     /// TODO: Split this up so that this work can be spread out.
-    Crawl { id: i64 },
+    Crawl {
+        id: i64,
+    },
     /// Refetches, parses, & indexes a URI
     /// If the URI no longer exists (file moved, 404 etc), delete from index.
-    Recrawl { id: i64 },
+    Recrawl {
+        id: i64,
+    },
     /// Applies tag information to an URI
     Tag,
     /// Updates the document store for indexed document database table to
     /// cleanup inconsistencies
     CleanupDatabase(CleanupTask),
+    // Generates an embedding for a document
+    Embedding {
+        id: i64,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -167,6 +176,42 @@ pub async fn manager_task(
             _ = shutdown_rx.recv() => {
                 log::info!("🛑 Shutting down manager");
                 manager_cmd_rx.close();
+                return;
+            }
+        };
+    }
+}
+
+#[tracing::instrument(skip_all)]
+pub async fn embedding_task(state: AppState, queue: mpsc::Sender<WorkerCommand>) {
+    log::info!("Embedding Task Tracker Started");
+
+    let mut queue_check_interval = tokio::time::interval(Duration::from_millis(500));
+    let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
+
+    // first is always instant
+    queue_check_interval.tick().await;
+    loop {
+        tokio::select! {
+            // Listen for manager level commands. This can be sent internally (i.e. CheckForJobs) or
+            // externally (e.g. Collect)
+            job = embedding_queue::check_for_embedding_jobs(&state.db) => {
+                match job {
+                    Ok(Some(job)) => {
+                        let _ = queue.send(WorkerCommand::Embedding{id: job.id}).await;
+                        queue_check_interval.tick().await;
+                    }
+                    Err(error) => {
+                        log::error!("Error accessing embedding jobs {:?}", error);
+                        queue_check_interval.tick().await;
+                    }
+                    _ => {
+                        queue_check_interval.tick().await;
+                    }
+                }
+            }
+            _ = shutdown_rx.recv() => {
+                log::info!("🛑 Shutting down manager");
                 return;
             }
         };
@@ -476,7 +521,11 @@ pub async fn worker_task(
                                 }
                             });
                         }
-                        WorkerCommand::Tag => {}
+                        WorkerCommand::Tag => {},
+                        WorkerCommand::Embedding { id } => {
+                            embeddings::trigger_processing_embedding(&state, id).await;
+                        },
+
                     }
                 }
             },
