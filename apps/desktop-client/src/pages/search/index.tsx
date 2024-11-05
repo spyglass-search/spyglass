@@ -143,6 +143,7 @@ export function SearchPage() {
               const selected = docResults[selectedIdx];
               await invoke("open_result", { url: selected.url });
               clearQuery();
+              await invoke("escape");
             } else if (resultMode === ResultDisplay.Lenses) {
               const selected = lensResults[selectedIdx];
               setSelectedLenses((lenses) => [...lenses, selected.label]);
@@ -258,7 +259,7 @@ export function SearchPage() {
     <div
       ref={searchWrapperRef}
       className="relative overflow-hidden rounded-xl border-neutral-600 border"
-      // onClick={(link.callback(|_| Msg::Focus))}
+      onClick={() => searchInput.current?.focus()}
     >
       <div className="flex flex-nowrap w-full bg-neutral-800">
         <SelectedLenses lenses={selectedLenses} />
@@ -271,7 +272,7 @@ export function SearchPage() {
           onChange={handleUpdateQuery}
           onKeyDown={handleKeyEvent}
           onKeyUp={handleKeyEvent}
-          // onClick={link.callback(|_| Msg::Focus)}
+          onClick={() => searchInput.current?.focus()}
           spellCheck={false}
           tabIndex={-1}
         />
