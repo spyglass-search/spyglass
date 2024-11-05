@@ -70,6 +70,8 @@ spyglass-netrunner = "0.2.11"
 spyglass-processor = { path = "../spyglass-processor" }
 spyglass-rpc = { path = "../spyglass-rpc" }
 spyglass-searcher = { path = "../spyglass-searcher" }
+spyglass-model-interface = { path = "../spyglass-model-interface" }
+sqlite-vec = "0.1.3"
 
 [dev-dependencies]
 tracing-test = { version = "0.2.4", features = ["no-env-filter"] }

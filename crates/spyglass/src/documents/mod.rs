@@ -4,12 +4,14 @@ use entities::{
         crawl_queue,
         indexed_document::{self, find_by_doc_ids},
         tag::{self, TagPair},
+        vec_documents,
     },
-    sea_orm::{ActiveModelTrait, DatabaseConnection},
+    sea_orm::{ActiveModelTrait, DatabaseConnection, DatabaseTransaction},
     BATCH_SIZE,
 };
 use serde::{Deserialize, Serialize};
 use shared::config::LensConfig;
+use spyglass_model_interface::embedding_api::EmbeddingContentType;
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use libnetrunner::parser::ParseResult;
@@ -83,6 +85,11 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
             log::warn!("Unable to delete_many_by_id: {err}")
         }
 
+        // delete their embeddings from the database
+        if let Err(error) = vec_documents::delete_embeddings_by_url(&state.db, chunk).await {
+            log::warn!("Error deleting document embeddings {:?}", error);
+        }
+
         // now that the documents are deleted delete from the queue
         if let Err(error) = indexed_document::delete_many_by_url(&state.db, chunk).await {
             log::warn!("Error deleting for indexed document store {:?}", error);
@@ -147,6 +154,7 @@ pub async fn process_crawl_results(
     // Find/create the tags for this crawl.
     let mut tag_map: HashMap<String, Vec<i64>> = HashMap::new();
     let mut tag_cache = HashMap::new();
+    let mut embedding_map: HashMap<String, Vec<f32>> = HashMap::new();
 
     // Grab tags that applies to all crawl results.
     let global_tids = _get_tag_ids(&state.db, global_tags, &mut tag_cache).await;
@@ -166,6 +174,7 @@ pub async fn process_crawl_results(
         // Add document to index
         let url = Url::parse(&crawl_result.url)?;
         let url_host = url.host_str().unwrap_or("");
+
         // Add document to index
         let doc_id = state
             .index
@@ -184,7 +193,20 @@ pub async fn process_crawl_results(
             )
             .await?;
 
-        if !id_map.contains_key(&doc_id) {
+        if let Some(content) = &crawl_result.content {
+            if let Some(embedding_api) = state.embedding_api.lock().await.as_ref() {
+                match embedding_api.embed(content, EmbeddingContentType::Document) {
+                    Ok(embedding) => {
+                        embedding_map.insert(doc_id.clone(), embedding.to_owned());
+                    }
+                    Err(err) => {
+                        log::error!("Error embedding document {:?}", err);
+                    }
+                }
+            }
+        }
+
+        if !model_map.contains_key(&doc_id) {
             added_docs.push(url.to_string());
             inserts.push(indexed_document::ActiveModel {
                 domain: Set(url_host.to_string()),
@@ -205,7 +227,12 @@ pub async fn process_crawl_results(
     // Insert docs & save everything.
     indexed_document::insert_many(&tx, &inserts).await?;
     for update in updates {
-        let _ = update.save(&tx).await;
+        let mut updated = update.save(&tx).await;
+        if let Ok(updated) = updated.as_mut() {
+            if let (Some(doc_id), Some(id)) = (updated.doc_id.take(), updated.id.take()) {
+                update_embedding(&tx, &embedding_map, &doc_id, id, true).await;
+            }
+        }
     }
 
     tx.commit().await?;
@@ -221,6 +248,8 @@ pub async fn process_crawl_results(
     let tx = state.db.begin().await?;
     let num_entries = added_entries.len();
     for added in added_entries {
+        update_embedding(&tx, &embedding_map, &added.doc_id, added.id, false).await;
+
         if let Some(tag_ids) = tag_map.get(&added.url) {
             if let Err(err) = indexed_document::insert_tags_for_docs(&tx, &[added], tag_ids).await {
                 log::error!("Error inserting tags {:?}", err);
@@ -236,7 +265,7 @@ pub async fn process_crawl_results(
 
     let num_updates = existing.len();
     Ok(AddUpdateResult {
-        num_added: num_entries - num_updates,
+        num_added: num_entries,
         num_updated: num_updates,
     })
 }
@@ -567,4 +596,24 @@ async fn _get_tag_ids(
     }
 
     tids
+}
+
+async fn update_embedding(
+    tx: &DatabaseTransaction,
+    embedding_map: &HashMap<String, Vec<f32>>,
+    doc_id: &str,
+    id: i64,
+    is_update: bool,
+) {
+    if let Some(embedding) = embedding_map.get(doc_id) {
+        let result = if is_update {
+            vec_documents::update_embedding(tx, id, embedding).await
+        } else {
+            vec_documents::insert_embedding(tx, id, embedding).await
+        };
+
+        if let Err(error) = result {
+            log::error!("Error inserting vectors {:?}", error);
+        }
+    }
 }

@@ -1,5 +1,5 @@
 use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
-use entities::models::{indexed_document, lens, tag};
+use entities::models::{indexed_document, lens, tag, vec_documents};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
@@ -9,6 +9,7 @@ use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_model_interface::embedding_api::EmbeddingContentType;
 use spyglass_searcher::schema::{DocFields, SearchDocument};
 use spyglass_searcher::{Boost, QueryBoost, SearchTrait};
 use std::collections::HashSet;
@@ -49,8 +50,8 @@ pub async fn search_docs(
     }
 
     let mut filters = Vec::new();
-    for lens in lens_ids {
-        filters.push(QueryBoost::new(Boost::Tag(lens)));
+    for lens in &lens_ids {
+        filters.push(QueryBoost::new(Boost::Tag(*lens)));
     }
 
     if let Some(tag_id) = get_favorite_tag(&state.db).await {
@@ -58,6 +59,42 @@ pub async fn search_docs(
             id: tag_id,
             required: false,
         }));
+    }
+
+    if let Some(embedding_api) = state.embedding_api.lock().await.as_ref() {
+        match embedding_api.embed(&query, EmbeddingContentType::Query) {
+            Ok(embedding) => {
+                let mut distances =
+                    vec_documents::get_document_distance(&state.db, &lens_ids, &embedding).await;
+
+                if let Ok(distances) = distances.as_mut() {
+                    distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+
+                    let min_value = distances
+                        .iter()
+                        .map(|distance| distance.distance)
+                        .reduce(f64::min);
+                    let max_value = distances
+                        .iter()
+                        .map(|distance| distance.distance)
+                        .reduce(f64::max);
+                    if let (Some(min), Some(max)) = (min_value, max_value) {
+                        for distance in distances {
+                            let boost_normalized = (distance.distance - min) / (max - min) * 3.0;
+                            let boost = 3.0 - boost_normalized;
+
+                            boosts.push(QueryBoost::with_value(
+                                Boost::DocId(distance.doc_id.clone()),
+                                boost as f32,
+                            ));
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("Error embedding query {:?}", err);
+            }
+        }
     }
 
     let search_result = state.index.search(&query, &filters, &boosts, 5).await;

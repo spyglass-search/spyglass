@@ -49,6 +49,13 @@ impl QueryBoost {
             value: *value,
         }
     }
+
+    pub fn with_value(boost: Boost, value: f32) -> Self {
+        QueryBoost {
+            field: boost,
+            value,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
