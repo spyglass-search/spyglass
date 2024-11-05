@@ -9,20 +9,22 @@ on:
 jobs:
   frontend-check:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/desktop-client
     steps:
       # Checkout source code
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Setup node
         uses: actions/setup-node@v3
         with:
           node-version: 23
           cache: 'npm'
+          cache-dependency-path: './apps/desktop-client/package-lock.json'
       - name: Install dependencies
-        working-directory: ./apps/desktop-client
         run: npm install
       - name: Lint
-        working-directory: ./apps/desktop-client
         run: npm run lint
       - name: Build
-        working-directory: ./apps/desktop-client
         run: npm run build
