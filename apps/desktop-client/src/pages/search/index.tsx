@@ -5,6 +5,7 @@ import { LensResult } from "../../bindings/LensResult";
 import { SearchResults } from "../../bindings/SearchResults";
 import { SearchMeta } from "../../bindings/SearchMeta";
 import { SearchResult } from "../../bindings/SearchResult";
+import { SelectedLenses } from "./SelectedLens";
 
 const LENS_SEARCH_PREFIX: string = '/';
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -14,14 +15,6 @@ enum ResultDisplay {
   None,
   Documents,
   Lenses,
-}
-
-interface SelectedLensProps {
-  lens: string[];
-}
-
-function SelectedLens({ lens }: SelectedLensProps) {
-  return <div>{lens}</div>;
 }
 
 // result_display: ResultDisplay::None,
@@ -41,7 +34,7 @@ export function SearchPage() {
   const searchWrapperRef = useRef<HTMLDivElement>(null);
 
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
-  const [selectedLens, setSelectedLens] = useState<string[]>([]);
+  const [selectedLenses, setSelectedLenses] = useState<string[]>([]);
 
   const [docResults, setDocResults] = useState<SearchResult[]>([]);
   const [lensResults, setLensResults] = useState<LensResult[]>([]);
@@ -62,7 +55,7 @@ export function SearchPage() {
     }
   };
   const clearFilters = () => {
-    setSelectedLens([]);
+    setSelectedLenses([]);
   };
 
   const clearQuery = async () => {
@@ -88,6 +81,17 @@ export function SearchPage() {
     setSearchMeta(null);
   };
 
+  const moveSelectionUp = () => {
+    if (_showActions) {} else {
+      // notihng to do
+      if(resultMode === ResultDisplay.None) {
+        return;
+      }
+
+      setSelectedIdx(idx => idx > 0 ? idx - 1 : idx);
+    }
+  };
+
   const moveSelectionDown = () => {
     if (_showActions) {} else {
       let max = 0;
@@ -103,7 +107,7 @@ export function SearchPage() {
     }
   };
 
-  const handleKeyEvent = (event: KeyboardEvent) => {
+  const handleKeyEvent = async (event: KeyboardEvent) => {
     if (event.type === "keydown") {
       let key = event.key;
       if (
@@ -118,11 +122,22 @@ export function SearchPage() {
 
       switch(event.key) {
         case "ArrowUp":
-          setSelectedIdx(idx => idx > 0 ? idx - 1 : idx); break;
+          moveSelectionUp(); break;
         case "ArrowDown":
           moveSelectionDown(); break;
         case "Enter":
             // do action or handle selection
+            if (_showActions) {} else {
+              if (resultMode === ResultDisplay.Documents) {
+                let selected = docResults[selectedIdx];
+                await invoke("open_result", { url: selected.url });
+                clearResults();
+              } else if (resultMode === ResultDisplay.Lenses) {
+                let selected = lensResults[selectedIdx];
+                setSelectedLenses(lenses => [...lenses, selected.label]);
+                clearQuery();
+              }
+            }
             break;
         case "Escape":
             // handle escape
@@ -130,8 +145,8 @@ export function SearchPage() {
             break;
         case "Backspace":
             // handle clearing lenses
-            if(query.length === 0 && selectedLens.length > 0){
-              setSelectedLens([]);
+            if(query.length === 0 && selectedLenses.length > 0){
+              setSelectedLenses([]);
             }
             break;
         default:
@@ -208,7 +223,7 @@ export function SearchPage() {
       // onClick={(link.callback(|_| Msg::Focus))}
     >
       <div className="flex flex-nowrap w-full bg-neutral-800">
-        <SelectedLens lens={selectedLens} />
+        <SelectedLenses lenses={selectedLenses} />
         <input
           ref={searchInput}
           id="searchbox"
