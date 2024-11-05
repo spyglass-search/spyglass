@@ -1,6 +1,9 @@
 import { MagnifyingGlassCircleIcon, StarIcon } from "@heroicons/react/24/solid";
 import { SearchResult } from "../../bindings/SearchResult";
 import { ReactNode } from "react";
+import { FolderIcon } from "@heroicons/react/24/solid";
+import { FileExtIcon } from "../../components/FileExtIcon";
+import { ConnectionIcon } from "../../components/ConnectionIcon";
 
 interface Props {
   id: string;
@@ -51,19 +54,28 @@ function DocumentIcon({ result }: { result: SearchResult }) {
   const url = new URL(result.crawl_uri);
   const iconStyles = ["w-8", "h-8", "m-auto", "mt-2"];
 
-  const isDirectory = result.tags
-    .map(
-      ([label, value]) =>
-        label.toLowerCase() === "type" && value.toLowerCase() === "directory",
-    )
-    .reduce((prev, cur) => prev || cur, false);
+  // Third-party connections like Reddit/Gmail/etc.
+  if (url.protocol === "api") {
+    return (
+      <ConnectionIcon
+        connection={url.hostname}
+        className={iconStyles.join(" ")}
+      />
+    );
+  } else if (url.protocol === "file") {
+    const isDirectory = result.tags
+      .map(
+        ([label, value]) =>
+          label.toLowerCase() === "type" && value.toLowerCase() === "directory",
+      )
+      .reduce((prev, cur) => prev || cur, false);
 
-  const isFile = result.tags
-    .map(
-      ([label, value]) =>
-        label.toLowerCase() === "type" && value.toLowerCase() === "file",
-    )
-    .reduce((prev, cur) => prev || cur, false);
+    return isDirectory ? (
+      <FolderIcon className="w-8 bg-color-white m-auto mt-2" />
+    ) : (
+      <FileExtIcon className={iconStyles.join(" ")} filePath={result.title} />
+    );
+  }
 
   return (
     <img
@@ -95,10 +107,11 @@ function DocumentMeta({ result }: { result: SearchResult }) {
       return;
     }
 
+    let tagComponent = <DocumentTag key={`${label}:${value}`} label={label} value={value} />;
     if (tag === "favorited") {
-      priorityTags.push(<DocumentTag label={label} value={value} />);
+      priorityTags.push(tagComponent);
     } else {
-      normalTags.push(<DocumentTag label={label} value={value} />);
+      normalTags.push(tagComponent);
     }
   });
 
