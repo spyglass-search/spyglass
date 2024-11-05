@@ -3,78 +3,84 @@ import { SearchResult } from "../../bindings/SearchResult";
 import { ReactNode } from "react";
 
 interface Props {
-    id: string;
-    onClick: () => void;
-    result: SearchResult;
-    isSelected: boolean;
+  id: string;
+  onClick: () => void;
+  result: SearchResult;
+  isSelected: boolean;
 }
 
 export function DocumentResultItem({ id, onClick, result, isSelected }: Props) {
-    const url = new URL(result.crawl_uri);
-    let styles = [
-        "flex",
-        "flex-row",
-        "gap-4",
-        "rounded",
-        "py-2",
-        "pr-2",
-        "mt-2",
-        "text-white",
-        "cursor-pointer",
-        "active:bg-cyan-900",
-        "scroll-mt-2",
-        isSelected ? "bg-cyan-900" : "bg-neutral-800"
-    ];
+  const url = new URL(result.crawl_uri);
+  let styles = [
+    "flex",
+    "flex-row",
+    "gap-4",
+    "rounded",
+    "py-2",
+    "pr-2",
+    "mt-2",
+    "text-white",
+    "cursor-pointer",
+    "active:bg-cyan-900",
+    "scroll-mt-2",
+    isSelected ? "bg-cyan-900" : "bg-neutral-800",
+  ];
 
-    return (
-        <a id={id} className={styles.join(' ')} onClick={onClick}>
-          <div className="mt-1 flex flex-none pl-6 pr-2">
-            <div className="relative flex-none bg-neutral-700 rounded h-12 w-12 items-center">
-              <DocumentIcon result={result} />
-            </div>
-          </div>
-          <div className="grow">
-            <div className="text-xs text-cyan-500">{url.hostname}</div>
-              <h2 className="text-base truncate font-semibold w-[30rem]">
-                {result.title}
-              </h2>
-                <div className="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
-                    {result.description}
-                </div>
-                <DocumentMeta result={result} />
-            </div>
-        </a>
-    );
+  return (
+    <a id={id} className={styles.join(" ")} onClick={onClick}>
+      <div className="mt-1 flex flex-none pl-6 pr-2">
+        <div className="relative flex-none bg-neutral-700 rounded h-12 w-12 items-center">
+          <DocumentIcon result={result} />
+        </div>
+      </div>
+      <div className="grow">
+        <div className="text-xs text-cyan-500">{url.hostname}</div>
+        <h2 className="text-base truncate font-semibold w-[30rem]">
+          {result.title}
+        </h2>
+        <div className="text-sm leading-relaxed text-neutral-400 max-h-10 overflow-hidden">
+          {result.description}
+        </div>
+        <DocumentMeta result={result} />
+      </div>
+    </a>
+  );
 }
-
 
 function DocumentIcon({ result }: { result: SearchResult }) {
   const url = new URL(result.crawl_uri);
   const iconStyles = ["w-8", "h-8", "m-auto", "mt-2"];
 
   const isDirectory = result.tags
-    .map(([label, value]) => label.toLowerCase() === "type" && value.toLowerCase() === "directory")
+    .map(
+      ([label, value]) =>
+        label.toLowerCase() === "type" && value.toLowerCase() === "directory",
+    )
     .reduce((prev, cur) => prev || cur, false);
 
   const isFile = result.tags
-    .map(([label, value]) => label.toLowerCase() === "type" && value.toLowerCase() === "file")
+    .map(
+      ([label, value]) =>
+        label.toLowerCase() === "type" && value.toLowerCase() === "file",
+    )
     .reduce((prev, cur) => prev || cur, false);
 
   return (
     <img
-      className={iconStyles.join(' ')}
+      className={iconStyles.join(" ")}
       alt="Website"
       src={`https://icons.duckduckgo.com/ip3/${url.hostname}.ico`}
     />
   );
 }
 
-
 function DocumentMeta({ result }: { result: SearchResult }) {
   let priorityTags: ReactNode[] = [];
   let normalTags: ReactNode[] = [];
 
-  let types = result.tags.flatMap(([label, value]) => label.toLowerCase() === "type" ? [value] : []);
+  let types = result.tags.flatMap(([label, value]) =>
+    label.toLowerCase() === "type" ? [value] : [],
+  );
 
   result.tags.forEach(([label, value]) => {
     let tag = label.toLowerCase();
@@ -82,14 +88,17 @@ function DocumentMeta({ result }: { result: SearchResult }) {
       return;
     }
 
-    if (types.findIndex((type) => type === 'repository') && tag === 'repository') {
+    if (
+      types.findIndex((type) => type === "repository") &&
+      tag === "repository"
+    ) {
       return;
     }
 
     if (tag === "favorited") {
-      priorityTags.push(<DocumentTag label={label} value={value} />)
+      priorityTags.push(<DocumentTag label={label} value={value} />);
     } else {
-      normalTags.push(<DocumentTag label={label} value={value} />)
+      normalTags.push(<DocumentTag label={label} value={value} />);
     }
   });
 
@@ -100,8 +109,7 @@ function DocumentMeta({ result }: { result: SearchResult }) {
   );
 }
 
-
-function DocumentTag({ label, value }: { label: string, value: string }) {
+function DocumentTag({ label, value }: { label: string; value: string }) {
   if (label.toLowerCase() === "favorited") {
     return (
       <div className="items-center">
@@ -110,9 +118,12 @@ function DocumentTag({ label, value }: { label: string, value: string }) {
     );
   }
 
-  let tagLabel = label === "lens"
-    ? <MagnifyingGlassCircleIcon className="w-4" />
-    : <>{label}</>
+  let tagLabel =
+    label === "lens" ? (
+      <MagnifyingGlassCircleIcon className="w-4" />
+    ) : (
+      <>{label}</>
+    );
 
   return (
     <div className="flex flex-row rounded border border-neutral-600 gap-1 py-0.5 px-1 text-xs text-white">

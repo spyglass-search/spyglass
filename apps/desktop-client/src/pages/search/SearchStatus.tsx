@@ -39,9 +39,13 @@ export function SearchStatus({ meta, isThinking }: Props) {
         </div>
         <div className="flex flex-row align-middle items-center gap-1">
           {"Use"}
-          <KeyComponent><ArrowUpIcon className="w-2" /></KeyComponent>
+          <KeyComponent>
+            <ArrowUpIcon className="w-2" />
+          </KeyComponent>
           {"and"}
-          <KeyComponent><ArrowDownIcon className="w-2" /></KeyComponent>
+          <KeyComponent>
+            <ArrowDownIcon className="w-2" />
+          </KeyComponent>
           {"to select."}
         </div>
       </div>

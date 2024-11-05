@@ -9,7 +9,7 @@ import { SelectedLenses } from "./SelectedLens";
 import { SearchStatus } from "./SearchStatus";
 import { DocumentResultItem } from "./DocumentResultItem";
 
-const LENS_SEARCH_PREFIX: string = '/';
+const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
 const SEARCH_MIN_CHARS: number = 2;
 
@@ -40,7 +40,9 @@ export function SearchPage() {
 
   const [docResults, setDocResults] = useState<SearchResult[]>([]);
   const [lensResults, setLensResults] = useState<LensResult[]>([]);
-  const [resultMode, setResultMode] = useState<ResultDisplay>(ResultDisplay.None);
+  const [resultMode, setResultMode] = useState<ResultDisplay>(
+    ResultDisplay.None,
+  );
 
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const [_showActions, setShowActions] = useState<boolean>(false);
@@ -51,7 +53,9 @@ export function SearchPage() {
 
   const requestResize = async () => {
     if (searchWrapperRef.current) {
-      console.debug(`resizing window to: ${searchWrapperRef.current.offsetHeight}`);
+      console.debug(
+        `resizing window to: ${searchWrapperRef.current.offsetHeight}`,
+      );
       // let height = searchWrapperRef.current.offsetHeight;
       // await invoke("resize_window", { height });
     }
@@ -84,20 +88,22 @@ export function SearchPage() {
   };
 
   const moveSelectionUp = () => {
-    if (_showActions) {} else {
+    if (_showActions) {
+    } else {
       // notihng to do
-      if(resultMode === ResultDisplay.None) {
+      if (resultMode === ResultDisplay.None) {
         return;
       }
 
-      setSelectedIdx(idx => idx > 0 ? idx - 1 : idx);
+      setSelectedIdx((idx) => (idx > 0 ? idx - 1 : idx));
     }
   };
 
   const moveSelectionDown = () => {
-    if (_showActions) {} else {
+    if (_showActions) {
+    } else {
       let max = 0;
-      if(resultMode === ResultDisplay.Documents) {
+      if (resultMode === ResultDisplay.Documents) {
         max = docResults.length;
       } else if (resultMode === ResultDisplay.Lenses) {
         max = lensResults.length;
@@ -114,49 +120,51 @@ export function SearchPage() {
       let key = event.key;
       if (
         // ArrowXX: Prevent cursor from moving around
-        key === "ArrowUp"
-        || key === "ArrowDown"
+        key === "ArrowUp" ||
+        key === "ArrowDown" ||
         // Tab: Prevent search box from losing focus
-        || key === "Tab"
+        key === "Tab"
       ) {
         event.preventDefault();
       }
 
-      switch(event.key) {
+      switch (event.key) {
         case "ArrowUp":
-          moveSelectionUp(); break;
+          moveSelectionUp();
+          break;
         case "ArrowDown":
-          moveSelectionDown(); break;
+          moveSelectionDown();
+          break;
         case "Enter":
-            // do action or handle selection
-            if (_showActions) {} else {
-              if (resultMode === ResultDisplay.Documents) {
-                let selected = docResults[selectedIdx];
-                await invoke("open_result", { url: selected.url });
-                clearResults();
-              } else if (resultMode === ResultDisplay.Lenses) {
-                let selected = lensResults[selectedIdx];
-                setSelectedLenses(lenses => [...lenses, selected.label]);
-                clearQuery();
-              }
+          // do action or handle selection
+          if (_showActions) {
+          } else {
+            if (resultMode === ResultDisplay.Documents) {
+              let selected = docResults[selectedIdx];
+              await invoke("open_result", { url: selected.url });
+              clearResults();
+            } else if (resultMode === ResultDisplay.Lenses) {
+              let selected = lensResults[selectedIdx];
+              setSelectedLenses((lenses) => [...lenses, selected.label]);
+              clearQuery();
             }
-            break;
+          }
+          break;
         case "Escape":
-            // handle escape
-            clearQuery();
-            break;
+          // handle escape
+          clearQuery();
+          break;
         case "Backspace":
-            // handle clearing lenses
-            if(query.length === 0 && selectedLenses.length > 0){
-              setSelectedLenses([]);
-            }
-            break;
+          // handle clearing lenses
+          if (query.length === 0 && selectedLenses.length > 0) {
+            setSelectedLenses([]);
+          }
+          break;
         default:
-          // if (searchInput.current) {
-            // setQuery(searchInput.current.value);
-          // }
+        // if (searchInput.current) {
+        // setQuery(searchInput.current.value);
+        // }
       }
-
     } else if (event.type === "keyup") {
       // handle keyup events.
     }
@@ -164,7 +172,7 @@ export function SearchPage() {
 
   const handleUpdateQuery = () => {
     if (searchInput.current) {
-      setQuery(searchInput.current.value)
+      setQuery(searchInput.current.value);
     }
   };
 
@@ -173,13 +181,21 @@ export function SearchPage() {
     const timer = setTimeout(async () => {
       if (query.startsWith(LENS_SEARCH_PREFIX)) {
         // search lenses.
-        let trimmedQuery = query.substring(LENS_SEARCH_PREFIX.length, query.length);
-        let results = await invoke<LensResult[]>("search_lenses", { query: trimmedQuery });
+        let trimmedQuery = query.substring(
+          LENS_SEARCH_PREFIX.length,
+          query.length,
+        );
+        let results = await invoke<LensResult[]>("search_lenses", {
+          query: trimmedQuery,
+        });
         setResultMode(ResultDisplay.Lenses);
         setLensResults(results);
       } else if (query.length >= SEARCH_MIN_CHARS) {
         // search docs
-        let resp = await invoke<SearchResults>("search_docs", { query, lenses: selectedLenses });
+        let resp = await invoke<SearchResults>("search_docs", {
+          query,
+          lenses: selectedLenses,
+        });
         setResultMode(ResultDisplay.Documents);
         setDocResults(resp.results);
         setSearchMeta(resp.meta);
@@ -243,29 +259,31 @@ export function SearchPage() {
       {resultMode === ResultDisplay.Documents ? (
         <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
           <div className="w-full flex flex-col">
-          {docResults.map((doc, idx) => (
-            <DocumentResultItem
-              key={doc.doc_id}
-              id={doc.doc_id}
-              onClick={() => {}}
-              result={doc}
-              isSelected={selectedIdx === idx}
-            />
-          ))}
+            {docResults.map((doc, idx) => (
+              <DocumentResultItem
+                key={doc.doc_id}
+                id={doc.doc_id}
+                onClick={() => {}}
+                result={doc}
+                isSelected={selectedIdx === idx}
+              />
+            ))}
           </div>
         </div>
-      ) : null
-      }
+      ) : null}
       {resultMode === ResultDisplay.Lenses ? (
         <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
           <div className="w-full flex flex-col">
-          {lensResults.map((lens, idx) => (
-            <LensResultItem key={lens.name} lens={lens} isSelected={selectedIdx === idx} />
-          ))}
+            {lensResults.map((lens, idx) => (
+              <LensResultItem
+                key={lens.name}
+                lens={lens}
+                isSelected={selectedIdx === idx}
+              />
+            ))}
           </div>
         </div>
-      ) : null
-      }
+      ) : null}
       <div className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
         <div className="grow text-neutral-500 text-sm pl-3 flex flex-row items-center">
           <SearchStatus meta={searchMeta} isThinking={isThinking} />
@@ -293,10 +311,10 @@ interface LensResultItemProps {
 
 function LensResultItem({ lens, isSelected }: LensResultItemProps) {
   return (
-    <div className={` flex flex-col p-2 mt-2 text-white rounded scroll-mt-2 ${isSelected ? "bg-cyan-900" : "bg-neutral-800"}`}>
-      <h2 className="text-2xl truncate py-1">
-        {lens.label}
-      </h2>
+    <div
+      className={` flex flex-col p-2 mt-2 text-white rounded scroll-mt-2 ${isSelected ? "bg-cyan-900" : "bg-neutral-800"}`}
+    >
+      <h2 className="text-2xl truncate py-1">{lens.label}</h2>
       <div className="text-sm leading-relaxed text-neutral-400">
         {lens.description}
       </div>
