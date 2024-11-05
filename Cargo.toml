@@ -1,7 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/*",
+    "crates/entities",
+    "crates/migrations",
+    "crates/shared",
+    "crates/spyglass",
+    "crates/spyglass-lens",
+    "crates/spyglass-processor",
+    "crates/spyglass-rpc",
+    "crates/spyglass-searcher",
+
     "apps/tauri"
 ]
 
