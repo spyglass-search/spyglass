@@ -34,7 +34,7 @@
   },
   "build": {
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../../dist && npm run build",
+    "frontendDist": "../desktop-client/dist",
     "beforeDevCommand": "cd ../desktop-client && npm run dev",
     "beforeBuildCommand": "cd ../desktop-client && npm run build"
   },

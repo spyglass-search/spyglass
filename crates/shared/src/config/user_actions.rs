@@ -1,6 +1,7 @@
 use diff::Diff;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use ts_rs::TS;
 
 use crate::accelerator;
 use crate::keyboard::{KeyCode, ModifiersState};
@@ -143,7 +144,8 @@ pub struct ContextFilter {
 }
 
 // The definition for an action
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub struct UserActionDefinition {
     pub label: String,
     pub status_msg: Option<String>,

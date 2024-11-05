@@ -104,3 +104,7 @@ upload-debug-symbols-windows:
 	cargo build -p spyglass-app --profile sentry
 	npx sentry-cli difutil check target/sentry/spyglass-app.exe
 	npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app.exe
+
+
+generate-bindings:
+	TS_RS_EXPORT_DIR="../../apps/desktop-client/src/bindings" cargo test -p shared
