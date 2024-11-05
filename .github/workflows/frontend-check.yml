@@ -1,0 +1,30 @@
+name: Frontend build check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  frontend-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/desktop-client
+    steps:
+      # Checkout source code
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
+          cache: 'npm'
+          cache-dependency-path: './apps/desktop-client/package-lock.json'
+      - name: Install dependencies
+        run: npm install
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use ts_rs::TS;
 use uuid::Uuid;
 
 pub use spyglass_lens::{
@@ -62,7 +63,8 @@ impl Limit {
 }
 
 // Enum of actions the user can take when a document is selected
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub enum UserAction {
     OpenApplication(String, String),
     OpenUrl(String),

@@ -1,8 +1,10 @@
 data
+dist
 _notebooks
 *.wasm
 Makefile.dev
 .env
+.vscode
 
 # Added by cargo
 target
