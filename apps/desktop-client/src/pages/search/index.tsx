@@ -7,6 +7,7 @@ import { SearchMeta } from "../../bindings/SearchMeta";
 import { SearchResult } from "../../bindings/SearchResult";
 import { SelectedLenses } from "./SelectedLens";
 import { SearchStatus } from "./SearchStatus";
+import { DocumentResultItem } from "./DocumentResultItem";
 
 const LENS_SEARCH_PREFIX: string = '/';
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -239,7 +240,23 @@ export function SearchPage() {
           tabIndex={-1}
         />
       </div>
-      {docResults.length > 0 || lensResults.length > 0 ? (
+      {resultMode === ResultDisplay.Documents ? (
+        <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
+          <div className="w-full flex flex-col">
+          {docResults.map((doc, idx) => (
+            <DocumentResultItem
+              key={doc.doc_id}
+              id={doc.doc_id}
+              onClick={() => {}}
+              result={doc}
+              isSelected={selectedIdx === idx}
+            />
+          ))}
+          </div>
+        </div>
+      ) : null
+      }
+      {resultMode === ResultDisplay.Lenses ? (
         <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
           <div className="w-full flex flex-col">
           {lensResults.map((lens, idx) => (
