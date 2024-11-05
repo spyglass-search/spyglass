@@ -19,7 +19,6 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::num::NonZeroU32;
 use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use url::{Host, Url};
@@ -543,53 +542,57 @@ async fn _process_file(
 
         match SupportedExt::from_ext(&ext.to_string_lossy()) {
             SupportedExt::Audio(_) => {
-                log::debug!("starting transcription for `{}`", file_name);
-                // Attempt to transcribe audio, assumes the model has been downloaded
-                // and ready to go
-                #[cfg(debug_assertions)]
-                let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
-                #[cfg(not(debug_assertions))]
-                let model_path: PathBuf = state.config.model_dir().join("whisper.base.en.bin");
+                log::warn!(
+                    "Audio File `{:?}` unsupported returning empty content",
+                    path
+                );
+                // log::debug!("starting transcription for `{}`", file_name);
+                // // Attempt to transcribe audio, assumes the model has been downloaded
+                // // and ready to go
+                // #[cfg(debug_assertions)]
+                // let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
+                // #[cfg(not(debug_assertions))]
+                // let model_path: PathBuf = state.config.model_dir().join("whisper.base.en.bin");
 
-                if !model_path.exists() {
-                    log::warn!("whisper model not installed, skipping transcription");
-                    content = None;
-                } else {
-                    match parser::audio::transcribe_audio(path.to_path_buf(), model_path, 0) {
-                        Ok(result) => {
-                            // Update crawl result with appropriate title/stuff
-                            if let Some(metadata) = result.metadata {
-                                // Update title for audio file, if available
-                                if let Some(track_title) = metadata.title {
-                                    title = Some(track_title);
-                                }
+                // if !model_path.exists() {
+                //     log::warn!("whisper model not installed, skipping transcription");
+                //     content = None;
+                // } else {
+                //     match parser::audio::transcribe_audio(path.to_path_buf(), model_path, 0) {
+                //         Ok(result) => {
+                //             // Update crawl result with appropriate title/stuff
+                //             if let Some(metadata) = result.metadata {
+                //                 // Update title for audio file, if available
+                //                 if let Some(track_title) = metadata.title {
+                //                     title = Some(track_title);
+                //                 }
 
-                                // Update author for audio file, if available
-                                if let Some(artist) = metadata.artist {
-                                    tags.push((TagType::Owner, artist));
-                                } else if let Some(artist) = metadata.album {
-                                    tags.push((TagType::Owner, artist));
-                                }
-                            }
+                //                 // Update author for audio file, if available
+                //                 if let Some(artist) = metadata.artist {
+                //                     tags.push((TagType::Owner, artist));
+                //                 } else if let Some(artist) = metadata.album {
+                //                     tags.push((TagType::Owner, artist));
+                //                 }
+                //             }
 
-                            // Combine segments into one large string.
-                            let combined = result
-                                .segments
-                                .iter()
-                                .map(|x| x.segment.to_string())
-                                .collect::<Vec<String>>()
-                                .join("");
-                            content = Some(combined);
-                        }
-                        Err(err) => {
-                            log::warn!(
-                                "Skipping transcription: unable to transcribe: `{}`: {}",
-                                path.display(),
-                                err
-                            );
-                        }
-                    }
-                }
+                //             // Combine segments into one large string.
+                //             let combined = result
+                //                 .segments
+                //                 .iter()
+                //                 .map(|x| x.segment.to_string())
+                //                 .collect::<Vec<String>>()
+                //                 .join("");
+                //             content = Some(combined);
+                //         }
+                //         Err(err) => {
+                //             log::warn!(
+                //                 "Skipping transcription: unable to transcribe: `{}`: {}",
+                //                 path.display(),
+                //                 err
+                //             );
+                //         }
+                //     }
+                // }
             }
             SupportedExt::Document(_) => match parser::parse_file(ext, path) {
                 Ok(parsed) => {
