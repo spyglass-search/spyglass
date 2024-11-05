@@ -2,6 +2,13 @@ import { BookOpenIcon } from "@heroicons/react/16/solid";
 import { UserActionDefinition } from "../../bindings/UserActionDefinition";
 import { KeyComponent } from "../../components/KeyComponent";
 
+export const DEFAULT_ACTION: UserActionDefinition = {
+    action: { "OpenApplication": ["default", ""] },
+    key_binding: "Enter",
+    label: "Open with default app",
+    status_msg: "OpenDefaultApplication"
+};
+
 interface ActionListButtonProps {
   isActive: boolean;
   onClick?: () => void;
@@ -35,7 +42,7 @@ export function ActionListButton({
 interface ActionListProps {
   actions: UserActionDefinition[];
   selectedActionIdx: number;
-  onClick?: () => void;
+  onClick?: (action: UserActionDefinition) => void;
 }
 
 export function ActionsList({
@@ -62,22 +69,15 @@ export function ActionsList({
     "p-1",
   ];
 
-  const defaultAction: UserActionDefinition = {
-    action: { "OpenApplication": ["default", ""] },
-    key_binding: "Enter",
-    label: "Open with default app",
-    status_msg: "OpenDefaultApplication"
-  };
-
   return (
     <div className={classes.join(" ")}>
       <div className="overflow-y-auto">
         <UserActionComponent
             key={`useraction-0`}
             actionId={`useraction-0`}
-            action={defaultAction}
+            action={DEFAULT_ACTION}
             isSelected={selectedActionIdx === 0}
-            onClick={onClick}
+            onClick={() => onClick(defaultAction)}
         />
         {actions.map((action, idx) => (
           <UserActionComponent
@@ -85,7 +85,7 @@ export function ActionsList({
             actionId={`useraction-${idx + 1}`}
             action={action}
             isSelected={selectedActionIdx === idx + 1}
-            onClick={onClick}
+            onClick={() => onClick(action)}
           />
         ))}
       </div>
@@ -100,7 +100,7 @@ interface UserActionProps {
   onClick?: () => void;
 }
 
-function UserActionComponent({ action, isSelected }: UserActionProps) {
+function UserActionComponent({ action, isSelected, onClick = () => {} }: UserActionProps) {
   const classes = [
     "flex",
     "flex-col",
@@ -114,7 +114,7 @@ function UserActionComponent({ action, isSelected }: UserActionProps) {
   ];
 
   return (
-    <div className={classes.join(" ")}>
+    <div className={classes.join(" ")} onClick={onClick}>
       <div className="flex flex-row px-2">
         <BookOpenIcon className="w-6" />
         <span className="grow">{action.label}</span>

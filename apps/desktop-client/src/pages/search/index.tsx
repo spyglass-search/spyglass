@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { act, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { invoke, listen } from "../../glue";
 import { UserActionDefinition } from "../../bindings/UserActionDefinition";
 import { LensResult } from "../../bindings/LensResult";
@@ -10,7 +10,8 @@ import { SearchStatus } from "./SearchStatus";
 import { DocumentResultItem } from "./DocumentResultItem";
 import { LensResultItem } from "./LensResultItem";
 import { UserActionSettings } from "../../bindings/UserActionSettings";
-import { ActionListButton, ActionsList } from "./ActionsList";
+import { ActionListButton, ActionsList, DEFAULT_ACTION } from "./ActionsList";
+import Handlebars from "handlebars";
 
 const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -136,6 +137,10 @@ export function SearchPage() {
           // do action or handle selection
           if (showActions) {
             // handle whichever action is selected.
+            const action = selectedActionIdx === 0
+              ? DEFAULT_ACTION
+              : userActions[selectedActionIdx - 1];
+            handleSelectedAction(action);
           } else {
             if (resultMode === ResultDisplay.Documents) {
               const selected = docResults[selectedIdx];
@@ -180,6 +185,27 @@ export function SearchPage() {
     } else if (event.type === "keyup") {
       // handle keyup events.
     }
+  };
+
+  const handleSelectedAction = async (action: UserActionDefinition) => {
+    console.debug('handling action: ', action);
+    // Get the context for the action execution
+    let selectedDoc = docResults[selectedIdx];
+    // open in application
+    if ("OpenApplication" in action.action) {
+      const url = selectedDoc.url;
+      const [app, _appArgs] = action.action.OpenApplication;
+      await invoke("open_result", { url, application: app });
+    // Open url
+    } else if ("OpenUrl" in action.action) {
+      const url = action.action.OpenUrl;
+      await invoke("open_result", { url, application: null });
+    } else if ("CopyToClipboard" in action.action) {
+      const template = Handlebars.compile(action.action.CopyToClipboard);
+      await invoke("copy_to_clipboard", { txt: template(selectedDoc) });
+    }
+
+    setShowActions(false);
   };
 
   const handleUpdateQuery = () => {
@@ -329,6 +355,7 @@ export function SearchPage() {
         <ActionsList
           actions={userActions}
           selectedActionIdx={selectedActionIdx}
+          onClick={handleSelectedAction}
         />
       ) : null}
     </div>
