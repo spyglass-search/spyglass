@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tauri::{
     async_runtime::JoinHandle,
     plugin::{Builder, TauriPlugin},
-    AppHandle, Manager, RunEvent, Wry,
+    AppHandle, Emitter, Manager, RunEvent, Wry,
 };
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
@@ -103,7 +103,7 @@ async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {
         }
     }
 
-    let _ = app_handle.emit_all(ClientEvent::UpdateLensFinished.as_ref(), true);
+    let _ = app_handle.emit(ClientEvent::UpdateLensFinished.as_ref(), true);
     log::info!("updated {} lenses", lenses_updated);
     Ok(())
 }
@@ -185,15 +185,15 @@ pub async fn handle_install_lens(
 #[tauri::command]
 pub async fn install_lens(win: tauri::Window, name: &str) -> Result<(), String> {
     let app_handle = win.app_handle();
-    let _ = handle_install_lens(&app_handle, name, false).await;
-    let _ = app_handle.emit_all(ClientEvent::RefreshDiscover.as_ref(), Value::Null);
+    let _ = handle_install_lens(app_handle, name, false).await;
+    let _ = app_handle.emit(ClientEvent::RefreshDiscover.as_ref(), Value::Null);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn list_installable_lenses(win: tauri::Window) -> Result<Vec<InstallableLens>, String> {
     let app_handle = win.app_handle();
-    let installed: HashSet<String> = get_installed_lenses(&app_handle)
+    let installed: HashSet<String> = get_installed_lenses(app_handle)
         .await
         .unwrap_or_default()
         .iter()
@@ -230,7 +230,7 @@ pub async fn list_installed_lenses(win: tauri::Window) -> Result<Vec<LensResult>
 
 #[tauri::command]
 pub async fn run_lens_updater(win: tauri::Window) -> Result<(), String> {
-    match check_for_lens_updates(&win.app_handle()).await {
+    match check_for_lens_updates(win.app_handle()).await {
         Ok(_) => Ok(()),
         Err(err) => {
             log::error!("Unable to run lens updater: {}", err);
@@ -248,7 +248,7 @@ pub async fn uninstall_lens(win: tauri::Window, name: &str) -> Result<(), String
         if let Err(err) = rpc.client.uninstall_lens(name.to_string()).await {
             log::error!("Unable to uninstall lens: {}", err.to_string());
         } else {
-            let _ = app_handle.emit_all(ClientEvent::RefreshLensLibrary.as_ref(), Value::Null);
+            let _ = app_handle.emit(ClientEvent::RefreshLensLibrary.as_ref(), Value::Null);
         }
     }
 

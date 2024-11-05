@@ -19,11 +19,13 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 spyglass-lens = "0.1.7"
+ts-rs = "10.0"
 uuid = { workspace = true }
 url = "2.2"
 # Dependencies for metrics
 chrono = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
+
 
 [features]
 metrics = ["dep:chrono", "dep:reqwest"]

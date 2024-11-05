@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
-jsonrpsee = { version = "0.16.2", features = ["full"] }
+jsonrpsee = { workspace = true, features = ["full"] }
 shared = { path = "../shared" }
 
 [lib]

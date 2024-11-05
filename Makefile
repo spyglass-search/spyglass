@@ -77,12 +77,14 @@ setup-dev:
 
 # Specifically for debian based distros
 setup-dev-linux:
-	sudo apt install libwebkit2gtk-4.0-dev \
+	sudo apt update
+	sudo apt install libwebkit2gtk-4.1-dev \
 		build-essential \
 		curl \
 		wget \
+		file \
+		libxdo-dev \
 		libssl-dev \
-		libgtk-3-dev \
 		libayatana-appindicator3-dev \
 		librsvg2-dev \
 		cmake \
@@ -108,3 +110,7 @@ upload-debug-symbols-windows:
 	cargo build -p spyglass-app --profile sentry
 	npx sentry-cli difutil check target/sentry/spyglass-app.exe
 	npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app.exe
+
+
+generate-bindings:
+	TS_RS_EXPORT_DIR="../../apps/desktop-client/src/bindings" cargo test -p shared

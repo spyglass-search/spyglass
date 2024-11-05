@@ -1,5 +1,4 @@
 use super::response;
-use anyhow::anyhow;
 use directories::UserDirs;
 use entities::get_library_stats;
 use entities::models::crawl_queue::{CrawlStatus, EnqueueSettings};
@@ -10,7 +9,7 @@ use entities::models::{
     lens,
 };
 use entities::sea_orm::{prelude::*, sea_query};
-use jsonrpsee::core::Error;
+use jsonrpsee::core::RpcResult;
 use libnetrunner::parser::html::html_to_text;
 use libspyglass::connection::{self, credentials, handle_authorize_connection};
 use libspyglass::crawler::CrawlResult;
@@ -26,7 +25,7 @@ use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
 };
-use spyglass_rpc::{RpcEvent, RpcEventType};
+use spyglass_rpc::{server_error, RpcEvent, RpcEventType};
 use spyglass_searcher::WriteTrait;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -36,7 +35,7 @@ use url::Url;
 
 pub mod search;
 
-pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) -> Result<(), Error> {
+pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) -> RpcResult<()> {
     // Validate tags and consolidate tags
     let mut tags = Vec::new();
     tags.push((TagType::Source, req.source.to_string()));
@@ -75,14 +74,14 @@ pub async fn add_document_batch(state: &AppState, req: &BatchDocumentRequest) ->
     )
     .await
     {
-        return Err(Error::Custom(format!("Unable to queue URL: {err}")));
+        return Err(server_error(format!("Unable to queue URL: {err}"), None));
     }
 
     Ok(())
 }
 
 /// Adds a raw document to the user's index.
-pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Result<(), Error> {
+pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> RpcResult<()> {
     // Validate tags and consolidate tags
     let mut tags = Vec::new();
     tags.push((TagType::Source, req.source.to_string()));
@@ -111,7 +110,7 @@ pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Res
             let url = match res.canonical_url.map(|s| Url::parse(&s)) {
                 Some(Ok(url)) => url,
                 _ => {
-                    return Err(Error::Custom(format!("Invalid URL: {}", req.url)));
+                    return Err(server_error(format!("Invalid URL: {}", req.url), None));
                 }
             };
 
@@ -156,7 +155,7 @@ pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Res
             )
             .await
             {
-                return Err(Error::Custom(format!("Unable to queue URL: {err}")));
+                return Err(server_error(format!("Unable to queue URL: {err}"), None));
             }
         }
     }
@@ -165,7 +164,7 @@ pub async fn add_raw_document(state: &AppState, req: &RawDocumentRequest) -> Res
 }
 
 #[instrument(skip(state))]
-pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(), Error> {
+pub async fn authorize_connection(state: AppState, api_id: String) -> RpcResult<()> {
     log::debug!("authorizing <{}>", api_id);
     state
         .metrics
@@ -175,9 +174,10 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
         .await;
 
     if let Err(err) = handle_authorize_connection(&state, &api_id).await {
-        Err(Error::Custom(format!(
-            "Unable to authorize {api_id}: {err}"
-        )))
+        Err(server_error(
+            format!("Unable to authorize {api_id}: {err}"),
+            None,
+        ))
     } else {
         Ok(())
     }
@@ -185,7 +185,7 @@ pub async fn authorize_connection(state: AppState, api_id: String) -> Result<(),
 
 /// Fun stats about index size, etc.
 #[instrument(skip(state))]
-pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
+pub async fn app_status(state: AppState) -> RpcResult<AppStatus> {
     // Grab details about index
     let index = state.index;
     let reader = index.reader.searcher();
@@ -197,18 +197,19 @@ pub async fn app_status(state: AppState) -> Result<AppStatus, Error> {
 
 /// Remove a doc from the index
 #[instrument(skip(state))]
-pub async fn delete_document(state: AppState, id: String) -> Result<(), Error> {
+pub async fn delete_document(state: AppState, id: String) -> RpcResult<()> {
     if let Err(e) = state.index.delete(&id).await {
         log::error!("Unable to delete doc {} due to {}", id, e);
-        return Err(Error::Custom(e.to_string()));
+        return Err(server_error(e.to_string(), None));
     }
+
     let _ = indexed_document::delete_many_by_doc_id(&state.db, &[id]).await;
     Ok(())
 }
 
 /// Remove a domain from crawl queue & index
 #[instrument(skip(state))]
-pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error> {
+pub async fn delete_domain(state: AppState, domain: String) -> RpcResult<()> {
     // Remove domain from bootstrap queue
     if let Err(err) =
         bootstrap_queue::dequeue(&state.db, format!("https://{domain}").as_str()).await
@@ -247,7 +248,7 @@ pub async fn delete_domain(state: AppState, domain: String) -> Result<(), Error>
 }
 
 #[instrument(skip(state))]
-pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, Error> {
+pub async fn list_connections(state: AppState) -> RpcResult<ListConnectionResult> {
     match entities::models::connection::Entity::find()
         .all(&state.db)
         .await
@@ -275,13 +276,13 @@ pub async fn list_connections(state: AppState) -> Result<ListConnectionResult, E
                 user_connections,
             })
         }
-        Err(err) => Err(Error::Custom(err.to_string())),
+        Err(err) => Err(server_error(err.to_string(), None)),
     }
 }
 
 /// List of installed lenses
 #[instrument(skip(state))]
-pub async fn list_installed_lenses(state: AppState) -> Result<Vec<LensResult>, Error> {
+pub async fn list_installed_lenses(state: AppState) -> RpcResult<Vec<LensResult>> {
     let stats = get_library_stats(&state.db).await.unwrap_or_default();
     let mut lenses: Vec<LensResult> = state
         .lenses
@@ -432,7 +433,7 @@ async fn build_filesystem_information(
     }
 }
 
-pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {
+pub async fn list_plugins(state: AppState) -> RpcResult<Vec<PluginResult>> {
     let mut plugins = Vec::new();
     let result = lens::Entity::find()
         .filter(lens::Column::LensType.eq(LensType::Plugin))
@@ -457,18 +458,18 @@ pub async fn list_plugins(state: AppState) -> Result<Vec<PluginResult>, Error> {
 /// Show the list of URLs in the queue and their status
 #[allow(dead_code)]
 #[instrument(skip(state))]
-pub async fn list_queue(state: AppState) -> Result<response::ListQueue, Error> {
+pub async fn list_queue(state: AppState) -> RpcResult<response::ListQueue> {
     let db = &state.db;
     let queue = crawl_queue::Entity::find().all(db).await;
 
     match queue {
         Ok(queue) => Ok(response::ListQueue { queue }),
-        Err(err) => Err(Error::Custom(err.to_string())),
+        Err(err) => Err(server_error(err.to_string(), None)),
     }
 }
 
 #[instrument(skip(state))]
-pub async fn recrawl_domain(state: AppState, domain: String) -> Result<(), Error> {
+pub async fn recrawl_domain(state: AppState, domain: String) -> RpcResult<()> {
     log::info!("handling recrawl domain: {}", domain);
     let db = &state.db;
 
@@ -501,7 +502,7 @@ pub async fn recrawl_domain(state: AppState, domain: String) -> Result<(), Error
 }
 
 #[instrument(skip(state))]
-pub async fn toggle_pause(state: AppState, is_paused: bool) -> Result<(), Error> {
+pub async fn toggle_pause(state: AppState, is_paused: bool) -> RpcResult<()> {
     // Scope so that the app_state mutex is correctly released.
     if let Some(sender) = state.pause_cmd_tx.lock().await.as_ref() {
         let _ = sender.send(if is_paused {
@@ -519,25 +520,26 @@ pub async fn update_user_settings(
     app: &AppState,
     _config: &Config,
     user_settings: &UserSettings,
-) -> Result<UserSettings, Error> {
+) -> RpcResult<UserSettings> {
     if let Err(error) = app
         .config_cmd_tx
         .lock()
         .await
         .send(UserSettingsChange::SettingsChanged(user_settings.clone()))
     {
-        return Err(anyhow!(error).into());
+        Err(server_error(error.to_string(), None))
+    } else {
+        Ok(user_settings.clone())
     }
-    Ok(user_settings.clone())
 }
 
 #[instrument(skip(app))]
-pub async fn user_settings(app: &AppState) -> Result<UserSettings, Error> {
+pub async fn user_settings(app: &AppState) -> RpcResult<UserSettings> {
     Ok(app.user_settings.load().as_ref().clone())
 }
 
 #[instrument(skip(state))]
-pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Result<(), Error> {
+pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> RpcResult<()> {
     // Remove from filesystem
     let lens_path = config.lenses_dir().join(format!("{name}.ron"));
     let config = state.lenses.remove(name);
@@ -558,7 +560,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
 
         // Remove from index
         if let Err(err) = state.index.delete_many_by_id(&doc_ids).await {
-            return Err(Error::Custom(err.to_string()));
+            return Err(server_error(err.to_string(), None));
         }
         // Remove from db
         let _ = indexed_document::delete_many_by_id(&state.db, &dbids).await;
@@ -566,7 +568,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Res
 
     // -- remove from crawl queue
     if let Err(err) = crawl_queue::delete_by_lens(state.db.clone(), name).await {
-        return Err(Error::Custom(err.to_string()));
+        return Err(server_error(err.to_string(), None));
     }
 
     // - remove seed urls from bootstrap queue table

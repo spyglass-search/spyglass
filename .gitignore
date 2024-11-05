@@ -1,11 +1,14 @@
 data
+dist
 _notebooks
 *.wasm
 Makefile.dev
 .env
+.vscode
 
 # Added by cargo
 target
 **/target
 node_modules
 binaries
+apps/tauri/gen/*

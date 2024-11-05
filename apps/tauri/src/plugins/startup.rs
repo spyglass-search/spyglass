@@ -1,8 +1,8 @@
 use tauri::{
-    api::dialog::blocking::message,
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Wry,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tokio::sync::{broadcast, Mutex};
 
 use migration::Migrator;
@@ -77,14 +77,13 @@ async fn run_and_check_backend(app_handle: AppHandle) {
         progress.set(&format!("Unable to migrate database: {}", &err.to_string()));
 
         // Let users know something has gone wrong.
-        message(
-            Some(&window),
-            "Migration Failure",
-            format!(
-                "Migration error: {}\nPlease file a bug report!\nThe application will exit now.",
-                &err.to_string()
-            ),
-        );
+        app_handle
+            .dialog()
+            .message(format!(
+                "Migration error: {err}\nPlease file a bug report!\nThe application will exit now."
+            ))
+            .kind(MessageDialogKind::Error)
+            .title("Migration Failure");
 
         app_handle.exit(0);
     }
@@ -114,7 +113,7 @@ async fn run_and_check_backend(app_handle: AppHandle) {
 
     // Run wizard on first run
     if !config.user_settings.run_wizard {
-        show_wizard_window(&window.app_handle());
+        show_wizard_window(window.app_handle());
     } else {
         let sbar = get_searchbar(&app_handle);
         window::show_search_bar(&sbar);

@@ -1,6 +1,7 @@
 use diff::Diff;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use ts_rs::TS;
 
 use crate::accelerator;
 use crate::keyboard::{KeyCode, ModifiersState};
@@ -11,7 +12,8 @@ use super::{Tag, UserAction};
 // Defines context specific actions. A context specific action
 // is a list of actions that are only valid when the document selected
 // matches the defined context.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub struct ContextActions {
     // Defines what context must be matched for the actions to be valid
     pub context: ContextFilter,
@@ -126,7 +128,8 @@ impl ContextActions {
 
 // Filter definition used to define what documents should match
 // against the context.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub struct ContextFilter {
     // Includes documents that match any of the defined tags
     pub has_tag: Option<Vec<Tag>>,
@@ -143,7 +146,8 @@ pub struct ContextFilter {
 }
 
 // The definition for an action
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub struct UserActionDefinition {
     pub label: String,
     pub status_msg: Option<String>,
@@ -165,7 +169,8 @@ impl UserActionDefinition {
 
 // The user action settings configuration provides the ability
 // for the user to define custom behavior for a document.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub struct UserActionSettings {
     pub actions: Vec<UserActionDefinition>,
     pub context_actions: Vec<ContextActions>,

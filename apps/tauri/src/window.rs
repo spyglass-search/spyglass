@@ -4,15 +4,17 @@ use crate::{constants, platform};
 use shared::config::Config;
 use shared::event::{ClientEvent, ModelStatusPayload};
 use shared::metrics::Metrics;
-use tauri::api::dialog::{MessageDialogBuilder, MessageDialogButtons, MessageDialogKind};
+use tauri::menu::Menu;
 use tauri::{
-    AppHandle, Manager, Menu, Monitor, PhysicalPosition, PhysicalSize, Size, Window, WindowBuilder,
-    WindowEvent, WindowUrl,
+    AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, Size, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_notification::NotificationExt;
 
 /// Try and detect which monitor the window is on so that we can determine the
 /// screen size
-fn find_monitor(window: &Window) -> Option<Monitor> {
+fn find_monitor(window: &WebviewWindow) -> Option<Monitor> {
     if let Ok(Some(mon)) = window.primary_monitor() {
         Some(mon)
     } else if let Ok(Some(mon)) = window.current_monitor() {
@@ -28,7 +30,7 @@ fn find_monitor(window: &Window) -> Option<Monitor> {
     }
 }
 
-pub fn center_search_bar(window: &Window) {
+pub fn center_search_bar(window: &WebviewWindow) {
     let window_size = match window.inner_size() {
         Ok(size) => size,
         // Nothing to do if the window is not created yet.
@@ -52,7 +54,7 @@ pub fn center_search_bar(window: &Window) {
     }
 }
 
-pub fn show_search_bar(window: &Window) {
+pub fn show_search_bar(window: &WebviewWindow) {
     platform::show_search_bar(window);
 
     // Wait a little bit for the window to show being focusing on it.
@@ -63,10 +65,10 @@ pub fn show_search_bar(window: &Window) {
     });
 }
 
-pub fn hide_search_bar(window: &Window) {
+pub fn hide_search_bar(window: &WebviewWindow) {
     let handle = window.app_handle();
     // don't hide if the settings window is open
-    if let Some(settings_window) = handle.get_window(SETTINGS_WIN_NAME) {
+    if let Some(settings_window) = handle.get_webview_window(SETTINGS_WIN_NAME) {
         if settings_window.is_visible().unwrap_or_default() {
             return;
         }
@@ -85,18 +87,18 @@ pub fn hide_search_bar(window: &Window) {
 }
 
 /// Builds or returns the main searchbar window
-pub fn get_searchbar(app: &AppHandle) -> Window {
-    if let Some(window) = app.get_window(constants::SEARCH_WIN_NAME) {
+pub fn get_searchbar(app: &AppHandle) -> WebviewWindow {
+    if let Some(window) = app.get_webview_window(constants::SEARCH_WIN_NAME) {
         window
     } else {
         let window =
-            WindowBuilder::new(app, constants::SEARCH_WIN_NAME, WindowUrl::App("/".into()))
-                .menu(get_app_menu())
+            WebviewWindowBuilder::new(app, constants::SEARCH_WIN_NAME, WebviewUrl::App("/".into()))
+                .menu(get_app_menu(app).expect("Unable to build app menu"))
                 .title("Spyglass")
                 .decorations(false)
                 .transparent(true)
-                .visible(false)
-                .disable_file_drop_handler()
+                .visible(true)
+                // .disable_file_drop_handler()
                 .inner_size(640.0, 108.0)
                 .build()
                 .expect("Unable to create searchbar window");
@@ -116,7 +118,7 @@ pub fn get_searchbar(app: &AppHandle) -> Window {
     }
 }
 
-pub async fn resize_window(window: &Window, height: f64) {
+pub async fn resize_window(window: &WebviewWindow, height: f64) {
     let new_size = if let Some(monitor) = find_monitor(window) {
         let size = monitor.size();
         let scale = monitor.scale_factor();
@@ -142,7 +144,7 @@ pub async fn resize_window(window: &Window, height: f64) {
     center_search_bar(window);
 }
 
-fn show_window(window: &Window) {
+fn show_window(window: &WebviewWindow) {
     let _ = window.show();
     let _ = window.set_focus();
     let _ = window.center();
@@ -151,17 +153,17 @@ fn show_window(window: &Window) {
 pub fn navigate_to_tab(app: &AppHandle, tab_url: &TabLocation) {
     let tab_url = tab_url.to_string();
 
-    let window = if let Some(window) = app.get_window(constants::SETTINGS_WIN_NAME) {
+    let window = if let Some(window) = app.get_webview_window(constants::SETTINGS_WIN_NAME) {
         window
     } else {
-        WindowBuilder::new(
+        WebviewWindowBuilder::new(
             app,
             constants::SETTINGS_WIN_NAME,
-            WindowUrl::App(tab_url.clone().into()),
+            WebviewUrl::App(tab_url.clone().into()),
         )
         .title("Spyglass - Personal Search Engine")
         // Create an empty menu so now menubar shows up on Windows
-        .menu(Menu::new())
+        .menu(Menu::new(app).expect("Unable to create empty menu"))
         .min_inner_size(constants::MIN_WINDOW_WIDTH, constants::MIN_WINDOW_HEIGHT)
         .build()
         .expect("Unable to build window for settings")
@@ -172,13 +174,13 @@ pub fn navigate_to_tab(app: &AppHandle, tab_url: &TabLocation) {
 }
 
 pub fn show_update_window(app: &AppHandle) {
-    let window = if let Some(window) = app.get_window(constants::UPDATE_WIN_NAME) {
+    let window = if let Some(window) = app.get_webview_window(constants::UPDATE_WIN_NAME) {
         window
     } else {
-        WindowBuilder::new(
+        WebviewWindowBuilder::new(
             app,
             constants::UPDATE_WIN_NAME,
-            WindowUrl::App("/updater".into()),
+            WebviewUrl::App("/updater".into()),
         )
         .title("Spyglass - Update Available!")
         .min_inner_size(450.0, 375.0)
@@ -190,14 +192,14 @@ pub fn show_update_window(app: &AppHandle) {
     show_window(&window);
 }
 
-pub fn show_startup_window(app: &AppHandle) -> Window {
-    let window = if let Some(window) = app.get_window(constants::STARTUP_WIN_NAME) {
+pub fn show_startup_window(app: &AppHandle) -> WebviewWindow {
+    let window = if let Some(window) = app.get_webview_window(constants::STARTUP_WIN_NAME) {
         window
     } else {
-        WindowBuilder::new(
+        WebviewWindowBuilder::new(
             app,
             constants::STARTUP_WIN_NAME,
-            WindowUrl::App("/startup".into()),
+            WebviewUrl::App("/startup".into()),
         )
         .title("Spyglass - Starting up")
         .decorations(false)
@@ -212,17 +214,17 @@ pub fn show_startup_window(app: &AppHandle) -> Window {
     window
 }
 
-pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Window {
-    let window = if let Some(window) = app.get_window(constants::PROGRESS_WIN_NAME) {
+pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> WebviewWindow {
+    let window = if let Some(window) = app.get_webview_window(constants::PROGRESS_WIN_NAME) {
         window
     } else {
-        WindowBuilder::new(
+        WebviewWindowBuilder::new(
             app,
             constants::PROGRESS_WIN_NAME,
-            WindowUrl::App("/progress".into()),
+            WebviewUrl::App("/progress".into()),
         )
         .title("Download Progress")
-        .menu(Menu::new())
+        .menu(Menu::new(app).expect("unable to create empty menu"))
         .resizable(true)
         .inner_size(300.0, 64.0)
         .build()
@@ -242,16 +244,16 @@ pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Windo
 }
 
 pub fn show_wizard_window(app: &AppHandle) {
-    let window = if let Some(window) = app.get_window(constants::WIZARD_WIN_NAME) {
+    let window = if let Some(window) = app.get_webview_window(constants::WIZARD_WIN_NAME) {
         window
     } else {
-        let wizard_window = WindowBuilder::new(
+        let wizard_window = WebviewWindowBuilder::new(
             app,
             constants::WIZARD_WIN_NAME,
-            WindowUrl::App("/wizard".into()),
+            WebviewUrl::App("/wizard".into()),
         )
         .title("Getting Started")
-        .menu(Menu::new())
+        .menu(Menu::new(app).expect("Unable to create empty menu"))
         .min_inner_size(400.0, 492.0)
         .max_inner_size(400.0, 492.0)
         .build()
@@ -269,46 +271,30 @@ pub fn show_wizard_window(app: &AppHandle) {
     show_window(&window);
 }
 
-pub fn alert(window: &Window, title: &str, message: &str) {
-    MessageDialogBuilder::new(title, message)
-        .parent(window)
-        .buttons(MessageDialogButtons::Ok)
+#[allow(dead_code)]
+pub fn alert(window: &WebviewWindow, title: &str, message: &str) {
+    let app_handle = window.app_handle();
+    app_handle
+        .dialog()
+        .message(message)
         .kind(MessageDialogKind::Error)
+        .title(title)
+        .buttons(MessageDialogButtons::Ok)
         .show(|_| {});
 }
 
-pub fn notify(_app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        let title = title.to_string();
-        let body = body.to_string();
-        tauri::async_runtime::spawn(async move {
-            // osascript -e 'display notification "hello world!" with title "test"'
-            Command::new("osascript")
-                .arg("-e")
-                .arg(format!(
-                    "display notification \"{body}\" with title \"{title}\""
-                ))
-                .spawn()
-                .expect("Failed to send message");
-        });
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        use tauri::api::notification::Notification;
-        let _ = Notification::new(&_app.config().tauri.bundle.identifier)
-            .title(title)
-            .body(body)
-            .show();
-    }
+pub fn notify(app: &AppHandle, title: &str, body: &str) -> anyhow::Result<()> {
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()?;
 
     Ok(())
 }
 
 // Helper method used to send the wizard closed event metric
-async fn wizard_closed_event(window: tauri::Window) {
+async fn wizard_closed_event(window: tauri::WebviewWindow) {
     if let Some(metrics) = window.app_handle().try_state::<Metrics>() {
         let current_version = crate::current_version(window.app_handle().package_info());
         metrics

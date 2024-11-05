@@ -3,7 +3,7 @@ use entities::models::{indexed_document, lens, tag, vec_documents};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
-use jsonrpsee::core::Error;
+use jsonrpsee::core::RpcResult;
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
@@ -21,7 +21,7 @@ use tracing::instrument;
 pub async fn search_docs(
     state: AppState,
     search_req: request::SearchParam,
-) -> Result<SearchResults, Error> {
+) -> RpcResult<SearchResults> {
     state
         .metrics
         .track(metrics::Event::Search {
@@ -210,7 +210,7 @@ struct LensSearch {
 pub async fn search_lenses(
     state: AppState,
     param: request::SearchLensesParam,
-) -> Result<SearchLensesResp, Error> {
+) -> RpcResult<SearchLensesResp> {
     let mut results = Vec::new();
     let query_result = tag::Entity::find()
         .column_as(tag::Column::Value, "name")

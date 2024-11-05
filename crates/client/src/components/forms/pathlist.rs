@@ -116,7 +116,7 @@ impl Component for PathField {
                                 classes={classes!("stroke-slate-400")}
                             />
                         </button>
-                        <div class={classes!("grow", "text-sm")}>{path.display()}</div>
+                        <div class={classes!("grow", "text-sm")}>{path.display().to_string()}</div>
                     </div>
                 </div>
             }
@@ -254,7 +254,7 @@ impl Component for PathList {
                             classes={classes!("stroke-slate-400")}
                         />
                     </button>
-                    <div class={classes!("grow", "text-sm")}>{path.display()}</div>
+                    <div class={classes!("grow", "text-sm")}>{path.display().to_string()}</div>
                     <button class={classes!("flex-none", "group")} onclick={link.callback(move |_| rm_msg.clone())}>
                         <icons::TrashIcon
                             height="h-5"

@@ -18,7 +18,7 @@ use crate::pages::{ProgressPopup, SearchPage, SettingsPage, StartupPage, Updater
 #[wasm_bindgen(module = "/public/fixtures.js")]
 extern "C" {
     #[wasm_bindgen(catch)]
-    pub async fn invoke(fn_name: &str, val: JsValue) -> Result<JsValue, JsValue>;
+    pub async fn invoke(fn_name: &str, val: JsValue, opts: JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(catch)]
     pub async fn listen(
@@ -52,17 +52,16 @@ extern "C" {
 }
 
 #[cfg(not(headless))]
-#[wasm_bindgen]
+#[wasm_bindgen(js_namespace = ["window", "__TAURI__"])]
 extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI__"], catch)]
+    #[wasm_bindgen(js_name = invoke, js_namespace = core, catch)]
     pub async fn invoke(fn_name: &str, val: JsValue) -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "event"], catch)]
+    #[wasm_bindgen(js_name = listen, js_namespace = event, catch)]
     pub async fn listen(
         event_name: &str,
         cb: &Closure<dyn Fn(JsValue)>,
     ) -> Result<JsValue, JsValue>;
-
 }
 
 #[cfg(not(headless))]
