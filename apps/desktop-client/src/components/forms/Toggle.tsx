@@ -4,7 +4,7 @@ import { SettingChangeEvent } from "../_constants";
 interface Props {
   name: string;
   value: boolean;
-  onChange?: (e: SettingChangeEvent) => void;
+  onChange?: (e: SettingChangeEvent<boolean>) => void;
   restartRequired?: boolean;
 }
 

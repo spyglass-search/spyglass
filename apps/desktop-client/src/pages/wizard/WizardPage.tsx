@@ -45,7 +45,7 @@ export function WizardPage() {
   const [toggleFileIndexer, setToggleFileIndexer] = useState<boolean>(false);
   const [toggleAudioTranscription, setToggleAudioTranscription] =
     useState<boolean>(false);
-  const handleOnChange = (e: SettingChangeEvent) => {
+  const handleOnChange = (e: SettingChangeEvent<boolean>) => {
     if (e.settingName === "_.file-indexer") {
       setToggleFileIndexer(e.newValue as boolean);
     } else if (e.settingName === "_.audio-transcription") {
