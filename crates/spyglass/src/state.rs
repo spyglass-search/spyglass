@@ -194,7 +194,16 @@ impl AppStateBuilder {
             model_root.push("models");
             model_root.push("embeddings");
 
-            embedding_api = EmbeddingApi::new(model_root).ok();
+            let mut tokenizer_file = model_root.clone();
+            tokenizer_file.push("tokenizer.json");
+            let mut model = model_root.clone();
+            model.push("model.safetensors");
+
+            if tokenizer_file.exists() && model.exists() {
+                embedding_api = EmbeddingApi::new(model_root.clone()).ok();
+            } else {
+                log::warn!("Model does not exist");
+            }
         }
 
         let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
