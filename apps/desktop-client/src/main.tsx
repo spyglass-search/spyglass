@@ -31,7 +31,7 @@ const router = createBrowserRouter([
   {
     path: "/wizard",
     element: <WizardPage />,
-  }
+  },
 ]);
 
 createRoot(document.getElementById("root")!).render(

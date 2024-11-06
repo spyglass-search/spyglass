@@ -48,8 +48,5 @@ export default {
       "5xl": "2rem",
     },
   },
-  plugins: [
-    formsPlugin,
-    daisyUI
-  ],
+  plugins: [formsPlugin, daisyUI],
 };

@@ -1,6 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 import { Btn } from "../../components/Btn";
-import {useState } from "react";
+import { useState } from "react";
 import { MenubarHelpPage } from "./MenubarHelpPage";
 
 enum WizardStage {
@@ -16,7 +16,7 @@ enum WizardStage {
 const ORDER: string[] = Object.values(WizardStage);
 
 function prevStage(curStage: WizardStage): WizardStage {
-  let idx = ORDER.findIndex(stage => stage === curStage);
+  const idx = ORDER.findIndex((stage) => stage === curStage);
   if (idx > 0) {
     return ORDER[idx - 1] as WizardStage;
   }
@@ -25,8 +25,8 @@ function prevStage(curStage: WizardStage): WizardStage {
 }
 
 function nextStage(curStage: WizardStage): WizardStage {
-  let idx = ORDER.findIndex(stage => stage === curStage);
-  if(idx < ORDER.length - 1) {
+  const idx = ORDER.findIndex((stage) => stage === curStage);
+  if (idx < ORDER.length - 1) {
     return ORDER[idx + 1] as WizardStage;
   }
 

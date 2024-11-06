@@ -11,13 +11,17 @@ export function MenubarHelpPage() {
       <div className="join">
         <button
           onClick={() => setOpSys(OperatingSystem.MacOS)}
-          className={classNames("btn btn-xs join-item", { "btn-success": opSys === OperatingSystem.MacOS })}
+          className={classNames("btn btn-xs join-item", {
+            "btn-success": opSys === OperatingSystem.MacOS,
+          })}
         >
           macOS
         </button>
         <button
           onClick={() => setOpSys(OperatingSystem.Windows)}
-          className={classNames("btn btn-xs join-item", { "btn-success": opSys === OperatingSystem.Windows })}
+          className={classNames("btn btn-xs join-item", {
+            "btn-success": opSys === OperatingSystem.Windows,
+          })}
         >
           Windows
         </button>
@@ -28,12 +32,10 @@ export function MenubarHelpPage() {
         className="h-[128px] mx-auto my-6"
       />
       <div className="font-bold text-lg text-white">
-        {`Spyglass lives in your ${opSys === OperatingSystem.MacOS ? 'menubar' : 'system tray'}.`}
+        {`Spyglass lives in your ${opSys === OperatingSystem.MacOS ? "menubar" : "system tray"}.`}
       </div>
       <div className="text-sm text-neutral-400 px-8">
-        {
-          `${opSys === OperatingSystem.MacOS ? 'Left click' : 'Right click'} on the icon to access your library, discover new lenses, and adjust your settings.`
-        }
+        {`${opSys === OperatingSystem.MacOS ? "Left click" : "Right click"} on the icon to access your library, discover new lenses, and adjust your settings.`}
       </div>
     </div>
   );
