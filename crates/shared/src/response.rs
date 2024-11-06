@@ -293,7 +293,8 @@ impl LibraryStats {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct DefaultIndices {
     pub file_paths: Vec<PathBuf>,
     pub extensions: Vec<String>,

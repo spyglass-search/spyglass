@@ -2,6 +2,8 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 import { Btn } from "../../components/Btn";
 import { useState } from "react";
 import { MenubarHelpPage } from "./MenubarHelpPage";
+import { IndexFilesHelp } from "./IndexFilesHelp";
+import { SettingChangeEvent } from "../../components/_constants";
 
 enum WizardStage {
   MenubarHelp = "menubar",
@@ -38,7 +40,29 @@ export function WizardPage() {
   const handleBack = () => setStage(prevStage(stage));
   const handleNext = () => setStage(nextStage(stage));
 
-  const content = <MenubarHelpPage />;
+  // Keep track of various settings we want to setup during the wizard.
+  const [toggleFileIndexer, setToggleFileIndexer] = useState<boolean>(false);
+  const [toggleAudioTranscription, setToggleAudioTranscription] = useState<boolean>(false);
+  const handleOnChange = (e: SettingChangeEvent) => {
+    if (e.settingName === "_.file-indexer") {
+      setToggleFileIndexer(e.newValue as boolean);
+    } else if (e.settingName === "_.audio-transcription") {
+      setToggleAudioTranscription(e.newValue as boolean);
+    }
+  };
+
+  let content = null;
+  switch (stage) {
+    case WizardStage.IndexFiles:
+      content = (<IndexFilesHelp
+        toggleAudioTranscription={toggleAudioTranscription}
+        toggleFileIndexer={toggleFileIndexer}
+        onChange={handleOnChange}
+      />);
+      break;
+    default:
+      content = <MenubarHelpPage />;
+  }
 
   return (
     <div className="py-4 px-8 bg-neutral-800 h-screen text-center flex flex-col gap-4">

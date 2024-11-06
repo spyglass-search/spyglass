@@ -10,3 +10,10 @@ export enum BtnType {
   Success,
   Primary,
 }
+
+export interface SettingChangeEvent {
+  settingName: string,
+  oldValue: any,
+  newValue: any,
+  restartRequired: boolean,
+}

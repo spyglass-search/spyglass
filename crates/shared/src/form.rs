@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use std::path::Path;
 use strum_macros::{Display, EnumString};
 
 use crate::keyboard::KeyCode;
 use crate::{accelerator, MAC_OS};
 
-#[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq)]
+#[derive(Clone, Debug, Display, EnumString, PartialEq, Serialize, Deserialize, Eq, TS)]
+#[ts(export)]
 pub enum FormType {
     Bool,
     /// Assumes non-negative number.
@@ -106,7 +108,8 @@ impl FormType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct SettingOpts {
     pub label: String,
     pub value: String,
