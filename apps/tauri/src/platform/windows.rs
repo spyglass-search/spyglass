@@ -4,7 +4,7 @@ use tauri::{Emitter, WebviewWindow};
 use url::Url;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowPlacement;
-use windows::Win32::UI::WindowsAndMessaging::{SHOW_WINDOW_CMD, WINDOWPLACEMENT};
+use windows::Win32::UI::WindowsAndMessaging::WINDOWPLACEMENT;
 
 pub fn is_visible(window: &WebviewWindow) -> bool {
     if let Ok(handle) = window.hwnd() {
