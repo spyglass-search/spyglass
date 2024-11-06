@@ -62,12 +62,6 @@ setup-dev:
 	mkdir -p assets/models/embeddings;
 	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
 	mv whisper.base.en.bin assets/models;
-	curl -L --output model.safetensors https://huggingface.co/nomic-ai/nomic-embed-text-v1/resolve/main/model.safetensors
-	mv model.safetensors assets/models/embeddings;
-	curl -L --output config.json https://huggingface.co/nomic-ai/nomic-embed-text-v1/resolve/main/config.json
-	mv config.json assets/models/embeddings;
-	curl -L --output tokenizer.json https://huggingface.co/nomic-ai/nomic-embed-text-v1/resolve/main/tokenizer.json
-	mv tokenizer.json assets/models/embeddings;
 # Check if .env exists and if not create it
 	test -f .env || cp .env.template .env
 # Check if /dist folder exists for Tauri and if not create it
