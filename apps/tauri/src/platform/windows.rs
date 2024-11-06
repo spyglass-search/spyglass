@@ -12,7 +12,8 @@ pub fn is_visible(window: &WebviewWindow) -> bool {
         unsafe {
             let _ = GetWindowPlacement::<HWND>(handle, &mut lpwndpl);
             // SHOW_WINDOW_CMD(2) == minimized
-            return lpwndpl.showCmd != SHOW_WINDOW_CMD(2);
+
+            return lpwndpl.showCmd != 2;
         }
     }
 

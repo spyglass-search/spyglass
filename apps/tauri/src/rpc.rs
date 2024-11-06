@@ -87,7 +87,7 @@ impl SpyglassServerClient {
 
         // Only startup & manage sidecar in release mode.
         #[cfg(not(debug_assertions))]
-        let sidecar_handle = Some(SpyglassServerClient::check_and_start_backend());
+        let sidecar_handle = Some(SpyglassServerClient::check_and_start_backend(app_handle));
 
         let client = match try_connect(&endpoint).await {
             Ok(client) => Some(client),
