@@ -6,7 +6,7 @@ use entities::{
         tag::{self, TagPair},
         vec_documents,
     },
-    sea_orm::{ActiveModelTrait, DatabaseConnection},
+    sea_orm::{ActiveModelTrait, DatabaseConnection, TryIntoModel},
     BATCH_SIZE,
 };
 use serde::{Deserialize, Serialize};
@@ -219,12 +219,22 @@ pub async fn process_crawl_results(
     // Insert docs & save everything.
     indexed_document::insert_many(&tx, &inserts).await?;
     for update in updates {
-        let mut updated = update.save(&tx).await;
-        if let Ok(updated) = updated.as_mut() {
-            if let (Some(doc_id), Some(id)) = (updated.doc_id.take(), updated.id.take()) {
-                if let Some(content) = embedding_map.get(&doc_id) {
-                    if let Err(err) = embedding_queue::enqueue(&tx, &doc_id, id, content).await {
+        let updated = update.save(&tx).await;
+        if let Ok(updated) = updated {
+            if let Ok(model) = updated.try_into_model() {
+                if let Some(content) = embedding_map.get(&model.doc_id) {
+                    if let Err(err) =
+                        embedding_queue::enqueue(&tx, &model.doc_id, model.id, content).await
+                    {
                         log::warn!("Error enqueuing document embedding task. {:?}", err);
+                    }
+                }
+
+                if let Some(tag_ids) = tag_map.get(&model.url) {
+                    if let Err(err) =
+                        indexed_document::insert_tags_for_docs(&tx, &[model], tag_ids).await
+                    {
+                        log::error!("Error inserting tags {:?}", err);
                     }
                 }
             }
