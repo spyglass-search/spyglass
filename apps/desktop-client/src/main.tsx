@@ -4,6 +4,7 @@ import "./index.css";
 import { SearchPage } from "./pages/search/index.tsx";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ErrorPage from "./error-page.tsx";
+import { WizardPage } from "./pages/wizard/WizardPage.tsx";
 
 const router = createBrowserRouter([
   {
@@ -29,8 +30,8 @@ const router = createBrowserRouter([
   },
   {
     path: "/wizard",
-    element: <div>wizard</div>,
-  },
+    element: <WizardPage />,
+  }
 ]);
 
 createRoot(document.getElementById("root")!).render(
