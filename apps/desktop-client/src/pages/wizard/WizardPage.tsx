@@ -3,7 +3,7 @@ import { Btn } from "../../components/Btn";
 import { useState } from "react";
 import { MenubarHelpPage } from "./MenubarHelpPage";
 import { IndexFilesHelp } from "./IndexFilesHelp";
-import { SettingChangeEvent } from "../../components/_constants";
+import { SettingChangeEvents } from "../../components/_constants";
 import { DisplaySearchbarHelp } from "./DisplaySearchbarHelp";
 
 enum WizardStage {
@@ -45,7 +45,7 @@ export function WizardPage() {
   const [toggleFileIndexer, setToggleFileIndexer] = useState<boolean>(false);
   const [toggleAudioTranscription, setToggleAudioTranscription] =
     useState<boolean>(false);
-  const handleOnChange = (e: SettingChangeEvent<boolean>) => {
+  const handleOnChange = (e: SettingChangeEvents) => {
     if (e.settingName === "_.file-indexer") {
       setToggleFileIndexer(e.newValue as boolean);
     } else if (e.settingName === "_.audio-transcription") {

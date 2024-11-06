@@ -2,12 +2,13 @@ import classNames from "classnames";
 import { SettingOpts } from "../bindings/SettingOpts";
 import { Toggle } from "./forms/Toggle";
 import { ReactNode } from "react";
+import { SettingChangeEvents } from "./_constants";
 
 interface Props {
   settingName: string;
   settingOptions: SettingOpts;
   errorMsg?: string;
-  onChange?: () => void;
+  onChange?: (e: SettingChangeEvents) => void;
   className?: string;
 }
 
@@ -50,7 +51,7 @@ export function FormElement({
 function renderElement(
   name: string,
   opts: SettingOpts,
-  onChange: () => void,
+  onChange: (e: SettingChangeEvents) => void,
 ): ReactNode {
   switch (opts.form_type) {
     case "Bool":

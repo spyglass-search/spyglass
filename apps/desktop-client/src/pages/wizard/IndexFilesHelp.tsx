@@ -4,11 +4,12 @@ import { FormElement } from "../../components/FormElement";
 import { SettingOpts } from "../../bindings/SettingOpts";
 import { invoke } from "../../glue";
 import { DefaultIndices } from "../../bindings/DefaultIndices";
+import { SettingChangeEvents } from "../../components/_constants";
 
 interface Props {
   toggleFileIndexer: boolean;
   toggleAudioTranscription: boolean;
-  onChange?: () => void;
+  onChange?: (e: SettingChangeEvents) => void;
 }
 
 export function IndexFilesHelp({

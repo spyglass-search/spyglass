@@ -10,6 +10,11 @@ export enum BtnType {
   Primary,
 }
 
+export type SettingChangeEvents =
+  | SettingChangeEvent<boolean>
+  | SettingChangeEvent<string>
+  | SettingChangeEvent<string[]>;
+
 export interface SettingChangeEvent<T> {
   settingName: string;
   oldValue: T;
