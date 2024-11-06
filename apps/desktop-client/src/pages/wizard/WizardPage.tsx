@@ -5,6 +5,9 @@ import { MenubarHelpPage } from "./MenubarHelpPage";
 import { IndexFilesHelp } from "./IndexFilesHelp";
 import { SettingChangeEvents } from "../../components/_constants";
 import { DisplaySearchbarHelp } from "./DisplaySearchbarHelp";
+import { IndexCloudHelp } from "./IndexCloudHelp";
+import { IndexBookmarksHelp } from "./IndexBookmarksHelp";
+import { IndexWebHelp } from "./IndexWebHelp";
 
 enum WizardStage {
   MenubarHelp = "menubar",
@@ -55,8 +58,20 @@ export function WizardPage() {
 
   let content = null;
   switch (stage) {
+    case WizardStage.MenubarHelp:
+      content = <MenubarHelpPage />;
+      break;
     case WizardStage.DisplaySearchbarHelp:
       content = <DisplaySearchbarHelp />;
+      break;
+    case WizardStage.IndexCloud:
+      content = <IndexCloudHelp />;
+      break;
+    case WizardStage.IndexBookmarks:
+      content = <IndexBookmarksHelp />;
+      break;
+    case WizardStage.IndexWeb:
+      content = <IndexWebHelp />;
       break;
     case WizardStage.IndexFiles:
       content = (
