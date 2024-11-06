@@ -2,6 +2,12 @@
 // Fast refresh only works when a file only exports components. Use a new file to
 // share constants or functions between components  react-refresh/only-export-components
 
+export enum BtnAlign {
+  Left,
+  Right,
+  Center,
+}
+
 export enum BtnType {
   Default,
   Borderless,
