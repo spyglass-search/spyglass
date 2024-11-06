@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MenubarHelpPage } from "./MenubarHelpPage";
 import { IndexFilesHelp } from "./IndexFilesHelp";
 import { SettingChangeEvent } from "../../components/_constants";
+import { DisplaySearchbarHelp } from "./DisplaySearchbarHelp";
 
 enum WizardStage {
   MenubarHelp = "menubar",
@@ -42,7 +43,8 @@ export function WizardPage() {
 
   // Keep track of various settings we want to setup during the wizard.
   const [toggleFileIndexer, setToggleFileIndexer] = useState<boolean>(false);
-  const [toggleAudioTranscription, setToggleAudioTranscription] = useState<boolean>(false);
+  const [toggleAudioTranscription, setToggleAudioTranscription] =
+    useState<boolean>(false);
   const handleOnChange = (e: SettingChangeEvent) => {
     if (e.settingName === "_.file-indexer") {
       setToggleFileIndexer(e.newValue as boolean);
@@ -53,12 +55,17 @@ export function WizardPage() {
 
   let content = null;
   switch (stage) {
+    case WizardStage.DisplaySearchbarHelp:
+      content = <DisplaySearchbarHelp />;
+      break;
     case WizardStage.IndexFiles:
-      content = (<IndexFilesHelp
-        toggleAudioTranscription={toggleAudioTranscription}
-        toggleFileIndexer={toggleFileIndexer}
-        onChange={handleOnChange}
-      />);
+      content = (
+        <IndexFilesHelp
+          toggleAudioTranscription={toggleAudioTranscription}
+          toggleFileIndexer={toggleFileIndexer}
+          onChange={handleOnChange}
+        />
+      );
       break;
     default:
       content = <MenubarHelpPage />;

@@ -4,11 +4,11 @@ import { Toggle } from "./forms/Toggle";
 import { ReactNode } from "react";
 
 interface Props {
-  settingName: string,
-  settingOptions: SettingOpts,
+  settingName: string;
+  settingOptions: SettingOpts;
   errorMsg?: string;
-  onChange?: () => void,
-  className?: string,
+  onChange?: () => void;
+  className?: string;
 }
 
 export function FormElement({
@@ -16,39 +16,51 @@ export function FormElement({
   errorMsg,
   settingName,
   settingOptions,
-  onChange = () => {}
+  onChange = () => {},
 }: Props) {
-
-  const parent = settingName.split('.')[0];
-  const label = parent !== "_" ? (
-    <>
-      <span className="text-white">{`${parent}: `}</span>
+  const parent = settingName.split(".")[0];
+  const label =
+    parent !== "_" ? (
+      <>
+        <span className="text-white">{`${parent}: `}</span>
+        <span>{settingOptions.label}</span>
+      </>
+    ) : (
       <span>{settingOptions.label}</span>
-    </>
-  ) : (
-    <span>{settingOptions.label}</span>
-  );
+    );
 
   return (
     <div className={classNames(className)}>
       <div className="mb-2">
-          <label className="text-white text-base font-semibold">{label}</label>
-          {settingOptions.help_text ? (
-            <div className="text-gray-500 text-sm">
-              {settingOptions.help_text}
-            </div>
-          ) : null}
-          {errorMsg ? (<div className="text-red-500 text-xs py-2">{errorMsg}</div>) : null}
+        <label className="text-white text-base font-semibold">{label}</label>
+        {settingOptions.help_text ? (
+          <div className="text-gray-500 text-sm">
+            {settingOptions.help_text}
+          </div>
+        ) : null}
+        {errorMsg ? (
+          <div className="text-red-500 text-xs py-2">{errorMsg}</div>
+        ) : null}
       </div>
       {renderElement(settingName, settingOptions, onChange)}
     </div>
   );
 }
 
-function renderElement(name: string, opts: SettingOpts, onChange: () => void): ReactNode {
-  switch(opts.form_type) {
+function renderElement(
+  name: string,
+  opts: SettingOpts,
+  onChange: () => void,
+): ReactNode {
+  switch (opts.form_type) {
     case "Bool":
-      return (<Toggle name={name} value={JSON.parse(opts.value)} onChange={onChange} />);
+      return (
+        <Toggle
+          name={name}
+          value={JSON.parse(opts.value)}
+          onChange={onChange}
+        />
+      );
     case "PathList":
       return null;
     default:
