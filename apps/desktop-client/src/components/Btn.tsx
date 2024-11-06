@@ -1,13 +1,6 @@
 import { MouseEvent, ReactNode } from "react";
 import classNames from "classnames";
-
-export enum BtnType {
-  Default,
-  Borderless,
-  Danger,
-  Success,
-  Primary,
-}
+import { BtnType } from "./_constants";
 
 interface Props {
   type?: BtnType;
