@@ -33,7 +33,8 @@ pub struct ListConnectionResult {
     pub user_connections: Vec<UserConnection>,
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct InstallableLens {
     pub author: String,
     pub description: String,

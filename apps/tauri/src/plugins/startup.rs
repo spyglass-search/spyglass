@@ -1,7 +1,4 @@
-use tauri::{
-    plugin::{Builder, TauriPlugin},
-    AppHandle, Manager, RunEvent, Wry,
-};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tokio::sync::{broadcast, Mutex};
 
@@ -22,38 +19,29 @@ impl StartupProgressText {
     }
 }
 
-pub fn init() -> TauriPlugin<Wry> {
-    Builder::new("tauri-plugin-startup")
-        .invoke_handler(tauri::generate_handler![get_startup_progress])
-        .on_event(|app_handle, event| {
-            match event {
-                RunEvent::Ready => {
-                    app_handle.manage(StartupProgressText(std::sync::Mutex::new(
-                        "Running startup tasks...".to_string(),
-                    )));
+pub fn init(app_handle: &AppHandle) {
+    app_handle.manage(StartupProgressText(std::sync::Mutex::new(
+        "Running startup tasks...".to_string(),
+    )));
 
-                    // Don't block the main thread
-                    tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
-                }
-                RunEvent::Exit => {
-                    let app_handle = app_handle.clone();
-                    if let Some(rpc) = app_handle.try_state::<RpcMutex>() {
-                        tauri::async_runtime::block_on(async move {
-                            let rpc = rpc.lock().await;
-                            if let Some(sidecar) = &rpc.sidecar_handle {
-                                sidecar.abort();
-                            }
-                        });
-                    }
-                }
-                _ => {}
+    // Don't block the main thread
+    tauri::async_runtime::spawn(run_and_check_backend(app_handle.clone()));
+}
+
+pub fn exit(app_handle: &AppHandle) {
+    let app_handle = app_handle.clone();
+    if let Some(rpc) = app_handle.try_state::<RpcMutex>() {
+        tauri::async_runtime::block_on(async move {
+            let rpc = rpc.lock().await;
+            if let Some(sidecar) = &rpc.sidecar_handle {
+                sidecar.abort();
             }
-        })
-        .build()
+        });
+    }
 }
 
 #[tauri::command]
-async fn get_startup_progress(window: tauri::Window) -> Result<String, String> {
+pub async fn get_startup_progress(window: tauri::Window) -> Result<String, String> {
     let app_handle = window.app_handle();
     if let Some(mutex) = app_handle.try_state::<StartupProgressText>() {
         if let Ok(progress) = mutex.0.lock() {
