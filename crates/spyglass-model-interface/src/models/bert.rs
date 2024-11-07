@@ -550,7 +550,7 @@ pub struct BertModel {
     embeddings: BertEmbeddings,
     encoder: BertEncoder,
     pool: Pool,
-    classifier: Option<Box<dyn ClassificationHead + Send>>,
+    classifier: Option<Box<dyn ClassificationHead + Send + Sync>>,
     splade: Option<BertSpladeHead>,
 
     num_attention_heads: usize,
@@ -573,7 +573,7 @@ impl BertModel {
             ModelType::Classifier => {
                 let pool = Pool::Cls;
 
-                let classifier: Box<dyn ClassificationHead + Send> =
+                let classifier: Box<dyn ClassificationHead + Send + Sync> =
                     Box::new(BertClassificationHead::load(vb.clone(), config)?);
                 (pool, Some(classifier), None)
             }
@@ -632,7 +632,7 @@ impl BertModel {
             ModelType::Classifier => {
                 let pool = Pool::Cls;
 
-                let classifier: Box<dyn ClassificationHead + Send> = Box::new(
+                let classifier: Box<dyn ClassificationHead + Send + Sync> = Box::new(
                     RobertaClassificationHead::load(vb.pp("classifier"), config)?,
                 );
                 (pool, Some(classifier), None)

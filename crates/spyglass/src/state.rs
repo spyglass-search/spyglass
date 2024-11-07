@@ -57,7 +57,7 @@ impl FetchLimitType {
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
-    pub embedding_api: Arc<Mutex<Option<EmbeddingApi>>>,
+    pub embedding_api: Arc<Option<EmbeddingApi>>,
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, LensConfig>>,
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
@@ -231,7 +231,7 @@ impl AppStateBuilder {
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
             readonly_mode: self.readonly_mode.unwrap_or_default(),
-            embedding_api: Arc::new(Mutex::new(embedding_api)),
+            embedding_api: Arc::new(embedding_api),
         }
     }
 

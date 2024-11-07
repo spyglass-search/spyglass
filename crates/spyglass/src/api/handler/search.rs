@@ -61,42 +61,38 @@ pub async fn search_docs(
         }));
     }
 
-    if let Ok(mutex) = state.embedding_api.try_lock() {
-        if let Some(embedding_api) = mutex.as_ref() {
-            match embedding_api.embed(&query, EmbeddingContentType::Query) {
-                Ok(embedding) => {
-                    let mut distances =
-                        vec_documents::get_document_distance(&state.db, &lens_ids, &embedding)
-                            .await;
+    if let Some(embedding_api) = state.embedding_api.as_ref() {
+        match embedding_api.embed(&query, EmbeddingContentType::Query) {
+            Ok(embedding) => {
+                let mut distances =
+                    vec_documents::get_document_distance(&state.db, &lens_ids, &embedding).await;
 
-                    if let Ok(distances) = distances.as_mut() {
-                        distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+                if let Ok(distances) = distances.as_mut() {
+                    distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
 
-                        let min_value = distances
-                            .iter()
-                            .map(|distance| distance.distance)
-                            .reduce(f64::min);
-                        let max_value = distances
-                            .iter()
-                            .map(|distance| distance.distance)
-                            .reduce(f64::max);
-                        if let (Some(min), Some(max)) = (min_value, max_value) {
-                            for distance in distances {
-                                let boost_normalized =
-                                    (distance.distance - min) / (max - min) * 3.0;
-                                let boost = 3.0 - boost_normalized;
+                    let min_value = distances
+                        .iter()
+                        .map(|distance| distance.distance)
+                        .reduce(f64::min);
+                    let max_value = distances
+                        .iter()
+                        .map(|distance| distance.distance)
+                        .reduce(f64::max);
+                    if let (Some(min), Some(max)) = (min_value, max_value) {
+                        for distance in distances {
+                            let boost_normalized = (distance.distance - min) / (max - min) * 3.0;
+                            let boost = 3.0 - boost_normalized;
 
-                                boosts.push(QueryBoost::with_value(
-                                    Boost::DocId(distance.doc_id.clone()),
-                                    boost as f32,
-                                ));
-                            }
+                            boosts.push(QueryBoost::with_value(
+                                Boost::DocId(distance.doc_id.clone()),
+                                boost as f32,
+                            ));
                         }
                     }
                 }
-                Err(err) => {
-                    log::error!("Error embedding query {:?}", err);
-                }
+            }
+            Err(err) => {
+                log::error!("Error embedding query {:?}", err);
             }
         }
     }

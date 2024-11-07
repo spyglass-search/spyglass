@@ -18,7 +18,7 @@ pub async fn processing_embedding(state: AppState, job_id: i64) {
         Ok(Some(job)) => {
             match job.content {
                 Some(content) => {
-                    let embedding = if let Some(api) = state.embedding_api.lock().await.as_ref() {
+                    let embedding = if let Some(api) = state.embedding_api.as_ref() {
                         api.embed(&content, EmbeddingContentType::Document)
                     } else {
                         Err(anyhow::format_err!(

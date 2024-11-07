@@ -159,7 +159,7 @@ enum Config {
 
 pub struct CandleBackend {
     device: Device,
-    model: Box<dyn Model + Send>,
+    model: Box<dyn Model + Send + Sync>,
 }
 
 impl CandleBackend {
@@ -269,7 +269,7 @@ impl CandleBackend {
         }
         .s()?;
 
-        let model: Result<Box<dyn Model + Send>, BackendError> = match (config, &device) {
+        let model: Result<Box<dyn Model + Send + Sync>, BackendError> = match (config, &device) {
             // #[cfg(not(feature = "cuda"))]
             (_, Device::Cuda(_)) => Err(BackendError::Start(
                 "`cuda` feature is not enabled".to_string(),

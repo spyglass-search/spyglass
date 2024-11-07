@@ -1,11 +1,12 @@
-use std::{path::PathBuf, time::Instant};
+use std::{path::PathBuf, sync::Arc, time::Instant};
 
 use tokenizers::Tokenizer;
 
 use crate::{batch, load_tokenizer, Backend, CandleBackend, Embedding, ModelType, Pool};
 
+#[derive(Clone)]
 pub struct EmbeddingApi {
-    backend: CandleBackend,
+    backend: Arc<CandleBackend>,
     tokenizer: Tokenizer,
 }
 
@@ -23,7 +24,10 @@ impl EmbeddingApi {
             ModelType::Embedding(Pool::Mean),
         )?;
 
-        Ok(EmbeddingApi { backend, tokenizer })
+        Ok(EmbeddingApi {
+            backend: Arc::new(backend),
+            tokenizer,
+        })
     }
 
     pub fn embed(
