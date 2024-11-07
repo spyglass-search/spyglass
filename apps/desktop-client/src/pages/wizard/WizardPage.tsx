@@ -1,6 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/solid";
 import { Btn } from "../../components/Btn";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MenubarHelpPage } from "./MenubarHelpPage";
 import { IndexFilesHelp } from "./IndexFilesHelp";
 import { SettingChangeEvents } from "../../components/_constants";
@@ -50,27 +50,27 @@ export function WizardPage() {
   const [toggleFileIndexer, setToggleFileIndexer] = useState<boolean>(false);
   const [toggleAudioTranscription, setToggleAudioTranscription] =
     useState<boolean>(false);
-  const handleOnChange = (e: SettingChangeEvents) => {
-    if (e.settingName === "_.file-indexer") {
+  const handleOnChange = (name: string, e: SettingChangeEvents) => {
+    if (name === "_.file-indexer") {
       setToggleFileIndexer(e.newValue as boolean);
-    } else if (e.settingName === "_.audio-transcription") {
+    } else if (name === "_.audio-transcription") {
       setToggleAudioTranscription(e.newValue as boolean);
     }
   };
 
-  const handleOnDone = async () => {
+  const handleOnDone = useCallback(async () => {
     await invoke("wizard_finished", {
       toggleAudioTranscription,
       toggleFileIndexer,
     }).catch((err) => console.error(err));
-  };
+  }, [toggleAudioTranscription, toggleFileIndexer]);
 
   // When we reach the end
   useEffect(() => {
     if (stage == WizardStage.Done) {
       handleOnDone();
     }
-  }, [stage]);
+  }, [stage, handleOnDone]);
 
   let content = null;
   switch (stage) {

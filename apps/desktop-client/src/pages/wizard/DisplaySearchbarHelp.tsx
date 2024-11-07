@@ -46,7 +46,7 @@ export function DisplaySearchbarHelp() {
     };
 
     loadShortcut();
-  });
+  }, []);
 
   return (
     <div className="my-auto flex flex-col gap-4 items-center align-middle text-center">

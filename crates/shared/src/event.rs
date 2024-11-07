@@ -66,6 +66,8 @@ pub enum ClientInvoke {
     RevokeConnection,
     #[serde(rename = "plugin:lens-updater|run_lens_updater")]
     RunLensUpdater,
+    #[serde(rename = "save_user_settings")]
+    SaveUserSettings,
     #[serde(rename = "search_docs")]
     SearchDocuments,
     #[serde(rename = "search_lenses")]

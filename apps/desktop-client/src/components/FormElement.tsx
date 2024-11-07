@@ -62,11 +62,7 @@ function renderElement(
   switch (opts.form_type) {
     case "Bool":
       return (
-        <Toggle
-          name={name}
-          value={JSON.parse(value)}
-          onChange={onChange}
-        />
+        <Toggle name={name} value={JSON.parse(value)} onChange={onChange} />
       );
     case "Number":
       return (
@@ -82,9 +78,13 @@ function renderElement(
     case "Path":
       return <PathField name={name} value={value} onChange={onChange} />;
     case "PathList":
-      return <PathList name={name} value={JSON.parse(value)} onChange={onChange} />;
+      return (
+        <PathList name={name} value={JSON.parse(value)} onChange={onChange} />
+      );
     case "StringList":
-      return <StringList name={name} value={JSON.parse(value)} onChange={onChange} />
+      return (
+        <StringList name={name} value={JSON.parse(value)} onChange={onChange} />
+      );
     case "KeyBinding":
       return <KeyBinding name={name} value={value} onChange={onChange} />;
     default:

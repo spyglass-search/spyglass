@@ -28,7 +28,6 @@ export function Btn({
     "flex",
     "font-semibold",
     "items-center",
-    "leading-5",
     type !== BtnType.Borderless ? "rounded-md" : "",
   ];
 

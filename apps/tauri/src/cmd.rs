@@ -38,14 +38,11 @@ pub async fn authorize_connection(win: tauri::Window, id: String) -> Result<(), 
 }
 
 #[tauri::command]
-pub async fn choose_folder(win: tauri::Window) -> Result<(), String> {
+pub async fn choose_folder(win: tauri::Window) -> Result<Option<String>, String> {
     let app = win.app_handle();
     let folder_path = app.dialog().file().blocking_pick_folder();
-    if let Some(folder_path) = folder_path {
-        let _ = win.emit(ClientEvent::FolderChosen.as_ref(), folder_path);
-    }
-
-    Ok(())
+    let folder_path = folder_path.map(|x| x.to_string());
+    Ok(folder_path)
 }
 
 #[tauri::command]

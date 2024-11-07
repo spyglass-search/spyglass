@@ -1,44 +1,60 @@
 import classNames from "classnames";
 import { FormFieldProps } from "./_constants";
-import { FolderIcon, FolderPlusIcon, TrashIcon } from "@heroicons/react/24/solid";
+import { TrashIcon } from "@heroicons/react/24/solid";
 import { Btn } from "../Btn";
-import { invoke } from "../../glue";
+import { useRef, useState } from "react";
+import { PlusIcon } from "@heroicons/react/16/solid";
 
-export function StringList({ value }: FormFieldProps) {
-  let paths = value as string[];
+export function StringList({ value, onChange = () => {} }: FormFieldProps) {
+  const [strings, setStrings] = useState<string[]>(value as string[]);
+  const ref = useRef<HTMLInputElement>(null);
 
-  const handleChooseFolder = async () => {
-    await invoke("choose_folder");
+  const handleAdd = () => {
+    if (ref.current) {
+      const updatedList = [...strings, ref.current.value];
+      onChange({ oldValue: strings, newValue: updatedList });
+      setStrings(updatedList);
+    }
   };
-
-  const handleOpenFolder = () => {};
-  const handleDelete = () => {};
+  const handleDelete = (str: string) => {
+    const updatedList = strings.flatMap((x) => (x === str ? [] : [x]));
+    onChange({ oldValue: strings, newValue: updatedList });
+    setStrings(updatedList);
+  };
 
   return (
     <div>
       <div className="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-y-auto">
-        {paths.map(path => (
-          <div className="flex items-center p-1.5">
-            <button
-              className={classNames("flex-none", "mr-2", "group")}
-              onClick={handleOpenFolder}
-            >
-              <FolderIcon className={classNames("w-5", "stroke-slate-400")}/>
-            </button>
-            <div className={classNames("grow", "text-sm")}>{path}</div>
+        {strings.map((str) => (
+          <div className="flex items-center rounded-md p-1.5">
+            <div className={classNames("grow", "text-sm")}>{str}</div>
             <button
               className={classNames("flex-none", "group")}
-              onClick={handleDelete}
+              onClick={() => handleDelete(str)}
             >
-              <TrashIcon className={classNames("w-5", "stroke-slate-400", "group-hover:stroke-white", "group-hover:fill-red-400")} />
+              <TrashIcon
+                className={classNames(
+                  "w-4",
+                  "fill-slate-400",
+                  "",
+                  "group-hover:fill-red-500",
+                )}
+              />
             </button>
           </div>
         ))}
       </div>
-      <div className="mt-4">
-        <Btn onClick={handleChooseFolder}>
-          <FolderPlusIcon className="mr-2 w-5" />
-          Add Folder
+      <div className="mt-2 flex flex-row gap-2">
+        <input
+          ref={ref}
+          type="text"
+          className="form-input text-sm rounded bg-stone-700 border-stone-800"
+          placeholder="html"
+          spellCheck={false}
+        />
+        <Btn onClick={handleAdd}>
+          <PlusIcon className="mr-1 w-4" />
+          Add
         </Btn>
       </div>
     </div>

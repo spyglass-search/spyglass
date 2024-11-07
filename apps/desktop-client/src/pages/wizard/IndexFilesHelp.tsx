@@ -25,7 +25,7 @@ export function IndexFilesHelp({
       setPaths(paths);
     };
     loadPaths();
-  });
+  }, []);
 
   const fileIndexerOpts: SettingOpts = {
     label: "Enable local file searching",
