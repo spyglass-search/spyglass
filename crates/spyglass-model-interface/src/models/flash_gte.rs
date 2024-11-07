@@ -1,9 +1,9 @@
 use crate::flash_attn::flash_attn_varlen;
 use crate::layers::{HiddenAct, LayerNorm, Linear};
 use crate::models::{GTEConfig, Model, NTKScaling, PositionEmbeddingType, RopeScaling};
+use crate::{Batch, ModelType, Pool};
 use candle::{DType, Device, IndexOp, Result, Tensor};
 use candle_nn::{Embedding, Module, VarBuilder};
-use text_embeddings_backend_core::{Batch, ModelType, Pool};
 
 struct GTEAttention {
     qkv_linear: Linear,

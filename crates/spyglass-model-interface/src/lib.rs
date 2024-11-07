@@ -1,17 +1,17 @@
 // Everything in this lib is pulled from https://github.com/huggingface/text-embeddings-inference
 mod alibi;
-// #[cfg(feature = "cuda")]
-// mod compute_cap;
+#[cfg(feature = "cuda")]
+mod compute_cap;
+pub mod embedding_api;
 // #[cfg(feature = "cuda")]
 // mod flash_attn;
-pub mod embedding_api;
 mod layers;
 mod models;
 
-// #[cfg(feature = "cuda")]
-// use crate::compute_cap::{
-//     compatible_compute_cap, get_compile_compute_cap, get_runtime_compute_cap,
-// };
+#[cfg(feature = "cuda")]
+use crate::compute_cap::{
+    compatible_compute_cap, get_compile_compute_cap, get_runtime_compute_cap,
+};
 use crate::models::{
     BertConfig, BertModel, DistilBertConfig, DistilBertModel, GTEConfig, JinaBertModel,
     JinaCodeBertModel, MistralConfig, Model, NomicBertModel, NomicConfig, Qwen2Config,
@@ -226,23 +226,24 @@ impl CandleBackend {
 
         // Get candle device
         let device = if candle::utils::cuda_is_available() {
-            // #[cfg(feature = "cuda")]
-            // match compatible_compute_cap() {
-            //     Ok(true) => Device::new_cuda(0),
-            //     Ok(false) => {
-            //         return Err(BackendError::Start(format!(
-            //             "Runtime compute cap {} is not compatible with compile time compute cap {}",
-            //             get_runtime_compute_cap().unwrap(),
-            //             get_compile_compute_cap().unwrap()
-            //         )));
-            //     }
-            //     Err(err) => {
-            //         tracing::warn!("Could not find a compatible CUDA device on host: {err:?}");
-            //         tracing::warn!("Using CPU instead");
-            //         Ok(Device::Cpu)
-            //     }
-            // }
-            // #[cfg(not(feature = "cuda"))]
+            #[cfg(feature = "cuda")]
+            match compatible_compute_cap() {
+                Ok(true) => Device::new_cuda(0),
+                Ok(false) => {
+                    log::error!(
+                        "Runtime compute cap {} is not compatible with compile time compute cap {}",
+                        get_runtime_compute_cap().unwrap(),
+                        get_compile_compute_cap().unwrap()
+                    );
+                    Ok(Device::Cpu)
+                }
+                Err(err) => {
+                    tracing::warn!("Could not find a compatible CUDA device on host: {err:?}");
+                    tracing::warn!("Using CPU instead");
+                    Ok(Device::Cpu)
+                }
+            }
+            #[cfg(not(feature = "cuda"))]
             Ok(Device::Cpu)
         } else if candle::utils::metal_is_available() {
             Device::new_metal(0)
@@ -270,11 +271,7 @@ impl CandleBackend {
         .s()?;
 
         let model: Result<Box<dyn Model + Send + Sync>, BackendError> = match (config, &device) {
-            // #[cfg(not(feature = "cuda"))]
-            (_, Device::Cuda(_)) => Err(BackendError::Start(
-                "`cuda` feature is not enabled".to_string(),
-            )),
-            (Config::Bert(config), Device::Cpu | Device::Metal(_)) => match config {
+            (Config::Bert(config), _) => match config {
                 BertConfigWrapper::JinaBert(config) => {
                     tracing::info!("Starting JinaBert model on {:?}", device);
                     Ok(Box::new(JinaBertModel::load(vb, &config, model_type).s()?))
@@ -292,175 +289,35 @@ impl CandleBackend {
             },
             (
                 Config::XlmRoberta(config) | Config::Camembert(config) | Config::Roberta(config),
-                Device::Cpu | Device::Metal(_),
+                _,
             ) => {
                 tracing::info!("Starting Bert model on {:?}", device);
                 Ok(Box::new(
                     BertModel::load_roberta(vb, &config, model_type).s()?,
                 ))
             }
-            (Config::DistilBert(config), Device::Cpu | Device::Metal(_)) => {
+            (Config::DistilBert(config), _) => {
                 tracing::info!("Starting DistilBert model on {:?}", device);
                 Ok(Box::new(
                     DistilBertModel::load(vb, &config, model_type).s()?,
                 ))
             }
-            (Config::NomicBert(config), Device::Cpu | Device::Metal(_)) => {
+            (Config::NomicBert(config), _) => {
                 tracing::info!("Starting NomicBert model on {:?}", device);
                 Ok(Box::new(NomicBertModel::load(vb, &config, model_type).s()?))
             }
-            (Config::Mistral(_), Device::Cpu | Device::Metal(_)) => Err(BackendError::Start(
+            (Config::Mistral(_), _) => Err(BackendError::Start(
                 "Mistral is only supported on Cuda devices in fp16 with flash attention enabled"
                     .to_string(),
             )),
-            (Config::Gte(_), Device::Cpu | Device::Metal(_)) => Err(BackendError::Start(
+            (Config::Gte(_), _) => Err(BackendError::Start(
                 "GTE is only supported on Cuda devices in fp16 with flash attention enabled"
                     .to_string(),
             )),
-            (Config::Qwen2(_), Device::Cpu | Device::Metal(_)) => Err(BackendError::Start(
+            (Config::Qwen2(_), _) => Err(BackendError::Start(
                 "Qwen2 is only supported on Cuda devices in fp16 with flash attention enabled"
                     .to_string(),
             )),
-            // #[cfg(feature = "cuda")]
-            // (Config::Bert(config), Device::Cuda(_)) => {
-            //     if cfg!(any(feature = "flash-attn", feature = "flash-attn-v1"))
-            //         && dtype == DType::F16
-            //         // Allow disabling because of flash attention v1 precision problems
-            //         // See: https://github.com/huggingface/text-embeddings-inference/issues/37
-            //         && &std::env::var("USE_FLASH_ATTENTION").unwrap_or("True".to_string()).to_lowercase() == "true"
-            //     {
-            //         match config {
-            //             BertConfigWrapper::JinaBert(config) => {
-            //                 tracing::info!("Starting FlashJinaBert model on {:?}", device);
-            //                 Ok(Box::new(
-            //                     FlashJinaBertModel::load(vb, &config, model_type).s()?,
-            //                 ))
-            //             }
-            //             BertConfigWrapper::JinaCodeBert(config) => {
-            //                 tracing::info!("Starting FlashJinaCodeBert model on {:?}", device);
-            //                 Ok(Box::new(
-            //                     FlashJinaCodeBertModel::load(vb, &config, model_type).s()?,
-            //                 ))
-            //             }
-            //             BertConfigWrapper::Bert(config) => {
-            //                 tracing::info!("Starting FlashBert model on {:?}", device);
-            //                 Ok(Box::new(FlashBertModel::load(vb, &config, model_type).s()?))
-            //             }
-            //         }
-            //     } else {
-            //         match config {
-            //             BertConfigWrapper::JinaBert(config) => {
-            //                 tracing::info!("Starting JinaBert model on {:?}", device);
-            //                 Ok(Box::new(JinaBertModel::load(vb, &config, model_type).s()?))
-            //             }
-            //             BertConfigWrapper::JinaCodeBert(config) => {
-            //                 tracing::info!("Starting JinaCodeBert model on {:?}", device);
-            //                 Ok(Box::new(
-            //                     JinaCodeBertModel::load(vb, &config, model_type).s()?,
-            //                 ))
-            //             }
-            //             BertConfigWrapper::Bert(config) => {
-            //                 tracing::info!("Starting Bert model on {:?}", device);
-            //                 Ok(Box::new(BertModel::load(vb, &config, model_type).s()?))
-            //             }
-            //         }
-            //     }
-            // }
-            // #[cfg(feature = "cuda")]
-            // (
-            //     Config::XlmRoberta(config) | Config::Camembert(config) | Config::Roberta(config),
-            //     Device::Cuda(_),
-            // ) => {
-            //     if cfg!(any(feature = "flash-attn", feature = "flash-attn-v1"))
-            //         && dtype == DType::F16
-            //         // Allow disabling because of flash attention v1 precision problems
-            //         // See: https://github.com/huggingface/text-embeddings-inference/issues/37
-            //         && &std::env::var("USE_FLASH_ATTENTION").unwrap_or("True".to_string()).to_lowercase() == "true"
-            //     {
-            //         tracing::info!("Starting FlashBert model on {:?}", device);
-            //         Ok(Box::new(
-            //             FlashBertModel::load_roberta(vb, &config, model_type).s()?,
-            //         ))
-            //     } else {
-            //         tracing::info!("Starting Bert model on {:?}", device);
-            //         Ok(Box::new(
-            //             BertModel::load_roberta(vb, &config, model_type).s()?,
-            //         ))
-            //     }
-            // }
-            // #[cfg(feature = "cuda")]
-            // (Config::DistilBert(config), Device::Cuda(_)) => {
-            //     if cfg!(feature = "flash-attn")
-            //         && dtype == DType::F16
-            //         && &std::env::var("USE_FLASH_ATTENTION")
-            //             .unwrap_or("True".to_string())
-            //             .to_lowercase()
-            //             == "true"
-            //     {
-            //         tracing::info!("Starting FlashDistilBert model on {:?}", device);
-            //         Ok(Box::new(
-            //             FlashDistilBertModel::load(vb, &config, model_type).s()?,
-            //         ))
-            //     } else {
-            //         tracing::info!("Starting DistilBertModel model on {:?}", device);
-            //         Ok(Box::new(
-            //             DistilBertModel::load(vb, &config, model_type).s()?,
-            //         ))
-            //     }
-            // }
-            // #[cfg(feature = "cuda")]
-            // (Config::NomicBert(config), Device::Cuda(_)) => {
-            //     if cfg!(feature = "flash-attn")
-            //         && dtype == DType::F16
-            //         && &std::env::var("USE_FLASH_ATTENTION")
-            //             .unwrap_or("True".to_string())
-            //             .to_lowercase()
-            //             == "true"
-            //     {
-            //         tracing::info!("Starting FlashNomicBert model on {:?}", device);
-            //         Ok(Box::new(
-            //             FlashNomicBertModel::load(vb, &config, model_type).s()?,
-            //         ))
-            //     } else {
-            //         tracing::info!("Starting NomicBert model on {:?}", device);
-            //         Ok(Box::new(NomicBertModel::load(vb, &config, model_type).s()?))
-            //     }
-            // }
-            // #[cfg(feature = "cuda")]
-            // (Config::Mistral(config), Device::Cuda(_)) => {
-            //     if dtype != DType::F16
-            //         || !cfg!(feature = "flash-attn")
-            //         || get_runtime_compute_cap().unwrap() < 80
-            //     {
-            //         return Err(BackendError::Start("Mistral is only supported on Cuda devices in fp16 with flash attention v2 enabled".to_string()));
-            //     }
-            //     tracing::info!("Starting FlashMistral model on {:?}", device);
-            //     Ok(Box::new(
-            //         FlashMistralModel::load(vb, &config, model_type).s()?,
-            //     ))
-            // }
-            // #[cfg(feature = "cuda")]
-            // (Config::Gte(config), Device::Cuda(_)) => {
-            //     if dtype != DType::F16
-            //         || !cfg!(any(feature = "flash-attn", feature = "flash-attn-v1"))
-            //     {
-            //         return Err(BackendError::Start("GTE is only supported on Cuda devices in fp16 with flash attention enabled".to_string()));
-            //     }
-            //     tracing::info!("Starting FlashGTE model on {:?}", device);
-            //     Ok(Box::new(FlashGTEModel::load(vb, &config, model_type).s()?))
-            // }
-            // #[cfg(feature = "cuda")]
-            // (Config::Qwen2(config), Device::Cuda(_)) => {
-            //     if dtype != DType::F16
-            //         || !cfg!(any(feature = "flash-attn", feature = "flash-attn-v1"))
-            //     {
-            //         return Err(BackendError::Start("Qwen2 is only supported on Cuda devices in fp16 with flash attention v2 enabled".to_string()));
-            //     }
-            //     tracing::info!("Starting FlashQwen2 model on {:?}", device);
-            //     Ok(Box::new(
-            //         FlashQwen2Model::load(vb, &config, model_type).s()?,
-            //     ))
-            // }
         };
 
         Ok(Self {
