@@ -9,13 +9,13 @@ import { SettingChangeEvents } from "../../components/_constants";
 interface Props {
   toggleFileIndexer: boolean;
   toggleAudioTranscription: boolean;
-  onChange?: (e: SettingChangeEvents) => void;
+  onChange?: (setting: string, e: SettingChangeEvents) => void;
 }
 
 export function IndexFilesHelp({
   toggleFileIndexer,
   toggleAudioTranscription,
-  onChange,
+  onChange = () => {},
 }: Props) {
   const [paths, setPaths] = useState<string[]>([]);
   useEffect(() => {
@@ -59,13 +59,13 @@ export function IndexFilesHelp({
         className="flex flex-row"
         settingName="_.file-indexer"
         settingOptions={fileIndexerOpts}
-        onChange={onChange}
+        onChange={(e) => onChange("_.file-indexer", e)}
       />
       <FormElement
         className="flex flex-row"
         settingName="_.audio-transcription"
         settingOptions={toggleAudio}
-        onChange={onChange}
+        onChange={(e) => onChange("_.audio-transcription", e)}
       />
       <div className="text-sm">
         If enabled, the following folders will be automatically indexed. You can

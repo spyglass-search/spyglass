@@ -5,6 +5,7 @@ import { SearchPage } from "./pages/search/index.tsx";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ErrorPage from "./error-page.tsx";
 import { WizardPage } from "./pages/wizard/WizardPage.tsx";
+import { UserSettingsPage } from "./pages/settings/UserSettingsPage.tsx";
 
 const router = createBrowserRouter([
   {
@@ -17,8 +18,9 @@ const router = createBrowserRouter([
     element: <div>Progress Popup</div>,
   },
   {
-    path: "/settings:tab",
-    element: <div>settings tab</div>,
+    path: "/settings/:tab",
+    loader: (params) => params,
+    element: <UserSettingsPage />,
   },
   {
     path: "/startup",

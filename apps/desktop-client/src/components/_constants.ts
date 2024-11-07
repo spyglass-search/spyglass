@@ -22,8 +22,6 @@ export type SettingChangeEvents =
   | SettingChangeEvent<string[]>;
 
 export interface SettingChangeEvent<T> {
-  settingName: string;
   oldValue: T;
   newValue: T;
-  restartRequired: boolean;
 }

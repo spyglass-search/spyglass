@@ -1,28 +1,14 @@
 import { useState } from "react";
-import { SettingChangeEvent } from "../_constants";
+import { FormFieldProps } from "./_constants";
 
-interface Props {
-  name: string;
-  value: boolean;
-  onChange?: (e: SettingChangeEvent<boolean>) => void;
-  restartRequired?: boolean;
-}
-
-export function Toggle({
-  name,
-  value,
-  onChange = () => {},
-  restartRequired = false,
-}: Props) {
-  const [state, setState] = useState<boolean>(value);
+export function Toggle({ name, value, onChange = () => {} }: FormFieldProps) {
+  const [state, setState] = useState<boolean>(value as boolean);
   const id = `toggle_${name}`;
 
   const handleOnChange = () => {
     onChange({
-      settingName: name,
       oldValue: state,
       newValue: !state,
-      restartRequired,
     });
     setState(!state);
   };
