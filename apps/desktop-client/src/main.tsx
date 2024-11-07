@@ -5,7 +5,7 @@ import { SearchPage } from "./pages/search/index.tsx";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ErrorPage from "./error-page.tsx";
 import { WizardPage } from "./pages/wizard/WizardPage.tsx";
-import { UserSettingsPage } from "./pages/settings/UserSettingsPage.tsx";
+import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 
 const router = createBrowserRouter([
   {
@@ -20,7 +20,7 @@ const router = createBrowserRouter([
   {
     path: "/settings/:tab",
     loader: (params) => params,
-    element: <UserSettingsPage />,
+    element: <SettingsPage />,
   },
   {
     path: "/startup",

@@ -82,7 +82,7 @@ export function UserSettingsPage() {
 
   return (
     <div>
-      <div className="p-4 sticky top-0 bg-neutral-800 flex flex-row items-center">
+      <div className="p-4 sticky top-0 bg-neutral-800 flex flex-row items-center z-10 border-b border-neutral-900 shadow">
         <div className="font-bold">User Settings</div>
         <div className="ml-auto flex flex-row gap-2">
           <Btn onClick={showSettingsFolder} className="btn-sm text-sm">
