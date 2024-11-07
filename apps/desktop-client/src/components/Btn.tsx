@@ -36,7 +36,7 @@ export function Btn({
       classes = classes.concat(["btn-neutral", "text-white"]);
       break;
     case BtnType.Danger:
-      classes = classes.concat(["btn-danger"]);
+      classes = classes.concat(["btn-error"]);
       break;
     case BtnType.Success:
       classes = classes.concat(["btn-success"]);
