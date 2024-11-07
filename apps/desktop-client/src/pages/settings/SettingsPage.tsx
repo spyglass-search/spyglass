@@ -8,6 +8,7 @@ import classNames from "classnames";
 import { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserSettingsPage } from "./UserSettingsPage";
+import { ConnectionManager } from "./ConnectionManager";
 
 type Tab = "discover" | "library" | "connections" | "user";
 interface Params {
@@ -58,6 +59,7 @@ export function SettingsPage() {
   let tabContent = null;
   switch (params.tab) {
     case "connections":
+      tabContent = <ConnectionManager />;
       break;
     case "discover":
       break;

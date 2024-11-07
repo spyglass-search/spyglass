@@ -51,16 +51,22 @@ export function KeyBinding({ value, onChange = () => {} }: FormFieldProps) {
     }
   });
   return (
-    <div className="w-full flex flex-row items-center">
-      <input
-        ref={ref}
-        spellCheck="false"
-        onKeyDown={handleKeydown}
-        value={keycodes.join("+")}
-        type="text"
-        className="grow form-input w-full text-sm rounded bg-stone-700 border-stone-800 mr-4"
-      />
-      <div className="flex flex-row gap-1 items-center">{keyBinding}</div>
+    <div className="w-full flex flex-col">
+      <div className="w-full flex flex-row items-center">
+        <input
+          ref={ref}
+          spellCheck="false"
+          onKeyDown={handleKeydown}
+          value={keycodes.join("+")}
+          type="text"
+          className="grow form-input w-full text-sm rounded bg-stone-700 border-stone-800 mr-4"
+          readOnly
+        />
+        <div className="flex flex-row gap-1 items-center">{keyBinding}</div>
+      </div>
+      <div className="text-xs text-gray-400 p-1">
+        Press the shortcut you want while the input box is selected.
+      </div>
     </div>
   );
 }

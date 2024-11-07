@@ -25,8 +25,11 @@ export function StringList({ value, onChange = () => {} }: FormFieldProps) {
   return (
     <div>
       <div className="border-1 rounded-md bg-stone-700 p-2 h-40 overflow-y-auto">
-        {strings.map((str) => (
-          <div className="flex items-center rounded-md p-1.5">
+        {strings.map((str, idx) => (
+          <div
+            key={`string-${idx}`}
+            className="flex items-center rounded-md p-1.5"
+          >
             <div className={classNames("grow", "text-sm")}>{str}</div>
             <button
               className={classNames("flex-none", "group")}

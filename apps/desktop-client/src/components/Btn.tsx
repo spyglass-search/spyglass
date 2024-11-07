@@ -18,7 +18,7 @@ export function Btn({
   className = "",
   disabled = false,
   type = BtnType.Default,
-  align = BtnAlign.Center,
+  align = BtnAlign.Left,
   onClick = () => {},
 }: Props) {
   let classes: string[] = [

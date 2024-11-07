@@ -7,6 +7,7 @@ import { BtnType, SettingChangeEvents } from "../../components/_constants";
 import { FormElement } from "../../components/FormElement";
 import classNames from "classnames";
 import { ArrowPathIcon } from "@heroicons/react/24/solid";
+import { Header } from "./Header";
 
 type Setting = [string, SettingOpts];
 type SettingMap = { [k: string]: SettingOpts };
@@ -82,23 +83,20 @@ export function UserSettingsPage() {
 
   return (
     <div>
-      <div className="p-4 sticky top-0 bg-neutral-800 flex flex-row items-center z-10 border-b border-neutral-900 shadow">
-        <div className="font-bold">User Settings</div>
-        <div className="ml-auto flex flex-row gap-2">
-          <Btn onClick={showSettingsFolder} className="btn-sm text-sm">
-            <FolderOpenIcon className="mr-1 w-4 h-4" />
-            Show Folder
-          </Btn>
-          <Btn
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving}
-            className="btn-sm text-sm"
-            type={hasChanges ? BtnType.Success : BtnType.Default}
-          >
-            {saveLabel()}
-          </Btn>
-        </div>
-      </div>
+      <Header label={"User Settings"}>
+        <Btn onClick={showSettingsFolder} className="btn-sm text-sm">
+          <FolderOpenIcon className="mr-1 w-4 h-4" />
+          Show Folder
+        </Btn>
+        <Btn
+          onClick={handleSave}
+          disabled={!hasChanges || isSaving}
+          className="btn-sm text-sm"
+          type={hasChanges ? BtnType.Success : BtnType.Default}
+        >
+          {saveLabel()}
+        </Btn>
+      </Header>
       <div className="mt-4 flex flex-col gap-4">
         {Object.entries(userSettings).map(([name, options]) => {
           const isVert = ["Path", "PathList"].includes(options.form_type);
