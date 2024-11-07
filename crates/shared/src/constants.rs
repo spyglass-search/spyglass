@@ -18,3 +18,12 @@ pub const FEEDBACK_FORM: &str = "https://forms.gle/7UWP8gvhnwBbwF3KA";
 // Model download links
 pub const WHISPER_MODEL: &str =
     "https://s3.amazonaws.com/assets.spyglass.fyi/models/whisper.base.en.bin";
+
+pub const EMBEDDING_MODEL: &str =
+    "https://huggingface.co/nomic-ai/nomic-embed-text-v1/resolve/main/model.safetensors";
+
+pub const EMBEDDING_MODEL_CONFIG: &str =
+    "https://huggingface.co/nomic-ai/nomic-embed-text-v1/resolve/main/config.json";
+
+pub const EMBEDDING_MODEL_TOKENIZER: &str =
+    "https://huggingface.co/nomic-ai/nomic-embed-text-v1/resolve/main/tokenizer.json";

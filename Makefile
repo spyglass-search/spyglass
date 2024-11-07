@@ -59,7 +59,7 @@ setup-dev:
 # Install tailwind
 	cd ./crates/client && npm install
 # Download whisper model used in development
-	mkdir -p assets/models;
+	mkdir -p assets/models/embeddings;
 	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
 	mv whisper.base.en.bin assets/models;
 # Check if .env exists and if not create it

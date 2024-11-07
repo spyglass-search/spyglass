@@ -1,6 +1,7 @@
 use crate::form::{FormType, SettingOpts};
 use diff::Diff;
 use directories::ProjectDirs;
+use embeddings::EmbeddingSettings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -14,6 +15,7 @@ pub use spyglass_lens::{
 };
 
 mod audio;
+mod embeddings;
 mod filesystem;
 mod user_actions;
 pub use audio::*;
@@ -112,6 +114,8 @@ pub struct UserSettings {
     pub user_action_settings: UserActionSettings,
     #[serde(default)]
     pub audio_settings: AudioSettings,
+    #[serde(default)]
+    pub embedding_settings: EmbeddingSettings,
     // /// Hide the app icon from the dock/taskbar while running. Will still show up
     // /// in the menubar/systemtray.
     // #[serde(default)]
@@ -259,6 +263,7 @@ impl Default for UserSettings {
             port: UserSettings::default_port(),
             user_action_settings: UserActionSettings::default(),
             audio_settings: AudioSettings::default(),
+            embedding_settings: EmbeddingSettings::default(),
         }
     }
 }
@@ -347,6 +352,10 @@ impl Config {
 
     pub fn model_dir(&self) -> PathBuf {
         self.data_dir().join("models")
+    }
+
+    pub fn embedding_model_dir(&self) -> PathBuf {
+        self.model_dir().join("embeddings")
     }
 
     pub fn prefs_dir() -> PathBuf {

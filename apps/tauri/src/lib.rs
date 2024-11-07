@@ -60,21 +60,21 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let current_version = current_version(ctx.package_info());
     let config = Config::new();
 
-    #[cfg(not(debug_assertions))]
-    let _guard = if config.user_settings.disable_telemetry {
-        None
-    } else {
-        Some(sentry::init((
-            "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
-            sentry::ClientOptions {
-                release: Some(std::borrow::Cow::from(
-                    ctx.package_info().version.to_string(),
-                )),
-                traces_sample_rate: 0.1,
-                ..Default::default()
-            },
-        )))
-    };
+    // #[cfg(not(debug_assertions))]
+    // let _guard = if config.user_settings.disable_telemetry {
+    //     None
+    // } else {
+    //     Some(sentry::init((
+    //         "https://13d7d51a8293459abd0aba88f99f4c18@o1334159.ingest.sentry.io/6600471",
+    //         sentry::ClientOptions {
+    //             release: Some(std::borrow::Cow::from(
+    //                 ctx.package_info().version.to_string(),
+    //             )),
+    //             traces_sample_rate: 0.1,
+    //             ..Default::default()
+    //         },
+    //     )))
+    // };
 
     update_auto_launch(&config.user_settings);
 

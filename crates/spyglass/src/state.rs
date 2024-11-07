@@ -2,6 +2,7 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
+use spyglass_model_interface::embedding_api::EmbeddingApi;
 use spyglass_rpc::RpcEvent;
 use spyglass_searcher::schema::DocFields;
 use spyglass_searcher::schema::SearchDocument;
@@ -56,6 +57,7 @@ impl FetchLimitType {
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
+    pub embedding_api: Arc<Option<EmbeddingApi>>,
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, LensConfig>>,
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
@@ -182,6 +184,28 @@ impl AppStateBuilder {
             UserSettings::default()
         };
 
+        let mut embedding_api = None;
+        if self
+            .user_settings
+            .as_ref()
+            .is_some_and(|settings| settings.embedding_settings.enable_embeddings)
+        {
+            let mut model_root = user_settings.data_directory.clone();
+            model_root.push("models");
+            model_root.push("embeddings");
+
+            let mut tokenizer_file = model_root.clone();
+            tokenizer_file.push("tokenizer.json");
+            let mut model = model_root.clone();
+            model.push("model.safetensors");
+
+            if tokenizer_file.exists() && model.exists() {
+                embedding_api = EmbeddingApi::new(model_root.clone()).ok();
+            } else {
+                log::warn!("Model does not exist");
+            }
+        }
+
         let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
         let (config_tx, _) = broadcast::channel::<UserSettingsChange>(16);
         let (rpc_events, _) = broadcast::channel::<RpcEvent>(10);
@@ -207,6 +231,7 @@ impl AppStateBuilder {
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
             readonly_mode: self.readonly_mode.unwrap_or_default(),
+            embedding_api: Arc::new(embedding_api),
         }
     }
 
