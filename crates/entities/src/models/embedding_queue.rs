@@ -84,7 +84,7 @@ where
     Entity::insert(model)
         .on_conflict(
             OnConflict::column(Column::DocumentId)
-                .update_column(Column::Status)
+                .update_columns([Column::Status, Column::Content])
                 .to_owned(),
         )
         .exec(db)
@@ -98,7 +98,7 @@ where
     Entity::insert_many(to_add.to_vec())
         .on_conflict(
             OnConflict::column(Column::DocumentId)
-                .update_column(Column::Status)
+                .update_columns([Column::Status, Column::Content])
                 .to_owned(),
         )
         .exec_without_returning(db)
@@ -149,6 +149,7 @@ pub async fn mark_done(db: &DatabaseConnection, id: i64) {
         let mut updated: ActiveModel = embedding.clone().into();
         updated.status = Set(QueueStatus::Completed);
         updated.content = Set(None);
+        updated.errors = Set(None);
         let _ = updated.update(db).await;
     }
 }
