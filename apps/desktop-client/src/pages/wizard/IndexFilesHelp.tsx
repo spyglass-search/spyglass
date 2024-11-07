@@ -72,7 +72,9 @@ export function IndexFilesHelp({
         add/remove folders in your settings.
         <ul className="mt-4 text-sm text-cyan-500 flex flex-col gap-2 font-mono">
           {paths.map((path) => (
-            <li className="list-disc">{path}</li>
+            <li key={path} className="list-disc">
+              {path}
+            </li>
           ))}
         </ul>
       </div>

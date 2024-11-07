@@ -32,7 +32,7 @@ function parseShortcut(shortcut: string): ReactNode {
   return (
     <div className="px-2 flex flex-row">
       {keycodes.map((k) => (
-        <Key keyCode={k} />
+        <Key key={k} keyCode={k} />
       ))}
     </div>
   );
