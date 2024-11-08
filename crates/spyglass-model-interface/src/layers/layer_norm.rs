@@ -27,7 +27,7 @@ impl LayerNorm {
         let _enter = self.span.enter();
 
         match hidden_states.device() {
-            Device::Cpu | Device::Metal(_) => {
+            Device::Cpu | Device::Metal(_) | Device::Cuda(_) => {
                 let mut hidden_states = hidden_states.clone();
                 if let Some(residual) = residual {
                     hidden_states = hidden_states.add(residual)?;
@@ -50,34 +50,33 @@ impl LayerNorm {
                     .to_dtype(hidden_states_dtype)?
                     .broadcast_mul(&self.weight)?;
                 hidden_states.broadcast_add(&self.bias)
-            }
-            Device::Cuda(_) => {
-                // #[cfg(feature = "cuda")]
-                // {
-                //     use candle_layer_norm::{fused_add_layer_norm, layer_norm};
+            } // Device::Cuda(_) => {
+              //     #[cfg(feature = "cuda")]
+              //     {
+              //         use candle_layer_norm::{fused_add_layer_norm, layer_norm};
 
-                //     let original_shape = hidden_states.shape();
-                //     let hidden_states = hidden_states.flatten_to(D::Minus2)?;
+              //         let original_shape = hidden_states.shape();
+              //         let hidden_states = hidden_states.flatten_to(D::Minus2)?;
 
-                //     let result = if let Some(residual) = residual {
-                //         let residual = residual.flatten_to(D::Minus2)?;
+              //         let result = if let Some(residual) = residual {
+              //             let residual = residual.flatten_to(D::Minus2)?;
 
-                //         let (result, _) = fused_add_layer_norm(
-                //             &hidden_states,
-                //             &residual,
-                //             &self.weight,
-                //             Some(&self.bias),
-                //             self.epsilon,
-                //         )?;
-                //         Ok(result)
-                //     } else {
-                //         layer_norm(&hidden_states, &self.weight, Some(&self.bias), self.epsilon)
-                //     }?;
-                //     result.reshape(original_shape)
-                // }
-                // #[cfg(not(feature = "cuda"))]
-                candle::bail!("`cuda` feature is not enabled")
-            }
+              //             let (result, _) = fused_add_layer_norm(
+              //                 &hidden_states,
+              //                 &residual,
+              //                 &self.weight,
+              //                 Some(&self.bias),
+              //                 self.epsilon,
+              //             )?;
+              //             Ok(result)
+              //         } else {
+              //             layer_norm(&hidden_states, &self.weight, Some(&self.bias), self.epsilon)
+              //         }?;
+              //         result.reshape(original_shape)
+              //     }
+              //     #[cfg(not(feature = "cuda"))]
+              //     candle::bail!("`cuda` feature is not enabled")
+              // }
         }
     }
 }

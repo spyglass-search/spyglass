@@ -11,17 +11,16 @@ candle = { version = "*", package = "candle-core", default-features = false }
 candle-nn = { version = "*" }
 candle-transformers = { version = "*" }
 candle-flash-attn = { version = "*", optional = true }
-candle-flash-attn-v1 = { git = "https://github.com/huggingface/candle-flash-attn-v1", rev = "3f1870b0d708579904c76e41745c659c3f9fa038", optional = true }
-candle-cublaslt = { git = "https://github.com/huggingface/candle-cublaslt", rev = "cf789b7dd6d4abb19b03b9556442f94f0588b4a0", optional = true }
-candle-layer-norm = { git = "https://github.com/huggingface/candle-layer-norm", rev = "94c2add7d94c2d63aebde77f7534614e04dbaea1", optional = true }
-candle-rotary = { git = "https://github.com/huggingface/candle-rotary", rev = "0a718a0856569a92f3112e64f10d07e4447822e8", optional = true }
 log = "0.4"
 nohash-hasher = "0.2.0"
 tracing = { workspace = true }
 safetensors = "^0.4"
-thiserror = "1.0.65"
+thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 memmap2 = "^0.9"
 simsimd = "5.9.9"
 tokenizers = "0.20.1"
+
+[features]
+cuda = ["candle/cuda", "candle-nn/cuda"]

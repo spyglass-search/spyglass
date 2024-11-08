@@ -2,9 +2,9 @@ use crate::flash_attn::flash_attn_varlen;
 use crate::layers::{LayerNorm, Linear};
 use crate::models::nomic::{NomicBertEmbeddings, NomicBertGatedMLP};
 use crate::models::{Model, NomicConfig};
+use crate::{Batch, ModelType, Pool};
 use candle::{DType, Device, IndexOp, Result, Tensor, D};
 use candle_nn::VarBuilder;
-use text_embeddings_backend_core::{Batch, ModelType, Pool};
 
 struct NomicAttention {
     qkv_linear: Linear,
