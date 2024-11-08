@@ -48,7 +48,7 @@ where
         Statement::from_sql_and_values(
             db.get_database_backend(),
             r#"
-            insert into vec_documents(id, embedding)
+            insert into vec_documents(rowid, embedding)
                 VALUES($1, $2)
             "#,
             vec![id.into(), embedding.into()],
@@ -65,7 +65,7 @@ where
     let statement = Statement::from_sql_and_values(
         db.get_database_backend(),
         r#"
-            delete from vec_documents where id = $1;
+            delete from vec_documents where rowid = $1;
         "#,
         vec![id.into()],
     );
@@ -89,7 +89,7 @@ where
         format!(
             r#"
             delete from vec_documents
-            where id in (
+            where rowid in (
                 select id from indexed_document
                     where indexed_document.url in ({})
             );
@@ -127,8 +127,8 @@ where
         Statement::from_sql_and_values(
             db.get_database_backend(),
             r#"
-                SELECT vec_documents.id, vec_documents.distance, indexed_document.doc_id FROM vec_documents
-                    left join indexed_document on indexed_document.id = vec_documents.id
+                SELECT vec_documents.rowid as id, vec_documents.distance, indexed_document.doc_id FROM vec_documents
+                    left join indexed_document on indexed_document.id = vec_documents.rowid
                     left join document_tag on document_tag.indexed_document_id = indexed_document.id
                     WHERE document_tag.id in $1 AND vec_documents.embedding MATCH $2 AND k = 10 ORDER BY vec_documents.distance ASC limit 20;
             "#,
@@ -138,8 +138,8 @@ where
         Statement::from_sql_and_values(
             db.get_database_backend(),
             r#"
-                SELECT vec_documents.id, vec_documents.distance, indexed_document.doc_id FROM vec_documents
-                    left join indexed_document on indexed_document.id = vec_documents.id
+                SELECT vec_documents.rowid as id, vec_documents.distance, indexed_document.doc_id FROM vec_documents
+                    left join indexed_document on indexed_document.id = vec_documents.rowid
                     WHERE vec_documents.embedding MATCH $1 AND k = 10 ORDER BY vec_documents.distance ASC limit 20;
             "#,
             vec![embedding_string.into()],
