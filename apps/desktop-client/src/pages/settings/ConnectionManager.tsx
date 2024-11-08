@@ -289,6 +289,7 @@ export function ConnectionManager() {
           <div className="pt-4">
             {userConnections.map((conn) => (
               <UserConnectionInfo
+                key={conn.id}
                 connection={conn}
                 label={
                   supportedConns.find((x) => x.id === conn.id)?.label ??

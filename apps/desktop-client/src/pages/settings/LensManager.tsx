@@ -74,11 +74,13 @@ export function LensManager() {
       <div className="flex flex-col gap-2 p-4">
         {lenses.map((x) => (
           <LibraryLens
+            key={x.name}
             author={x.author}
             categories={x.categories}
             label={x.label}
             name={x.name}
             description={x.description}
+            lensType={x.lens_type}
             isInstalled={true}
             onUninstall={() => handleUninstall(x.name)}
           />

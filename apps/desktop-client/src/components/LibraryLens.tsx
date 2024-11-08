@@ -1,6 +1,7 @@
 import classNames from "classnames";
 import {
   ArrowPathIcon,
+  Cog6ToothIcon,
   DocumentArrowDownIcon,
   EyeIcon,
   TagIcon,
@@ -8,6 +9,8 @@ import {
 } from "@heroicons/react/24/solid";
 import { Btn } from "./Btn";
 import { BtnType } from "./_constants";
+import { LensType } from "../bindings/LensType";
+import { useNavigate } from "react-router-dom";
 
 interface Props {
   author: string;
@@ -15,7 +18,7 @@ interface Props {
   description: string;
   label: string;
   name: string;
-
+  lensType?: LensType;
   isInstalled?: boolean;
   isInstalling?: boolean;
 
@@ -29,6 +32,7 @@ export function LibraryLens({
   label,
   name,
   description,
+  lensType = "Lens",
   categories = [],
   isInstalled = false,
   isInstalling = false,
@@ -80,6 +84,7 @@ export function LibraryLens({
       </div>
       <LensActionBar
         name={name}
+        lensType={lensType}
         isInstalled={isInstalled}
         isInstalling={isInstalling}
         onInstall={onInstall}
@@ -93,6 +98,7 @@ interface LensActionBarProps {
   name: string;
   isInstalled: boolean;
   isInstalling: boolean;
+  lensType: LensType;
   onInstall?: () => void;
   onUninstall?: () => void;
 }
@@ -101,13 +107,60 @@ function LensActionBar({
   name,
   isInstalled,
   isInstalling,
+  lensType,
   onInstall = () => {},
   onUninstall = () => {},
 }: LensActionBarProps) {
+  const nav = useNavigate();
   /// Create a view link to the lens directory HTML page.
   const viewLink = (lensName: string) => {
     const fmt = lensName.toLowerCase().replace("_", "-");
     return `https://lenses.spyglass.fyi/lenses/${fmt}`;
+  };
+
+  const viewDetails = () => {
+    if (lensType === "Lens") {
+      return (
+        <Btn href={viewLink(name)} className="btn-sm text-sm">
+          <EyeIcon className="w-3 mr-1" />
+          Details
+        </Btn>
+      );
+    } else if (lensType === "API") {
+      return (
+        <Btn
+          onClick={() => nav("/settings/connections")}
+          className="btn-sm text-sm"
+        >
+          <EyeIcon className="w-3 mr-1" />
+          Details
+        </Btn>
+      );
+    } else if (lensType === "Internal") {
+      return (
+        <Btn onClick={() => nav("/settings/user")} className="btn-sm text-sm">
+          <Cog6ToothIcon className="w-3 mr-1" />
+          Configure
+        </Btn>
+      );
+    }
+  };
+
+  const uninstallButton = () => {
+    if (lensType === "Lens") {
+      return (
+        <Btn
+          type={BtnType.Danger}
+          className="btn-sm text-sm"
+          onClick={onUninstall}
+        >
+          <TrashIcon className="w-3" />
+          Uninstall
+        </Btn>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -120,19 +173,9 @@ function LensActionBar({
         "gap-2",
       )}
     >
-      <Btn href={viewLink(name)} className="btn-sm text-sm">
-        <EyeIcon className="w-3 mr-1" />
-        Details
-      </Btn>
+      {viewDetails()}
       {isInstalled ? (
-        <Btn
-          type={BtnType.Danger}
-          className="btn-sm text-sm"
-          onClick={onUninstall}
-        >
-          <TrashIcon className="w-3" />
-          Uninstall
-        </Btn>
+        uninstallButton()
       ) : (
         <Btn
           disabled={isInstalling}
