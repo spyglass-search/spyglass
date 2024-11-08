@@ -82,7 +82,6 @@ export function SearchPage() {
     if (searchInput.current) {
       searchInput.current.value = "";
     }
-    await requestResize();
   }, [clearResults, searchInput]);
 
   const moveSelectionUp = () => {
@@ -250,7 +249,7 @@ export function SearchPage() {
       }
     }, QUERY_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [query, selectedLenses, clearQuery, clearResults]);
+  }, [query, selectedLenses, clearResults]);
 
   useEffect(() => {
     requestResize();
@@ -287,8 +286,9 @@ export function SearchPage() {
 
       await fetchUserActions();
     };
+
     initialize().catch(console.error);
-  });
+  }, [clearResults]);
 
   return (
     <div
