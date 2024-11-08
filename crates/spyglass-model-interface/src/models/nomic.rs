@@ -1,4 +1,4 @@
-use crate::layers::{get_cublas_lt_wrapper, HiddenAct, LayerNorm, Linear};
+use crate::layers::{HiddenAct, LayerNorm, Linear};
 use crate::models::Model;
 use crate::{Batch, ModelType, Pool};
 use candle::{DType, Device, IndexOp, Module, Result, Tensor, D};
@@ -193,7 +193,7 @@ impl NomicAttention {
         sin: &Tensor,
     ) -> Result<Tensor> {
         let _enter = self.span.enter();
-        let device = hidden_states.device();
+        // let device = hidden_states.device();
 
         let qkv = self.qkv_linear.forward(hidden_states)?;
 
