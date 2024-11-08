@@ -44,7 +44,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tantivy = "0.19"
 tendril = "0.4.3"
-thiserror = "1.0.37"
+thiserror = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tokio-retry = "0.3"
 tower = { version = "0.4", features = ["full"] }
@@ -78,6 +78,7 @@ tracing-test = { version = "0.2.4", features = ["no-env-filter"] }
 
 [features]
 tokio-console = ["tokio/tracing", "console-subscriber"]
+cuda = ["spyglass-model-interface/cuda"]
 
 [lib]
 name = "libspyglass"

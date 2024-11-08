@@ -58,10 +58,10 @@ pub(crate) fn flash_attn_varlen(
                 causal,
             );
         }
-        #[cfg(not(feature = "flash-attn-v1"))]
+        // #[cfg(not(feature = "flash-attn-v1"))]
         candle::bail!("Flash attention v1 is not installed. Use `flash-attn-v1` feature.")
     } else if (80..90).contains(&runtime_compute_cap) || runtime_compute_cap == 90 {
-        #[cfg(feature = "flash-attn")]
+        //  #[cfg(feature = "flash-attn")]
         {
             use candle_flash_attn::{flash_attn_varlen_alibi_windowed, flash_attn_varlen_windowed};
 

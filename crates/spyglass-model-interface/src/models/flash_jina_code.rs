@@ -4,9 +4,9 @@ use crate::layers::{HiddenAct, LayerNorm, Linear};
 use crate::models::bert::PositionEmbeddingType;
 use crate::models::jina::JinaEmbeddings;
 use crate::models::{BertConfig, Model};
+use crate::{Batch, ModelType, Pool};
 use candle::{DType, Device, IndexOp, Result, Tensor};
 use candle_nn::VarBuilder;
-use text_embeddings_backend_core::{Batch, ModelType, Pool};
 
 struct JinaCodeAttention {
     qkv_linear: Linear,
