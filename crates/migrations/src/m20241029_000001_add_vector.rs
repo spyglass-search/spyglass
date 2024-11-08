@@ -13,7 +13,6 @@ impl MigrationTrait for Migration {
             .query_all(Statement::from_string(
                 manager.get_database_backend(),
                 "create virtual table vec_documents using vec0(
-                    id integer primary key,
                     embedding float[768]
                 );"
                 .to_owned(),
