@@ -99,6 +99,7 @@ function UserConnectionInfo({ connection, label }: UserConnnectionProps) {
       id: connection.id,
       account: connection.account,
     });
+    // TODO: listen for resync finished events.
   };
 
   const handleRevoke = async () => {
@@ -107,6 +108,7 @@ function UserConnectionInfo({ connection, label }: UserConnnectionProps) {
       id: connection.id,
       account: connection.account,
     });
+    // TODO: listen for revoke finished events.
   };
 
   return (

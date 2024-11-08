@@ -90,6 +90,7 @@
     "process:allow-restart",
     "shell:allow-execute",
     "shell:allow-open",
-    "updater:default"
+    "updater:default",
+    "notification:default"
   ]
 }

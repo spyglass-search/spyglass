@@ -31,8 +31,8 @@ export function PathList({ value, onChange = () => {} }: FormFieldProps) {
   return (
     <div className="w-full">
       <div className="border-1 rounded-md bg-stone-700 p-2 h-40 w-full overflow-y-auto">
-        {paths.map((path) => (
-          <div className="flex items-center p-1.5">
+        {paths.map((path, idx) => (
+          <div key={`path-${idx}`} className="flex items-center p-1.5">
             <button
               className={classNames("flex-none", "mr-2", "group")}
               onClick={() => handleOpenFolder(path)}

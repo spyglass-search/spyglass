@@ -9,6 +9,8 @@ import { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { UserSettingsPage } from "./UserSettingsPage";
 import { ConnectionManager } from "./ConnectionManager";
+import { Discover } from "./Discover";
+import { LensManager } from "./LensManager";
 
 type Tab = "discover" | "library" | "connections" | "user";
 interface Params {
@@ -62,8 +64,10 @@ export function SettingsPage() {
       tabContent = <ConnectionManager />;
       break;
     case "discover":
+      tabContent = <Discover />;
       break;
     case "library":
+      tabContent = <LensManager />;
       break;
     case "user":
       tabContent = <UserSettingsPage />;

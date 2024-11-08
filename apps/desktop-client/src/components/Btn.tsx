@@ -57,7 +57,7 @@ export function Btn({
   const btnStyles = classNames(classes, className, conditionalClasses);
   const labelStyles = classNames("flex", "flex-row", "gap-1", "items-center");
   return href ? (
-    <a onClick={onClick} className={btnStyles} href={href} target="blank">
+    <a onClick={onClick} className={btnStyles} href={href} target="_blank">
       <div className={labelStyles}>{children}</div>
     </a>
   ) : (

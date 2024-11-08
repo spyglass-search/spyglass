@@ -133,7 +133,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(plugins::notify::init())
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
@@ -222,6 +221,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Initialize other modules
             plugins::startup::init(app_handle);
             plugins::lens_updater::init(app_handle);
+            plugins::notify::init(app_handle);
+
             Ok(())
         })
         .build(ctx)
@@ -235,6 +236,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             plugins::lens_updater::exit(app_handle);
             plugins::startup::exit(app_handle);
+            plugins::notify::exit(app_handle);
         }
         RunEvent::Exit { .. } => {
             log::info!("😔 bye bye");
