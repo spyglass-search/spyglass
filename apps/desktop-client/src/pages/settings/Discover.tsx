@@ -4,6 +4,7 @@ import { ArrowPathIcon } from "@heroicons/react/24/solid";
 import { invoke, listen } from "../../glue";
 import { InstallableLens } from "../../bindings/InstallableLens";
 import { LibraryLens } from "../../components/LibraryLens";
+import { LensStatus } from "../../components/_constants";
 
 type CategoryCounts = { [k: string]: number };
 
@@ -145,7 +146,11 @@ export function Discover() {
               description={lens.description}
               label={lens.label}
               name={lens.name}
-              isInstalling={installing.includes(lens.name)}
+              status={
+                installing.includes(lens.name)
+                  ? LensStatus.Installing
+                  : LensStatus.NotInstalled
+              }
               onCategoryClick={handleCategoryClick}
               onInstall={() => handleInstall(lens)}
             />

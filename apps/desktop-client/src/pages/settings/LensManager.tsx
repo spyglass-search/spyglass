@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { invoke, listen } from "../../glue";
 import { LensResult } from "../../bindings/LensResult";
 import { LibraryLens } from "../../components/LibraryLens";
+import { LensStatus } from "../../components/_constants";
 
 export function LensManager() {
   const [inProgress, setInProgress] = useState<boolean>(false);
@@ -81,7 +82,11 @@ export function LensManager() {
             name={x.name}
             description={x.description}
             lensType={x.lens_type}
-            isInstalled={true}
+            status={
+              uninstalling.includes(x.name)
+                ? LensStatus.Uninstalling
+                : LensStatus.Installed
+            }
             onUninstall={() => handleUninstall(x.name)}
           />
         ))}

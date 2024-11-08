@@ -8,7 +8,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/solid";
 import { Btn } from "./Btn";
-import { BtnType } from "./_constants";
+import { BtnType, LensStatus } from "./_constants";
 import { LensType } from "../bindings/LensType";
 import { useNavigate } from "react-router-dom";
 
@@ -19,8 +19,8 @@ interface Props {
   label: string;
   name: string;
   lensType?: LensType;
-  isInstalled?: boolean;
-  isInstalling?: boolean;
+
+  status: LensStatus;
 
   onCategoryClick?: (cat: string) => void;
   onInstall?: () => void;
@@ -32,10 +32,9 @@ export function LibraryLens({
   label,
   name,
   description,
+  status,
   lensType = "Lens",
   categories = [],
-  isInstalled = false,
-  isInstalling = false,
   onCategoryClick = () => {},
   onInstall = () => {},
   onUninstall = () => {},
@@ -50,20 +49,21 @@ export function LibraryLens({
     "gap-4",
   ];
 
-  const categoryTags = !isInstalled ? (
-    <div className="mt-2 flex flex-row gap-2 flex-wrap text-xs items-center">
-      <TagIcon className="w-4" />
-      {categories.map((cat, idx) => (
-        <div
-          key={`category-${idx}`}
-          className="bg-cyan-500 cursor-pointer text-white rounded px-1 py-0.5 hover:bg-cyan-600"
-          onClick={() => onCategoryClick(cat)}
-        >
-          {cat}
-        </div>
-      ))}
-    </div>
-  ) : null;
+  const categoryTags =
+    status === LensStatus.NotInstalled ? (
+      <div className="mt-2 flex flex-row gap-2 flex-wrap text-xs items-center">
+        <TagIcon className="w-4" />
+        {categories.map((cat, idx) => (
+          <div
+            key={`category-${idx}`}
+            className="bg-cyan-500 cursor-pointer text-white rounded px-1 py-0.5 hover:bg-cyan-600"
+            onClick={() => onCategoryClick(cat)}
+          >
+            {cat}
+          </div>
+        ))}
+      </div>
+    ) : null;
 
   return (
     <div className={classNames(styles)}>
@@ -85,8 +85,7 @@ export function LibraryLens({
       <LensActionBar
         name={name}
         lensType={lensType}
-        isInstalled={isInstalled}
-        isInstalling={isInstalling}
+        status={status}
         onInstall={onInstall}
         onUninstall={onUninstall}
       />
@@ -96,8 +95,7 @@ export function LibraryLens({
 
 interface LensActionBarProps {
   name: string;
-  isInstalled: boolean;
-  isInstalling: boolean;
+  status: LensStatus;
   lensType: LensType;
   onInstall?: () => void;
   onUninstall?: () => void;
@@ -105,8 +103,7 @@ interface LensActionBarProps {
 
 function LensActionBar({
   name,
-  isInstalled,
-  isInstalling,
+  status,
   lensType,
   onInstall = () => {},
   onUninstall = () => {},
@@ -152,9 +149,14 @@ function LensActionBar({
         <Btn
           type={BtnType.Danger}
           className="btn-sm text-sm"
+          disabled={status === LensStatus.Uninstalling}
           onClick={onUninstall}
         >
-          <TrashIcon className="w-3" />
+          {status === LensStatus.Uninstalling ? (
+            <ArrowPathIcon className="w-3 animate-spin" />
+          ) : (
+            <TrashIcon className="w-3" />
+          )}
           Uninstall
         </Btn>
       );
@@ -174,16 +176,18 @@ function LensActionBar({
       )}
     >
       {viewDetails()}
-      {isInstalled ? (
-        uninstallButton()
-      ) : (
+      {status === LensStatus.Installed || status === LensStatus.Uninstalling
+        ? uninstallButton()
+        : null}
+      {status === LensStatus.NotInstalled ||
+      status === LensStatus.Installing ? (
         <Btn
-          disabled={isInstalling}
+          disabled={status === LensStatus.Installing}
           type={BtnType.Success}
           className="btn-sm text-sm"
           onClick={onInstall}
         >
-          {isInstalling ? (
+          {status === LensStatus.Installing ? (
             <ArrowPathIcon className="w-3 animate-spin" />
           ) : (
             <>
@@ -192,7 +196,7 @@ function LensActionBar({
             </>
           )}
         </Btn>
-      )}
+      ) : null}
     </div>
   );
 }

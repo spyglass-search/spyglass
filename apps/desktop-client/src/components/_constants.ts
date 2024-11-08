@@ -25,3 +25,10 @@ export interface SettingChangeEvent<T> {
   oldValue: T;
   newValue: T;
 }
+
+export enum LensStatus {
+  Installed,
+  NotInstalled,
+  Installing,
+  Uninstalling,
+}
