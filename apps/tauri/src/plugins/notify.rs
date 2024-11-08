@@ -2,7 +2,9 @@ use crate::window::notify;
 use crate::{rpc, AppEvent};
 use anyhow::anyhow;
 use jsonrpsee::core::client::Subscription;
+use shared::event::ClientEvent;
 use spyglass_rpc::{ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType};
+use tauri::Emitter;
 use tauri::{async_runtime::JoinHandle, AppHandle, Manager};
 use tokio::sync::broadcast;
 
@@ -74,8 +76,16 @@ async fn setup_notification_handler(app: AppHandle) {
                         log::debug!("received event: {:?}", event);
                         let notif: Option<(String, String)> = match &event.event_type {
                             RpcEventType::ConnectionSyncFinished => Some(("Sync Completed".into(), event.payload)),
-                            RpcEventType::LensInstalled => Some(("Lens Installed".into(), event.payload)),
-                            RpcEventType::LensUninstalled => Some(("Lens Removed".into(), event.payload)),
+                            RpcEventType::LensInstalled => {
+                                let _ = app.emit(ClientEvent::LensInstalled.as_ref(), event.payload.clone());
+                                log::debug!("lens installed {}", &event.payload);
+                                Some(("Lens Installed".into(), format!("{} was installed in your library", event.payload)))
+                            },
+                            RpcEventType::LensUninstalled => {
+                                let _ = app.emit(ClientEvent::LensUninstalled.as_ref(), event.payload.clone());
+                                log::debug!("lens removed {}", &event.payload);
+                                Some(("Lens Uninstalled".into(), format!("{} was removed from your library", event.payload)))
+                            },
                             RpcEventType::ModelDownloadStatus => {
                                 if let Ok(status) = serde_json::de::from_str::<ModelDownloadStatusPayload>(&event.payload) {
                                     match status {

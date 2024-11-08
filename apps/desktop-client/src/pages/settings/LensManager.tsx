@@ -35,17 +35,26 @@ export function LensManager() {
     await invoke("uninstall_lens", { name });
   };
 
+  const handleUninstallDone = (name: string) => {
+    setUninstalling(list => list.flatMap(x => x === name ? [] : [x]));
+    setLenses(lenses => lenses.flatMap(lens => lens.name === name ? [] : [lens]));
+  }
+
   useEffect(() => {
     const init = async () => {
       const installed = await invoke<LensResult[]>("list_installed_lenses");
       setLenses(installed.sort((a, b) => a.label.localeCompare(b.label)));
 
-      return await listen("UpdateLensFinished", () => setInProgress(false));
+      return Promise.all([
+        listen("UpdateLensFinished", () => setInProgress(false)),
+        listen<string>("LensUninstalled", (event) => handleUninstallDone(event.payload))
+      ]);
     };
 
     const unlisten = init();
     return () => {
-      (async () => await unlisten.then((fn) => fn()))();
+      // loop through each listener and unlisten.
+      (async () => await unlisten.then((fn) => fn.forEach(x => x())))();
     };
   }, []);
 

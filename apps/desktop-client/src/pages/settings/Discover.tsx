@@ -38,6 +38,11 @@ export function Discover() {
     setNameFilter(event.currentTarget.value.toLowerCase());
   };
 
+  const handleInstalledFinished = (name: string) => {
+    setInstalling(list => list.flatMap(x => x === name ? [] : [x]));
+    handleRefresh();
+  };
+
   const handleInstall = async (lens: InstallableLens) => {
     if (installing.includes(lens.name)) {
       return;
@@ -92,15 +97,16 @@ export function Discover() {
   useEffect(() => {
     const init = async () => {
       await handleRefresh();
-      return await listen("RefreshDiscover", async () => {
-        await handleRefresh();
-      });
+      return Promise.all([
+        listen("RefreshDiscover", async () => await handleRefresh()),
+        listen<string>("LensInstalled", (event) => handleInstalledFinished(event.payload)),
+      ]);
     };
 
     const unlisten = init();
     return () => {
       (async () => {
-        await unlisten.then((fn) => fn());
+        await unlisten.then(fns => fns.forEach(fn => fn()));
       })();
     };
   }, []);
