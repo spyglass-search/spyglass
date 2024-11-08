@@ -13,6 +13,8 @@ pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
     FolderChosen,
+    LensInstalled,
+    LensUninstalled,
     Navigate,
     RefreshConnections,
     /// Request a refresh of the discover lens page when a lens is succesfully installed.

@@ -123,7 +123,7 @@ pub async fn process_update(
     state
         .publish_event(&spyglass_rpc::RpcEvent {
             event_type: spyglass_rpc::RpcEventType::LensInstalled,
-            payload: format!("{} lens installed!", lens.label()),
+            payload: lens.name.to_string(),
         })
         .await;
 }
