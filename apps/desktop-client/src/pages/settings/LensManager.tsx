@@ -36,9 +36,11 @@ export function LensManager() {
   };
 
   const handleUninstallDone = (name: string) => {
-    setUninstalling(list => list.flatMap(x => x === name ? [] : [x]));
-    setLenses(lenses => lenses.flatMap(lens => lens.name === name ? [] : [lens]));
-  }
+    setUninstalling((list) => list.flatMap((x) => (x === name ? [] : [x])));
+    setLenses((lenses) =>
+      lenses.flatMap((lens) => (lens.name === name ? [] : [lens])),
+    );
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -47,14 +49,16 @@ export function LensManager() {
 
       return Promise.all([
         listen("UpdateLensFinished", () => setInProgress(false)),
-        listen<string>("LensUninstalled", (event) => handleUninstallDone(event.payload))
+        listen<string>("LensUninstalled", (event) =>
+          handleUninstallDone(event.payload),
+        ),
       ]);
     };
 
     const unlisten = init();
     return () => {
       // loop through each listener and unlisten.
-      (async () => await unlisten.then((fn) => fn.forEach(x => x())))();
+      (async () => await unlisten.then((fn) => fn.forEach((x) => x())))();
     };
   }, []);
 

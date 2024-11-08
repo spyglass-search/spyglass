@@ -14,7 +14,7 @@ export function Discover() {
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [nameFilter, setNameFilter] = useState<string>("");
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [categoryList, setCategoryList] = useState<CategoryCounts>({});
   const [installable, setInstallable] = useState<InstallableLens[]>([]);
   const [filteredList, setFilteredList] = useState<InstallableLens[]>([]);
@@ -38,25 +38,12 @@ export function Discover() {
     setNameFilter(event.currentTarget.value.toLowerCase());
   };
 
-  const handleInstalledFinished = (name: string) => {
-    setInstalling(list => list.flatMap(x => x === name ? [] : [x]));
-    handleRefresh();
-  };
-
-  const handleInstall = async (lens: InstallableLens) => {
-    if (installing.includes(lens.name)) {
+  const handleRefresh = async () => {
+    if (isLoading) {
       return;
     }
 
-    setInstalling((list) => {
-      const updated = [...list, lens.name];
-      return updated;
-    });
-
-    await invoke("install_lens", { name: lens.name });
-  };
-
-  const handleRefresh = async () => {
+    setIsLoading(true);
     const lenses = await invoke<InstallableLens[]>(
       "list_installable_lenses",
     ).finally(() => setIsLoading(false));
@@ -74,6 +61,24 @@ export function Discover() {
 
     setCategoryList(categories);
     setInstallable(lenses);
+  };
+
+  const handleInstalledFinished = (name: string) => {
+    setInstalling((list) => list.flatMap((x) => (x === name ? [] : [x])));
+    handleRefresh();
+  };
+
+  const handleInstall = async (lens: InstallableLens) => {
+    if (installing.includes(lens.name)) {
+      return;
+    }
+
+    setInstalling((list) => {
+      const updated = [...list, lens.name];
+      return updated;
+    });
+
+    await invoke("install_lens", { name: lens.name });
   };
 
   useEffect(() => {
@@ -99,14 +104,16 @@ export function Discover() {
       await handleRefresh();
       return Promise.all([
         listen("RefreshDiscover", async () => await handleRefresh()),
-        listen<string>("LensInstalled", (event) => handleInstalledFinished(event.payload)),
+        listen<string>("LensInstalled", (event) =>
+          handleInstalledFinished(event.payload),
+        ),
       ]);
     };
 
     const unlisten = init();
     return () => {
       (async () => {
-        await unlisten.then(fns => fns.forEach(fn => fn()));
+        await unlisten.then((fns) => fns.forEach((fn) => fn()));
       })();
     };
   }, []);
