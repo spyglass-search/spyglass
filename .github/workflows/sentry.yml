@@ -8,92 +8,88 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [
-          macos-latest,
-          'ubuntu-20.04',
-          'windows-latest'
-        ]
+        platform: [macos-latest, "ubuntu-24.04", "windows-latest"]
 
     runs-on: ${{ matrix.platform }}
     steps:
-    # Checkout source code
-    - uses: actions/checkout@v3
-    - name: install Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-    # Install sentry-cli
-    - name: install sentry-cli
-      run: npm install @sentry/cli
-    # Install dependencies for plugins/client
-    - name: install wasm target
-      run: rustup target add wasm32-unknown-unknown
-    - name: install wasm32-wasi toolchain
-      run: rustup target add wasm32-wasi
-    # Install macos specific targets
-    - name: install arm64 rust target (macos only)
-      if: matrix.platform == 'macos-latest'
-      run: rustup target add aarch64-apple-darwin
-    # Install tauri build deps
-    - name: install tauri-cli & tauri-build
-      run: cargo install tauri-cli --version "^1.1"
-    - name: install trunk
-      run: cargo install --locked trunk
-    # Install linux specific dependencies
-    - name: install dependencies (ubuntu only)
-      if: matrix.platform == 'ubuntu-20.04'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libgtk-3-dev \
-          webkit2gtk-4.0 \
-          libappindicator3-dev \
-          libayatana-appindicator3-dev \
-          librsvg2-dev \
-          patchelf
-    # Setup arch targets - linux
-    - name: setup arch target - linux
-      if: ${{startsWith(matrix.platform, 'ubuntu')}}
-      run: |
-        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
-        echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=linux" >> $GITHUB_ENV
-    - name: setup arch target - macos
-      if: ${{startsWith(matrix.platform, 'macos')}}
-      run: |
-        echo "target_arch=x86_64-apple-darwin" >> $GITHUB_ENV
-        echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=mac" >> $GITHUB_ENV
-    - name: Setup arch target (windows only)
-      if: ${{startsWith(matrix.platform, 'windows')}}
-      run: |
-        echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
-        echo "target_ext=.exe" >> $env:GITHUB_ENV
-        echo "target_os_name=win" >> $env:GITHUB_ENV
-    # search backend
-    - name: build search backend
-      run: |
-        cargo build -p spyglass --profile sentry
-        cargo build -p spyglass --bin spyglass-debug --profile sentry
-    - name: upload backend to sentry
-      run: |
-        npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
-        npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass${{ env.target_ext }}
-      env:
-        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-    # build front & tauri app
-    - name: copy sidebar
-      run: |
-        cp target/sentry/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-        cp target/sentry/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
-        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
-    - name: build frontend
-      run: cd crates/client && trunk build
-    - name: build tauri app
-      run: cargo build -p spyglass-app --profile sentry
-    - name: upload frontend sentry
-      run: |
-        npx sentry-cli difutil check target/sentry/spyglass-app${{ env.target_ext }}
-        npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app${{ env.target_ext }}
-      env:
-        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # Checkout source code
+      - uses: actions/checkout@v3
+      - name: install Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      # Install sentry-cli
+      - name: install sentry-cli
+        run: npm install @sentry/cli
+      # Install dependencies for plugins/client
+      - name: install wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: install wasm32-wasi toolchain
+        run: rustup target add wasm32-wasi
+      # Install macos specific targets
+      - name: install arm64 rust target (macos only)
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin
+      # Install tauri build deps
+      - name: install tauri-cli & tauri-build
+        run: cargo install tauri-cli --version "^1.1"
+      - name: install trunk
+        run: cargo install --locked trunk
+      # Install linux specific dependencies
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            webkit2gtk-4.0 \
+            libappindicator3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+      # Setup arch targets - linux
+      - name: setup arch target - linux
+        if: ${{startsWith(matrix.platform, 'ubuntu')}}
+        run: |
+          echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
+          echo "target_ext=" >> $GITHUB_ENV
+          echo "target_os_name=linux" >> $GITHUB_ENV
+      - name: setup arch target - macos
+        if: ${{startsWith(matrix.platform, 'macos')}}
+        run: |
+          echo "target_arch=x86_64-apple-darwin" >> $GITHUB_ENV
+          echo "target_ext=" >> $GITHUB_ENV
+          echo "target_os_name=mac" >> $GITHUB_ENV
+      - name: Setup arch target (windows only)
+        if: ${{startsWith(matrix.platform, 'windows')}}
+        run: |
+          echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
+          echo "target_ext=.exe" >> $env:GITHUB_ENV
+          echo "target_os_name=win" >> $env:GITHUB_ENV
+      # search backend
+      - name: build search backend
+        run: |
+          cargo build -p spyglass --profile sentry
+          cargo build -p spyglass --bin spyglass-debug --profile sentry
+      - name: upload backend to sentry
+        run: |
+          npx sentry-cli difutil check target/sentry/spyglass${{ env.target_ext }}
+          npx sentry-cli upload-dif -o spyglass -p spyglass-server --include-sources target/sentry/spyglass${{ env.target_ext }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # build front & tauri app
+      - name: copy sidebar
+        run: |
+          cp target/sentry/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+          cp target/sentry/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
+          cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
+      - name: build frontend
+        run: cd crates/client && trunk build
+      - name: build tauri app
+        run: cargo build -p spyglass-app --profile sentry
+      - name: upload frontend sentry
+        run: |
+          npx sentry-cli difutil check target/sentry/spyglass-app${{ env.target_ext }}
+          npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app${{ env.target_ext }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
