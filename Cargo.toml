@@ -22,7 +22,7 @@ opt-level = "s"
 [workspace.dependencies]
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
-jsonrpsee = "0.23"
+jsonrpsee = "0.24"
 log = "0.4"
 reqwest = { version = "0.11.7", features = ["json", "stream", "multipart"] }
 ron = "0.8"
