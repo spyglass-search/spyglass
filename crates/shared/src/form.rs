@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 use std::path::Path;
 use strum_macros::{Display, EnumString};
+use ts_rs::TS;
 
 use crate::keyboard::KeyCode;
 use crate::{accelerator, MAC_OS};
