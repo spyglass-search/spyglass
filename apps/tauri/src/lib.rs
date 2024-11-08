@@ -133,9 +133,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(plugins::lens_updater::init())
-        .plugin(plugins::notify::init())
-        .plugin(plugins::startup::init())
         .invoke_handler(tauri::generate_handler![
             cmd::authorize_connection,
             cmd::choose_folder,
@@ -163,6 +160,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             cmd::search_lenses,
             cmd::update_and_restart,
             cmd::wizard_finished,
+            plugins::lens_updater::install_lens,
+            plugins::lens_updater::list_installable_lenses,
+            plugins::lens_updater::list_installed_lenses,
+            plugins::lens_updater::run_lens_updater,
+            plugins::lens_updater::uninstall_lens,
+            plugins::startup::get_startup_progress,
         ])
         .menu(menu::get_app_menu)
         .setup(move |app| {
@@ -215,6 +218,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app_handle.clone(),
             ));
 
+            // Initialize other modules
+            plugins::startup::init(app_handle);
+            plugins::lens_updater::init(app_handle);
+            plugins::notify::init(app_handle);
+
             Ok(())
         })
         .build(ctx)
@@ -225,6 +233,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Do some cleanup for long running tasks
             let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
             let _ = shutdown_tx.send(AppEvent::Shutdown);
+
+            plugins::lens_updater::exit(app_handle);
+            plugins::startup::exit(app_handle);
+            plugins::notify::exit(app_handle);
         }
         RunEvent::Exit { .. } => {
             log::info!("😔 bye bye");

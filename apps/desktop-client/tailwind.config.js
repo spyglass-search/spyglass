@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 import formsPlugin from "@tailwindcss/forms";
+import daisyUI from "daisyui";
 
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
@@ -47,5 +48,5 @@ export default {
       "5xl": "2rem",
     },
   },
-  plugins: [formsPlugin],
+  plugins: [formsPlugin, daisyUI],
 };

@@ -4,6 +4,8 @@ import "./index.css";
 import { SearchPage } from "./pages/search/index.tsx";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ErrorPage from "./error-page.tsx";
+import { WizardPage } from "./pages/wizard/WizardPage.tsx";
+import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 
 const router = createBrowserRouter([
   {
@@ -16,8 +18,9 @@ const router = createBrowserRouter([
     element: <div>Progress Popup</div>,
   },
   {
-    path: "/settings:tab",
-    element: <div>settings tab</div>,
+    path: "/settings/:tab",
+    loader: (params) => params,
+    element: <SettingsPage />,
   },
   {
     path: "/startup",
@@ -29,7 +32,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/wizard",
-    element: <div>wizard</div>,
+    element: <WizardPage />,
   },
 ]);
 

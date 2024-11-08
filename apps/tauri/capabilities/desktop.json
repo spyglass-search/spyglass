@@ -8,7 +8,12 @@
     "linux"
   ],
   "windows": [
-    "main"
+    "main",
+    "progress_window",
+    "settings_window",
+    "startup_window",
+    "update_window",
+    "wizard_window"
   ],
   "permissions": [
     "clipboard-manager:allow-read-text",
@@ -49,6 +54,10 @@
     "core:window:allow-start-dragging",
     "core:window:allow-unmaximize",
     "core:window:allow-unminimize",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "dialog:allow-ask",
     "dialog:allow-confirm",
     "dialog:allow-message",
@@ -81,6 +90,7 @@
     "process:allow-restart",
     "shell:allow-execute",
     "shell:allow-open",
-    "updater:default"
+    "updater:default",
+    "notification:default"
   ]
 }

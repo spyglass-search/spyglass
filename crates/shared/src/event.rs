@@ -42,15 +42,15 @@ pub enum ClientInvoke {
     GetLibraryStats,
     #[serde(rename = "get_shortcut")]
     GetShortcut,
-    #[serde(rename = "plugin:tauri-plugin-startup|get_startup_progress")]
+    #[serde(rename = "get_startup_progress")]
     GetStartupProgressText,
-    #[serde(rename = "plugin:lens-updater|install_lens")]
+    #[serde(rename = "install_lens")]
     InstallLens,
     #[serde(rename = "list_connections")]
     ListConnections,
-    #[serde(rename = "plugin:lens-updater|list_installed_lenses")]
+    #[serde(rename = "list_installed_lenses")]
     ListInstalledLenses,
-    #[serde(rename = "plugin:lens-updater|list_installable_lenses")]
+    #[serde(rename = "list_installable_lenses")]
     ListInstallableLenses,
     #[serde(rename = "list_plugins")]
     ListPlugins,
@@ -64,8 +64,10 @@ pub enum ClientInvoke {
     ResyncConnection,
     #[serde(rename = "revoke_connection")]
     RevokeConnection,
-    #[serde(rename = "plugin:lens-updater|run_lens_updater")]
+    #[serde(rename = "run_lens_updater")]
     RunLensUpdater,
+    #[serde(rename = "save_user_settings")]
+    SaveUserSettings,
     #[serde(rename = "search_docs")]
     SearchDocuments,
     #[serde(rename = "search_lenses")]
@@ -80,7 +82,7 @@ pub enum ClientInvoke {
     CopyToClipboard,
     #[serde(rename = "open_settings_folder")]
     OpenSettingsFolder,
-    #[serde(rename = "plugin:lens-updater|uninstall_lens")]
+    #[serde(rename = "uninstall_lens")]
     UninstallLens,
     #[serde(rename = "update_and_restart")]
     UpdateAndRestart,
@@ -130,10 +132,9 @@ pub struct UninstallLensParams {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WizardFinishedParams {
-    #[serde(rename(serialize = "toggleAudioTranscription"))]
     pub toggle_audio_transcription: bool,
-    #[serde(rename(serialize = "toggleFileIndexer"))]
     pub toggle_file_indexer: bool,
 }
 

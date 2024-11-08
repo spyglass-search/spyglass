@@ -3,33 +3,21 @@ use crate::{rpc, AppEvent};
 use anyhow::anyhow;
 use jsonrpsee::core::client::Subscription;
 use spyglass_rpc::{ModelDownloadStatusPayload, RpcClient, RpcEvent, RpcEventType};
-use tauri::{
-    async_runtime::JoinHandle,
-    plugin::{Builder, TauriPlugin},
-    AppHandle, Manager, RunEvent, Wry,
-};
+use tauri::{async_runtime::JoinHandle, AppHandle, Manager};
 use tokio::sync::broadcast;
 
 pub struct NotificationHandler(JoinHandle<()>);
 
-pub fn init() -> TauriPlugin<Wry> {
-    Builder::new("tauri-plugin-notify")
-        .on_event(|app_handle, event| match event {
-            RunEvent::Ready => {
-                log::info!("starting notify plugin");
-                let handle =
-                    tauri::async_runtime::spawn(setup_notification_handler(app_handle.clone()));
-                app_handle.manage(NotificationHandler(handle));
-            }
-            RunEvent::Exit => {
-                let app_handle = app_handle.clone();
-                if let Some(handle) = app_handle.try_state::<NotificationHandler>() {
-                    handle.0.abort();
-                }
-            }
-            _ => {}
-        })
-        .build()
+pub fn init(app: &AppHandle) {
+    log::info!("starting notify plugin");
+    let handle = tauri::async_runtime::spawn(setup_notification_handler(app.clone()));
+    app.manage(NotificationHandler(handle));
+}
+
+pub fn exit(app: &AppHandle) {
+    if let Some(handle) = app.try_state::<NotificationHandler>() {
+        handle.0.abort();
+    }
 }
 
 async fn _subscribe(app: &AppHandle) -> anyhow::Result<Subscription<RpcEvent>> {

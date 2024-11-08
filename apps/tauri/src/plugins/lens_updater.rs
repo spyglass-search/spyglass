@@ -1,10 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use tauri::{
-    async_runtime::JoinHandle,
-    plugin::{Builder, TauriPlugin},
-    AppHandle, Emitter, Manager, RunEvent, Wry,
-};
+use tauri::{async_runtime::JoinHandle, AppHandle, Emitter, Manager};
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
@@ -19,54 +15,40 @@ use spyglass_rpc::RpcClient;
 
 pub struct LensWatcherHandle(JoinHandle<()>);
 
-pub fn init() -> TauriPlugin<Wry> {
-    Builder::new("lens-updater")
-        .invoke_handler(tauri::generate_handler![
-            install_lens,
-            list_installable_lenses,
-            list_installed_lenses,
-            run_lens_updater,
-            uninstall_lens,
-        ])
-        .on_event(|app_handle, event| match event {
-            RunEvent::Ready => {
-                let app_handle = app_handle.clone();
-                let app_clone = app_handle.clone();
-                let handle = tauri::async_runtime::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(
-                        constants::LENS_UPDATE_CHECK_INTERVAL_S,
-                    ));
+pub fn init(app_handle: &AppHandle) {
+    let app_handle = app_handle.clone();
+    let app_clone = app_handle.clone();
+    let handle = tauri::async_runtime::spawn(async move {
+        let mut interval =
+            time::interval(Duration::from_secs(constants::LENS_UPDATE_CHECK_INTERVAL_S));
 
-                    let app_handle = app_handle.clone();
-                    let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
-                    let mut shutdown = shutdown_tx.subscribe();
+        let app_handle = app_handle.clone();
+        let shutdown_tx = app_handle.state::<broadcast::Sender<AppEvent>>();
+        let mut shutdown = shutdown_tx.subscribe();
 
-                    loop {
-                        tokio::select! {
-                            event = shutdown.recv() => {
-                                if let Ok(AppEvent::Shutdown) = event {
-                                    log::info!("🛑 Shutting down lens updater");
-                                    return;
-                                }
-                            },
-                            _ = interval.tick() => {
-                                let _ = check_for_lens_updates(&app_handle).await;
-                            },
-                        }
+        loop {
+            tokio::select! {
+                event = shutdown.recv() => {
+                    if let Ok(AppEvent::Shutdown) = event {
+                        log::info!("🛑 Shutting down lens updater");
+                        return;
                     }
-                });
+                },
+                _ = interval.tick() => {
+                    let _ = check_for_lens_updates(&app_handle).await;
+                },
+            }
+        }
+    });
 
-                app_clone.manage(LensWatcherHandle(handle));
-            }
-            RunEvent::Exit => {
-                let app_handle = app_handle.clone();
-                if let Some(handle) = app_handle.try_state::<LensWatcherHandle>() {
-                    handle.0.abort();
-                }
-            }
-            _ => {}
-        })
-        .build()
+    app_clone.manage(LensWatcherHandle(handle));
+}
+
+pub fn exit(app_handle: &AppHandle) {
+    let app_handle = app_handle.clone();
+    if let Some(handle) = app_handle.try_state::<LensWatcherHandle>() {
+        handle.0.abort();
+    }
 }
 
 async fn check_for_lens_updates(app_handle: &AppHandle) -> anyhow::Result<()> {

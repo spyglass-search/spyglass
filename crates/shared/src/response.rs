@@ -10,27 +10,31 @@ pub struct AppStatus {
     pub num_docs: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct SupportedConnection {
     pub id: String,
     pub label: String,
     pub description: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct UserConnection {
     pub id: String,
     pub account: String,
     pub is_syncing: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct ListConnectionResult {
     pub supported: Vec<SupportedConnection>,
     pub user_connections: Vec<UserConnection>,
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct InstallableLens {
     pub author: String,
     pub description: String,
@@ -293,7 +297,8 @@ impl LibraryStats {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct DefaultIndices {
     pub file_paths: Vec<PathBuf>,
     pub extensions: Vec<String>,
