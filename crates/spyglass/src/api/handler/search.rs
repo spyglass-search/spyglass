@@ -1,4 +1,5 @@
 use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
+use entities::models::vec_documents::DocDistance;
 use entities::models::{indexed_document, lens, tag, vec_documents};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
@@ -68,6 +69,10 @@ pub async fn search_docs(
                     vec_documents::get_document_distance(&state.db, &lens_ids, &embedding).await;
 
                 if let Ok(distances) = distances.as_mut() {
+                    let mut distances = distances
+                        .iter()
+                        .filter(|dist| dist.distance < 25.0)
+                        .collect::<Vec<&DocDistance>>();
                     distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
 
                     let min_value = distances
