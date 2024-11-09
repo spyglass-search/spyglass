@@ -421,7 +421,8 @@ impl<O> WrapErr<O> for Result<O, candle::Error> {
 pub fn load_tokenizer(model_root: &Path) -> anyhow::Result<Tokenizer> {
     // Load tokenizer
     let tokenizer_path = model_root.join("tokenizer.json");
-    let mut tokenizer = Tokenizer::from_file(tokenizer_path).expect("tokenizer.json not found");
+    let mut tokenizer = Tokenizer::from_file(tokenizer_path)
+        .map_err(|error| anyhow::format_err!("Error loading tokenizer {:?}", error))?;
     // See https://github.com/huggingface/tokenizers/pull/1357
     if let Some(pre_tokenizer) = tokenizer.get_pre_tokenizer() {
         if let PreTokenizerWrapper::Metaspace(m) = pre_tokenizer {

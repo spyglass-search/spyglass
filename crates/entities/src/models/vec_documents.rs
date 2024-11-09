@@ -40,7 +40,7 @@ where
             db.get_database_backend(),
             r#"
             update vec_documents set embedding = $2
-                where id = $1
+                where rowid = $1
             "#,
             vec![id.into(), embedding.into()],
         )

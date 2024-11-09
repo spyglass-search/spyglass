@@ -509,6 +509,20 @@ pub async fn copy_table(
     Ok(())
 }
 
+pub async fn get_documents_missing_embeddings(
+    db: &DatabaseConnection,
+) -> Result<Vec<Model>, DbErr> {
+    let statement = Statement::from_string(
+        db.get_database_backend(),
+        r#"
+         select * from indexed_document where id not in (
+	        select indexed_document_id from embedding_queue where status != 'Failed')
+    "#,
+    );
+
+    Model::find_by_statement(statement).all(db).await
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;

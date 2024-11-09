@@ -62,7 +62,7 @@ pub async fn search_docs(
         }));
     }
 
-    if let Some(embedding_api) = state.embedding_api.as_ref() {
+    if let Some(embedding_api) = state.embedding_api.load_full().as_ref() {
         match embedding_api.embed(&query, EmbeddingContentType::Query) {
             Ok(embedding) => {
                 let mut distances =

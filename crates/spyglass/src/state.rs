@@ -57,7 +57,7 @@ impl FetchLimitType {
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
-    pub embedding_api: Arc<Option<EmbeddingApi>>,
+    pub embedding_api: Arc<ArcSwap<Option<EmbeddingApi>>>,
     pub app_state: Arc<DashMap<String, String>>,
     pub lenses: Arc<DashMap<String, LensConfig>>,
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
@@ -118,6 +118,11 @@ impl AppState {
 
         // self.user_settings = config.user_settings.clone();
         self.config = config;
+    }
+
+    pub fn reload_model(&mut self) {
+        let embedding_api = load_model(self.user_settings.load_full().as_ref());
+        self.embedding_api.store(Arc::new(embedding_api));
     }
 
     pub fn builder() -> AppStateBuilder {
@@ -184,27 +189,7 @@ impl AppStateBuilder {
             UserSettings::default()
         };
 
-        let mut embedding_api = None;
-        if self
-            .user_settings
-            .as_ref()
-            .is_some_and(|settings| settings.embedding_settings.enable_embeddings)
-        {
-            let mut model_root = user_settings.data_directory.clone();
-            model_root.push("models");
-            model_root.push("embeddings");
-
-            let mut tokenizer_file = model_root.clone();
-            tokenizer_file.push("tokenizer.json");
-            let mut model = model_root.clone();
-            model.push("model.safetensors");
-
-            if tokenizer_file.exists() && model.exists() {
-                embedding_api = EmbeddingApi::new(model_root.clone()).ok();
-            } else {
-                log::warn!("Model does not exist");
-            }
-        }
+        let embedding_api = load_model(&user_settings);
 
         let (shutdown_tx, _) = broadcast::channel::<AppShutdown>(16);
         let (config_tx, _) = broadcast::channel::<UserSettingsChange>(16);
@@ -231,7 +216,7 @@ impl AppStateBuilder {
             user_settings: Arc::new(ArcSwap::from_pointee(user_settings)),
             fetch_limits: Arc::new(DashMap::new()),
             readonly_mode: self.readonly_mode.unwrap_or_default(),
-            embedding_api: Arc::new(embedding_api),
+            embedding_api: Arc::new(ArcSwap::from_pointee(embedding_api)),
         }
     }
 
@@ -278,5 +263,36 @@ impl AppStateBuilder {
 
         self.index = Some(searcher.expect("Unable to open index"));
         self
+    }
+}
+
+fn load_model(user_settings: &UserSettings) -> Option<EmbeddingApi> {
+    if user_settings.embedding_settings.enable_embeddings {
+        let mut model_root = user_settings.data_directory.clone();
+        model_root.push("models");
+        model_root.push("embeddings");
+
+        let mut tokenizer_file = model_root.clone();
+        tokenizer_file.push("tokenizer.json");
+        let mut model = model_root.clone();
+        model.push("model.safetensors");
+
+        if tokenizer_file.exists() && model.exists() {
+            match EmbeddingApi::new(model_root.clone()) {
+                Ok(embedding_api) => {
+                    log::info!("Embedding Model Loaded");
+                    Some(embedding_api)
+                }
+                Err(error) => {
+                    log::error!("Error Loading Embedding Model {:?}", error);
+                    None
+                }
+            }
+        } else {
+            log::warn!("Model does not exist");
+            None
+        }
+    } else {
+        None
     }
 }

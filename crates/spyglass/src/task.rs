@@ -1,12 +1,16 @@
 use anyhow::anyhow;
 use entities::models::crawl_queue::CrawlStatus;
-use entities::models::{bootstrap_queue, connection, crawl_queue, embedding_queue};
+use entities::models::{
+    bootstrap_queue, connection, crawl_queue, embedding_queue, indexed_document,
+};
+use entities::sea_orm::Set;
 use entities::sea_orm::{sea_query::Expr, ColumnTrait, Condition, EntityTrait, QueryFilter};
 use futures::StreamExt;
 use notify::event::ModifyKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use shared::config::{Config, LensConfig, UserSettings, UserSettingsDiff};
 use spyglass_rpc::{ModelDownloadStatusPayload, RpcEvent, RpcEventType};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -23,6 +27,7 @@ use crate::filesystem;
 use crate::state::AppState;
 use crate::task::worker::FetchResult;
 use diff::Diff;
+use entities::sea_orm::ActiveModelBehavior;
 use spyglass_processor::utils::extensions::AudioExt;
 
 pub mod lens;
@@ -265,18 +270,37 @@ pub async fn config_task(mut state: AppState) {
                         }
 
                         if new_settings.embedding_settings.enable_embeddings {
+                            let model_dir = state.config.embedding_model_dir();
                             let model_path = state.config.embedding_model_dir().join("model.safetensors");
                             let tokenizer_path = state.config.embedding_model_dir().join("tokenizer.json");
                             let model_config_path = state.config.embedding_model_dir().join("config.json");
                             if !model_path.exists() || !tokenizer_path.exists() || !model_config_path.exists() {
-                                let state_clone = state.clone();
-                                tokio::spawn(async move {
-                                    let _ = download_model(&state_clone, "Embedding Model", model_path, shared::constants::EMBEDDING_MODEL).await;
-                                    let _ = download_model(&state_clone, "Embedding Model Config", tokenizer_path, shared::constants::EMBEDDING_MODEL_CONFIG).await;
-                                    let _ = download_model(&state_clone, "Embedding Model Tokenizer", model_config_path, shared::constants::EMBEDDING_MODEL_TOKENIZER).await;
+                                log::debug!("Loading Embedding Models...");
+                                let mut state_clone = state.clone();
 
-                                    //TODO Embed current documents
+                                if !model_dir.exists() {
+                                    let _ = std::fs::create_dir_all(model_dir);
+                                }
+
+                                tokio::spawn(async move {
+
+                                    if let Err(error) = download_model(&state_clone, "Embedding Model", model_path, shared::constants::EMBEDDING_MODEL).await {
+                                        log::error!("Error downloading Embedding model {:?}", error);
+                                    }
+                                    if let Err(error) = download_model(&state_clone, "Embedding Model Config", model_config_path, shared::constants::EMBEDDING_MODEL_CONFIG).await {
+                                        log::error!("Error downloading Embedding model config {:?}", error);
+                                    }
+                                    if let Err(error) = download_model(&state_clone, "Embedding Model Tokenizer", tokenizer_path, shared::constants::EMBEDDING_MODEL_TOKENIZER).await {
+                                        log::error!("Error downloading Embedding model tokenizer config {:?}", error);
+                                    }
+
+                                    state_clone.reload_model();
+
+                                    add_missing_embeddings(&state_clone).await;
                                 });
+                            } else {
+                                state.reload_model();
+                                add_missing_embeddings(&state).await;
                             }
                         }
                     }
@@ -290,6 +314,48 @@ pub async fn config_task(mut state: AppState) {
     }
 }
 
+async fn add_missing_embeddings(state: &AppState) {
+    match indexed_document::get_documents_missing_embeddings(&state.db).await {
+        Ok(missing_embeddings) => {
+            // could be a very large set of documents
+            for missing_embeddings in missing_embeddings.chunks(1000) {
+                let doc_ids = missing_embeddings
+                    .iter()
+                    .map(|doc| doc.doc_id.clone())
+                    .collect::<Vec<String>>();
+
+                let docs = state
+                    .index
+                    .search_by_query(None, Some(doc_ids), &[], &[])
+                    .await;
+                let mut content_map: HashMap<String, String> = HashMap::new();
+                for (_, result) in docs {
+                    content_map.insert(result.doc_id.to_owned(), result.content.to_owned());
+                }
+
+                let updates = missing_embeddings
+                    .iter()
+                    .map(|doc| {
+                        let mut model = embedding_queue::ActiveModel::new();
+                        let content = content_map.get(&doc.doc_id).cloned();
+                        model.document_id = Set(doc.doc_id.clone());
+                        model.content = Set(content);
+                        model.indexed_document_id = Set(doc.id);
+                        model
+                    })
+                    .collect::<Vec<embedding_queue::ActiveModel>>();
+
+                if let Err(error) = embedding_queue::add_to_queue(&state.db, &updates).await {
+                    log::error!("Error adding documents to embedding queue {:?}", error);
+                }
+            }
+        }
+        Err(error) => {
+            log::error!("Error getting missing document embeddings. {:?}", error);
+        }
+    }
+}
+
 /// Downloads a model from our assets S3 bucket
 async fn download_model(
     state: &AppState,
@@ -297,7 +363,6 @@ async fn download_model(
     model_path: PathBuf,
     model_url: &str,
 ) -> anyhow::Result<()> {
-    // Currently we only have the audio model :)
     match reqwest::get(model_url).await {
         Ok(res) => {
             let total_size = res.content_length().expect("Unable to get content length");
