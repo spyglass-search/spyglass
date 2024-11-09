@@ -25,16 +25,13 @@ else
 	cp utils/linux/pdftotext apps/tauri/binaries/pdftotext-$(strip $(TARGET_ARCH))
 endif
 
-build-client:
-	cargo build -p spyglass-client -p spyglass-app
-
 build-release: build-backend
 	cargo tauri build
 
 check:
 	cargo check --all
 
-clippy: fmt
+clippy: check fmt
 	cargo clippy --all
 
 fmt:
@@ -53,19 +50,15 @@ setup-dev:
 	rustup target add wasm32-unknown-unknown
 # Required for plugin development
 	rustup target add wasm32-wasi
-# Install tauri-cli & trunk for client development
+# install tauri-cli and node dependencies
 	cargo install --locked tauri-cli
-	cargo install --locked trunk
-# Install tailwind
-	cd ./crates/client && npm install
+	cd ./apps/desktop-client && npm i
 # Download whisper model used in development
 	mkdir -p assets/models/embeddings;
 	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
 	mv whisper.base.en.bin assets/models;
 # Check if .env exists and if not create it
 	test -f .env || cp .env.template .env
-# Check if /dist folder exists for Tauri and if not create it
-	mkdir -p ./apps/tauri/dist
 # Build backend to copy binaries for Tauri
 	make build-backend
 
@@ -89,10 +82,7 @@ run-backend-dev:
 	cargo run -p spyglass
 
 run-client-dev:
-	cargo tauri dev --config ./apps/tauri/tauri.dev.conf.json
-
-run-client-headless:
-	cd ./crates/client && HEADLESS_CLIENT=true trunk serve
+	cd apps/tauri && cargo tauri dev
 
 upload-debug-symbols-windows:
 	cargo build -p spyglass --profile sentry
@@ -105,6 +95,6 @@ upload-debug-symbols-windows:
 	npx sentry-cli difutil check target/sentry/spyglass-app.exe
 	npx sentry-cli upload-dif -o spyglass -p spyglass-frontend --include-sources target/sentry/spyglass-app.exe
 
-
+# Generate typescript bindings for rust <> typescript interop
 generate-bindings:
 	TS_RS_EXPORT_DIR="../../apps/desktop-client/src/bindings" cargo test -p shared

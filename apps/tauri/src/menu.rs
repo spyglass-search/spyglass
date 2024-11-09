@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
-use shared::config::UserSettings;
+use shared::config::{Config, UserSettings};
 use strum_macros::{Display, EnumString};
 use tauri::{
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
     tray::{TrayIcon, TrayIconEvent},
-    AppHandle, PackageInfo,
+    AppHandle, Manager, PackageInfo,
 };
 
 use crate::{pause_crawler, platform::os_open, window};
@@ -235,7 +235,11 @@ pub fn handle_tray_menu_events(app: &AppHandle, event: MenuEvent) {
         MenuID::OPEN_LENS_MANAGER => {
             window::navigate_to_tab(app, &crate::constants::TabLocation::Library);
         }
-        // MenuID::OPEN_LOGS_FOLDER => window::open_folder(config.logs_dir()),
+        MenuID::OPEN_LOGS_FOLDER => {
+            if let Some(config) = app.try_state::<Config>() {
+                crate::open_folder(config.logs_dir())
+            }
+        }
         MenuID::OPEN_SETTINGS_MANAGER => {
             window::navigate_to_tab(app, &crate::constants::TabLocation::UserSettings);
         }
