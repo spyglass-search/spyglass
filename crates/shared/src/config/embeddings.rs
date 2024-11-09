@@ -5,17 +5,9 @@ use crate::form::{FormType, SettingOpts};
 
 use super::UserSettings;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Diff)]
+#[derive(Clone, Debug, Serialize, Deserialize, Diff, Default)]
 pub struct EmbeddingSettings {
     pub enable_embeddings: bool,
-}
-
-impl Default for EmbeddingSettings {
-    fn default() -> Self {
-        EmbeddingSettings {
-            enable_embeddings: false,
-        }
-    }
 }
 
 #[allow(dead_code)]
