@@ -1,7 +1,7 @@
 use crate::form::{FormType, SettingOpts};
 use diff::Diff;
 use directories::ProjectDirs;
-use embeddings::EmbeddingSettings;
+use embeddings::{embedding_setting_opts, EmbeddingSettings};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -234,6 +234,7 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
 
         config.extend(fs_setting_opts(&settings));
         config.extend(audio_setting_opts(&settings));
+        config.extend(embedding_setting_opts(&settings));
 
         config
     }

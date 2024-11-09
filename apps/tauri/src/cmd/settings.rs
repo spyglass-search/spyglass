@@ -90,6 +90,10 @@ pub async fn save_user_settings(
                                     current_settings.audio_settings.enable_audio_transcription =
                                         serde_json::from_str(value).unwrap_or_default()
                                 }
+                                "embedding_settings.enable_embeddings" => {
+                                    current_settings.embedding_settings.enable_embeddings =
+                                        serde_json::from_str(value).unwrap_or_default()
+                                }
                                 _ => {}
                             }
                         }

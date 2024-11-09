@@ -194,7 +194,7 @@ pub async fn process_crawl_results(
             )
             .await?;
 
-        if crawl_result.content.is_some() && state.embedding_api.as_ref().is_some() {
+        if crawl_result.content.is_some() && state.embedding_api.load().as_ref().is_some() {
             embedding_map.insert(doc_id.clone(), crawl_result.content.clone().unwrap());
         }
 

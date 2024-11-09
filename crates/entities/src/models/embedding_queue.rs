@@ -84,7 +84,12 @@ where
     Entity::insert(model)
         .on_conflict(
             OnConflict::column(Column::DocumentId)
-                .update_columns([Column::Status, Column::Content, Column::IndexedDocumentId])
+                .update_columns([
+                    Column::Status,
+                    Column::Content,
+                    Column::IndexedDocumentId,
+                    Column::UpdatedAt,
+                ])
                 .to_owned(),
         )
         .exec(db)
@@ -98,7 +103,12 @@ where
     Entity::insert_many(to_add.to_vec())
         .on_conflict(
             OnConflict::column(Column::DocumentId)
-                .update_columns([Column::Status, Column::Content, Column::IndexedDocumentId])
+                .update_columns([
+                    Column::Status,
+                    Column::Content,
+                    Column::IndexedDocumentId,
+                    Column::UpdatedAt,
+                ])
                 .to_owned(),
         )
         .exec_without_returning(db)

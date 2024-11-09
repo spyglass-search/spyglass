@@ -13,7 +13,7 @@ pub struct EmbeddingSettings {
 impl Default for EmbeddingSettings {
     fn default() -> Self {
         EmbeddingSettings {
-            enable_embeddings: true,
+            enable_embeddings: false,
         }
     }
 }
@@ -26,7 +26,7 @@ pub fn embedding_setting_opts(settings: &UserSettings) -> Vec<(String, SettingOp
             label: "Beta: Enable Similarity Search".into(),
             value: settings.embedding_settings.enable_embeddings.to_string(),
             form_type: FormType::Bool,
-            restart_required: true,
+            restart_required: false,
             help_text: Some(
                 r#"Embeddings are generated for documents and search will check for
                    semantic similarity as well as standard search."#
