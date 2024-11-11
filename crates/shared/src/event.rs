@@ -145,13 +145,15 @@ pub struct NavigateParams {
     pub page: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct ModelStatusPayload {
     pub msg: String,
     pub percent: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct ModelStatusPayloadWrapper {
     pub payload: ModelStatusPayload,
 }
