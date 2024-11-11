@@ -77,6 +77,8 @@ jobs:
         if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
         run: |
           cargo build -p spyglass --verbose --release
+
+          mkdir -p apps/tauri/binaries
           cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
           cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
           cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
