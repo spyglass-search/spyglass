@@ -40,6 +40,9 @@ jobs:
       - name: install tauri & plugins
         working-directory: './apps/tauri'
         run: npm install
+      - name: install front-end dependencies
+        working-directory: './apps/desktop-client'
+        run: npm install
       # Install system dependencies
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
