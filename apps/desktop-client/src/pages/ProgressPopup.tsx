@@ -14,7 +14,9 @@ export function ProgressPopup() {
       },
     );
 
-    return () => unlisten.then((fn) => fn());
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   return (
