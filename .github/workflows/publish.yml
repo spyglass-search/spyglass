@@ -141,7 +141,6 @@ jobs:
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }} --config tauri.rel.conf.json
           # the action automatically replaces \_\_VERSION\_\_ with the app version
           tagName: v20__VERSION__
-          tauriScript: cargo tauri
           releaseName: "Spyglass v20__VERSION__"
           releaseBody: "See the assets to download this version and install."
           # releaseDraft: true
