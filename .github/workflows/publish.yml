@@ -133,6 +133,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
         with:
+          projectPath: "apps/tauri"
           # Build universal binary on macOS
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }} --config tauri.rel.conf.json
           # the action automatically replaces \_\_VERSION\_\_ with the app version
