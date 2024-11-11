@@ -3,36 +3,33 @@ on:
   push:
     branches:
       - release
+      - refactor/production-build
 jobs:
   publish-tauri:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, "ubuntu-24.04", "windows-latest"]
+        include:
+          # - platform: "macos-latest"
+          #   args: "--target aarch64-apple-darwin"
+          - platform: "ubuntu-24.04"
+            args: ""
+          # - platform: "windows-latest"
+          #   args: ""
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v2
-      # Cleanup Disk
-      - name: Cleanup Disk
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          df -h
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
-      - name: setup node
-        uses: actions/setup-node@v1
+      - uses: actions/checkout@v4
+      # Setup tne node version we want
+      - name: Setup node
+        uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 23
+          cache: 'npm'
+          cache-dependency-path: './apps/desktop-client/package-lock.json'
       - name: install Rust stable
-        uses: actions-rs/toolchain@v1
+        uses: moonrepo/setup-rust@v1
         with:
-          toolchain: stable
-      # Install dependencies for plugins/client
-      - name: install wasm target
-        run: rustup target add wasm32-unknown-unknown
-      - name: install wasm32-wasi toolchain
-        run: rustup target add wasm32-wasi
+          channel: stable
       # Install macos specific targets
       - name: install intel & arm64 rust target (macos only)
         if: matrix.platform == 'macos-latest'
@@ -40,19 +37,18 @@ jobs:
           rustup target add aarch64-apple-darwin
           rustup target add x86_64-apple-darwin
       # Install tauri build deps
-      - name: install tauri-cli & tauri-build
-        run: cargo install tauri-cli --version "^1.1"
-      - name: install trunk
-        run: cargo install --locked trunk
+      - name: install tauri & plugins
+        working-directory: './apps/tauri'
+        run: npm install
+      # Install system dependencies
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-3-dev \
-            webkit2gtk-4.0 \
+            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
-            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
       # Setup arch targets - linux
@@ -77,7 +73,6 @@ jobs:
         if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
         run: |
           cargo build -p spyglass --verbose --release
-
           cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
           cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
           cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
@@ -90,7 +85,7 @@ jobs:
           cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
 
           cp target/x86_64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-x86_64-apple-darwin;
-          # cp target/aarch64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+          cp target/aarch64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
 
           cp target/x86_64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
           cp target/aarch64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
@@ -108,8 +103,6 @@ jobs:
             target/x86_64-apple-darwin/release/spyglass-debug \
             target/aarch64-apple-darwin/release/spyglass-debug;
 
-      - name: build default plugins
-        run: make build-plugins-release
       - name: import windows certificate
         if: matrix.platform == 'windows-latest'
         env:
@@ -121,7 +114,7 @@ jobs:
           certutil -decode certificate/tempCert.txt certificate/certificate.pfx
           Remove-Item -path certificate -include tempCert.txt
           Import-PfxCertificate -FilePath certificate/certificate.pfx -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText)
-      - uses: tauri-apps/tauri-action@dev
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -137,9 +130,9 @@ jobs:
           # Build universal binary on macOS
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }} --config tauri.rel.conf.json
           # the action automatically replaces \_\_VERSION\_\_ with the app version
-          tagName: v20__VERSION__
-          tauriScript: cargo tauri
-          releaseName: "Spyglass v20__VERSION__"
-          releaseBody: "See the assets to download this version and install."
-          releaseDraft: true
-          prerelease: false
+          # tagName: v20__VERSION__
+          # tauriScript: cargo tauri
+          # releaseName: "Spyglass v20__VERSION__"
+          # releaseBody: "See the assets to download this version and install."
+          # releaseDraft: true
+          # prerelease: false
