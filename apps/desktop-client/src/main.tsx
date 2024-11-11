@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ErrorPage from "./error-page.tsx";
 import { WizardPage } from "./pages/wizard/WizardPage.tsx";
 import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
+import { ProgressPopup } from "./pages/ProgressPopup.tsx";
 
 const router = createBrowserRouter([
   {
@@ -15,7 +16,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/progress",
-    element: <div>Progress Popup</div>,
+    element: <ProgressPopup />,
   },
   {
     path: "/settings/:tab",
