@@ -53,16 +53,30 @@ impl EmbeddingApi {
         let input_batch = batch(vec![tokens], [0].to_vec(), vec![]);
 
         let start = Instant::now();
-        let embed = self.backend.embed(input_batch).unwrap();
-        log::debug!(
-            "Embedding {} tokens took {}",
-            token_length,
-            start.elapsed().as_millis()
-        );
-        if let Some(Embedding::Pooled(embedding)) = embed.get(&0) {
-            Ok(embedding.to_owned())
-        } else {
-            Err(anyhow::format_err!("Unable to process embedding"))
+
+        match self.backend.embed(input_batch) {
+            Ok(embed) => {
+                log::debug!(
+                    "Embedding {} tokens took {}",
+                    token_length,
+                    start.elapsed().as_millis()
+                );
+                if let Some(Embedding::Pooled(embedding)) = embed.get(&0) {
+                    Ok(embedding.to_owned())
+                } else {
+                    Err(anyhow::format_err!("Unable to process embedding"))
+                }
+            }
+            Err(error) => {
+                log::error!(
+                    "Embedding failed after {} tokens took {}. {:?}",
+                    token_length,
+                    start.elapsed().as_millis(),
+                    error
+                );
+
+                Err(anyhow::format_err!("Embedding failed {:?}", error))
+            }
         }
     }
 }
