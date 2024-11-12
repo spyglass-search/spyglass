@@ -246,13 +246,33 @@ pub async fn config_task(mut state: AppState) {
                         // Audio transcriptions enabled?
                         if new_settings.audio_settings.enable_audio_transcription {
                             // Do we already have this model?
-                            let model_path = state.config.model_dir().join("whisper.base.en.bin");
-                            if !model_path.exists() {
+                            let model_dir = state.config.model_dir().join("whisper");
+                            let model_path = model_dir.join("model.safetensors");
+                            let tokenizer_path = model_dir.join("tokenizer.json");
+                            let model_config_path = model_dir.join("config.json");
+
+                            if !model_path.exists() || !tokenizer_path.exists() || !model_config_path.exists() {
+
+                                if !model_dir.exists() {
+                                    let _ = std::fs::create_dir_all(model_dir);
+                                }
+
                                 // Spawn a background task to download and send progress updates to
                                 // any listening clients
                                 let state_clone = state.clone();
                                 tokio::spawn(async move {
-                                    let _ = download_model(&state_clone, "Audio Transcription Model", model_path, shared::constants::WHISPER_MODEL).await;
+
+                                    if let Err(error) = download_model(&state_clone, "Audio Transcription Model", model_path, shared::constants::WHISPER_MODEL).await {
+                                        log::error!("Error downloading Audio Model {:?}", error);
+                                    }
+
+                                    if let Err(error) = download_model(&state_clone, "Audio Transcription Model Config", model_config_path, shared::constants::WHISPER_MODEL_CONFIG).await {
+                                        log::error!("Error downloading Audio Model Config {:?}", error);
+                                    }
+
+                                    if let Err(error) = download_model(&state_clone, "Audio Transcription Model Tokenizer", tokenizer_path, shared::constants::WHISPER_MODEL_TOKENIZER).await {
+                                        log::error!("Error downloading Audio Model Tokenizer {:?}", error);
+                                    }
                                     // Once we're done downloading the model, recrawl any audio files
                                     let audio_exts = AudioExt::iter().map(|x| x.to_string()).collect::<Vec<String>>();
                                     let mut condition = Condition::any();
