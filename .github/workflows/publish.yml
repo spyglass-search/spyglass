@@ -10,12 +10,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
-            args: "--target universal-apple-darwin"
-          - platform: "ubuntu-24.04"
-            args: ""
-          # - platform: "windows-latest"
+          # - platform: "macos-latest"
+          #   args: "--target universal-apple-darwin"
+          # - platform: "ubuntu-24.04"
           #   args: ""
+          - platform: "windows-latest"
+            args: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
