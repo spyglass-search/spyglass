@@ -99,6 +99,13 @@ jobs:
           cargo build -p spyglass --bin spyglass-debug --verbose --release --target x86_64-apple-darwin;
           cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
 
+          # tauri also expects these binaries to be in the binaries folder.
+          cp target/aarch64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+          cp target/x86_64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-x86_64-apple-darwin;
+
+          cp target/aarch64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
+          cp target/x86_64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
+
           # There's no build specifically for ARM macs, so lets use the same one for both.
           cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-aarch64-apple-darwin;
           cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-x86_64-apple-darwin;
