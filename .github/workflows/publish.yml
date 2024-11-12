@@ -89,15 +89,12 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
+          cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
+
           # For now only build the spyglass-debug on ARM, we'll provide
           # the ARM build ourselves as part of the repo.
+          cargo build -p spyglass --bin spyglass-debug --verbose --release --target x86_64-apple-darwin;
           cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
-
-          cp target/x86_64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-x86_64-apple-darwin;
-          cp target/aarch64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
-
-          cp target/x86_64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
-          cp target/aarch64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
 
           # There's no build specifically for ARM macs, so lets use the same one for both.
           cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-aarch64-apple-darwin;
@@ -106,7 +103,7 @@ jobs:
 
           lipo -create -output apps/tauri/binaries/spyglass-server-universal-apple-darwin \
             target/x86_64-apple-darwin/release/spyglass \
-            apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+            target/aarch64-apple-darwin/release/spyglass;
 
           lipo -create -output apps/tauri/binaries/spyglass-debug-universal-apple-darwin \
             target/x86_64-apple-darwin/release/spyglass-debug \
