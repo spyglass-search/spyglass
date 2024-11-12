@@ -79,15 +79,18 @@ jobs:
       - name: build sidecar (windows/linux)
         if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
         run: |
+          mkdir -p apps/tauri/binaries
+
           cargo build -p spyglass --verbose --release
 
-          mkdir -p apps/tauri/binaries
           cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
           cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
           cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
       - name: build sidecar (macos)
         if: matrix.platform == 'macos-latest'
         run: |
+          mkdir -p apps/tauri/binaries
+
           cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
           cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
 
@@ -133,9 +136,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
         with:
-          projectPath: "apps/tauri"
+          projectPath: "./apps/tauri"
           # Build universal binary on macOS
-          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }} --config tauri.rel.conf.json
+          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }} --config /apps/tauri/tauri.rel.conf.json
           # the action automatically replaces \_\_VERSION\_\_ with the app version
           tagName: v20__VERSION__
           releaseName: "Spyglass v20__VERSION__"
