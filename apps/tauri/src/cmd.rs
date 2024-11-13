@@ -94,7 +94,7 @@ pub async fn open_result(
         "open_url"
     };
 
-    let result = match url::Url::parse(&url) {
+    let result = match url::Url::parse(url) {
         Ok(mut url) => {
             schema = String::from(url.scheme());
             if url.scheme() == "file" {
