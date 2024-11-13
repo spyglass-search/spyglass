@@ -54,9 +54,14 @@ setup-dev:
 	cargo install --locked tauri-cli
 	cd ./apps/desktop-client && npm i
 # Download whisper model used in development
-	mkdir -p assets/models/embeddings;
-	curl -L --output whisper.base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin;
-	mv whisper.base.en.bin assets/models;
+	mkdir -p assets/models/embeddings
+	mkdir -p assets/models/whisper
+	curl -L --output model.safetensors https://huggingface.co/openai/whisper-base.en/resolve/main/model.safetensors?download=true
+	mv model.safetensors assets/models/whisper
+	curl -L --output config.json https://huggingface.co/openai/whisper-base.en/resolve/main/config.json?download=true
+	mv config.json assets/models/whisper
+	curl -L --output tokenizer.json https://huggingface.co/openai/whisper-base.en/resolve/main/tokenizer.json?download=true
+	mv tokenizer.json assets/models/whisper
 # Check if .env exists and if not create it
 	test -f .env || cp .env.template .env
 # Build backend to copy binaries for Tauri

@@ -38,6 +38,8 @@ use tokenizers::pre_tokenizers::metaspace::PrependScheme;
 use tokenizers::pre_tokenizers::sequence::Sequence;
 use tokenizers::{Encoding, PreTokenizerWrapper, Tokenizer};
 
+pub mod whisper;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum ModelType {
     Classifier,

@@ -7057,9 +7057,9 @@ dependencies = [
 
 [[package]]
 name = "rubato"
-version = "0.12.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd70209c27d5b08f5528bdc779ea3ffb418954e28987f9f9775c6eac41003f9c"
+checksum = "cdd96992d7e24b3d7f35fdfe02af037a356ac90d41b466945cf3333525a86eea"
 dependencies = [
  "num-complex",
  "num-integer",
@@ -8286,6 +8286,7 @@ version = "23.11.1"
 dependencies = [
  "accelerate-src",
  "anyhow",
+ "byteorder",
  "candle-core",
  "candle-flash-attn",
  "candle-nn",
@@ -8294,10 +8295,13 @@ dependencies = [
  "log",
  "memmap2 0.9.5",
  "nohash-hasher",
+ "rand 0.8.5",
+ "rubato",
  "safetensors",
  "serde",
  "serde_json",
  "simsimd",
+ "symphonia",
  "thiserror 2.0.0",
  "tokenizers",
  "tracing",
@@ -8361,8 +8365,8 @@ dependencies = [
  "mime",
  "new_mime_guess",
  "pdf",
- "rubato",
  "shared",
+ "spyglass-model-interface",
  "strum 0.26.3",
  "strum_macros 0.26.4",
  "symphonia",
