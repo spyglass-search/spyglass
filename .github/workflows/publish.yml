@@ -80,7 +80,7 @@ jobs:
         run: |
           mkdir -p apps/tauri/binaries
 
-          cargo build -p spyglass --verbose --release
+          cargo build -p spyglass --verbose --release --features cuda;
 
           cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
           cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
