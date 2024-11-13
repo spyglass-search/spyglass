@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
-use shared::url_to_file_path;
 use tauri::Manager;
 use tauri::{Emitter, State};
 use tauri_plugin_clipboard_manager::ClipboardExt;
