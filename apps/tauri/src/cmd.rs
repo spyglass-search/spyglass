@@ -4,6 +4,7 @@ use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
+use shared::url_to_file_path;
 use tauri::Manager;
 use tauri::{Emitter, State};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -77,6 +78,16 @@ pub async fn open_result(
 ) -> Result<(), String> {
     let mut schema = String::from("unknown");
     let mut is_default_action = false;
+
+    let application = if application
+        .as_ref()
+        .is_some_and(|a| a.to_lowercase() != "default")
+    {
+        application
+    } else {
+        None
+    };
+
     let action = if application.is_some() {
         "open_application"
     } else {
@@ -84,7 +95,7 @@ pub async fn open_result(
         "open_url"
     };
 
-    let result = match url::Url::parse(url) {
+    let result = match url::Url::parse(&url) {
         Ok(mut url) => {
             schema = String::from(url.scheme());
             if url.scheme() == "file" {
