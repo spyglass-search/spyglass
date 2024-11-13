@@ -77,6 +77,16 @@ pub async fn open_result(
 ) -> Result<(), String> {
     let mut schema = String::from("unknown");
     let mut is_default_action = false;
+
+    let application = if application
+        .as_ref()
+        .is_some_and(|a| a.to_lowercase() != "default")
+    {
+        application
+    } else {
+        None
+    };
+
     let action = if application.is_some() {
         "open_application"
     } else {

@@ -13,6 +13,8 @@ import { UserActionSettings } from "../../bindings/UserActionSettings";
 import { ActionListButton, ActionsList } from "./ActionsList";
 import { DEFAULT_ACTION } from "./constants";
 import Handlebars from "handlebars";
+import { ContextActions } from "../../bindings/ContextActions";
+import { includeAction, resultToTemplate } from "./utils";
 
 const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -49,6 +51,10 @@ export function SearchPage() {
   const [showActions, setShowActions] = useState<boolean>(false);
 
   const [userActions, setUserActions] = useState<UserActionDefinition[]>([]);
+  const [currentContextActions, setCurrentContextActions] = useState<
+    UserActionDefinition[]
+  >([]);
+  const [contextActions, setContextActions] = useState<ContextActions[]>([]);
 
   const [selectedActionIdx, setSelectedActionIdx] = useState<number>(0);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
@@ -100,7 +106,7 @@ export function SearchPage() {
   const moveSelectionDown = () => {
     if (showActions) {
       // default + number of actions
-      const max = 1 + (userActions.length - 1);
+      const max = 1 + (currentContextActions.length - 1);
       setSelectedActionIdx((idx) => (idx < max ? idx + 1 : max));
     } else {
       let max = 0;
@@ -140,7 +146,7 @@ export function SearchPage() {
             const action =
               selectedActionIdx === 0
                 ? DEFAULT_ACTION
-                : userActions[selectedActionIdx - 1];
+                : currentContextActions[selectedActionIdx - 1];
             handleSelectedAction(action);
           } else {
             if (resultMode === ResultDisplay.Documents) {
@@ -199,11 +205,20 @@ export function SearchPage() {
       await invoke("open_result", { url, application: app });
       // Open url
     } else if ("OpenUrl" in action.action) {
-      const url = action.action.OpenUrl;
-      await invoke("open_result", { url, application: null });
+      const template = Handlebars.compile(action.action.OpenUrl);
+      const selectedResultTemplate = resultToTemplate(selectedDoc);
+
+      await invoke("open_result", {
+        url: template(selectedResultTemplate),
+        application: null,
+      });
     } else if ("CopyToClipboard" in action.action) {
+      const selectedResultTemplate = resultToTemplate(selectedDoc);
       const template = Handlebars.compile(action.action.CopyToClipboard);
-      await invoke("copy_to_clipboard", { txt: template(selectedDoc) });
+
+      await invoke("copy_to_clipboard", {
+        txt: template(selectedResultTemplate),
+      });
     }
 
     setShowActions(false);
@@ -252,6 +267,22 @@ export function SearchPage() {
   }, [query, selectedLenses, clearResults]);
 
   useEffect(() => {
+    const newActions = [...userActions];
+    if (docResults.length > selectedIdx && contextActions.length > 0) {
+      const selected = docResults[selectedIdx];
+
+      for (const action of contextActions) {
+        if (includeAction(action, selected)) {
+          for (const actionDefinition of action.actions) {
+            newActions.push(actionDefinition);
+          }
+        }
+      }
+    }
+    setCurrentContextActions(newActions);
+  }, [selectedIdx, contextActions, userActions, docResults]);
+
+  useEffect(() => {
     requestResize();
   }, [docResults, lensResults]);
 
@@ -270,6 +301,7 @@ export function SearchPage() {
         "load_action_settings",
       );
       setUserActions(userActions.actions);
+      setContextActions(userActions.context_actions);
     };
 
     const initialize = async () => {
@@ -352,7 +384,7 @@ export function SearchPage() {
       </div>
       {showActions ? (
         <ActionsList
-          actions={userActions}
+          actions={currentContextActions}
           selectedActionIdx={selectedActionIdx}
           onClick={handleSelectedAction}
         />

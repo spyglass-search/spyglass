@@ -157,7 +157,8 @@ pub struct SearchResult {
 // fields for action template expansion. This provides
 // additional power for template expansion without the need
 // for complicated template logic
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TS)]
+#[ts(export)]
 pub struct SearchResultTemplate {
     /// Document ID
     pub doc_id: String,
