@@ -378,7 +378,7 @@ function resultToTemplate(result: SearchResult) {
   }
 
   let url_parent = "";
-  let index = result.url.lastIndexOf("/");
+  const index = result.url.lastIndexOf("/");
   if (index >= 0) {
     url_parent = result.url.substring(0, index);
   }
@@ -389,7 +389,7 @@ function resultToTemplate(result: SearchResult) {
   let url_path: string[] = [];
   let url_path_length = 0;
   let url_query = "";
-  let parsed_url = URL.parse(result.url);
+  const parsed_url = URL.parse(result.url);
   if (parsed_url) {
     url_schema = parsed_url.protocol;
     url_userinfo = parsed_url.username;
