@@ -75,9 +75,15 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           echo "target_os_name=mac" >> $GITHUB_ENV
+      - name: Setup cuda-toolkit
+        if: ${{startsWith(matrix.platform, 'windows')}}
+        uses: Jimver/cuda-toolkit@v0.2.18
+        id: cuda-toolkit
       # Build stuff
       - name: build sidecar (windows/linux)
         if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
+        env:
+          CUDA_COMPUTE_CAP: 80
         run: |
           mkdir -p apps/tauri/binaries
 
