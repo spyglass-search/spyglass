@@ -3,7 +3,7 @@ use candle::{Device, Tensor};
 use candle_nn::ops::softmax;
 use tokenizers::Tokenizer;
 
-use super::whisper::Model;
+use super::whisper_context::Model;
 use candle::IndexOp;
 use candle_transformers::models::whisper;
 use rand::distributions::Distribution;

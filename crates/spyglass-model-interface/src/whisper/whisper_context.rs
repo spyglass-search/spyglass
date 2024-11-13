@@ -98,7 +98,7 @@ impl WhisperContext {
             &mut mel_filters,
         );
 
-        let audio_file = super::parse_audio_file(&input)?;
+        let audio_file = super::parse_audio_file(input)?;
         let metadata = audio_file.metadata;
 
         log::debug!("pcm data loaded {}", audio_file.samples.len());

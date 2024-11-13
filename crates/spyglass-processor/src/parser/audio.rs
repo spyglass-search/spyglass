@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use spyglass_model_interface::whisper::{whisper::WhisperContext, AudioMetadata, Segment};
+use spyglass_model_interface::whisper::{whisper_context::WhisperContext, AudioMetadata, Segment};
 
 pub struct TranscriptionResult {
     pub metadata: Option<AudioMetadata>,

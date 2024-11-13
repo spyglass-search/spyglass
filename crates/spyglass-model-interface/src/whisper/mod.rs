@@ -17,7 +17,7 @@ use symphonia::core::{
 
 pub mod decoder;
 pub mod multilingual;
-pub mod whisper;
+pub mod whisper_context;
 
 #[derive(Clone, Debug)]
 pub struct Segment {

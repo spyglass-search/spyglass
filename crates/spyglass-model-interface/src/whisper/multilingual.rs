@@ -1,4 +1,4 @@
-use crate::whisper::whisper::Model;
+use crate::whisper::whisper_context::Model;
 use candle::{IndexOp, Result, Tensor, D};
 use candle_transformers::models::whisper;
 use tokenizers::Tokenizer;
