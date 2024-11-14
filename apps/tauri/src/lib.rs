@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use auto_launch::AutoLaunchBuilder;
 use constants::SEARCH_WIN_NAME;
+use menu::MenuState;
 use rpc::RpcMutex;
 use tauri::image::Image;
 use tauri::process::current_binary;
@@ -199,11 +200,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .on_tray_icon_event(menu::handle_tray_icon_events)
                 .build(app)?;
 
-            // Copy default plugins to data directory to be picked up by the backend
-            // if let Err(e) = copy_plugins(&config, app.path()) {
-            //     log::error!("Unable to copy default plugins: {}", e);
-            // }
-
             let bar = get_searchbar(app_handle);
             bar.show()?;
 
@@ -351,7 +347,7 @@ pub fn update_auto_launch(user_settings: &UserSettings) {
     }
 }
 
-async fn pause_crawler(app: AppHandle, _menu_id: String) {
+async fn pause_crawler(app: AppHandle) {
     if let Some(rpc) = app.try_state::<RpcMutex>() {
         let pause_state = app.state::<Arc<PauseState>>().inner();
         let rpc = rpc.lock().await;
@@ -366,16 +362,17 @@ async fn pause_crawler(app: AppHandle, _menu_id: String) {
                 let is_paused = !pause_state.load(Ordering::Relaxed);
                 pause_state.store(is_paused, Ordering::Relaxed);
 
-                let _new_label = if is_paused {
+                let new_label = if is_paused {
                     "▶️ Resume indexing"
                 } else {
                     "⏸ Pause indexing"
                 };
 
-                // if let Some(tray) = app.tray_by_id("main-tray"){
-                //     let _ = item_handle.set_title(new_label);
-                //     let _ = item_handle.set_enabled(true);
-                // }
+                // Update menu item label.
+                if let Some(state) = app.try_state::<MenuState>() {
+                    let _ = state.pause_toggle.set_text(new_label);
+                    let _ = state.pause_toggle.set_enabled(true);
+                }
             }
             Err(err) => log::warn!("Error sending RPC: {}", err),
         }
