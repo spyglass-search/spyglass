@@ -40,7 +40,7 @@
   },
   "productName": "Spyglass",
   "mainBinaryName": "Spyglass",
-  "version": "23.11.1",
+  "version": "24.11.1",
   "identifier": "com.athlabs.spyglass",
   "plugins": {
     "updater": {
