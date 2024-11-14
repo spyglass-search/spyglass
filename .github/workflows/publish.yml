@@ -75,6 +75,9 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           echo "target_os_name=mac" >> $GITHUB_ENV
+      - name: Setup mscv dev commands
+        if: ${{startsWith(matrix.platform, 'windows')}}
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Setup cuda-toolkit
         if: ${{startsWith(matrix.platform, 'windows')}}
         uses: Jimver/cuda-toolkit@v0.2.18
