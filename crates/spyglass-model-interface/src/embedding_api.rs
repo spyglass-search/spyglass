@@ -4,6 +4,8 @@ use tokenizers::Tokenizer;
 
 use crate::{batch, load_tokenizer, Backend, CandleBackend, Embedding, ModelType, Pool};
 
+const MAX_TOKENS: usize = 2048;
+
 #[derive(Clone)]
 pub struct EmbeddingApi {
     backend: Arc<CandleBackend>,
@@ -45,11 +47,14 @@ impl EmbeddingApi {
             }
         };
 
-        let tokens = self
+        let mut tokens = self
             .tokenizer
             .encode(doc_content, false)
             .map_err(|err| anyhow::format_err!("Error tokenizing {:?}", err))?;
         let token_length = tokens.len();
+        if token_length > MAX_TOKENS {
+            tokens.truncate(MAX_TOKENS, 1, tokenizers::TruncationDirection::Right);
+        }
         let input_batch = batch(vec![tokens], [0].to_vec(), vec![]);
 
         let start = Instant::now();
