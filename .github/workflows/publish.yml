@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - release
-      - tweak/enable-cuda-in-windows-release-build
 jobs:
   publish-tauri:
     strategy:

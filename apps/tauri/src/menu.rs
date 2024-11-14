@@ -5,10 +5,15 @@ use strum_macros::{Display, EnumString};
 use tauri::{
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
     tray::{TrayIcon, TrayIconEvent},
-    AppHandle, Manager, PackageInfo,
+    AppHandle, Manager, PackageInfo, Wry,
 };
 
 use crate::{pause_crawler, platform::os_open, window};
+
+#[derive(Clone)]
+pub struct MenuState {
+    pub pause_toggle: MenuItem<Wry>,
+}
 
 #[derive(Display, Debug, EnumString)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -64,6 +69,18 @@ pub fn get_tray_menu(
         ],
     )?;
 
+    let pause_status = MenuItem::with_id(
+        app,
+        MenuID::CRAWL_STATUS.to_string(),
+        "⏸ Pause indexing",
+        true,
+        None::<&str>,
+    )?;
+    // manage the pause status menu item so we can update it later.
+    app.manage(MenuState {
+        pause_toggle: pause_status.clone(),
+    });
+
     tray.append_items(&[
         &MenuItem::with_id(
             app,
@@ -72,13 +89,7 @@ pub fn get_tray_menu(
             true,
             Some(user_settings.shortcut.clone()),
         )?,
-        &MenuItem::with_id(
-            app,
-            MenuID::CRAWL_STATUS.to_string(),
-            "⏸ Pause indexing",
-            true,
-            None::<&str>,
-        )?,
+        &pause_status,
         &PredefinedMenuItem::separator(app)?,
         &MenuItem::with_id(
             app,
@@ -219,12 +230,11 @@ pub fn handle_tray_menu_events(app: &AppHandle, event: MenuEvent) {
     match menu_id {
         MenuID::CRAWL_STATUS => {
             // Don't block main thread when pausing the crawler.
-            tauri::async_runtime::spawn(pause_crawler(app.clone(), menu_id.to_string()));
-            // if let Some(tray) = app.tray_by_id("main-tray") {
-            //     let _ = item_handle.set_title("Handling request...");
-            //     let _ = item_handle.set_enabled(false);
-            //     tauri::async_runtime::spawn(pause_crawler(app.clone(), menu_id.to_string()));
-            // }
+            tauri::async_runtime::spawn(pause_crawler(app.clone()));
+            if let Some(state) = app.try_state::<MenuState>() {
+                let _ = state.pause_toggle.set_text("Handling request...");
+                let _ = state.pause_toggle.set_enabled(false);
+            }
         }
         MenuID::DISCOVER => {
             window::navigate_to_tab(app, &crate::constants::TabLocation::Discover);
