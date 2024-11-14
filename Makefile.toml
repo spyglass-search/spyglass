@@ -5,7 +5,7 @@ skip_git_env_info = true
 
 [env]
 SPYGLASS_CLIENT_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/client"
-TAURI_DEV_CONFIG = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/tauri/tauri.dev.conf.json"
+TAURI_DEV_CONFIG = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/apps/tauri/tauri.dev.conf.json"
 EXECUTABLE_EXTENSION = { source = "${CARGO_MAKE_RUST_TARGET_OS}", mapping = { "windows" = ".exe" } }
 TARGET_FOLDER = { default_value = "debug", mapping = { "release" = "release" }, source = "${PROFILE}" }
 
@@ -19,6 +19,10 @@ PROFILE = "${CARGO_MAKE_CARGO_PROFILE}"
 WORKSPACE_TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 
 [tasks.run]
+dependencies = [
+    "build-crates"
+]
+
 args = ["cargo make run-backend", "cargo make run-client"]
 command = "mprocs"
 install_crate = { crate_name = "mprocs" }
@@ -38,16 +42,16 @@ dependencies = [
     "setup-tauri",
     "download-whisper",
     "prepare-env-file",
-    "build-backend",
+    "build-crates",
     "copy-backend-binaries",
     "copy-pdftotext-binaries",
 ]
 
 [tasks.build]
 command = "cargo"
-args = ["build", "-p", "spyglass-client", "-p", "spyglass-app", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+args = ["tauri", "build", "--config", "${TAURI_DEV_CONFIG}"]
 dependencies = [
-    "build-backend",
+    "build-crates",
     "copy-backend-binaries",
     "copy-pdftotext-binaries"
 ]
@@ -56,9 +60,10 @@ dependencies = [
 # Private Helpers #
 ###################
 
-[tasks.build-backend]
-args = ["build", "-p", "spyglass", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+[tasks.build-crates]
+args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
 command = "cargo"
+private = true
 
 [tasks.copy-backend-binaries]
 dependencies = ["create-binary-directory", "set-platform-specific-variables"]
@@ -70,30 +75,30 @@ cp "${SPYGLASS_BACKEND_DEBUG_BIN}" "${SPYGLASS_BACKEND_DEBUG_TAURI_BIN}"
 script_runner = "@shell"
 
 [tasks.set-platform-specific-variables]
-env = { SPYGLASS_BACKEND_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${TARGET_FOLDER}}/spyglass", SPYGLASS_BACKEND_DEBUG_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${TARGET_FOLDER}/spyglass-debug", SPYGLASS_TAURI_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/crates/tauri/binaries", SPYGLASS_BACKEND_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}", SPYGLASS_BACKEND_DEBUG_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}" }
+env = { SPYGLASS_BACKEND_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${TARGET_FOLDER}}/spyglass", SPYGLASS_BACKEND_DEBUG_BIN = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${TARGET_FOLDER}/spyglass-debug", SPYGLASS_TAURI_DIR = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/apps/tauri/binaries", SPYGLASS_BACKEND_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}", SPYGLASS_BACKEND_DEBUG_TAURI_BIN = "${SPYGLASS_TAURI_DIR}/spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}" }
 private = true
 
 [tasks.set-platform-specific-variables.windows]
 # Only needed for these kinds of path-building, composite environment variables.
-env = { SPYGLASS_BACKEND_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\${TARGET_FOLDER}\spyglass.exe''', SPYGLASS_BACKEND_DEBUG_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\${TARGET_FOLDER}\spyglass-debug.exe''', SPYGLASS_TAURI_DIR = '''${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\crates\tauri\binaries''', SPYGLASS_BACKEND_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''', SPYGLASS_BACKEND_DEBUG_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''' }
+env = { SPYGLASS_BACKEND_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\${TARGET_FOLDER}\spyglass.exe''', SPYGLASS_BACKEND_DEBUG_BIN = '''${CARGO_MAKE_CRATE_TARGET_DIRECTORY}\${TARGET_FOLDER}\spyglass-debug.exe''', SPYGLASS_TAURI_DIR = '''${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\apps\tauri\binaries''', SPYGLASS_BACKEND_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-server-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''', SPYGLASS_BACKEND_DEBUG_TAURI_BIN = '''${SPYGLASS_TAURI_DIR}\spyglass-debug-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe''' }
 private = true
 
 [tasks.copy-pdftotext-binaries]
 private = true
 script_runner = "@shell"
 [tasks.copy-pdftotext-binaries.linux]
-script = '''cp utils/linux/pdftotext crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
+script = '''cp utils/linux/pdftotext apps/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
 [tasks.copy-pdftotext-binaries.mac]
-script = '''cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
+script = '''cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}'''
 [tasks.copy-pdftotext-binaries.windows]
-script = '''cp utils/win/pdftotext.exe crates/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe'''
+script = '''cp utils/win/pdftotext.exe apps/tauri/binaries/pdftotext-${CARGO_MAKE_RUST_TARGET_TRIPLE}.exe'''
 
 [tasks.create-binary-directory]
 private = true
-script = '''mkdir -p crates/tauri/binaries'''
+script = '''mkdir -p apps/tauri/binaries'''
 script_runner = "@shell"
 [tasks.create-binary-directory.windows]
-script = '''IF NOT EXIST .\crates\tauri\binaries mkdir .\crates\tauri\binaries'''
+script = '''IF NOT EXIST .\apps\tauri\binaries mkdir .\apps\tauri\binaries'''
 
 [tasks.download-whisper]
 private = true
@@ -150,11 +155,11 @@ dependencies = [
     "install-wasm32-wasi",
 ]
 private = true
-script = '''mkdir -p ./crates/tauri/dist'''
+script = '''mkdir -p ./apps/tauri/dist'''
 script_runner = "@shell"
 
 [tasks.setup-tauri.windows]
-script = '''IF NOT EXIST .\crates\tauri\dist mkdir .\crates\tauri\dist'''
+script = '''IF NOT EXIST .\apps\tauri\dist mkdir .\apps\tauri\dist'''
 
 [tasks.prepare-env-file]
 private = true

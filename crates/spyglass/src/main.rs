@@ -1,12 +1,10 @@
 extern crate notify;
 use clap::Parser;
-use entities::models::{self, crawl_queue, lens};
+use entities::models::{crawl_queue, lens};
 use libspyglass::pipeline;
-use libspyglass::plugin;
 use libspyglass::state::AppState;
 use libspyglass::task::{self, AppPause, AppShutdown, ManagerCommand};
-use sentry::ClientInitGuard;
-use shared::config::{self, Config};
+use shared::config::Config;
 use std::io;
 use std::net::IpAddr;
 use tokio::signal;
@@ -46,7 +44,7 @@ struct CliArgs {
 }
 
 #[cfg(feature = "tokio-console")]
-pub fn setup_logging(_config: &Config) -> (Option<WorkerGuard>, Option<ClientInitGuard>) {
+pub fn setup_logging(_config: &Config) -> Option<WorkerGuard> {
     let subscriber = tracing_subscriber::registry()
         .with(
             EnvFilter::from_default_env()
@@ -60,27 +58,11 @@ pub fn setup_logging(_config: &Config) -> (Option<WorkerGuard>, Option<ClientIni
         );
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
 
-    (None, None)
+    None
 }
 
 #[cfg(not(feature = "tokio-console"))]
-pub fn setup_logging(config: &Config) -> (Option<WorkerGuard>, Option<ClientInitGuard>) {
-    #[cfg(not(debug_assertions))]
-    let sentry_guard = if config.user_settings.disable_telemetry {
-        None
-    } else {
-        Some(sentry::init((
-            "https://5c1196909a4e4e5689406705be13aad3@o1334159.ingest.sentry.io/6600345",
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                traces_sample_rate: 0.1,
-                ..Default::default()
-            },
-        )))
-    };
-    #[cfg(debug_assertions)]
-    let sentry_guard = None;
-
+pub fn setup_logging(config: &Config) -> Option<WorkerGuard> {
     let file_appender = tracing_appender::rolling::daily(config.logs_dir(), "server.log");
     let (non_blocking, tracing_guard) = tracing_appender::non_blocking(file_appender);
 
@@ -103,19 +85,18 @@ pub fn setup_logging(config: &Config) -> (Option<WorkerGuard>, Option<ClientInit
                 .add_directive("docx=WARN".parse().expect("Invalid EnvFilter")),
         )
         .with(fmt::Layer::new().with_writer(io::stdout))
-        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking))
-        .with(sentry_tracing::layer());
+        .with(fmt::Layer::new().with_ansi(false).with_writer(non_blocking));
     tracing::subscriber::set_global_default(subscriber).expect("Unable to set a global subscriber");
 
-    (Some(tracing_guard), sentry_guard)
+    Some(tracing_guard)
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), ()> {
-    let mut config = Config::new();
+    let config = Config::new();
     let args = CliArgs::parse();
 
-    let (_trace_guard, _sentry_guard) = setup_logging(&config);
+    let _trace_guard = setup_logging(&config);
     LogTracer::init().expect("Unable to initialize LogTracer");
 
     log::info!("Loading prefs from: {:?}", Config::prefs_dir());
@@ -150,27 +131,6 @@ async fn main() -> Result<(), ()> {
 
         if migration_status.is_err() {
             return Ok(());
-        }
-    }
-
-    {
-        // migrate plugin settings
-        let db = models::create_connection(&config, false)
-            .await
-            .expect("Unable to connect to db");
-
-        // state.user_settings
-        if let Ok(Some(model)) = lens::find_by_name(config::LEGACY_FILESYSTEM_PLUGIN, &db).await {
-            let mut new_settings = config.user_settings.clone();
-            new_settings.filesystem_settings.enable_filesystem_scanning = model.is_enabled;
-            let _ = Config::save_user_settings(&new_settings);
-            if let Ok(settings) = Config::load_user_settings() {
-                config.user_settings = settings;
-            }
-
-            if let Err(err) = lens::delete_by_id(model.id, &db).await {
-                log::error!("Error deleting filesystem plugin lens {:?}", err);
-            }
         }
     }
 
@@ -221,8 +181,6 @@ async fn start_backend(state: AppState, config: Config) {
 
     // Channel for scheduler commands
     let (manager_cmd_tx, manager_cmd_rx) = mpsc::unbounded_channel::<ManagerCommand>();
-    // Channel for plugin commands
-    let (plugin_cmd_tx, plugin_cmd_rx) = mpsc::channel(16);
 
     // Channel for pipeline commands
     let (pipeline_cmd_tx, pipeline_cmd_rx) = mpsc::channel(16);
@@ -241,14 +199,6 @@ async fn start_backend(state: AppState, config: Config) {
 
     {
         state
-            .plugin_cmd_tx
-            .lock()
-            .await
-            .replace(plugin_cmd_tx.clone());
-    }
-
-    {
-        state
             .pipeline_cmd_tx
             .lock()
             .await
@@ -258,13 +208,15 @@ async fn start_backend(state: AppState, config: Config) {
     // Work scheduler
     let manager_handle = tokio::spawn(task::manager_task(
         state.clone(),
-        worker_cmd_tx,
+        worker_cmd_tx.clone(),
         manager_cmd_tx.clone(),
         manager_cmd_rx,
     ));
 
     // Config change detection
     let config_handle = tokio::spawn(task::config_task(state.clone()));
+
+    let embedding_handler = tokio::spawn(task::embedding_task(state.clone(), worker_cmd_tx));
 
     // Crawlers
     let worker_handle = tokio::spawn(task::worker_task(
@@ -292,14 +244,6 @@ async fn start_backend(state: AppState, config: Config) {
     {
         state.file_watcher.lock().await.replace(watcher);
     }
-
-    // Plugin server
-    let pm_handle = tokio::spawn(plugin::plugin_event_loop(
-        state.clone(),
-        config.clone(),
-        plugin_cmd_tx.clone(),
-        plugin_cmd_rx,
-    ));
 
     state
         .metrics
@@ -335,8 +279,8 @@ async fn start_backend(state: AppState, config: Config) {
     let _ = tokio::join!(
         manager_handle,
         worker_handle,
-        pm_handle,
         lens_watcher_handle,
-        config_handle
+        config_handle,
+        embedding_handler,
     );
 }

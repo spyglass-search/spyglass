@@ -1,14 +1,16 @@
 use entities::models::tag::{check_query_for_tags, get_favorite_tag, TagType};
-use entities::models::{indexed_document, lens, tag};
+use entities::models::vec_documents::DocDistance;
+use entities::models::{indexed_document, lens, tag, vec_documents};
 use entities::sea_orm::{
     self, prelude::*, sea_query::Expr, FromQueryResult, JoinType, QueryOrder, QuerySelect,
 };
-use jsonrpsee::core::Error;
+use jsonrpsee::core::RpcResult;
 use libspyglass::state::AppState;
 use libspyglass::task::{CleanupTask, ManagerCommand};
 use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
+use spyglass_model_interface::embedding_api::EmbeddingContentType;
 use spyglass_searcher::schema::{DocFields, SearchDocument};
 use spyglass_searcher::{Boost, QueryBoost, SearchTrait};
 use std::collections::HashSet;
@@ -20,7 +22,7 @@ use tracing::instrument;
 pub async fn search_docs(
     state: AppState,
     search_req: request::SearchParam,
-) -> Result<SearchResults, Error> {
+) -> RpcResult<SearchResults> {
     state
         .metrics
         .track(metrics::Event::Search {
@@ -49,8 +51,8 @@ pub async fn search_docs(
     }
 
     let mut filters = Vec::new();
-    for lens in lens_ids {
-        filters.push(QueryBoost::new(Boost::Tag(lens)));
+    for lens in &lens_ids {
+        filters.push(QueryBoost::new(Boost::Tag(*lens)));
     }
 
     if let Some(tag_id) = get_favorite_tag(&state.db).await {
@@ -58,6 +60,46 @@ pub async fn search_docs(
             id: tag_id,
             required: false,
         }));
+    }
+
+    if let Some(embedding_api) = state.embedding_api.load_full().as_ref() {
+        match embedding_api.embed(&query, EmbeddingContentType::Query) {
+            Ok(embedding) => {
+                let mut distances =
+                    vec_documents::get_document_distance(&state.db, &lens_ids, &embedding).await;
+
+                if let Ok(distances) = distances.as_mut() {
+                    let mut distances = distances
+                        .iter()
+                        .filter(|dist| dist.distance < 25.0)
+                        .collect::<Vec<&DocDistance>>();
+                    distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+
+                    let min_value = distances
+                        .iter()
+                        .map(|distance| distance.distance)
+                        .reduce(f64::min);
+                    let max_value = distances
+                        .iter()
+                        .map(|distance| distance.distance)
+                        .reduce(f64::max);
+                    if let (Some(min), Some(max)) = (min_value, max_value) {
+                        for distance in distances {
+                            let boost_normalized = (distance.distance - min) / (max - min) * 3.0;
+                            let boost = 3.0 - boost_normalized;
+
+                            boosts.push(QueryBoost::with_value(
+                                Boost::DocId(distance.doc_id.clone()),
+                                boost as f32,
+                            ));
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("Error embedding query {:?}", err);
+            }
+        }
     }
 
     let search_result = state.index.search(&query, &filters, &boosts, 5).await;
@@ -147,13 +189,10 @@ pub async fn search_docs(
     // Send cleanup task for any missing docs
     if !missing.is_empty() {
         let mut cmd_tx = state.manager_cmd_tx.lock().await;
-        match &mut *cmd_tx {
-            Some(cmd_tx) => {
-                let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
-                    missing_docs: missing,
-                }));
-            }
-            None => {}
+        if let Some(cmd_tx) = &mut *cmd_tx {
+            let _ = cmd_tx.send(ManagerCommand::CleanupDatabase(CleanupTask {
+                missing_docs: missing,
+            }));
         }
     }
 
@@ -172,14 +211,14 @@ struct LensSearch {
 pub async fn search_lenses(
     state: AppState,
     param: request::SearchLensesParam,
-) -> Result<SearchLensesResp, Error> {
+) -> RpcResult<SearchLensesResp> {
     let mut results = Vec::new();
     let query_result = tag::Entity::find()
         .column_as(tag::Column::Value, "name")
         .column_as(lens::Column::Author, "author")
         .column_as(lens::Column::Description, "description")
         .filter(tag::Column::Label.eq(TagType::Lens.to_string()))
-        .filter(tag::Column::Value.like(&format!("%{}%", &param.query)))
+        .filter(tag::Column::Value.like(format!("%{}%", &param.query)))
         // Pull in lens metadata
         .join_rev(
             JoinType::LeftJoin,

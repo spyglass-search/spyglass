@@ -8,138 +8,160 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, 'ubuntu-20.04', 'windows-latest']
+        include:
+          # - platform: "macos-latest"
+          #   args: "--target universal-apple-darwin"
+          # - platform: "ubuntu-24.04"
+          #   args: ""
+          - platform: "windows-latest"
+            args: ""
     runs-on: ${{ matrix.platform }}
     steps:
-    - uses: actions/checkout@v2
-    # Cleanup Disk
-    - name: Cleanup Disk
-      if: matrix.platform == 'ubuntu-20.04'
-      run: |
-            df -h
-            sudo rm -rf /usr/local/lib/android
-            sudo rm -rf /usr/share/dotnet
-            df -h
-    - name: setup node
-      uses: actions/setup-node@v1
-      with:
-        node-version: 16
-    - name: install Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-    # Install dependencies for plugins/client
-    - name: install wasm target
-      run: rustup target add wasm32-unknown-unknown
-    - name: install wasm32-wasi toolchain
-      run: rustup target add wasm32-wasi
-    # Install macos specific targets
-    - name: install intel & arm64 rust target (macos only)
-      if: matrix.platform == 'macos-latest'
-      run: |
-        rustup target add aarch64-apple-darwin
-        rustup target add x86_64-apple-darwin
-    # Install tauri build deps
-    - name: install tauri-cli & tauri-build
-      run: cargo install tauri-cli --version "^1.1"
-    - name: install trunk
-      run: cargo install --locked trunk
-    - name: install dependencies (ubuntu only)
-      if: matrix.platform == 'ubuntu-20.04'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libgtk-3-dev \
-          webkit2gtk-4.0 \
-          libappindicator3-dev \
-          libayatana-appindicator3-dev \
-          librsvg2-dev \
-          patchelf
-    # Setup arch targets - linux
-    - name: setup arch target - linux
-      if: ${{startsWith(matrix.platform, 'ubuntu')}}
-      run: |
-        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
-        echo "target_ext=" >> $GITHUB_ENV
-        echo "target_os_name=linux" >> $GITHUB_ENV
-    - name: Setup arch target (windows only)
-      if: ${{startsWith(matrix.platform, 'windows')}}
-      run: |
-        echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
-        echo "target_ext=.exe" >> $env:GITHUB_ENV
-        echo "target_os_name=win" >> $env:GITHUB_ENV
-    - name: Setup arch target (mac only)
-      if: matrix.platform == 'macos-latest'
-      run: |
-        echo "target_os_name=mac" >> $GITHUB_ENV
-    # Build stuff
-    - name: build sidecar (windows/linux)
-      if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
-      run: |
-        cargo build -p spyglass --verbose --release
+      - uses: actions/checkout@v4
+      # Setup tne node version we want
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
+          cache: 'npm'
+          cache-dependency-path: './apps/desktop-client/package-lock.json'
+      - name: install Rust stable
+        uses: moonrepo/setup-rust@v1
+        with:
+          channel: stable
+      # Install macos specific targets
+      - name: install intel & arm64 rust target (macos only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+      # Install tauri build deps
+      - name: install tauri & plugins
+        working-directory: './apps/tauri'
+        run: npm install
+      - name: install front-end dependencies
+        working-directory: './apps/desktop-client'
+        run: npm install
+      # Install system dependencies
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt install \
+              libwebkit2gtk-4.1-dev \
+              build-essential \
+              curl \
+              wget \
+              file \
+              libxdo-dev \
+              libssl-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev
+      # Setup arch targets - linux
+      - name: setup arch target - linux
+        if: ${{startsWith(matrix.platform, 'ubuntu')}}
+        run: |
+          echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV
+          echo "target_ext=" >> $GITHUB_ENV
+          echo "target_os_name=linux" >> $GITHUB_ENV
+      - name: Setup arch target (windows only)
+        if: ${{startsWith(matrix.platform, 'windows')}}
+        run: |
+          echo "target_arch=x86_64-pc-windows-msvc" >> $env:GITHUB_ENV
+          echo "target_ext=.exe" >> $env:GITHUB_ENV
+          echo "target_os_name=win" >> $env:GITHUB_ENV
+      - name: Setup arch target (mac only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          echo "target_os_name=mac" >> $GITHUB_ENV
+      - name: Setup mscv dev commands
+        if: ${{startsWith(matrix.platform, 'windows')}}
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup cuda-toolkit
+        if: ${{startsWith(matrix.platform, 'windows')}}
+        uses: Jimver/cuda-toolkit@v0.2.18
+        id: cuda-toolkit
+      # Build stuff
+      - name: build sidecar (windows/linux)
+        if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
+        env:
+          CUDA_COMPUTE_CAP: 80
+        run: |
+          mkdir -p apps/tauri/binaries
 
-        cp target/release/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-        cp target/release/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
-        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
-    - name: build sidecar (macos)
-      if: matrix.platform == 'macos-latest'
-      run: |
-        cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
-        # For now only build the spyglass-debug on ARM, we'll provide
-        # the ARM build ourselves as part of the repo.
-        cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
+          cargo build -p spyglass --verbose --release --features cuda;
 
-        cp target/x86_64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-x86_64-apple-darwin;
-        # cp target/aarch64-apple-darwin/release/spyglass crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+          cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
+          cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
+          cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
+      - name: build sidecar (macos)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          mkdir -p apps/tauri/binaries
 
-        cp target/x86_64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
-        cp target/aarch64-apple-darwin/release/spyglass-debug crates/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
+          cargo build -p spyglass --verbose --release --target x86_64-apple-darwin;
+          cargo build -p spyglass --verbose --release --target aarch64-apple-darwin;
 
-        # There's no build specifically for ARM macs, so lets use the same one for both.
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-aarch64-apple-darwin;
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-x86_64-apple-darwin;
-        cp utils/mac/pdftotext crates/tauri/binaries/pdftotext-universal-apple-darwin;
+          # For now only build the spyglass-debug on ARM, we'll provide
+          # the ARM build ourselves as part of the repo.
+          cargo build -p spyglass --bin spyglass-debug --verbose --release --target x86_64-apple-darwin;
+          cargo build -p spyglass --bin spyglass-debug --verbose --release --target aarch64-apple-darwin;
 
-        lipo -create -output crates/tauri/binaries/spyglass-server-universal-apple-darwin \
-          target/x86_64-apple-darwin/release/spyglass \
-          crates/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+          # tauri also expects these binaries to be in the binaries folder.
+          cp target/aarch64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-aarch64-apple-darwin;
+          cp target/x86_64-apple-darwin/release/spyglass apps/tauri/binaries/spyglass-server-x86_64-apple-darwin;
 
-        lipo -create -output crates/tauri/binaries/spyglass-debug-universal-apple-darwin \
-          target/x86_64-apple-darwin/release/spyglass-debug \
-          target/aarch64-apple-darwin/release/spyglass-debug;
+          cp target/aarch64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-aarch64-apple-darwin;
+          cp target/x86_64-apple-darwin/release/spyglass-debug apps/tauri/binaries/spyglass-debug-x86_64-apple-darwin;
 
-    - name: build default plugins
-      run: make build-plugins-release
-    - name: import windows certificate
-      if: matrix.platform == 'windows-latest'
-      env:
-        WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-        WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-      run: |
-        New-Item -ItemType directory -Path certificate
-        Set-Content -Path certificate/tempCert.txt -Value $env:WINDOWS_CERTIFICATE
-        certutil -decode certificate/tempCert.txt certificate/certificate.pfx
-        Remove-Item -path certificate -include tempCert.txt
-        Import-PfxCertificate -FilePath certificate/certificate.pfx -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText)
-    - uses: tauri-apps/tauri-action@dev
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-        TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        # required for macOS code signing
-        #ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
-        #APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-        #APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        #APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        #APPLE_ID: ${{ secrets.APPLE_ID }}
-        #APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      with:
-        # Build universal binary on macOS
-        args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
-        # the action automatically replaces \_\_VERSION\_\_ with the app version
-        tagName: v20__VERSION__
-        tauriScript: cargo tauri
-        releaseName: "Spyglass v20__VERSION__"
-        releaseBody: "See the assets to download this version and install."
-        releaseDraft: true
-        prerelease: false
+          # There's no build specifically for ARM macs, so lets use the same one for both.
+          cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-aarch64-apple-darwin;
+          cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-x86_64-apple-darwin;
+          cp utils/mac/pdftotext apps/tauri/binaries/pdftotext-universal-apple-darwin;
+
+          lipo -create -output apps/tauri/binaries/spyglass-server-universal-apple-darwin \
+            target/x86_64-apple-darwin/release/spyglass \
+            target/aarch64-apple-darwin/release/spyglass;
+
+          lipo -create -output apps/tauri/binaries/spyglass-debug-universal-apple-darwin \
+            target/x86_64-apple-darwin/release/spyglass-debug \
+            target/aarch64-apple-darwin/release/spyglass-debug;
+
+      - name: Import Apple Developer certificate
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          # required for macOS code signing
+          ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: "apps/tauri"
+          # Build universal binary on macOS
+          args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }} --config ./tauri.rel.conf.json
+          # the action automatically replaces \_\_VERSION\_\_ with the app version
+          tagName: v20__VERSION__
+          releaseName: "Spyglass v20__VERSION__"
+          releaseBody: "See the assets to download this version and install."
+          # releaseDraft: true
+          # prerelease: false

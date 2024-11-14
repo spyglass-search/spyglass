@@ -135,8 +135,8 @@ mod test {
     #[test]
     pub fn test_code_mime_type() {
         assert_eq!(
-            SupportedMime::from_mime("application/javascript"),
-            SupportedMime::Code("application/javascript".parse().unwrap())
+            SupportedMime::from_mime("text/javascript"),
+            SupportedMime::Code("text/javascript".parse().unwrap())
         );
 
         assert_eq!(
@@ -214,8 +214,7 @@ mod test {
 
     #[test]
     pub fn test_is_supported() {
-        assert_eq!(SupportedMime::is_supported("application/javascript"), true);
-
+        assert_eq!(SupportedMime::is_supported("text/javascript"), true);
         assert_eq!(SupportedMime::is_supported(GSLIDES), false);
     }
 }

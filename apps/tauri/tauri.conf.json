@@ -1,0 +1,62 @@
+{
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "",
+      "exceptionDomain": "",
+      "signingIdentity": "Developer ID Application: Andrew Huynh (D436KBE6J9)",
+      "entitlements": "entitlements.plist",
+      "providerShortName": "AndrewHuynh1092684215"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "../../assets/*",
+      "icons/tray-icon.png"
+    ],
+    "copyright": "(C) 2023 Spyglass Search, Inc.",
+    "category": "DeveloperTool",
+    "shortDescription": "",
+    "longDescription": "",
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "createUpdaterArtifacts": "v1Compatible"
+  },
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../desktop-client/dist",
+    "beforeDevCommand": "cd ../desktop-client && npm run dev",
+    "beforeBuildCommand": "cd ../desktop-client && npm run build"
+  },
+  "productName": "Spyglass",
+  "mainBinaryName": "Spyglass",
+  "version": "24.11.1",
+  "identifier": "com.athlabs.spyglass",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFREEwQzA5QjA1NjM5NDUKUldSRk9WYXdDUXphYm5keUUvY2V3VUh2cjl3YlB0MlBuV1NJd3VjUnk5ektjVTExY3JKVGdRNHUK",
+      "endpoints": [
+        "https://update.spyglass.fyi/VERSION.json",
+        "https://raw.githubusercontent.com/spyglass-search/spyglass/main/VERSION.json"
+      ]
+    }
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'self'; script-src 'unsafe-eval'; connect-src ipc: http://ipc.localhost",
+      "capabilities": ["desktop"]
+    },
+    "withGlobalTauri": true
+  }
+}

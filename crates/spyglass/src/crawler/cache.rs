@@ -3,8 +3,7 @@ use entities::models::lens;
 use entities::sea_orm::DatabaseConnection;
 use std::path::PathBuf;
 
-use http::HeaderValue;
-use reqwest::header::{HeaderMap, IF_MODIFIED_SINCE, LAST_MODIFIED};
+use reqwest::header::{HeaderMap, HeaderValue, IF_MODIFIED_SINCE, LAST_MODIFIED};
 use reqwest::Response;
 use shared::config::Config;
 use std::io::{Error, ErrorKind, Write};

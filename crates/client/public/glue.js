@@ -1,7 +1,7 @@
 let invoke = () => {};
 let listen = () => {};
 if (window.__TAURI__) {
-    invoke = window.__TAURI__.invoke;
+    invoke = window.__TAURI__.core.invoke;
     listen = window.__TAURI__.event.listen;
 }
 

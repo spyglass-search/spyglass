@@ -51,7 +51,7 @@ pub enum Msg {
     HandleError(String),
     SetCurrentActions(UserActionSettings),
     OpenResult(SearchResult),
-    UserActionComplete(String),
+    UserActionComplete,
     UserActionSelected(UserActionDefinition),
     ToggleShowActions,
     SearchDocs,
@@ -143,14 +143,14 @@ impl SearchPage {
             let link = link.clone();
             let selected = selected.clone();
             spawn_local(async move {
-                let label = action_def.label.clone();
+                let _label = action_def.label.clone();
                 components::user_action_list::execute_action(selected, action_def).await;
 
                 // The action is asynchronous making the firing of UserActionComplete instantly after
                 // the execute_action is set. To allow the user to see a status change that indicates
                 // something actually happened we need to delay it for a little bit.
                 Timeout::new(250, move || {
-                    link.send_message(Msg::UserActionComplete(label));
+                    link.send_message(Msg::UserActionComplete);
                 })
                 .forget();
             });
@@ -434,7 +434,7 @@ impl Component for SearchPage {
                     true
                 }
             }
-            Msg::UserActionComplete(_) => {
+            Msg::UserActionComplete => {
                 self.executed_action = None;
                 true
             }
@@ -475,15 +475,14 @@ impl Component for SearchPage {
                         self.modifier.set(ModifiersState::SUPER, e.meta_key());
 
                         if new_key {
-                            if let Some(actions) = &self.action_settings {
-                                if !self.docs_results.is_empty()
-                                    && !self.modifier.is_empty()
-                                    && self.pressed_key.is_some()
-                                {
+                            if let (Some(actions), Some(pressed_key)) =
+                                (&self.action_settings, &self.pressed_key)
+                            {
+                                if !self.docs_results.is_empty() && !self.modifier.is_empty() {
                                     let context = self.docs_results.get(self.selected_idx);
                                     if let Some(action) = actions.get_triggered_action(
                                         &self.modifier,
-                                        &self.pressed_key.unwrap(),
+                                        pressed_key,
                                         utils::get_os().to_string().as_str(),
                                         context,
                                     ) {
@@ -527,12 +526,15 @@ impl Component for SearchPage {
 
                         match KeyCode::from_str(key.to_uppercase().as_str()) {
                             Ok(key_code) => {
-                                if self.executed_key.is_some()
-                                    && self.executed_key.unwrap().eq(&key_code)
+                                if self
+                                    .executed_key
+                                    .map(|key| key == key_code)
+                                    .unwrap_or_default()
                                 {
                                     executed_key_released = true;
                                     self.executed_key = None;
                                 }
+
                                 if let Some(key) = self.pressed_key {
                                     if key.eq(&key_code) {
                                         self.pressed_key = None;
@@ -796,7 +798,7 @@ impl Component for SearchPage {
                 html! {
                     <div>
                         {"Searched "}
-                        <span class="text-cyan-600">{num_docs}</span>
+                        <span class="text-cyan-600">{num_docs.to_string()}</span>
                         {" documents in "}
                         <span class="text-cyan-600">{wall_time}{" ms."}</span>
                     </div>

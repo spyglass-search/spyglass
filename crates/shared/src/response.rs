@@ -2,34 +2,39 @@ use crate::url_to_file_path;
 use num_format::{Buffer, Locale};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use ts_rs::TS;
 use url::Url;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AppStatus {
     pub num_docs: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct SupportedConnection {
     pub id: String,
     pub label: String,
     pub description: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct UserConnection {
     pub id: String,
     pub account: String,
     pub is_syncing: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct ListConnectionResult {
     pub supported: Vec<SupportedConnection>,
     pub user_connections: Vec<UserConnection>,
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct InstallableLens {
     pub author: String,
     pub description: String,
@@ -57,7 +62,8 @@ impl InstallableLens {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub enum InstallStatus {
     NotInstalled,
     Finished { num_docs: u32 },
@@ -82,7 +88,8 @@ impl InstallStatus {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub enum LensType {
     #[default]
     Lens,
@@ -91,7 +98,8 @@ pub enum LensType {
     Internal,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub struct LensResult {
     /// Author of this lens
     pub author: String,
@@ -122,14 +130,16 @@ pub struct PluginResult {
     pub is_enabled: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct SearchMeta {
     pub query: String,
     pub num_docs: u32,
     pub wall_time_ms: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TS)]
+#[ts(export)]
 pub struct SearchResult {
     /// Document ID
     pub doc_id: String,
@@ -147,7 +157,8 @@ pub struct SearchResult {
 // fields for action template expansion. This provides
 // additional power for template expansion without the need
 // for complicated template logic
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TS)]
+#[ts(export)]
 pub struct SearchResultTemplate {
     /// Document ID
     pub doc_id: String,
@@ -226,7 +237,8 @@ impl From<SearchResult> for SearchResultTemplate {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct SearchResults {
     pub results: Vec<SearchResult>,
     pub meta: SearchMeta,
@@ -286,7 +298,8 @@ impl LibraryStats {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct DefaultIndices {
     pub file_paths: Vec<PathBuf>,
     pub extensions: Vec<String>,

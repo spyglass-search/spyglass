@@ -75,6 +75,8 @@
 
 use std::{fmt, str::FromStr};
 
+use serde::{Deserialize, Serialize};
+
 impl ModifiersState {
     /// Returns `true` if the shift key is pressed.
     pub fn shift_key(&self) -> bool {
@@ -121,7 +123,6 @@ bitflags::bitflags! {
     }
 }
 
-#[cfg(feature = "serde")]
 mod modifiers_serde {
     use super::ModifiersState;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -174,8 +175,7 @@ mod modifiers_serde {
 
 /// Contains the platform-native physical key identifier (aka scancode)
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NativeKeyCode {
     Unidentified,
     Windows(u16),
@@ -198,8 +198,7 @@ pub enum NativeKeyCode {
 ///
 /// [`KeyboardEvent.code`]: https://w3c.github.io/uievents-code/#code-value-tables
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum KeyCode {
     /// This variant is used when the key cannot be translated to any
     /// other variant.
@@ -981,8 +980,7 @@ impl fmt::Display for KeyCode {
 ///
 /// [`KeyboardEvent.key`]: https://w3c.github.io/uievents-key/
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Key<'a> {
     /// A key string that corresponds to the character typed by the user, taking into account the
     /// user’s current locale setting, and any system-level keyboard mapping overrides that are in
@@ -1723,8 +1721,7 @@ impl<'a> From<&'a str> for Key<'a> {
 
 /// Represents the location of a physical key.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum KeyLocation {
     Standard,
     Left,

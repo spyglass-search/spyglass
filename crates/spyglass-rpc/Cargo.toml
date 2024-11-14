@@ -6,8 +6,8 @@ description = "RPC definitions for spyglass server"
 edition = "2021"
 
 [dependencies]
-serde = "1.0"
-jsonrpsee = { version = "0.16.2", features = ["full"] }
+serde = { workspace = true }
+jsonrpsee = { workspace = true, features = ["full"] }
 shared = { path = "../shared" }
 
 [lib]

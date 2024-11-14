@@ -138,7 +138,7 @@ impl WatchPath {
 /// then send them for appropriate processing
 async fn watch_events(
     state: AppState,
-    mut file_events: Receiver<Result<Vec<DebouncedEvent>, Vec<notify::Error>>>,
+    mut file_events: Receiver<Result<Vec<DebouncedEvent>, notify::Error>>,
 ) {
     let mut shutdown_rx = state.shutdown_cmd_tx.lock().await.subscribe();
     loop {
@@ -233,17 +233,16 @@ impl SpyglassFileWatcher {
     pub fn new(state: &AppState) -> Self {
         let (tx, file_events) = tokio::sync::mpsc::channel(1);
 
-        let watcher =
-            notify_debouncer_mini::new_debouncer(Duration::from_secs(5), None, move |res| {
-                futures::executor::block_on(async {
-                    if !tx.is_closed() {
-                        if let Err(err) = tx.send(res).await {
-                            log::error!("fseventwatcher error: {}", err.to_string());
-                        }
+        let watcher = notify_debouncer_mini::new_debouncer(Duration::from_secs(5), move |res| {
+            futures::executor::block_on(async {
+                if !tx.is_closed() {
+                    if let Err(err) = tx.send(res).await {
+                        log::error!("fseventwatcher error: {}", err.to_string());
                     }
-                })
+                }
             })
-            .expect("Unable to watch lens directory");
+        })
+        .expect("Unable to watch lens directory");
 
         SpyglassFileWatcher {
             watcher: Arc::new(Mutex::new(watcher)),

@@ -1,15 +1,16 @@
 use chrono::Utc;
 use entities::{
     models::{
-        crawl_queue,
+        crawl_queue, embedding_queue,
         indexed_document::{self, find_by_doc_ids},
         tag::{self, TagPair},
+        vec_documents,
     },
-    sea_orm::{ActiveModelTrait, DatabaseConnection},
+    sea_orm::{ActiveModelTrait, DatabaseConnection, TryIntoModel},
     BATCH_SIZE,
 };
+use serde::{Deserialize, Serialize};
 use shared::config::LensConfig;
-use spyglass_plugin::TagModification;
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use libnetrunner::parser::ParseResult;
@@ -22,6 +23,34 @@ use spyglass_searcher::{
     schema::{DocumentUpdate, ToDocument},
     RetrievedDocument, WriteTrait,
 };
+
+pub mod embeddings;
+
+pub type Tag = (String, String);
+
+/// Defines a Tag modification request. Tags can be added or deleted
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct TagModification {
+    pub add: Option<Vec<Tag>>,
+    pub remove: Option<Vec<Tag>>,
+}
+
+/// Defines a document query.
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct DocumentQuery {
+    /// Will match against the urls. Since a single document can only
+    /// have one url these fields are or'd together
+    pub urls: Option<Vec<String>>,
+    /// With match against the document id. Since a single document can
+    /// only have one document id these fields are or'd together
+    pub ids: Option<Vec<String>>,
+    /// Matches only documents that have the specified tags. These entries
+    /// are and'd together
+    pub has_tags: Option<Vec<Tag>>,
+    /// Matches only documents that do not have the specified tags. These
+    /// entries are and'd together
+    pub exclude_tags: Option<Vec<Tag>>,
+}
 
 /// Helper method to delete indexed documents, crawl queue items and search
 /// documents by url
@@ -55,6 +84,11 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
 
         if let Err(err) = state.index.delete_many_by_id(&doc_id_list).await {
             log::warn!("Unable to delete_many_by_id: {err}")
+        }
+
+        // delete their embeddings from the database
+        if let Err(error) = vec_documents::delete_embeddings_by_url(&state.db, chunk).await {
+            log::warn!("Error deleting document embeddings {:?}", error);
         }
 
         // now that the documents are deleted delete from the queue
@@ -121,6 +155,7 @@ pub async fn process_crawl_results(
     // Find/create the tags for this crawl.
     let mut tag_map: HashMap<String, Vec<i64>> = HashMap::new();
     let mut tag_cache = HashMap::new();
+    let mut embedding_map: HashMap<String, String> = HashMap::new();
 
     // Grab tags that applies to all crawl results.
     let global_tids = _get_tag_ids(&state.db, global_tags, &mut tag_cache).await;
@@ -140,6 +175,7 @@ pub async fn process_crawl_results(
         // Add document to index
         let url = Url::parse(&crawl_result.url)?;
         let url_host = url.host_str().unwrap_or("");
+
         // Add document to index
         let doc_id = state
             .index
@@ -158,7 +194,11 @@ pub async fn process_crawl_results(
             )
             .await?;
 
-        if !id_map.contains_key(&doc_id) {
+        if crawl_result.content.is_some() && state.embedding_api.load().as_ref().is_some() {
+            embedding_map.insert(doc_id.clone(), crawl_result.content.clone().unwrap());
+        }
+
+        if !model_map.contains_key(&doc_id) {
             added_docs.push(url.to_string());
             inserts.push(indexed_document::ActiveModel {
                 domain: Set(url_host.to_string()),
@@ -179,7 +219,26 @@ pub async fn process_crawl_results(
     // Insert docs & save everything.
     indexed_document::insert_many(&tx, &inserts).await?;
     for update in updates {
-        let _ = update.save(&tx).await;
+        let updated = update.save(&tx).await;
+        if let Ok(updated) = updated {
+            if let Ok(model) = updated.try_into_model() {
+                if let Some(content) = embedding_map.get(&model.doc_id) {
+                    if let Err(err) =
+                        embedding_queue::enqueue(&tx, &model.doc_id, model.id, content).await
+                    {
+                        log::warn!("Error enqueuing document embedding task. {:?}", err);
+                    }
+                }
+
+                if let Some(tag_ids) = tag_map.get(&model.url) {
+                    if let Err(err) =
+                        indexed_document::insert_tags_for_docs(&tx, &[model], tag_ids).await
+                    {
+                        log::error!("Error inserting tags {:?}", err);
+                    }
+                }
+            }
+        }
     }
 
     tx.commit().await?;
@@ -195,6 +254,14 @@ pub async fn process_crawl_results(
     let tx = state.db.begin().await?;
     let num_entries = added_entries.len();
     for added in added_entries {
+        if let Some(content) = embedding_map.get(&added.doc_id) {
+            if let Err(error) =
+                embedding_queue::enqueue(&tx, &added.doc_id, added.id, content).await
+            {
+                log::warn!("Error enqueuing document embedding task. {:?}", error);
+            }
+        }
+
         if let Some(tag_ids) = tag_map.get(&added.url) {
             if let Err(err) = indexed_document::insert_tags_for_docs(&tx, &[added], tag_ids).await {
                 log::error!("Error inserting tags {:?}", err);
@@ -210,7 +277,7 @@ pub async fn process_crawl_results(
 
     let num_updates = existing.len();
     Ok(AddUpdateResult {
-        num_added: num_entries - num_updates,
+        num_added: num_entries,
         num_updated: num_updates,
     })
 }

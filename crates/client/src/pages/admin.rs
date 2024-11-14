@@ -17,8 +17,6 @@ pub enum Tab {
     Discover,
     #[strum(serialize = "library")]
     LensManager,
-    #[strum(serialize = "plugins")]
-    PluginsManager,
     #[strum(serialize = "user")]
     UserSettings,
 }
@@ -64,7 +62,7 @@ pub struct SettingsPageProps {
 
 #[function_component(SettingsPage)]
 pub fn settings_page(props: &SettingsPageProps) -> Html {
-    let history = use_navigator().expect("History not available in this browser");
+    let history = use_navigator().expect_throw("History not available in this browser");
 
     spawn_local(async move {
         let cb = Closure::wrap(Box::new(move |payload: JsValue| {
@@ -78,9 +76,6 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     }),
                     "/settings/connections" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::ConnectionsManager,
-                    }),
-                    "/settings/plugins" => history.push(&Route::SettingsPage {
-                        tab: pages::Tab::PluginsManager,
                     }),
                     "/settings/user" => history.push(&Route::SettingsPage {
                         tab: pages::Tab::UserSettings,
@@ -130,12 +125,6 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                             </NavLink>
                         </li>
                         <li class="mb-2">
-                            <NavLink tab={Tab::PluginsManager} current={props.tab.clone()}>
-                                <icons::ChipIcon classes="mr-2" height="h-4" width="h-4" />
-                                {"Plugins"}
-                            </NavLink>
-                        </li>
-                        <li class="mb-2">
                             <NavLink tab={Tab::UserSettings} current={props.tab.clone()}>
                                 <icons::AdjustmentsIcon classes="mr-2" height="h-4" width="h-4" />
                                 {"User Settings"}
@@ -153,8 +142,6 @@ pub fn settings_page(props: &SettingsPageProps) -> Html {
                     Tab::Discover => html! { <pages::DiscoverPage /> },
                     #[allow(clippy::let_unit_value)]
                     Tab::LensManager => html! { <pages::LensManagerPage /> },
-                    #[allow(clippy::let_unit_value)]
-                    Tab::PluginsManager => html! { <pages::PluginManagerPage /> },
                     #[allow(clippy::let_unit_value)]
                     Tab::UserSettings => html! { <pages::UserSettingsPage /> },
                 }

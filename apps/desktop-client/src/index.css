@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input:checked ~ .dot {
+  transform: translateX(100%);
+  background-color: #48bb78;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #171717;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #171717;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 100vh;
+  border: 2px solid #171717;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #164e63;
+}
+
+mark {
+  color: rgb(255 255 255);
+  background-color: rgb(14 116 144 / var(--tw-bg-opacity));
+  padding-left: 0.125rem;
+  padding-right: 0.125rem;
+}

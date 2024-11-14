@@ -11,27 +11,31 @@ env:
   ARCH: x86_64-unknown-linux-gnu
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    env:
+      RUST_BACKTRACE: 1
+    strategy:
+      matrix:
+        # build: [ubuntu64, win64]
+        build: [ubuntu64]
+        include:
+          - build: ubuntu64
+            os: ubuntu-latest
+            host_target: x86_64-unknown-linux-gnu
+          # - build: win64
+          #   os: windows-latest
+          #   host_target: x86_64-pc-windows-msvc
     steps:
     # Checkout source code
     - uses: actions/checkout@v3
     # Cleanup Disk
     - name: Cleanup Disk
+      if: matrix.os == 'ubuntu-latest'
       run: |
         df -h;
         sudo rm -rf /usr/local/lib/android;
         sudo rm -rf /usr/share/dotnet;
         df -h
-    # Setup arch target for sidecar build
-    - name: Setup arch target
-      run: |
-        echo "target_arch=$(rustc -Vv | grep host | awk '{print $2 " "}')" >> $GITHUB_ENV;
-        echo "target_ext=" >> $GITHUB_ENV;
-        echo "target_os_name=linux" >> $GITHUB_ENV;
-    - name: Setup env file
-      run: cp .env.template .env
     # Setup rust toolchain
     - name: Setup rust toolchain
       uses: actions-rs/toolchain@v1
@@ -48,37 +52,16 @@ jobs:
       with:
         key: "1" # increment this to bust the cache if needed
     - name: Install tauri system deps
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update -y
         make setup-dev-linux
         make setup-dev
-    - name: Build sidecar
+    - name: Build crates
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: -p spyglass
-     # Setup arch targets - linux
-    - name: Move sidecar into place
-      run: |
-        mkdir -p crates/tauri/binaries
-        cp target/debug/spyglass${{ env.target_ext }} crates/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
-        cp target/debug/spyglass-debug${{ env.target_ext }} crates/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
-        cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} crates/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
-    # Build front-end client
-    - name: Build client
-      env:
-        TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-        TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-      uses: actions-rs/cargo@v1
-      with:
-        command: tauri
-        args: build --verbose
-    # Build backend crates
-    - name: Build backend
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: -p spyglass
+        args: --all
     # Run tests
     - name: Run tests
       uses: actions-rs/cargo@v1

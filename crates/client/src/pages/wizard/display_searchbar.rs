@@ -57,20 +57,15 @@ pub fn display_search_help() -> Html {
 
     {
         let shortcut_state = shortcut.clone();
-        use_effect_with_deps(
-            move |_| {
-                spawn_local(async move {
-                    if let Ok(result) =
-                        tauri_invoke::<_, String>(ClientInvoke::GetShortcut, "").await
-                    {
-                        shortcut_state.set(result);
-                    }
-                });
+        use_effect_with((), move |_| {
+            spawn_local(async move {
+                if let Ok(result) = tauri_invoke::<_, String>(ClientInvoke::GetShortcut, "").await {
+                    shortcut_state.set(result);
+                }
+            });
 
-                || ()
-            },
-            (),
-        );
+            || ()
+        });
     }
 
     html! {

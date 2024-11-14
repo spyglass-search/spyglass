@@ -1,5 +1,5 @@
 extern crate glob;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use ignore::{gitignore::Gitignore, Error};
 use std::{
     ffi::OsStr,
@@ -116,10 +116,9 @@ pub fn last_modified_time(path: &Path) -> DateTime<Utc> {
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards");
 
-            if let Some(time) =
-                NaiveDateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
+            if let Some(time) = DateTime::from_timestamp_millis(since_the_epoch.as_millis() as i64)
             {
-                time.and_utc()
+                time
             } else {
                 Utc::now()
             }

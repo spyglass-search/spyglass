@@ -1,13 +1,12 @@
-use crate::{
-    form::{FormType, SettingOpts},
-    plugin::PluginConfig,
-};
+use crate::form::{FormType, SettingOpts};
 use diff::Diff;
 use directories::ProjectDirs;
+use embeddings::{embedding_setting_opts, EmbeddingSettings};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use ts_rs::TS;
 use uuid::Uuid;
 
 pub use spyglass_lens::{
@@ -16,6 +15,7 @@ pub use spyglass_lens::{
 };
 
 mod audio;
+mod embeddings;
 mod filesystem;
 mod user_actions;
 pub use audio::*;
@@ -24,15 +24,6 @@ pub use user_actions::*;
 
 pub const MAX_TOTAL_INFLIGHT: u32 = 100;
 pub const MAX_DOMAIN_INFLIGHT: u32 = 100;
-
-// Name of legacy file importer plugin
-pub const LEGACY_FILESYSTEM_PLUGIN: &str = "local-file-importer";
-pub const LEGACY_PLUGIN_SETTINGS: &[&str] =
-    &["local-file-importer", "chrome-importer", "firefox-importer"];
-
-// Folder containing legacy local file importer plugin
-pub const LEGACY_PLUGIN_FOLDERS: &[&str] =
-    &["local-file-indexer", "chrome-importer", "firefox-importer"];
 
 const USER_UUID_ENV_VAR: &str = "SPYGLASS_STATIC_USER_UUID";
 
@@ -74,7 +65,8 @@ impl Limit {
 }
 
 // Enum of actions the user can take when a document is selected
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Diff, TS)]
+#[ts(export)]
 pub enum UserAction {
     OpenApplication(String, String),
     OpenUrl(String),
@@ -114,9 +106,6 @@ pub struct UserSettings {
     pub disable_telemetry: bool,
     #[serde(default)]
     pub filesystem_settings: FileSystemSettings,
-    /// Plugin settings
-    #[serde(default)]
-    pub plugin_settings: PluginSettings,
     #[serde(default)]
     pub disable_autolaunch: bool,
     #[serde(default = "UserSettings::default_port")]
@@ -125,6 +114,8 @@ pub struct UserSettings {
     pub user_action_settings: UserActionSettings,
     #[serde(default)]
     pub audio_settings: AudioSettings,
+    #[serde(default)]
+    pub embedding_settings: EmbeddingSettings,
     // /// Hide the app icon from the dock/taskbar while running. Will still show up
     // /// in the menubar/systemtray.
     // #[serde(default)]
@@ -243,6 +234,7 @@ impl From<UserSettings> for Vec<(String, SettingOpts)> {
 
         config.extend(fs_setting_opts(&settings));
         config.extend(audio_setting_opts(&settings));
+        config.extend(embedding_setting_opts(&settings));
 
         config
     }
@@ -268,11 +260,11 @@ impl Default for UserSettings {
             crawl_external_links: false,
             disable_telemetry: false,
             filesystem_settings: FileSystemSettings::default(),
-            plugin_settings: Default::default(),
             disable_autolaunch: false,
             port: UserSettings::default_port(),
             user_action_settings: UserActionSettings::default(),
             audio_settings: AudioSettings::default(),
+            embedding_settings: EmbeddingSettings::default(),
         }
     }
 }
@@ -308,91 +300,6 @@ impl Config {
                 .expect("Unable to save user preferences file.");
 
                 Ok(settings)
-            }
-        }
-    }
-
-    pub fn migrate_user_settings(mut settings: UserSettings) -> anyhow::Result<UserSettings> {
-        // convert local-filesystem-config to user settings filesystem config
-        let mut modified: bool = false;
-        for setting in LEGACY_PLUGIN_SETTINGS {
-            let res = settings.plugin_settings.remove(&setting.to_string());
-            if setting == &"local-file-importer" {
-                if let Some(local_file_settings) = res {
-                    modified = true;
-
-                    let dir_list = local_file_settings
-                        .get("FOLDERS_LIST")
-                        .map(|f| f.to_owned())
-                        .unwrap_or_default();
-
-                    if let Ok(dirs) = serde_json::from_str::<HashSet<String>>(&dir_list) {
-                        settings.filesystem_settings.watched_paths =
-                            dirs.iter().map(PathBuf::from).collect::<Vec<PathBuf>>();
-                    }
-
-                    let ext_list = local_file_settings
-                        .get("EXTS_LIST")
-                        .map(|s| s.to_owned())
-                        .unwrap_or_default();
-                    if let Ok(exts) = serde_json::from_str::<HashSet<String>>(&ext_list) {
-                        settings.filesystem_settings.supported_extensions =
-                            exts.iter().cloned().collect();
-                    }
-                }
-            }
-        }
-
-        if modified {
-            let _ = Self::save_user_settings(&settings);
-            return Self::load_user_settings();
-        }
-
-        Ok(settings)
-    }
-
-    /// Load & read plugin manifests to get plugin settings that are available.
-    pub fn load_plugin_config(&self) -> HashMap<String, PluginConfig> {
-        let plugins_dir = self.plugins_dir();
-        let plugin_files = fs::read_dir(plugins_dir).expect("Invalid plugin directory");
-        let mut settings: HashMap<String, PluginConfig> = Default::default();
-
-        for entry in plugin_files.flatten() {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-
-            // Load plugin settings
-            let plugin_config = path.join("manifest.ron");
-            if !plugin_config.exists() || !plugin_config.is_file() {
-                log::warn!("Invalid plugin manifest: {}", path.as_path().display());
-                continue;
-            }
-
-            if let Ok(file_contents) = std::fs::read_to_string(plugin_config) {
-                match ron::from_str::<PluginConfig>(&file_contents) {
-                    Ok(plugin_config) => {
-                        let mut config = plugin_config.clone();
-                        config.path = Some(path.join("main.wasm"));
-
-                        settings.insert(plugin_config.name.clone(), config.clone());
-                    }
-                    Err(error) => log::warn!("Error loading plugin config {:?}", error),
-                }
-            }
-        }
-
-        settings
-    }
-
-    fn cleanup_legacy_plugins(plugin_dir: &Path) {
-        for folder in LEGACY_PLUGIN_FOLDERS {
-            let fs_plugin_path = plugin_dir.join(folder);
-            if fs_plugin_path.exists() {
-                if let Err(err) = fs::remove_dir_all(fs_plugin_path) {
-                    log::warn!("Error removing plugin {folder} - {:?}", err);
-                }
             }
         }
     }
@@ -448,6 +355,10 @@ impl Config {
         self.data_dir().join("models")
     }
 
+    pub fn embedding_model_dir(&self) -> PathBuf {
+        self.model_dir().join("embeddings")
+    }
+
     pub fn prefs_dir() -> PathBuf {
         let proj_dirs = ProjectDirs::from("com", "athlabs", &Config::app_identifier())
             .expect("Unable to find a suitable settings directory");
@@ -485,11 +396,6 @@ impl Config {
             Default::default()
         });
 
-        let user_settings = Self::migrate_user_settings(user_settings).unwrap_or_else(|err| {
-            log::warn!("Unable to migrate user settings file! Reason: {}", err);
-            Default::default()
-        });
-
         let config = Config {
             lenses: HashMap::new(),
             pipelines: HashMap::new(),
@@ -503,8 +409,6 @@ impl Config {
         fs::create_dir_all(config.pipelines_dir()).expect("Unable to create `pipelines` folder");
         fs::create_dir_all(config.plugins_dir()).expect("Unable to create `plugin` folder");
         fs::create_dir_all(config.model_dir()).expect("Unable to create models folder");
-
-        Self::cleanup_legacy_plugins(&config.plugins_dir());
 
         config
     }

@@ -1,16 +1,20 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, Display};
+use ts_rs::TS;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ListenPayload<T> {
     pub payload: T,
 }
 
-#[derive(AsRefStr, Display)]
+#[derive(AsRefStr, Display, TS)]
+#[ts(export)]
 pub enum ClientEvent {
     ClearSearch,
     FocusWindow,
     FolderChosen,
+    LensInstalled,
+    LensUninstalled,
     Navigate,
     RefreshConnections,
     /// Request a refresh of the discover lens page when a lens is succesfully installed.
@@ -23,63 +27,70 @@ pub enum ClientEvent {
     UpdateLensFinished,
 }
 
-#[derive(AsRefStr, Display)]
+#[derive(AsRefStr, Display, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub enum ClientInvoke {
-    #[strum(serialize = "authorize_connection")]
+    #[serde(rename = "authorize_connection")]
     AuthorizeConnection,
-    #[strum(serialize = "choose_folder")]
+    #[serde(rename = "choose_folder")]
     ChooseFolder,
-    #[strum(serialize = "default_indices")]
+    #[serde(rename = "default_indices")]
     DefaultIndices,
-    #[strum(serialize = "escape")]
+    #[serde(rename = "escape")]
     Escape,
-    #[strum(serialize = "open_plugins_folder")]
+    #[serde(rename = "open_plugins_folder")]
     EditPluginSettings,
-    #[strum(serialize = "get_library_stats")]
+    #[serde(rename = "get_library_stats")]
     GetLibraryStats,
-    #[strum(serialize = "get_shortcut")]
+    #[serde(rename = "get_shortcut")]
     GetShortcut,
-    #[strum(serialize = "plugin:tauri-plugin-startup|get_startup_progress")]
+    #[serde(rename = "get_startup_progress")]
     GetStartupProgressText,
-    #[strum(serialize = "plugin:lens-updater|install_lens")]
+    #[serde(rename = "install_lens")]
     InstallLens,
-    #[strum(serialize = "list_connections")]
+    #[serde(rename = "list_connections")]
     ListConnections,
-    #[strum(serialize = "plugin:lens-updater|list_installed_lenses")]
+    #[serde(rename = "list_installed_lenses")]
     ListInstalledLenses,
-    #[strum(serialize = "plugin:lens-updater|list_installable_lenses")]
+    #[serde(rename = "list_installable_lenses")]
     ListInstallableLenses,
-    #[strum(serialize = "list_plugins")]
+    #[serde(rename = "list_plugins")]
     ListPlugins,
-    #[strum(serialize = "load_user_settings")]
+    #[serde(rename = "load_user_settings")]
     LoadUserSettings,
-    #[strum(serialize = "load_action_settings")]
+    #[serde(rename = "load_action_settings")]
     LoadUserActions,
-    #[strum(serialize = "resync_connection")]
+    #[serde(rename = "resize_window")]
+    ResizeWindow,
+    #[serde(rename = "resync_connection")]
     ResyncConnection,
-    #[strum(serialize = "revoke_connection")]
+    #[serde(rename = "revoke_connection")]
     RevokeConnection,
-    #[strum(serialize = "toggle_plugin")]
-    TogglePlugin,
-    #[strum(serialize = "plugin:lens-updater|run_lens_updater")]
+    #[serde(rename = "run_lens_updater")]
     RunLensUpdater,
-    #[strum(serialize = "open_folder_path")]
+    #[serde(rename = "save_user_settings")]
+    SaveUserSettings,
+    #[serde(rename = "search_docs")]
+    SearchDocuments,
+    #[serde(rename = "search_lenses")]
+    SearchLenses,
+    #[serde(rename = "open_folder_path")]
     OpenFolder,
-    #[strum(serialize = "open_lens_folder")]
+    #[serde(rename = "open_lens_folder")]
     OpenLensFolder,
-    #[strum(serialize = "open_result")]
+    #[serde(rename = "open_result")]
     OpenResult,
-    #[strum(serialize = "copy_to_clipboard")]
+    #[serde(rename = "copy_to_clipboard")]
     CopyToClipboard,
-    #[strum(serialize = "open_settings_folder")]
+    #[serde(rename = "open_settings_folder")]
     OpenSettingsFolder,
-    #[strum(serialize = "plugin:lens-updater|uninstall_lens")]
+    #[serde(rename = "uninstall_lens")]
     UninstallLens,
-    #[strum(serialize = "update_and_restart")]
+    #[serde(rename = "update_and_restart")]
     UpdateAndRestart,
-    #[strum(serialize = "wizard_finished")]
+    #[serde(rename = "wizard_finished")]
     WizardFinished,
-    #[strum(serialize = "navigate")]
+    #[serde(rename = "navigate")]
     Navigate,
 }
 
@@ -99,7 +110,8 @@ pub struct InstallLensParams {
     pub name: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct OpenResultParams {
     pub url: String,
     pub application: Option<String>,
@@ -122,10 +134,9 @@ pub struct UninstallLensParams {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WizardFinishedParams {
-    #[serde(rename(serialize = "toggleAudioTranscription"))]
     pub toggle_audio_transcription: bool,
-    #[serde(rename(serialize = "toggleFileIndexer"))]
     pub toggle_file_indexer: bool,
 }
 
@@ -134,13 +145,15 @@ pub struct NavigateParams {
     pub page: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct ModelStatusPayload {
     pub msg: String,
     pub percent: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, TS)]
+#[ts(export)]
 pub struct ModelStatusPayloadWrapper {
     pub payload: ModelStatusPayload,
 }

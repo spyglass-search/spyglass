@@ -6,7 +6,6 @@ pub mod form;
 pub mod keyboard;
 #[cfg(feature = "metrics")]
 pub mod metrics;
-pub mod plugin;
 pub mod regex;
 pub mod request;
 pub mod response;

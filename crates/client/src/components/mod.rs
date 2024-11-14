@@ -69,8 +69,8 @@ pub fn header(props: &HeaderProps) -> Html {
 
 #[derive(Debug)]
 pub struct TabEvent {
-    pub tab_idx: usize,
-    pub tab_name: String,
+    pub _tab_idx: usize,
+    pub _tab_name: String,
 }
 
 #[derive(PartialEq, Properties)]
@@ -97,16 +97,13 @@ pub fn tabs(props: &TabsProps) -> Html {
 
     let onchange = props.onchange.clone();
     let tabs = props.tabs.clone();
-    use_effect_with_deps(
-        move |updated| {
-            onchange.emit(TabEvent {
-                tab_idx: **updated,
-                tab_name: tabs[**updated].clone(),
-            });
-            || {}
-        },
-        active_idx.clone(),
-    );
+    use_effect_with(active_idx.clone(), move |updated| {
+        onchange.emit(TabEvent {
+            _tab_idx: **updated,
+            _tab_name: tabs[**updated].clone(),
+        });
+        || {}
+    });
 
     html! {
         <ul class="flex flex-row list-none gap-4">

@@ -49,6 +49,13 @@ impl QueryBoost {
             value: *value,
         }
     }
+
+    pub fn with_value(boost: Boost, value: f32) -> Self {
+        QueryBoost {
+            field: boost,
+            value,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -110,7 +117,7 @@ pub trait WriteTrait {
 
     async fn upsert(&self, single_doc: &Document) -> SearcherResult<String> {
         let upserted = self.upsert_many(&[single_doc.clone()]).await?;
-        Ok(upserted.get(0).expect("Expected a single doc").to_owned())
+        Ok(upserted.first().expect("Expected a single doc").to_owned())
     }
 
     /// Insert/update documents in the index, returning the list of document ids

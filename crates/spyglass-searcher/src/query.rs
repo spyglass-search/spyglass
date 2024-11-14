@@ -24,7 +24,7 @@ fn _boosted_term(term: Term, boost: Score) -> Box<BoostQuery> {
 fn _boosted_phrase(terms: Vec<(usize, Term)>, boost: Score) -> Box<BoostQuery> {
     let slop = terms
         .last()
-        .map(|(position, _)| ((*position as i32) - 2).max(0).min(3) as u32)
+        .map(|(position, _)| ((*position as i32) - 2).clamp(0, 3) as u32)
         .unwrap_or(0);
     Box::new(BoostQuery::new(
         Box::new(PhraseQuery::new_with_offset_and_slop(terms, slop)),

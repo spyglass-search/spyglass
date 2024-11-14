@@ -5,6 +5,7 @@ use entities::models::schema::v1::{self, SearchDocument as SearchDocumentV1};
 use entities::models::schema::v2::{self, SearchDocument as SearchDocumentV2};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
+use sea_orm_migration::prelude::ConnectionTrait;
 use sea_orm_migration::prelude::*;
 use tantivy_18::collector::TopDocs;
 use tantivy_18::directory::MmapDirectory;
@@ -15,7 +16,7 @@ use tantivy_18::{Index, IndexReader, ReloadPolicy};
 
 // use entities::schema::DocFields;
 use entities::models::crawl_queue;
-use entities::sea_orm::{ConnectionTrait, Statement};
+use entities::sea_orm::Statement;
 use shared::config::Config;
 
 use crate::utils::migration_utils;

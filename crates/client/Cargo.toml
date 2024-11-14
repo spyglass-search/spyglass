@@ -8,20 +8,23 @@ edition = "2021"
 [dependencies]
 js-sys = "0.3"
 log = "0.4"
-gloo = "0.8.0"
+gloo = "0.11.0"
 handlebars = "4.3.6"
 num-format = { version = "0.4", default-features = false }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde-wasm-bindgen = "0.5"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = "0.6.5"
 "shared" = { path = "../shared" }
-strum = "0.24"
-strum_macros = "0.24"
-wasm-bindgen = "0.2.83"
-wasm-bindgen-futures = "0.4.33"
+strum = { workspace = true }
+strum_macros = { workspace = true }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2.0"
 web-sys = { version = "0.3.60", features = ["Navigator", "VisibilityState"] }
-yew = { version = "0.20", features = ["csr"] }
-yew-router = "0.17"
+yew = { version = "0.21", features = ["csr"] }
+yew-router = "0.18"
 ui-components = { path = "../ui-components" }
 url = "2.2.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(headless)']}

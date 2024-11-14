@@ -546,16 +546,16 @@ async fn _process_file(
                 log::debug!("starting transcription for `{}`", file_name);
                 // Attempt to transcribe audio, assumes the model has been downloaded
                 // and ready to go
-                #[cfg(debug_assertions)]
-                let model_path: PathBuf = "assets/models/whisper.base.en.bin".into();
-                #[cfg(not(debug_assertions))]
-                let model_path: PathBuf = state.config.model_dir().join("whisper.base.en.bin");
+                // #[cfg(debug_assertions)]
+                // let model_path: PathBuf = "assets/models/whisper".into();
+                // #[cfg(not(debug_assertions))]
+                let model_path: PathBuf = state.config.model_dir().join("whisper");
 
                 if !model_path.exists() {
                     log::warn!("whisper model not installed, skipping transcription");
                     content = None;
                 } else {
-                    match parser::audio::transcribe_audio(path.to_path_buf(), model_path, 0) {
+                    match parser::audio::transcribe_audio(path.to_path_buf(), model_path) {
                         Ok(result) => {
                             // Update crawl result with appropriate title/stuff
                             if let Some(metadata) = result.metadata {
@@ -678,15 +678,16 @@ fn is_html_content(content_type: &str) -> bool {
 
 #[cfg(test)]
 mod test {
+    use std::path::Path;
+
     use entities::models::crawl_queue::CrawlType;
     use entities::models::{crawl_queue, resource_rule};
     use entities::sea_orm::{ActiveModelTrait, Set};
     use entities::test::setup_test_db;
-    use spyglass_plugin::utils::path_to_uri;
 
     use crate::crawler::{determine_canonical, normalize_href, Crawler};
+    use crate::filesystem::utils::path_to_uri;
     use crate::state::AppState;
-    use std::path::Path;
     use url::Url;
 
     #[tokio::test]
@@ -893,7 +894,7 @@ mod test {
         let test_path = test_folder.join("test.txt");
         std::fs::write(test_path.clone(), "test_content").expect("Unable to write test file");
 
-        let uri = path_to_uri(test_path.to_path_buf());
+        let uri = path_to_uri(&test_path.to_path_buf());
         let url = Url::parse(&uri).unwrap();
 
         let query = crawl_queue::ActiveModel {
