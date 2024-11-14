@@ -546,9 +546,9 @@ async fn _process_file(
                 log::debug!("starting transcription for `{}`", file_name);
                 // Attempt to transcribe audio, assumes the model has been downloaded
                 // and ready to go
-                #[cfg(debug_assertions)]
-                let model_path: PathBuf = "assets/models/whisper".into();
-                #[cfg(not(debug_assertions))]
+                // #[cfg(debug_assertions)]
+                // let model_path: PathBuf = "assets/models/whisper".into();
+                // #[cfg(not(debug_assertions))]
                 let model_path: PathBuf = state.config.model_dir().join("whisper");
 
                 if !model_path.exists() {
