@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc, time::Instant};
 
-use tokenizers::Tokenizer;
+use tokenizers::{Encoding, Tokenizer};
 
 use crate::{batch, load_tokenizer, Backend, CandleBackend, Embedding, ModelType, Pool};
 
@@ -55,8 +55,17 @@ impl EmbeddingApi {
         if token_length > MAX_TOKENS {
             tokens.truncate(MAX_TOKENS, 1, tokenizers::TruncationDirection::Right);
         }
-        let input_batch = batch(vec![tokens], [0].to_vec(), vec![]);
 
+        self.embed_tokens(tokens)
+    }
+
+    pub fn embed_tokens(&self, tokens: Encoding) -> anyhow::Result<Vec<f32>> {
+        let token_length = tokens.len();
+
+        let mut token_list = Vec::new();
+        token_list.extend(tokens.get_overflowing().to_vec());
+        token_list.insert(0, tokens);
+        let input_batch = batch(token_list, [0].to_vec(), vec![]);
         let start = Instant::now();
 
         match self.backend.embed(input_batch) {
@@ -66,6 +75,7 @@ impl EmbeddingApi {
                     token_length,
                     start.elapsed().as_millis()
                 );
+
                 if let Some(Embedding::Pooled(embedding)) = embed.get(&0) {
                     Ok(embedding.to_owned())
                 } else {
