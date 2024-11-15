@@ -82,15 +82,21 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.18
         id: cuda-toolkit
       # Build stuff
-      - name: build sidecar (windows/linux)
-        if: ${{ matrix.platform == 'windows-latest' || startsWith(matrix.platform, 'ubuntu') }}
+      - name: build sidecar (ubuntu)
+        if: ${{ startsWith(matrix.platform, 'ubuntu') }}
+        run: |
+          mkdir -p apps/tauri/binaries
+          cargo build -p spyglass --verbose --release;
+      - name: build sidecar (windows)
+        if: ${{ startsWith(matrix.platform, 'windows') }}
         env:
           CUDA_COMPUTE_CAP: 80
         run: |
           mkdir -p apps/tauri/binaries
-
           cargo build -p spyglass --verbose --release --features cuda;
-
+      - name: copy binaries (windows/ubuntu)
+        if: ${{ startsWith(matrix.platform, 'windows') || startsWith(matrix.platform, 'ubuntu') }}
+        run: |
           cp target/release/spyglass${{ env.target_ext }} apps/tauri/binaries/spyglass-server-${{ env.target_arch }}${{ env.target_ext }}
           cp target/release/spyglass-debug${{ env.target_ext }} apps/tauri/binaries/spyglass-debug-${{ env.target_arch }}${{ env.target_ext }}
           cp utils/${{ env.target_os_name }}/pdftotext${{ env.target_ext }} apps/tauri/binaries/pdftotext-${{ env.target_arch }}${{ env.target_ext }}
