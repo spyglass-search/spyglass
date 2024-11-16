@@ -325,7 +325,7 @@ export function SearchPage() {
   return (
     <div
       ref={searchWrapperRef}
-      className="relative overflow-hidden rounded-xl border-neutral-600 border"
+      className="relative overflow-hidden"
       onClick={() => searchInput.current?.focus()}
     >
       <div className="flex flex-nowrap w-full bg-neutral-800">
@@ -334,7 +334,7 @@ export function SearchPage() {
           ref={searchInput}
           id="searchbox"
           type="text"
-          className="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+          className="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 border-none caret-white active:outline-none focus-visible:outline-none focus:outline-none"
           placeholder="Search"
           onChange={handleUpdateQuery}
           onKeyDown={handleKeyEvent}

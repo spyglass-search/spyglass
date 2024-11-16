@@ -95,21 +95,31 @@ pub fn get_searchbar(app: &AppHandle) -> WebviewWindow {
             WebviewWindowBuilder::new(app, constants::SEARCH_WIN_NAME, WebviewUrl::App("/".into()))
                 .menu(get_app_menu(app).expect("Unable to build app menu"))
                 .title("Spyglass")
-                .decorations(false)
-                .transparent(true)
                 .visible(true)
                 // .disable_file_drop_handler()
-                .inner_size(640.0, 108.0)
-                .build()
-                .expect("Unable to create searchbar window");
+                .resizable(false)
+                .inner_size(640.0, 108.0);
 
-        // macOS: Handle multiple spaces correctly
+        #[cfg(target_os = "macos")]
+        let window = window.title_bar_style(tauri::TitleBarStyle::Transparent);
+
+        let window = window.build().expect("Unable to build startup window");
         #[cfg(target_os = "macos")]
         {
-            use cocoa::appkit::NSWindow;
+            use cocoa::appkit::{NSColor, NSWindow};
+            use cocoa::base::{id, nil};
+
+            let ns_window = window.ns_window().unwrap() as id;
             unsafe {
-                let ns_window =
-                    window.ns_window().expect("Unable to get ns_window") as cocoa::base::id;
+                let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                    nil,
+                    38.0 / 255.0,
+                    38.0 / 255.0,
+                    38.0 / 255.0,
+                    1.0,
+                );
+                ns_window.setBackgroundColor_(bg_color);
+                // macOS: Handle multiple spaces correctly
                 ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
             }
         }
@@ -139,9 +149,7 @@ pub async fn resize_window(window: &WebviewWindow, height: f64) {
         })
     };
 
-    // recenter after resize
     let _ = window.set_size(new_size);
-    center_search_bar(window);
 }
 
 fn show_window(window: &WebviewWindow) {
