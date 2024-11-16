@@ -21,6 +21,10 @@
     "core:app:allow-app-hide",
     "core:app:allow-app-show",
     "core:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:event:default",
     "core:webview:allow-print",
     "core:window:allow-center",
     "core:window:allow-close",
@@ -54,10 +58,6 @@
     "core:window:allow-start-dragging",
     "core:window:allow-unmaximize",
     "core:window:allow-unminimize",
-    "core:event:default",
-    "core:event:allow-emit",
-    "core:event:allow-listen",
-    "core:event:allow-unlisten",
     "dialog:allow-ask",
     "dialog:allow-confirm",
     "dialog:allow-message",
@@ -90,7 +90,6 @@
     "process:allow-restart",
     "shell:allow-execute",
     "shell:allow-open",
-    "updater:default",
-    "notification:default"
+    "updater:default"
   ]
 }

@@ -373,7 +373,10 @@ export function SearchPage() {
           </div>
         </div>
       ) : null}
-      <div className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
+      <div
+        data-tauri-drag-region
+        className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0"
+      >
         <SearchStatus meta={searchMeta} isThinking={isThinking} />
         {searchMeta ? (
           <ActionListButton
