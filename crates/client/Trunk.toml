@@ -1,9 +1,0 @@
-[watch]
-ignore = ["dist", "../../apps/tauri"]
-
-[build]
-target = "index.html"
-dist = "dist"
-
-[serve]
-ws_protocol = "ws"
