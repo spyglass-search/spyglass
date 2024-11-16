@@ -1,4 +1,4 @@
-use sea_orm::{ConnectionTrait, DbErr, ExecResult, FromQueryResult, Statement};
+use sea_orm::{ConnectionTrait, DbErr, ExecResult, FromQueryResult, QueryResult, Statement};
 
 pub async fn insert_embedding<C>(db: &C, id: i64, embedding: &[f32]) -> Result<ExecResult, DbErr>
 where
@@ -73,6 +73,25 @@ where
     db.execute(statement).await
 }
 
+pub async fn delete_embedding_by_ids<C>(db: &C, ids: &[i64]) -> Result<ExecResult, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let st = format!(
+        r#"
+        delete from vec_documents where rowid in ({})
+        "#,
+        ids.iter()
+            .map(|id| format!("{}", id))
+            .collect::<Vec<String>>()
+            .join(",")
+            .to_string()
+    );
+    let statement = Statement::from_string(db.get_database_backend(), st);
+
+    db.execute(statement).await
+}
+
 pub async fn delete_embeddings_by_url<C>(db: &C, urls: &[String]) -> Result<ExecResult, DbErr>
 where
     C: ConnectionTrait,
@@ -127,10 +146,23 @@ where
         Statement::from_sql_and_values(
             db.get_database_backend(),
             r#"
-                SELECT vec_documents.rowid as id, vec_documents.distance, indexed_document.doc_id FROM vec_documents
-                    left join indexed_document on indexed_document.id = vec_documents.rowid
+                 WITH RankedScores AS (
+                    SELECT
+                        indexed_document.id AS score_id,
+                        vd.distance,
+                        indexed_document.doc_id,
+                        ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
+                    FROM
+                        vec_documents vd
+                    left JOIN
+                        vec_to_indexed vti
+                        ON vd.rowid = vti.id
+                    left JOIN indexed_document
+                        ON vti.indexed_id = indexed_document.id
                     left join document_tag on document_tag.indexed_document_id = indexed_document.id
-                    WHERE document_tag.id in $1 AND vec_documents.embedding MATCH $2 AND k = 10 ORDER BY vec_documents.distance ASC limit 20;
+                    WHERE document_tag.id in $1 AND vd.embedding MATCH $2 AND k = 25 ORDER BY vd.distance ASC
+                )
+                SELECT score_id as id, distance, doc_id FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit 10;
             "#,
             vec![lens_ids.to_owned().into(), embedding_string.into()],
         )
@@ -138,9 +170,22 @@ where
         Statement::from_sql_and_values(
             db.get_database_backend(),
             r#"
-                SELECT vec_documents.rowid as id, vec_documents.distance, indexed_document.doc_id FROM vec_documents
-                    left join indexed_document on indexed_document.id = vec_documents.rowid
-                    WHERE vec_documents.embedding MATCH $1 AND k = 10 ORDER BY vec_documents.distance ASC limit 20;
+                WITH RankedScores AS (
+                    SELECT
+                        indexed_document.id AS score_id,
+                        vd.distance,
+                        indexed_document.doc_id,
+                        ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
+                    FROM
+                        vec_documents vd
+                    left JOIN
+                        vec_to_indexed vti
+                        ON vd.rowid = vti.id
+                    left JOIN indexed_document
+                        ON vti.indexed_id = indexed_document.id
+                    WHERE vd.embedding MATCH $1 AND k = 25 ORDER BY vd.distance ASC
+                )
+                SELECT score_id as id, distance, doc_id FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit 10;
             "#,
             vec![embedding_string.into()],
         )

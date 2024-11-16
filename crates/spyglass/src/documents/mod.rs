@@ -4,7 +4,7 @@ use entities::{
         crawl_queue, embedding_queue,
         indexed_document::{self, find_by_doc_ids},
         tag::{self, TagPair},
-        vec_documents,
+        vec_documents, vec_to_indexed,
     },
     sea_orm::{ActiveModelTrait, DatabaseConnection, TryIntoModel},
     BATCH_SIZE,
@@ -87,7 +87,7 @@ pub async fn delete_documents_by_uri(state: &AppState, uri: Vec<String>) {
         }
 
         // delete their embeddings from the database
-        if let Err(error) = vec_documents::delete_embeddings_by_url(&state.db, chunk).await {
+        if let Err(error) = vec_to_indexed::delete_all_by_urls(&state.db, chunk).await {
             log::warn!("Error deleting document embeddings {:?}", error);
         }
 

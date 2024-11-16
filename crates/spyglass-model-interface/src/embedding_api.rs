@@ -36,36 +36,71 @@ impl EmbeddingApi {
         &self,
         content: &str,
         content_type: EmbeddingContentType,
-    ) -> anyhow::Result<Vec<f32>> {
+    ) -> anyhow::Result<Vec<Vec<f32>>> {
         // TODO need to properly segment the data
         let doc_content = match content_type {
             EmbeddingContentType::Document => {
-                format!("search_document: {}", content)
+                format!("search_document: {}", content.trim())
             }
             EmbeddingContentType::Query => {
-                format!("search_query: {}", content)
+                format!("search_query: {}", content.trim())
             }
         };
 
-        let mut tokens = self
+        let tokens = self
             .tokenizer
             .encode(doc_content, false)
             .map_err(|err| anyhow::format_err!("Error tokenizing {:?}", err))?;
         let token_length = tokens.len();
+        let mut content_chunks = Vec::new();
         if token_length > MAX_TOKENS {
-            tokens.truncate(MAX_TOKENS, 1, tokenizers::TruncationDirection::Right);
+            let segment_count = token_length.div_ceil(MAX_TOKENS);
+            let char_per_segment = content.len().div_euclid(segment_count);
+
+            let chunks: Vec<String> = content
+                .trim()
+                .chars()
+                .collect::<Vec<char>>()
+                .chunks(char_per_segment)
+                .map(|chunk| chunk.iter().collect::<String>())
+                .collect();
+
+            log::debug!(
+                "Splitting text into chunks of {} chars long",
+                char_per_segment
+            );
+            for chunk in chunks {
+                let doc_content = match content_type {
+                    EmbeddingContentType::Document => {
+                        format!("search_document: {}", chunk)
+                    }
+                    EmbeddingContentType::Query => {
+                        format!("search_query: {}", chunk)
+                    }
+                };
+                let tokens = self
+                    .tokenizer
+                    .encode(doc_content, false)
+                    .map_err(|err| anyhow::format_err!("Error tokenizing {:?}", err))?;
+                log::trace!("Chunk was {} tokens long", tokens.len());
+                content_chunks.push(tokens);
+            }
+        } else {
+            content_chunks.push(tokens);
         }
 
-        self.embed_tokens(tokens)
+        let mut embeddings = Vec::new();
+        for chunk in content_chunks {
+            let embedding = self.embed_tokens(chunk.to_owned())?;
+            embeddings.push(embedding);
+        }
+
+        Ok(embeddings)
     }
 
     pub fn embed_tokens(&self, tokens: Encoding) -> anyhow::Result<Vec<f32>> {
         let token_length = tokens.len();
-
-        let mut token_list = Vec::new();
-        token_list.extend(tokens.get_overflowing().to_vec());
-        token_list.insert(0, tokens);
-        let input_batch = batch(token_list, [0].to_vec(), vec![]);
+        let input_batch = batch(vec![tokens], [0].to_vec(), vec![]);
         let start = Instant::now();
 
         match self.backend.embed(input_batch) {
