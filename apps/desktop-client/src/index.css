@@ -8,7 +8,9 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: transparent;
 }
+
 
 input:checked ~ .dot {
   transform: translateX(100%);
@@ -43,4 +45,10 @@ mark {
   background-color: rgb(14 116 144 / var(--tw-bg-opacity));
   padding-left: 0.125rem;
   padding-right: 0.125rem;
+}
+
+.titlebar {
+  height: 30px;
+  user-select: none;
+  width: 100%;
 }

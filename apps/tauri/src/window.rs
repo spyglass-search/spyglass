@@ -95,30 +95,22 @@ pub fn get_searchbar(app: &AppHandle) -> WebviewWindow {
             WebviewWindowBuilder::new(app, constants::SEARCH_WIN_NAME, WebviewUrl::App("/".into()))
                 .menu(get_app_menu(app).expect("Unable to build app menu"))
                 .title("Spyglass")
+                .decorations(false)
+                .transparent(true)
                 .visible(true)
+                .shadow(false)
                 // .disable_file_drop_handler()
                 .resizable(false)
                 .inner_size(640.0, 108.0);
 
-        #[cfg(target_os = "macos")]
-        let window = window.title_bar_style(tauri::TitleBarStyle::Transparent);
-
         let window = window.build().expect("Unable to build startup window");
         #[cfg(target_os = "macos")]
         {
-            use cocoa::appkit::{NSColor, NSWindow};
-            use cocoa::base::{id, nil};
+            use cocoa::appkit::NSWindow;
+            use cocoa::base::id;
 
             let ns_window = window.ns_window().unwrap() as id;
             unsafe {
-                let bg_color = NSColor::colorWithRed_green_blue_alpha_(
-                    nil,
-                    38.0 / 255.0,
-                    38.0 / 255.0,
-                    38.0 / 255.0,
-                    1.0,
-                );
-                ns_window.setBackgroundColor_(bg_color);
                 // macOS: Handle multiple spaces correctly
                 ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
             }

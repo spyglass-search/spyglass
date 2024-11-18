@@ -15,6 +15,7 @@ import { DEFAULT_ACTION } from "./constants";
 import Handlebars from "handlebars";
 import { ContextActions } from "../../bindings/ContextActions";
 import { includeAction, resultToTemplate } from "./utils";
+import { CustomTitleBar } from "../../components/CustomTitleBar";
 
 const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -325,9 +326,10 @@ export function SearchPage() {
   return (
     <div
       ref={searchWrapperRef}
-      className="relative overflow-hidden"
+      className="relative overflow-clip rounded-xl bg-transparent"
       onClick={() => searchInput.current?.focus()}
     >
+      <CustomTitleBar />
       <div className="flex flex-nowrap w-full bg-neutral-800">
         <SelectedLenses lenses={selectedLenses} />
         <input
