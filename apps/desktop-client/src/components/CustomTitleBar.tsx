@@ -1,20 +1,15 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import classNames from "classnames";
 import { getOperatingSystem, OperatingSystem } from "../utils";
 import { XMarkIcon } from "@heroicons/react/16/solid";
+import { invoke } from "../glue";
 
 interface Props {
   osStyle?: OperatingSystem;
 }
 
 export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
-  const appWindow = getCurrentWindow();
-  const handleClose = () => {
-    if (osStyle === OperatingSystem.MacOS) {
-      appWindow.hide();
-    } else {
-      appWindow.close();
-    }
+  const handleClose = async () => {
+    await invoke("escape");
   };
 
   const renderButton = () => {
@@ -22,8 +17,10 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
       "flex",
       "flex-row",
       "justify-center",
+      "items-center",
       "group-hover:bg-red-500",
     ];
+
     if (osStyle === OperatingSystem.MacOS) {
       return (
         <div className="ml-[8px] group">
@@ -34,7 +31,7 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
             )}
             onClick={handleClose}
           >
-            <XMarkIcon className="w-[10px] ml-[1px] text-neutral group-hover:text-black" />
+            <XMarkIcon className="w-[10px] text-neutral group-hover:text-black" />
           </button>
         </div>
       );
@@ -62,6 +59,7 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
         "titlebar",
         "flex",
         "flex-row",
+        "items-center",
         "bg-neutral-900",
         {
           "place-content-end": osStyle !== OperatingSystem.MacOS,
