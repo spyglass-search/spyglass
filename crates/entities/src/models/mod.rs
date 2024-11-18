@@ -16,6 +16,7 @@ pub mod resource_rule;
 pub mod schema;
 pub mod tag;
 pub mod vec_documents;
+pub mod vec_to_indexed;
 
 use shared::config::Config;
 

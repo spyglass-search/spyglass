@@ -63,8 +63,11 @@ pub async fn search_docs(
     }
 
     if let Some(embedding_api) = state.embedding_api.load_full().as_ref() {
-        match embedding_api.embed(&query, EmbeddingContentType::Query) {
-            Ok(embedding) => {
+        match embedding_api
+            .embed(&query, EmbeddingContentType::Query)
+            .map(|embedding| embedding.first().map(|val| val.to_owned()))
+        {
+            Ok(Some(embedding)) => {
                 let mut distances =
                     vec_documents::get_document_distance(&state.db, &lens_ids, &embedding).await;
 
@@ -95,6 +98,9 @@ pub async fn search_docs(
                         }
                     }
                 }
+            }
+            Ok(None) => {
+                log::error!("No embedding could be generated");
             }
             Err(err) => {
                 log::error!("Error embedding query {:?}", err);
