@@ -1,5 +1,5 @@
 use entities::{
-    models::{embedding_queue, vec_documents},
+    models::{embedding_queue, vec_documents, vec_to_indexed},
     sea_orm::EntityTrait,
 };
 use spyglass_model_interface::embedding_api::EmbeddingContentType;
@@ -15,37 +15,37 @@ pub async fn processing_embedding(state: AppState, job_id: i64) {
         .one(&state.db)
         .await
     {
-        Ok(Some(job)) => {
-            match job.content {
-                Some(content) => {
-                    let embedding = if let Some(api) = state.embedding_api.load_full().as_ref() {
-                        api.embed(&content, EmbeddingContentType::Document)
-                    } else {
-                        Err(anyhow::format_err!(
-                            "Embedding Model is not properly configured"
-                        ))
-                    };
-                    match embedding {
-                        Ok(embedding) => {
-                            match vec_documents::insert_embedding(
+        Ok(Some(job)) => match job.content {
+            Some(content) => {
+                let embeddings = if let Some(api) = state.embedding_api.load_full().as_ref() {
+                    api.embed(&content, EmbeddingContentType::Document)
+                } else {
+                    Err(anyhow::format_err!(
+                        "Embedding Model is not properly configured"
+                    ))
+                };
+                match embeddings {
+                    Ok(embeddings) => {
+                        if let Err(error) = vec_to_indexed::delete_all_for_document(
+                            &state.db,
+                            job.indexed_document_id,
+                        )
+                        .await
+                        {
+                            log::error!("Error deleting document vectors {:?}", error);
+                        }
+
+                        for embedding in embeddings {
+                            match vec_to_indexed::insert_embedding_mapping(
                                 &state.db,
                                 job.indexed_document_id,
-                                &embedding,
                             )
                             .await
                             {
-                                Ok(_) => {
-                                    let _ = embedding_queue::mark_done(&state.db, job_id).await;
-                                }
-                                Err(insert_error) => {
-                                    // The virtual table does not support on conflict so we try to
-                                    // insert first then update.
-                                    match vec_documents::update_embedding(
-                                        &state.db,
-                                        job.indexed_document_id,
-                                        &embedding,
-                                    )
-                                    .await
+                                Ok(insert_result) => {
+                                    let id: i64 = insert_result.last_insert_id;
+                                    match vec_documents::insert_embedding(&state.db, id, &embedding)
+                                        .await
                                     {
                                         Ok(_) => {
                                             let _ =
@@ -56,39 +56,42 @@ pub async fn processing_embedding(state: AppState, job_id: i64) {
                                                 &state.db,
                                                 job_id,
                                                 Some(format!(
-                                                    "Error storing embedding for {}. Error {:?} and {:?}",
-                                                    job.document_id, insert_error, error
+                                                    "Error storing embedding for {}. Error {:?}",
+                                                    job.document_id, error
                                                 )),
                                             )
                                             .await;
                                         }
                                     }
                                 }
+                                Err(error) => {
+                                    log::error!("Error inserting mapping {:?}", error);
+                                }
                             }
                         }
-                        Err(error) => {
-                            let _ = embedding_queue::mark_failed(
-                                &state.db,
-                                job_id,
-                                Some(format!(
-                                    "Error generating embedding for {}. Error {:?}",
-                                    job.document_id, error
-                                )),
-                            )
-                            .await;
-                        }
+                    }
+                    Err(error) => {
+                        let _ = embedding_queue::mark_failed(
+                            &state.db,
+                            job_id,
+                            Some(format!(
+                                "Error generating embedding for {}. Error {:?}",
+                                job.document_id, error
+                            )),
+                        )
+                        .await;
                     }
                 }
-                None => {
-                    let _ = embedding_queue::mark_failed(
-                        &state.db,
-                        job_id,
-                        Some(format!("No content found for document {}", job.document_id)),
-                    )
-                    .await;
-                }
             }
-        }
+            None => {
+                let _ = embedding_queue::mark_failed(
+                    &state.db,
+                    job_id,
+                    Some(format!("No content found for document {}", job.document_id)),
+                )
+                .await;
+            }
+        },
         Ok(None) => {
             let _ = embedding_queue::mark_failed(
                 &state.db,
