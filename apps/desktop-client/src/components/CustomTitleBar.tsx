@@ -18,10 +18,16 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
   };
 
   const renderButton = () => {
+    const baseStyles = [
+      "flex",
+      "flex-row",
+      "justify-center",
+      "group-hover:bg-red-500"
+    ];
     if (osStyle === OperatingSystem.MacOS) {
       return (
         <div className="ml-[8px] group">
-          <button className="btn-circle bg-neutral w-[12px] h-[12px] group-hover:bg-red-500" onClick={handleClose}>
+          <button className={classNames(baseStyles, "btn-circle bg-neutral w-[12px] h-[12px]")} onClick={handleClose}>
             <XMarkIcon className="w-[10px] ml-[1px] text-neutral group-hover:text-black"/>
           </button>
         </div>
@@ -29,7 +35,7 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
     } else {
       return (
         <div className="group">
-          <div className="flex flex-row items-center justify-center w-[30px] h-[30px] bg-neutral-900 hover:bg-red-500">
+          <div className={classNames(baseStyles, "w-[30px] h-[30px] bg-neutral-900")} onClick={handleClose}>
             <XMarkIcon className="w-[16px] text-neutral-400 group-hover:text-black" />
           </div>
         </div>
