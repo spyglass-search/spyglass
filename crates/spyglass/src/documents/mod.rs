@@ -4,7 +4,7 @@ use entities::{
         crawl_queue, embedding_queue,
         indexed_document::{self, find_by_doc_ids},
         tag::{self, TagPair},
-        vec_documents, vec_to_indexed,
+        vec_to_indexed,
     },
     sea_orm::{ActiveModelTrait, DatabaseConnection, TryIntoModel},
     BATCH_SIZE,

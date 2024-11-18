@@ -1,4 +1,4 @@
-use sea_orm::{ConnectionTrait, DbErr, ExecResult, FromQueryResult, QueryResult, Statement};
+use sea_orm::{ConnectionTrait, DbErr, ExecResult, FromQueryResult, Statement};
 
 pub async fn insert_embedding<C>(db: &C, id: i64, embedding: &[f32]) -> Result<ExecResult, DbErr>
 where
@@ -85,7 +85,6 @@ where
             .map(|id| format!("{}", id))
             .collect::<Vec<String>>()
             .join(",")
-            .to_string()
     );
     let statement = Statement::from_string(db.get_database_backend(), st);
 

@@ -1,4 +1,4 @@
-use sea_orm::{entity::prelude::*, DeleteResult, InsertResult, Set};
+use sea_orm::{entity::prelude::*, InsertResult, Set};
 use serde::Serialize;
 
 use super::{indexed_document, vec_documents};
@@ -90,7 +90,7 @@ pub async fn delete_all_by_urls(db: &DatabaseConnection, urls: &[String]) -> Res
         .await?;
 
     for doc in documents {
-        let _ = delete_all_for_document(db, doc.id).await?;
+        delete_all_for_document(db, doc.id).await?;
     }
     Ok(())
 }
