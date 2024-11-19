@@ -1,5 +1,3 @@
 export function BigMode() {
-  return (
-    <div>BIGMODE!</div>
-  )
+  return <div>BIGMODE!</div>;
 }

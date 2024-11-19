@@ -585,7 +585,7 @@ mod test {
         let res = document_tag::Entity::find().all(&db).await?;
         assert_eq!(res.len(), 2);
 
-        let doc_res = super::Entity::find_by_id(doc.id.clone())
+        let doc_res = super::Entity::find_by_id(doc.id)
             .one(&db)
             .await?
             .unwrap();
@@ -650,7 +650,7 @@ mod test {
 
         for (id, model) in tags_before.iter() {
             // The same tag should not have been changed in anyway
-            if let Some(model_after) = tags_after.get(&id) {
+            if let Some(model_after) = tags_after.get(id) {
                 assert_eq!(model.id, model_after.id);
             }
         }

@@ -310,7 +310,7 @@ mod test {
         let (is_new, _model) = add_or_enable(&db, &lens, super::LensType::Simple)
             .await
             .unwrap();
-        assert_eq!(is_new, false);
+        assert!(!is_new);
 
         let model = Entity::find().one(&db).await.unwrap().unwrap();
         assert_eq!(model.name, "test_lens".to_owned());

@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf};
+use std::path::PathBuf;
 
 use strum_macros::{AsRefStr, Display, EnumString};
 
@@ -47,18 +47,8 @@ pub enum WindowLocation {
     UserSettings,
 }
 
-impl From<PathBuf> for WindowLocation {
-    fn from(value: PathBuf) -> Self {
-        if let Some(value) = value.to_str() {
-            value.try_into().unwrap_or(WindowLocation::SearchBar)
-        } else {
-            WindowLocation::SearchBar
-        }
-    }
-}
-
-impl Into<PathBuf> for WindowLocation {
-    fn into(self) -> PathBuf {
-        self.to_string().into()
+impl From<WindowLocation> for PathBuf {
+    fn from(value: WindowLocation) -> Self {
+        value.to_string().into()
     }
 }

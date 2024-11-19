@@ -330,8 +330,10 @@ mod test {
 
     #[tokio::test]
     async fn test_handle_cdx_collection() {
-        let mut lens = LensConfig::default();
-        lens.name = "example_lens".to_string();
+        let lens = LensConfig {
+            name: "example_lens".to_string(),
+            ..Default::default()
+        };
 
         let db = setup_test_db().await;
         let state = AppState::builder()
@@ -502,14 +504,14 @@ mod test {
         assert_eq!(docs.len(), 1);
 
         // Should have added the tag.
-        let new_doc = docs.get(0).expect("new_doc");
+        let new_doc = docs.first().expect("new_doc");
         let tags = new_doc
             .find_related(tag::Entity)
             .all(&db)
             .await
             .unwrap_or_default();
         assert_eq!(tags.len(), 1);
-        let tag = tags.get(0).expect("tags.get(0)");
+        let tag = tags.first().expect("tags.get(0)");
         assert_eq!(tag.label, TagType::Source.to_string());
         assert_eq!(tag.value, "web".to_string());
     }
@@ -559,7 +561,7 @@ mod test {
             content: Some("fake content".to_owned()),
             title: Some("Title".to_owned()),
             url: "https://example.com/test".to_owned(),
-            tags: vec![((TagType::MimeType, "application/pdf".to_owned()))],
+            tags: vec![(TagType::MimeType, "application/pdf".to_owned())],
             ..Default::default()
         };
 
@@ -577,7 +579,7 @@ mod test {
         assert_eq!(docs.len(), 1);
 
         // Should only add the new tag.
-        let doc = docs.get(0).expect("docs.get");
+        let doc = docs.first().expect("docs.get");
         let tags = doc
             .find_related(tag::Entity)
             .all(&db)
