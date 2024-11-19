@@ -585,10 +585,7 @@ mod test {
         let res = document_tag::Entity::find().all(&db).await?;
         assert_eq!(res.len(), 2);
 
-        let doc_res = super::Entity::find_by_id(doc.id)
-            .one(&db)
-            .await?
-            .unwrap();
+        let doc_res = super::Entity::find_by_id(doc.id).one(&db).await?.unwrap();
 
         let doc_tags = doc_res.find_related(tag::Entity).all(&db).await?;
         assert_eq!(doc_res.id, doc.id);
