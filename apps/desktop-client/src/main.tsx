@@ -7,12 +7,17 @@ import ErrorPage from "./error-page.tsx";
 import { WizardPage } from "./pages/wizard/WizardPage.tsx";
 import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 import { ProgressPopup } from "./pages/ProgressPopup.tsx";
+import { BigMode } from "./pages/bigmode/BigMode.tsx";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <SearchPage />,
     errorElement: <ErrorPage />,
+  },
+  {
+    path: "/bigmode",
+    element: <BigMode />,
   },
   {
     path: "/progress",
