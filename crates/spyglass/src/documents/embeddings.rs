@@ -39,13 +39,19 @@ pub async fn processing_embedding(state: AppState, job_id: i64) {
                             match vec_to_indexed::insert_embedding_mapping(
                                 &state.db,
                                 job.indexed_document_id,
+                                embedding.start,
+                                embedding.end,
                             )
                             .await
                             {
                                 Ok(insert_result) => {
                                     let id: i64 = insert_result.last_insert_id;
-                                    match vec_documents::insert_embedding(&state.db, id, &embedding)
-                                        .await
+                                    match vec_documents::insert_embedding(
+                                        &state.db,
+                                        id,
+                                        &embedding.embedding,
+                                    )
+                                    .await
                                     {
                                         Ok(_) => {
                                             let _ =

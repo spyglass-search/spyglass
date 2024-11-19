@@ -33,6 +33,7 @@ mod m20230315_000001_migrate_search_schema;
 mod m20241029_000001_add_vector;
 mod m20241105_000001_add_embeddings_table;
 mod m20241115_000001_embedding_to_indexed_document;
+mod m20241119_000001_segment_columns;
 mod utils;
 
 pub struct Migrator;
@@ -71,6 +72,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241029_000001_add_vector::Migration),
             Box::new(m20241105_000001_add_embeddings_table::Migration),
             Box::new(m20241115_000001_embedding_to_indexed_document::Migration),
+            Box::new(m20241119_000001_segment_columns::Migration),
         ]
     }
 }
