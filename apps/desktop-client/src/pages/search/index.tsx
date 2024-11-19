@@ -15,6 +15,7 @@ import { DEFAULT_ACTION } from "./constants";
 import Handlebars from "handlebars";
 import { ContextActions } from "../../bindings/ContextActions";
 import { includeAction, resultToTemplate } from "./utils";
+import { CustomTitleBar } from "../../components/CustomTitleBar";
 
 const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -325,16 +326,17 @@ export function SearchPage() {
   return (
     <div
       ref={searchWrapperRef}
-      className="relative overflow-hidden rounded-xl border-neutral-600 border"
+      className="relative overflow-clip rounded-xl bg-transparent"
       onClick={() => searchInput.current?.focus()}
     >
+      <CustomTitleBar />
       <div className="flex flex-nowrap w-full bg-neutral-800">
         <SelectedLenses lenses={selectedLenses} />
         <input
           ref={searchInput}
           id="searchbox"
           type="text"
-          className="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 outline-none active:outline-none focus:outline-none caret-white"
+          className="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 border-none caret-white active:outline-none focus-visible:outline-none focus:outline-none"
           placeholder="Search"
           onChange={handleUpdateQuery}
           onKeyDown={handleKeyEvent}
@@ -373,7 +375,10 @@ export function SearchPage() {
           </div>
         </div>
       ) : null}
-      <div className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0">
+      <div
+        data-tauri-drag-region
+        className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0"
+      >
         <SearchStatus meta={searchMeta} isThinking={isThinking} />
         {searchMeta ? (
           <ActionListButton

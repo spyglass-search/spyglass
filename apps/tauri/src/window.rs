@@ -98,18 +98,20 @@ pub fn get_searchbar(app: &AppHandle) -> WebviewWindow {
                 .decorations(false)
                 .transparent(true)
                 .visible(true)
+                .shadow(false)
                 // .disable_file_drop_handler()
-                .inner_size(640.0, 108.0)
-                .build()
-                .expect("Unable to create searchbar window");
+                .resizable(false)
+                .inner_size(640.0, 108.0);
 
-        // macOS: Handle multiple spaces correctly
+        let window = window.build().expect("Unable to build startup window");
         #[cfg(target_os = "macos")]
         {
             use cocoa::appkit::NSWindow;
+            use cocoa::base::id;
+
+            let ns_window = window.ns_window().unwrap() as id;
             unsafe {
-                let ns_window =
-                    window.ns_window().expect("Unable to get ns_window") as cocoa::base::id;
+                // macOS: Handle multiple spaces correctly
                 ns_window.setCollectionBehavior_(cocoa::appkit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace);
             }
         }
@@ -139,9 +141,7 @@ pub async fn resize_window(window: &WebviewWindow, height: f64) {
         })
     };
 
-    // recenter after resize
     let _ = window.set_size(new_size);
-    center_search_bar(window);
 }
 
 fn show_window(window: &WebviewWindow) {

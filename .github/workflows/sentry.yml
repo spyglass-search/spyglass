@@ -1,8 +1,7 @@
 name: "Sentry: Upload debug symbols"
-on:
-  push:
-    branches:
-      - release
+
+on: workflow_dispatch
+
 jobs:
   sentry-upload:
     strategy:
