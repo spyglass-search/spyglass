@@ -1,16 +1,63 @@
-import { useRef } from "react";
+import React, { KeyboardEvent, useEffect, useRef } from "react";
 import { SelectedLenses } from "./SelectedLens";
+import { listen } from "@tauri-apps/api/event";
 
 interface Props {
-  selectedLenses: string[]
+  selectedLenses: string[];
+  setSelectedLenses: React.Dispatch<React.SetStateAction<string[]>>;
+  query: string;
+  setQuery: React.Dispatch<React.SetStateAction<string>>;
+  // Event handlers.
+  onEnter?: (event: KeyboardEvent) => void;
+  onKeyEvent?: (event: KeyboardEvent) => void;
 }
 
 export function SearchInput({
-  selectedLenses
+  selectedLenses,
+  setSelectedLenses,
+  query,
+  setQuery,
+  onEnter = () => {},
+  onKeyEvent = () => {},
 }: Props) {
   const searchInput = useRef<HTMLInputElement>(null);
-  const handleUpdateQuery = () => {};
-  const handleKeyEvent = () => {};
+  const handleUpdateQuery = () => {
+    if (searchInput.current) {
+      setQuery(searchInput.current.value);
+    }
+  };
+
+  const handleKeyEvent = async (event: KeyboardEvent) => {
+    const key = event.key;
+    // ArrowXX: Prevent cursor from moving around
+    // Tab: Prevent search box from losing focus
+    if (["ArrowUp", "ArrowDown", "Tab"].includes(key)) {
+      event.preventDefault();
+    }
+
+    switch (event.key) {
+      case "Backspace":
+        // handle clearing lenses
+        if (query.length === 0 && selectedLenses.length > 0) {
+          setSelectedLenses([]);
+        }
+        break;
+      case "Enter":
+        return onEnter(event);
+      default:
+        return onKeyEvent(event);
+    }
+  };
+
+  useEffect(() => {
+    const initialize = async () => {
+      await listen("FocusWindow", () => {
+        searchInput.current?.focus();
+      });
+    };
+
+    initialize().catch(console.error);
+  }, []);
 
   return (
     <div className="flex flex-nowrap w-full bg-neutral-800">
@@ -23,11 +70,11 @@ export function SearchInput({
         placeholder="Search"
         onChange={handleUpdateQuery}
         onKeyDown={handleKeyEvent}
-        onKeyUp={handleKeyEvent}
         onClick={() => searchInput.current?.focus()}
+        value={query}
         spellCheck={false}
         tabIndex={-1}
       />
     </div>
-  )
+  );
 }

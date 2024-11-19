@@ -5,7 +5,6 @@ import { LensResult } from "../../bindings/LensResult";
 import { SearchResults } from "../../bindings/SearchResults";
 import { SearchMeta } from "../../bindings/SearchMeta";
 import { SearchResult } from "../../bindings/SearchResult";
-import { SelectedLenses } from "./SelectedLens";
 import { SearchStatus } from "./SearchStatus";
 import { DocumentResultItem } from "./DocumentResultItem";
 import { LensResultItem } from "./LensResultItem";
@@ -16,6 +15,7 @@ import Handlebars from "handlebars";
 import { ContextActions } from "../../bindings/ContextActions";
 import { includeAction, resultToTemplate } from "./utils";
 import { CustomTitleBar } from "../../components/CustomTitleBar";
+import { SearchInput } from "./SearchInput";
 
 const LENS_SEARCH_PREFIX: string = "/";
 const QUERY_DEBOUNCE_MS: number = 256;
@@ -28,7 +28,6 @@ enum ResultDisplay {
 }
 
 export function SearchPage() {
-  const searchInput = useRef<HTMLInputElement>(null);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
 
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
@@ -77,11 +76,7 @@ export function SearchPage() {
   const clearQuery = useCallback(async () => {
     setQuery("");
     await clearResults();
-
-    if (searchInput.current) {
-      searchInput.current.value = "";
-    }
-  }, [clearResults, searchInput]);
+  }, [clearResults]);
 
   const moveSelectionUp = () => {
     if (showActions) {
@@ -112,78 +107,58 @@ export function SearchPage() {
     }
   };
 
-  const handleKeyEvent = async (event: KeyboardEvent) => {
-    if (event.type === "keydown") {
-      const key = event.key;
-      if (
-        // ArrowXX: Prevent cursor from moving around
-        key === "ArrowUp" ||
-        key === "ArrowDown" ||
-        // Tab: Prevent search box from losing focus
-        key === "Tab"
-      ) {
-        event.preventDefault();
+  const handleEnter = async () => {
+    // do action or handle selection
+    if (showActions) {
+      // handle whichever action is selected.
+      const action =
+        selectedActionIdx === 0
+          ? DEFAULT_ACTION
+          : currentContextActions[selectedActionIdx - 1];
+      handleSelectedAction(action);
+    } else {
+      if (resultMode === ResultDisplay.Documents) {
+        const selected = docResults[selectedIdx];
+        await invoke("open_result", { url: selected.url });
+        clearQuery();
+        await invoke("escape");
+      } else if (resultMode === ResultDisplay.Lenses) {
+        const selected = lensResults[selectedIdx];
+        setSelectedLenses((lenses) => [...lenses, selected.label]);
+        clearQuery();
       }
+    }
+  };
 
-      switch (event.key) {
-        case "ArrowUp":
-          moveSelectionUp();
-          break;
-        case "ArrowDown":
-          moveSelectionDown();
-          break;
-        case "Enter":
-          // do action or handle selection
-          if (showActions) {
-            // handle whichever action is selected.
-            const action =
-              selectedActionIdx === 0
-                ? DEFAULT_ACTION
-                : currentContextActions[selectedActionIdx - 1];
-            handleSelectedAction(action);
-          } else {
-            if (resultMode === ResultDisplay.Documents) {
-              const selected = docResults[selectedIdx];
-              await invoke("open_result", { url: selected.url });
-              clearQuery();
-              await invoke("escape");
-            } else if (resultMode === ResultDisplay.Lenses) {
-              const selected = lensResults[selectedIdx];
-              setSelectedLenses((lenses) => [...lenses, selected.label]);
-              clearQuery();
-            }
-          }
-          break;
-        case "Escape":
-          // Close action menu if we're in it.
-          if (showActions) {
-            setShowActions(false);
-            // otherwise close the window.
-          } else {
-            clearQuery();
-            await invoke("escape");
-          }
-          break;
-        case "Backspace":
-          // handle clearing lenses
-          if (query.length === 0 && selectedLenses.length > 0) {
-            setSelectedLenses([]);
-          }
-          break;
-        case "Tab":
-          // Handle tab completion for len search/results
-          if (resultMode === ResultDisplay.Lenses) {
-            const selected = lensResults[selectedIdx];
-            setSelectedLenses((lenses) => [...lenses, selected.label]);
-            clearQuery();
-            // Jump to action menu
-          } else if (resultMode === ResultDisplay.Documents) {
-            setShowActions(true);
-          }
-          break;
-      }
-    } else if (event.type === "keyup") {
-      // handle keyup events.
+  const handleKeyEvent = async (event: KeyboardEvent) => {
+    switch (event.key) {
+      case "ArrowUp":
+        moveSelectionUp();
+        break;
+      case "ArrowDown":
+        moveSelectionDown();
+        break;
+      case "Escape":
+        // Close action menu if we're in it.
+        if (showActions) {
+          setShowActions(false);
+          // otherwise close the window.
+        } else {
+          clearQuery();
+          await invoke("escape");
+        }
+        break;
+      case "Tab":
+        // Handle tab completion for len search/results
+        if (resultMode === ResultDisplay.Lenses) {
+          const selected = lensResults[selectedIdx];
+          setSelectedLenses((lenses) => [...lenses, selected.label]);
+          clearQuery();
+          // Jump to action menu
+        } else if (resultMode === ResultDisplay.Documents) {
+          setShowActions(true);
+        }
+        break;
     }
   };
 
@@ -215,12 +190,6 @@ export function SearchPage() {
     }
 
     setShowActions(false);
-  };
-
-  const handleUpdateQuery = () => {
-    if (searchInput.current) {
-      setQuery(searchInput.current.value);
-    }
   };
 
   // when the query changes shoot it over to the server.
@@ -305,10 +274,6 @@ export function SearchPage() {
       await listen("ClearSearch", () => {
         clearResults();
       });
-      await listen("FocusWindow", () => {
-        searchInput.current?.focus();
-      });
-
       await fetchUserActions();
     };
 
@@ -319,25 +284,16 @@ export function SearchPage() {
     <div
       ref={searchWrapperRef}
       className="relative overflow-clip rounded-xl bg-transparent"
-      onClick={() => searchInput.current?.focus()}
     >
       <CustomTitleBar />
-      <div className="flex flex-nowrap w-full bg-neutral-800">
-        <SelectedLenses lenses={selectedLenses} />
-        <input
-          ref={searchInput}
-          id="searchbox"
-          type="text"
-          className="bg-neutral-800 text-white text-5xl py-3 overflow-hidden flex-1 border-none caret-white active:outline-none focus-visible:outline-none focus:outline-none"
-          placeholder="Search"
-          onChange={handleUpdateQuery}
-          onKeyDown={handleKeyEvent}
-          onKeyUp={handleKeyEvent}
-          onClick={() => searchInput.current?.focus()}
-          spellCheck={false}
-          tabIndex={-1}
-        />
-      </div>
+      <SearchInput
+        selectedLenses={selectedLenses}
+        setSelectedLenses={setSelectedLenses}
+        query={query}
+        setQuery={setQuery}
+        onEnter={handleEnter}
+        onKeyEvent={handleKeyEvent}
+      />
       {resultMode === ResultDisplay.Documents ? (
         <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
           <div className="w-full flex flex-col">
