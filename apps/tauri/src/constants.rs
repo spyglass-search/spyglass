@@ -1,3 +1,5 @@
+use std::{convert::TryInto, path::PathBuf};
+
 use strum_macros::{AsRefStr, Display, EnumString};
 
 pub const INPUT_WIDTH: f64 = 640.0;
@@ -21,7 +23,20 @@ pub const WIZARD_WIN_NAME: &str = "wizard_window";
 pub const PROGRESS_WIN_NAME: &str = "progress_window";
 
 #[derive(Display, EnumString, AsRefStr)]
-pub enum TabLocation {
+pub enum WindowLocation {
+    #[strum(serialize = "/bigmode")]
+    BigMode,
+    #[strum(serialize = "/progress")]
+    DownloadProgress,
+    #[strum(serialize = "/")]
+    SearchBar,
+    #[strum(serialize = "/startup")]
+    Startup,
+    #[strum(serialize = "/updater")]
+    Updater,
+    #[strum(serialize = "/wizard")]
+    Wizard,
+    // Settings tabs
     #[strum(serialize = "/settings/connections")]
     Connections,
     #[strum(serialize = "/settings/discover")]
@@ -30,4 +45,20 @@ pub enum TabLocation {
     Library,
     #[strum(serialize = "/settings/user")]
     UserSettings,
+}
+
+impl From<PathBuf> for WindowLocation {
+    fn from(value: PathBuf) -> Self {
+        if let Some(value) = value.to_str() {
+            value.try_into().unwrap_or(WindowLocation::SearchBar)
+        } else {
+            WindowLocation::SearchBar
+        }
+    }
+}
+
+impl Into<PathBuf> for WindowLocation {
+    fn into(self) -> PathBuf {
+        self.to_string().into()
+    }
 }

@@ -20,8 +20,8 @@ use spyglass_rpc::RpcClient;
 
 use super::platform::os_open;
 
-pub mod window;
 mod settings;
+pub mod window;
 pub use settings::*;
 
 #[tauri::command]
@@ -371,7 +371,7 @@ pub async fn wizard_finished(
         let _ = window.close();
         navigate_to_tab(
             window.app_handle(),
-            &crate::constants::TabLocation::Discover,
+            &crate::constants::WindowLocation::Discover,
         );
     }
 

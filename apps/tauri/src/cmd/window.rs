@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use tauri::Manager;
 
-use crate::constants::TabLocation;
+use crate::constants::WindowLocation;
 
 #[tauri::command]
 pub async fn escape(window: tauri::WebviewWindow) -> Result<(), String> {
@@ -16,7 +16,7 @@ pub async fn resize_window(window: tauri::WebviewWindow, height: f64) {
 
 #[tauri::command]
 pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
-    if let Ok(tab_loc) = TabLocation::from_str(&page) {
+    if let Ok(tab_loc) = WindowLocation::from_str(&page) {
         crate::window::navigate_to_tab(win.app_handle(), &tab_loc);
     }
 
