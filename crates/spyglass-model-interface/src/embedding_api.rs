@@ -53,7 +53,6 @@ impl EmbeddingApi {
             }
         };
 
-        let content_length = doc_content.len();
         let tokens = self
             .tokenizer
             .encode(doc_content, false)

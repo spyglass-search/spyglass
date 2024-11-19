@@ -1,4 +1,3 @@
-use entities::models::vec_to_indexed;
 use sea_orm::Statement;
 use sea_orm_migration::prelude::*;
 use shared::config::Config;
@@ -72,7 +71,7 @@ impl MigrationTrait for Migration {
             let segment_start: Result<i64, DbErr> = result.try_get("", "segment_start");
             let doc_id: Result<String, DbErr> = result.try_get("", "doc_id");
 
-            if let Err(_) = segment_start {
+            if segment_start.is_err() {
                 if let (Ok(id), Ok(indexed_id), Ok(doc_id)) = (id, indexed_id, doc_id) {
                     let (_writer, reader) = open_index();
                     let schema = DocFields::as_schema();
@@ -83,7 +82,7 @@ impl MigrationTrait for Migration {
                         let content = doc.get_first(content_field);
                         if let Some(content) = content {
                             if let Some(content) = content.as_text() {
-                                calc_update_length(id, indexed_id, content, &manager, &tokenizer)
+                                calc_update_length(id, indexed_id, content, manager, &tokenizer)
                                     .await?;
                             }
                         }
@@ -157,7 +156,7 @@ async fn calc_update_length(
             );
 
             let _ = manager.get_connection().execute(statement).await?;
-            i = i + char_per_segment;
+            i += char_per_segment;
         }
     } else {
         let end = (content.len() - 1) as i64;
