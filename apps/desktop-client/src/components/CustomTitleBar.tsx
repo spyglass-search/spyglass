@@ -14,7 +14,7 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
   };
 
   const handleMaximize = async () => {
-    console.log("to the max!");
+    await invoke("open_big_mode");
   };
 
   const renderButton = () => {

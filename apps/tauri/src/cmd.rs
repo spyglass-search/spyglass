@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 
 use shared::response::{DefaultIndices, SearchResults};
@@ -10,11 +9,10 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::UpdaterExt;
 
-use crate::constants::TabLocation;
 use crate::current_version;
 use crate::window::navigate_to_tab;
 use crate::PauseState;
-use crate::{open_folder, rpc, window};
+use crate::{open_folder, rpc};
 use shared::config::{Config, UserSettings};
 use shared::metrics::{Event, Metrics};
 use shared::{event::ClientEvent, request, response};
@@ -22,6 +20,7 @@ use spyglass_rpc::RpcClient;
 
 use super::platform::os_open;
 
+pub mod window;
 mod settings;
 pub use settings::*;
 
@@ -43,12 +42,6 @@ pub async fn choose_folder(win: tauri::Window) -> Result<Option<String>, String>
     let folder_path = app.dialog().file().blocking_pick_folder();
     let folder_path = folder_path.map(|x| x.to_string());
     Ok(folder_path)
-}
-
-#[tauri::command]
-pub async fn escape(window: tauri::WebviewWindow) -> Result<(), String> {
-    window::hide_search_bar(&window);
-    Ok(())
 }
 
 #[tauri::command]
@@ -140,11 +133,6 @@ pub async fn copy_to_clipboard(win: tauri::Window, txt: &str) -> Result<(), Stri
             .await;
     }
     Ok(())
-}
-
-#[tauri::command]
-pub async fn resize_window(window: tauri::WebviewWindow, height: f64) {
-    window::resize_window(&window, height).await;
 }
 
 #[tauri::command]
@@ -439,13 +427,4 @@ pub async fn user_settings(win: tauri::Window) -> Result<UserSettings, String> {
     }
 
     Err(String::from("Unable to access user settings"))
-}
-
-#[tauri::command]
-pub async fn navigate(win: tauri::Window, page: String) -> Result<(), String> {
-    if let Ok(tab_loc) = TabLocation::from_str(&page) {
-        super::window::navigate_to_tab(win.app_handle(), &tab_loc);
-    }
-
-    Ok(())
 }

@@ -173,6 +173,25 @@ pub fn navigate_to_tab(app: &AppHandle, tab_url: &TabLocation) {
     show_window(&window);
 }
 
+pub fn show_bigmode(app: &AppHandle) {
+    let window = if let Some(window) = app.get_webview_window(constants::BIG_MODE_WIN_NAME) {
+        window
+    } else {
+        WebviewWindowBuilder::new(
+            app,
+            constants::UPDATE_WIN_NAME,
+            WebviewUrl::App("/updater".into()),
+        )
+        .title("Spyglass - Update Available!")
+        .min_inner_size(450.0, 375.0)
+        .max_inner_size(450.0, 375.0)
+        .build()
+        .expect("Unable to build window for updater")
+    };
+
+    show_window(&window);
+}
+
 pub fn show_update_window(app: &AppHandle) {
     let window = if let Some(window) = app.get_webview_window(constants::UPDATE_WIN_NAME) {
         window
