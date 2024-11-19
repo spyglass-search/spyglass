@@ -27,14 +27,6 @@ enum ResultDisplay {
   Lenses,
 }
 
-// pressed_key: None,
-// executed_key: None,
-// executed_action: None,
-// modifier: ModifiersState::empty(),
-// show_actions: false,
-// selected_action_idx: 0,
-// action_menu_button_selected: false,
-
 export function SearchPage() {
   const searchInput = useRef<HTMLInputElement>(null);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
