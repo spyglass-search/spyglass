@@ -14,16 +14,11 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
   };
 
   const handleMaximize = async () => {
-    console.log('to the max!');
+    console.log("to the max!");
   };
 
   const renderButton = () => {
-    const baseStyles = [
-      "flex",
-      "flex-row",
-      "justify-center",
-      "items-center",
-    ];
+    const baseStyles = ["flex", "flex-row", "justify-center", "items-center"];
 
     if (osStyle === OperatingSystem.MacOS) {
       return (
@@ -53,21 +48,39 @@ export function CustomTitleBar({ osStyle = getOperatingSystem() }: Props) {
             )}
             onClick={handleMaximize}
           >
-            <img src={macMaximize} className="w-[10px] hidden group-hover:block" />
+            <img
+              src={macMaximize}
+              className="w-[10px] hidden group-hover:block"
+            />
           </button>
         </div>
       );
     } else {
       return (
-        <div className="group">
+        <div className="flex flex-row-reverse">
           <div
             className={classNames(
               baseStyles,
-              "w-[30px] h-[30px] bg-neutral-900 group-hover:bg-red-500",
+              "w-[30px] h-[30px] bg-neutral-900 group hover:bg-red-500",
             )}
             onClick={handleClose}
           >
             <XMarkIcon className="w-[16px] text-neutral-400 group-hover:text-black" />
+          </div>
+          <div
+            className={classNames(
+              baseStyles,
+              "w-[30px] h-[30px] bg-neutral-900 group hover:bg-neutral-500",
+            )}
+            onClick={handleMaximize}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-[16px] h-[16px] text-neutral-400 group-hover:text-black"
+              viewBox="0 0 24 24"
+            >
+              <path fill="currentColor" d="M4 4h16v16H4zm2 4v10h12V8z" />
+            </svg>
           </div>
         </div>
       );
