@@ -24,14 +24,14 @@ export function UpdaterPopup() {
 
   const rando = Math.floor(Math.random() * UPDATE_GIFS.length);
   return (
-    <div className="text-white h-screen relative bg-neutral-800">
-      <h1 className="text-center text-xl">Update Available!</h1>
+    <div className="text-white h-screen relative bg-neutral-800 w-full">
+      <h1 className="text-center text-xl pt-4">Update Available!</h1>
       <div className="pt-4 px-8 pb-16 h-64 overflow-hidden text-sm text-center">
         <div className="flex flex-row place-content-center">
           <iframe
             src={`https://giphy.com/embed/${UPDATE_GIFS[rando]}`}
             height="135"
-            className="giphy-embed border-none"
+            className="giphy-embed border-none rounded"
           />
         </div>
         <div className="pt-4">{"Thank you for using Spyglass!"}</div>

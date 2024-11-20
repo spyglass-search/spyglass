@@ -30,7 +30,7 @@ export function StartupPopup() {
   }, []);
 
   return (
-    <div className="bg-neutral-800 py-12 rounded-xl">
+    <div className="bg-neutral-800 py-12 rounded-xl w-full h-screen">
       <div className="flex flex-col place-content-center place-items-center">
         <ArrowPathIcon className="animate-spin h-16 w-16" />
         <div className="mt-4 font-medium">{"Starting Spyglass"}</div>
