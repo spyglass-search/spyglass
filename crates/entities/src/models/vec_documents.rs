@@ -160,7 +160,7 @@ where
                         vd.distance,
                         indexed_document.doc_id,
                         vti.segment_start,
-                        vit.segment_end,
+                        vti.segment_end,
                         indexed_document.url
                         ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
                     FROM
@@ -193,7 +193,7 @@ where
                         indexed_document.doc_id,
                         indexed_document.url,
                         vti.segment_start,
-                        vit.segment_end,
+                        vti.segment_end,
                         ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
                     FROM
                         vec_documents vd
@@ -243,7 +243,7 @@ where
                     vd.distance,
                     indexed_document.doc_id,
                     vti.segment_start,
-                    vit.segment_end,
+                    vti.segment_end,
                     indexed_document.url
                 FROM
                     vec_documents vd
@@ -271,7 +271,7 @@ where
                     indexed_document.doc_id,
                     indexed_document.url,
                     vti.segment_start,
-                    vit.segment_end,
+                    vti.segment_end,
                     ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
                 FROM
                     vec_documents vd
