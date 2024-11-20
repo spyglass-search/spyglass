@@ -6,26 +6,21 @@ import { SearchResults } from "../../bindings/SearchResults";
 import { SearchMeta } from "../../bindings/SearchMeta";
 import { SearchResult } from "../../bindings/SearchResult";
 import { SearchStatus } from "./SearchStatus";
-import { DocumentResultItem } from "./DocumentResultItem";
-import { LensResultItem } from "./LensResultItem";
 import { UserActionSettings } from "../../bindings/UserActionSettings";
 import { ActionListButton, ActionsList } from "./ActionsList";
-import { DEFAULT_ACTION } from "./constants";
+import {
+  DEFAULT_ACTION,
+  LENS_SEARCH_PREFIX,
+  QUERY_DEBOUNCE_MS,
+  ResultDisplayMode,
+  SEARCH_MIN_CHARS,
+} from "./constants";
 import Handlebars from "handlebars";
 import { ContextActions } from "../../bindings/ContextActions";
 import { includeAction, resultToTemplate } from "./utils";
 import { CustomTitleBar } from "../../components/CustomTitleBar";
 import { SearchInput } from "./SearchInput";
-
-const LENS_SEARCH_PREFIX: string = "/";
-const QUERY_DEBOUNCE_MS: number = 256;
-const SEARCH_MIN_CHARS: number = 2;
-
-enum ResultDisplay {
-  None,
-  Documents,
-  Lenses,
-}
+import { ResultListView } from "./ResultListView";
 
 export function SearchPage() {
   const searchWrapperRef = useRef<HTMLDivElement>(null);
@@ -35,8 +30,8 @@ export function SearchPage() {
 
   const [docResults, setDocResults] = useState<SearchResult[]>([]);
   const [lensResults, setLensResults] = useState<LensResult[]>([]);
-  const [resultMode, setResultMode] = useState<ResultDisplay>(
-    ResultDisplay.None,
+  const [resultMode, setResultMode] = useState<ResultDisplayMode>(
+    ResultDisplayMode.None,
   );
 
   const [isThinking, setIsThinking] = useState<boolean>(false);
@@ -62,7 +57,7 @@ export function SearchPage() {
 
   // Clear search results
   const clearResults = useCallback(async () => {
-    setResultMode(ResultDisplay.None);
+    setResultMode(ResultDisplayMode.None);
     setSelectedIdx(0);
     setDocResults([]);
     setLensResults([]);
@@ -84,7 +79,7 @@ export function SearchPage() {
       setSelectedActionIdx((idx) => (idx > 0 ? idx - 1 : idx));
     } else {
       // notihng to do
-      if (resultMode === ResultDisplay.None) {
+      if (resultMode === ResultDisplayMode.None) {
         return;
       }
       setSelectedIdx((idx) => (idx > 0 ? idx - 1 : idx));
@@ -98,9 +93,9 @@ export function SearchPage() {
       setSelectedActionIdx((idx) => (idx < max ? idx + 1 : max));
     } else {
       let max = 0;
-      if (resultMode === ResultDisplay.Documents) {
+      if (resultMode === ResultDisplayMode.Documents) {
         max = docResults.length - 1;
-      } else if (resultMode === ResultDisplay.Lenses) {
+      } else if (resultMode === ResultDisplayMode.Lenses) {
         max = lensResults.length - 1;
       }
       setSelectedIdx((idx) => (idx < max ? idx + 1 : max));
@@ -117,12 +112,12 @@ export function SearchPage() {
           : currentContextActions[selectedActionIdx - 1];
       handleSelectedAction(action);
     } else {
-      if (resultMode === ResultDisplay.Documents) {
+      if (resultMode === ResultDisplayMode.Documents) {
         const selected = docResults[selectedIdx];
         await invoke("open_result", { url: selected.url });
         clearQuery();
         await invoke("escape");
-      } else if (resultMode === ResultDisplay.Lenses) {
+      } else if (resultMode === ResultDisplayMode.Lenses) {
         const selected = lensResults[selectedIdx];
         setSelectedLenses((lenses) => [...lenses, selected.label]);
         clearQuery();
@@ -150,12 +145,12 @@ export function SearchPage() {
         break;
       case "Tab":
         // Handle tab completion for len search/results
-        if (resultMode === ResultDisplay.Lenses) {
+        if (resultMode === ResultDisplayMode.Lenses) {
           const selected = lensResults[selectedIdx];
           setSelectedLenses((lenses) => [...lenses, selected.label]);
           clearQuery();
           // Jump to action menu
-        } else if (resultMode === ResultDisplay.Documents) {
+        } else if (resultMode === ResultDisplayMode.Documents) {
           setShowActions(true);
         }
         break;
@@ -209,7 +204,7 @@ export function SearchPage() {
         const results = await invoke<LensResult[]>("search_lenses", {
           query: trimmedQuery,
         });
-        setResultMode(ResultDisplay.Lenses);
+        setResultMode(ResultDisplayMode.Lenses);
         setLensResults(results);
         setIsThinking(false);
       } else if (query.length >= SEARCH_MIN_CHARS) {
@@ -219,7 +214,7 @@ export function SearchPage() {
           query,
           lenses: selectedLenses,
         });
-        setResultMode(ResultDisplay.Documents);
+        setResultMode(ResultDisplayMode.Documents);
         setDocResults(resp.results);
         setSearchMeta(resp.meta);
         setIsThinking(false);
@@ -247,14 +242,6 @@ export function SearchPage() {
   useEffect(() => {
     requestResize();
   }, [docResults, lensResults]);
-
-  // Scroll to the current selected result.
-  useEffect(() => {
-    const element = document.getElementById(`result-${selectedIdx}`);
-    if (element) {
-      element.scrollIntoView(true);
-    }
-  }, [selectedIdx]);
 
   useEffect(() => {
     // get_action_list
@@ -294,35 +281,12 @@ export function SearchPage() {
         onEnter={handleEnter}
         onKeyEvent={handleKeyEvent}
       />
-      {resultMode === ResultDisplay.Documents ? (
-        <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
-          <div className="w-full flex flex-col">
-            {docResults.map((doc, idx) => (
-              <DocumentResultItem
-                key={doc.doc_id}
-                id={`result-${idx}`}
-                onClick={() => {}}
-                result={doc}
-                isSelected={selectedIdx === idx}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {resultMode === ResultDisplay.Lenses ? (
-        <div className="overflow-y-auto overflow-x-hidden h-full max-h-[640px] bg-neutral-800 px-2 border-t border-neutral-600">
-          <div className="w-full flex flex-col">
-            {lensResults.map((lens, idx) => (
-              <LensResultItem
-                key={lens.name}
-                id={`result-${idx}`}
-                lens={lens}
-                isSelected={selectedIdx === idx}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <ResultListView
+        displayMode={resultMode}
+        docResults={docResults}
+        lensResults={lensResults}
+        selectedIdx={selectedIdx}
+      />
       <div
         data-tauri-drag-region
         className="flex flex-row w-full items-center bg-neutral-900 h-8 p-0"
