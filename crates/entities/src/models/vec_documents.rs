@@ -124,12 +124,20 @@ pub struct DocDistance {
     pub id: i64,
     pub distance: f64,
     pub doc_id: String,
+    pub url: String,
+    pub segment_start: i64,
+    pub segment_end: i64,
 }
 
+// Returns the topX documents based on the distance. (The smaller the number the
+// better the result). A single document that has multiple segments in the
+// topX will only be returned once and the segment provided will only be the
+// top result. get_top_context can be used to get the highest ranked context
 pub async fn get_document_distance<C>(
     db: &C,
     lens_ids: &[u64],
     embedding: &[f32],
+    top_x: u32,
 ) -> Result<Vec<DocDistance>, DbErr>
 where
     C: ConnectionTrait,
@@ -141,6 +149,7 @@ where
         })
         .unwrap();
 
+    let k_size = 3 * top_x;
     let statement = if !lens_ids.is_empty() {
         Statement::from_sql_and_values(
             db.get_database_backend(),
@@ -150,6 +159,9 @@ where
                         indexed_document.id AS score_id,
                         vd.distance,
                         indexed_document.doc_id,
+                        vti.segment_start,
+                        vti.segment_end,
+                        indexed_document.url
                         ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
                     FROM
                         vec_documents vd
@@ -159,11 +171,16 @@ where
                     left JOIN indexed_document
                         ON vti.indexed_id = indexed_document.id
                     left join document_tag on document_tag.indexed_document_id = indexed_document.id
-                    WHERE document_tag.id in $1 AND vd.embedding MATCH $2 AND k = 25 ORDER BY vd.distance ASC
+                    WHERE document_tag.id in $1 AND vd.embedding MATCH $2 AND k = $3 ORDER BY vd.distance ASC
                 )
-                SELECT score_id as id, distance, doc_id FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit 10;
+                SELECT score_id as id, distance, doc_id, url, segment_start, segment_end FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit $4;
             "#,
-            vec![lens_ids.to_owned().into(), embedding_string.into()],
+            vec![
+                lens_ids.to_owned().into(),
+                embedding_string.into(),
+                k_size.into(),
+                top_x.into(),
+            ],
         )
     } else {
         Statement::from_sql_and_values(
@@ -174,6 +191,9 @@ where
                         indexed_document.id AS score_id,
                         vd.distance,
                         indexed_document.doc_id,
+                        indexed_document.url,
+                        vti.segment_start,
+                        vti.segment_end,
                         ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
                     FROM
                         vec_documents vd
@@ -182,11 +202,87 @@ where
                         ON vd.rowid = vti.id
                     left JOIN indexed_document
                         ON vti.indexed_id = indexed_document.id
-                    WHERE vd.embedding MATCH $1 AND k = 25 ORDER BY vd.distance ASC
+                    WHERE vd.embedding MATCH $1 AND k = $2 ORDER BY vd.distance ASC
                 )
-                SELECT score_id as id, distance, doc_id FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit 10;
+                SELECT score_id as id, distance, doc_id, url, segment_start, segment_end FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit $3;
             "#,
-            vec![embedding_string.into()],
+            vec![embedding_string.into(), k_size.into(), top_x.into()],
+        )
+    };
+
+    DocDistance::find_by_statement(statement)
+        .all(db)
+        .await
+        .map_err(|err| {
+            log::error!("Error is {:?}", err);
+            err
+        })
+}
+
+pub async fn get_top_context<C>(
+    db: &C,
+    lens_ids: &[u64],
+    embedding: &[f32],
+    top_x: u32,
+) -> Result<Vec<DocDistance>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let embedding_string = serde_json::to_string(embedding)
+        .map_err(|err| {
+            log::error!("Error {:?}", err);
+            err
+        })
+        .unwrap();
+    let statement = if !lens_ids.is_empty() {
+        Statement::from_sql_and_values(
+            db.get_database_backend(),
+            r#"
+                SELECT
+                    indexed_document.id AS id,
+                    vd.distance,
+                    indexed_document.doc_id,
+                    vti.segment_start,
+                    vti.segment_end,
+                    indexed_document.url
+                FROM
+                    vec_documents vd
+                left JOIN
+                    vec_to_indexed vti
+                    ON vd.rowid = vti.id
+                left JOIN indexed_document
+                    ON vti.indexed_id = indexed_document.id
+                left join document_tag on document_tag.indexed_document_id = indexed_document.id
+                WHERE document_tag.id in $1 AND vd.embedding MATCH $2 AND k = $3 ORDER BY vd.distance ASC
+            "#,
+            vec![
+                lens_ids.to_owned().into(),
+                embedding_string.into(),
+                top_x.into(),
+            ],
+        )
+    } else {
+        Statement::from_sql_and_values(
+            db.get_database_backend(),
+            r#"
+                SELECT
+                    indexed_document.id AS score_id,
+                    vd.distance,
+                    indexed_document.doc_id,
+                    indexed_document.url,
+                    vti.segment_start,
+                    vti.segment_end,
+                    ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
+                FROM
+                    vec_documents vd
+                left JOIN
+                    vec_to_indexed vti
+                    ON vd.rowid = vti.id
+                left JOIN indexed_document
+                    ON vti.indexed_id = indexed_document.id
+                WHERE vd.embedding MATCH $1 AND k = $2 ORDER BY vd.distance ASC
+            "#,
+            vec![embedding_string.into(), top_x.into()],
         )
     };
 
