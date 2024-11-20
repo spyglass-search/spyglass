@@ -8,6 +8,7 @@ import { WizardPage } from "./pages/wizard/WizardPage.tsx";
 import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 import { ProgressPopup } from "./pages/ProgressPopup.tsx";
 import { BigMode } from "./pages/bigmode/BigMode.tsx";
+import { StartupPopup } from "./pages/StartupPopup.tsx";
 
 const router = createBrowserRouter([
   {
@@ -30,7 +31,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/startup",
-    element: <div>startup</div>,
+    element: <StartupPopup />,
   },
   {
     path: "/updater",
