@@ -68,8 +68,12 @@ pub async fn search_docs(
             .map(|embedding| embedding.first().map(|val| val.to_owned()))
         {
             Ok(Some(embedding)) => {
-                let mut distances =
-                    vec_documents::get_document_distance(&state.db, &lens_ids, &embedding).await;
+                let mut distances = vec_documents::get_document_distance(
+                    &state.db,
+                    &lens_ids,
+                    &embedding.embedding,
+                )
+                .await;
 
                 if let Ok(distances) = distances.as_mut() {
                     let mut distances = distances

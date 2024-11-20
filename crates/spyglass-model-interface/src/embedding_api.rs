@@ -17,6 +17,13 @@ pub enum EmbeddingContentType {
     Query,
 }
 
+#[derive(Clone, Debug)]
+pub struct SegmentEmbedding {
+    pub embedding: Vec<f32>,
+    pub start: usize,
+    pub end: usize,
+}
+
 impl EmbeddingApi {
     pub fn new(model_root: PathBuf) -> anyhow::Result<Self> {
         let tokenizer = load_tokenizer(&model_root)?;
@@ -36,8 +43,7 @@ impl EmbeddingApi {
         &self,
         content: &str,
         content_type: EmbeddingContentType,
-    ) -> anyhow::Result<Vec<Vec<f32>>> {
-        // TODO need to properly segment the data
+    ) -> anyhow::Result<Vec<SegmentEmbedding>> {
         let doc_content = match content_type {
             EmbeddingContentType::Document => {
                 format!("search_document: {}", content.trim())
@@ -55,21 +61,27 @@ impl EmbeddingApi {
         let mut content_chunks = Vec::new();
         if token_length > MAX_TOKENS {
             let segment_count = token_length.div_ceil(MAX_TOKENS);
-            let char_per_segment = content.len().div_euclid(segment_count);
+            let char_per_segment = content.len().div_ceil(segment_count);
 
-            let chunks: Vec<String> = content
+            let chunks: Vec<(String, usize, usize)> = content
                 .trim()
                 .chars()
                 .collect::<Vec<char>>()
                 .chunks(char_per_segment)
-                .map(|chunk| chunk.iter().collect::<String>())
+                .enumerate()
+                .map(|(i, chunk)| {
+                    let start_index = i * char_per_segment;
+                    let end_index = start_index + chunk.len() - 1;
+
+                    (chunk.iter().collect::<String>(), start_index, end_index)
+                })
                 .collect();
 
             log::debug!(
                 "Splitting text into chunks of {} chars long",
                 char_per_segment
             );
-            for chunk in chunks {
+            for (chunk, start_index, end_index) in chunks {
                 let doc_content = match content_type {
                     EmbeddingContentType::Document => {
                         format!("search_document: {}", chunk)
@@ -83,16 +95,20 @@ impl EmbeddingApi {
                     .encode(doc_content, false)
                     .map_err(|err| anyhow::format_err!("Error tokenizing {:?}", err))?;
                 log::trace!("Chunk was {} tokens long", tokens.len());
-                content_chunks.push(tokens);
+                content_chunks.push((tokens, start_index, end_index));
             }
         } else {
-            content_chunks.push(tokens);
+            content_chunks.push((tokens, 0, content.len() - 1));
         }
 
         let mut embeddings = Vec::new();
-        for chunk in content_chunks {
+        for (chunk, start, end) in content_chunks {
             let embedding = self.embed_tokens(chunk.to_owned())?;
-            embeddings.push(embedding);
+            embeddings.push(SegmentEmbedding {
+                embedding,
+                start,
+                end,
+            });
         }
 
         Ok(embeddings)

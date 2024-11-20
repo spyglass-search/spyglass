@@ -18,5 +18,6 @@ shared = { path = "../shared" }
 spyglass-searcher = { path = "../spyglass-searcher" }
 tantivy_18 = { package="tantivy", version="0.18" }
 tantivy = "0.19"
+tokenizers = "0.20.1"
 tar = "0.4"
 url = "2.3"

@@ -13,6 +13,8 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     /// When this task was last updated.
     pub updated_at: DateTimeUtc,
+    pub segment_start: i64,
+    pub segment_end: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]
@@ -53,9 +55,13 @@ impl ActiveModelBehavior for ActiveModel {
 pub async fn insert_embedding_mapping(
     db: &DatabaseConnection,
     indexed_id: i64,
+    start: usize,
+    end: usize,
 ) -> Result<InsertResult<ActiveModel>, DbErr> {
     let mut active_model = ActiveModel::new();
     active_model.indexed_id = Set(indexed_id);
+    active_model.segment_start = Set(start as i64);
+    active_model.segment_end = Set(end as i64);
 
     Entity::insert(active_model).exec(db).await
 }

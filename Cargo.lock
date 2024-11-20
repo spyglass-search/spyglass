@@ -4830,6 +4830,7 @@ dependencies = [
  "tantivy 0.18.1",
  "tantivy 0.19.2",
  "tar",
+ "tokenizers",
  "url",
 ]
 
