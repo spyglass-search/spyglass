@@ -1,18 +1,25 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import { SearchPage } from "./pages/search/index.tsx";
+import { SearchPage } from "./pages/search/SearchPage.tsx";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import ErrorPage from "./error-page.tsx";
 import { WizardPage } from "./pages/wizard/WizardPage.tsx";
 import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 import { ProgressPopup } from "./pages/ProgressPopup.tsx";
+import { BigMode } from "./pages/bigmode/BigMode.tsx";
+import { StartupPopup } from "./pages/StartupPopup.tsx";
+import { UpdaterPopup } from "./pages/UpdaterPopup.tsx";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <SearchPage />,
     errorElement: <ErrorPage />,
+  },
+  {
+    path: "/bigmode",
+    element: <BigMode />,
   },
   {
     path: "/progress",
@@ -25,11 +32,11 @@ const router = createBrowserRouter([
   },
   {
     path: "/startup",
-    element: <div>startup</div>,
+    element: <StartupPopup />,
   },
   {
     path: "/updater",
-    element: <div>updater</div>,
+    element: <UpdaterPopup />,
   },
   {
     path: "/wizard",

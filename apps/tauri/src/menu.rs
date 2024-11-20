@@ -237,13 +237,13 @@ pub fn handle_tray_menu_events(app: &AppHandle, event: MenuEvent) {
             }
         }
         MenuID::DISCOVER => {
-            window::navigate_to_tab(app, &crate::constants::TabLocation::Discover);
+            window::navigate_to_tab(app, &crate::constants::WindowLocation::Discover);
         }
         MenuID::OPEN_CONNECTION_MANAGER => {
-            window::navigate_to_tab(app, &crate::constants::TabLocation::Connections);
+            window::navigate_to_tab(app, &crate::constants::WindowLocation::Connections);
         }
         MenuID::OPEN_LENS_MANAGER => {
-            window::navigate_to_tab(app, &crate::constants::TabLocation::Library);
+            window::navigate_to_tab(app, &crate::constants::WindowLocation::Library);
         }
         MenuID::OPEN_LOGS_FOLDER => {
             if let Some(config) = app.try_state::<Config>() {
@@ -251,7 +251,7 @@ pub fn handle_tray_menu_events(app: &AppHandle, event: MenuEvent) {
             }
         }
         MenuID::OPEN_SETTINGS_MANAGER => {
-            window::navigate_to_tab(app, &crate::constants::TabLocation::UserSettings);
+            window::navigate_to_tab(app, &crate::constants::WindowLocation::UserSettings);
         }
         MenuID::OPEN_WIZARD => {
             window::show_wizard_window(app);
