@@ -1,5 +1,5 @@
 use shared::event::ClientEvent;
-use tauri::{Emitter, Manager, WebviewWindow};
+use tauri::{Emitter, WebviewWindow};
 use url::Url;
 
 use crate::window;
@@ -9,14 +9,14 @@ pub fn is_visible(window: &WebviewWindow) -> bool {
 }
 
 pub fn show_search_bar(window: &WebviewWindow) {
-    let _ = tauri::AppHandle::show(window.app_handle());
+    let _ = window.show();
     let _ = window.set_focus();
     window::center_search_bar(window);
 }
 
 pub fn hide_search_bar(window: &WebviewWindow) {
-    let _ = tauri::AppHandle::hide(window.app_handle());
-    let _ = window.emit(ClientEvent::ClearSearch.as_ref(), true);
+    let _ = window.hide();
+    let _ = window.emit(ClientEvent::ClearSearch.as_ref(), ());
 }
 
 pub fn os_open(url: &Url, application: Option<String>) -> anyhow::Result<()> {

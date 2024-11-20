@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use strum_macros::{AsRefStr, Display, EnumString};
 
 pub const INPUT_WIDTH: f64 = 640.0;
@@ -12,6 +14,7 @@ pub const VERSION_CHECK_INTERVAL_S: u64 = 60 * 60 * 6;
 // Check on start & every day for new lenses
 pub const LENS_UPDATE_CHECK_INTERVAL_S: u64 = 60 * 60 * 24;
 
+pub const BIG_MODE_WIN_NAME: &str = "big_mode";
 pub const SEARCH_WIN_NAME: &str = "main";
 pub const SETTINGS_WIN_NAME: &str = "settings_window";
 pub const STARTUP_WIN_NAME: &str = "startup_window";
@@ -20,7 +23,20 @@ pub const WIZARD_WIN_NAME: &str = "wizard_window";
 pub const PROGRESS_WIN_NAME: &str = "progress_window";
 
 #[derive(Display, EnumString, AsRefStr)]
-pub enum TabLocation {
+pub enum WindowLocation {
+    #[strum(serialize = "/bigmode")]
+    BigMode,
+    #[strum(serialize = "/progress")]
+    DownloadProgress,
+    #[strum(serialize = "/")]
+    SearchBar,
+    #[strum(serialize = "/startup")]
+    Startup,
+    #[strum(serialize = "/updater")]
+    Updater,
+    #[strum(serialize = "/wizard")]
+    Wizard,
+    // Settings tabs
     #[strum(serialize = "/settings/connections")]
     Connections,
     #[strum(serialize = "/settings/discover")]
@@ -29,4 +45,10 @@ pub enum TabLocation {
     Library,
     #[strum(serialize = "/settings/user")]
     UserSettings,
+}
+
+impl From<WindowLocation> for PathBuf {
+    fn from(value: WindowLocation) -> Self {
+        value.to_string().into()
+    }
 }

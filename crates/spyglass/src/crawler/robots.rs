@@ -278,8 +278,8 @@ mod test {
         let allow = filter_set(&matches, true);
         let disallow = filter_set(&matches, false);
 
-        assert_eq!(allow.is_match("/Belt_transport_system"), true);
-        assert_eq!(disallow.is_match("/Belt_transport_system"), false);
+        assert!(allow.is_match("/Belt_transport_system"));
+        assert!(!disallow.is_match("/Belt_transport_system"));
     }
 
     #[tokio::test]
@@ -305,6 +305,6 @@ mod test {
 
         let res = check_resource_rules(&db, &crawler.client, &url).await;
 
-        assert_eq!(res, true);
+        assert!(res);
     }
 }

@@ -198,7 +198,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &vec![1_i64],
+                tags: &[1_i64],
                 published_at: None,
                 last_modified: None,
             }.to_document())
@@ -220,7 +220,7 @@ mod test {
             fresh and green with every spring, carrying in their lower leaf junctures the
             debris of the winter’s flooding; and sycamores with mottled, white, recumbent
             limbs and branches that arch over the pool",
-                tags: &vec![2_i64],
+                tags: &[2_i64],
                 published_at: None,
                 last_modified: None,
             }.to_document())
@@ -241,7 +241,7 @@ mod test {
             eros. Donec rhoncus mauris libero, et imperdiet neque sagittis sed. Nulla
             ac volutpat massa. Vivamus sed imperdiet est, id pretium ex. Praesent suscipit
             mattis ipsum, a lacinia nunc semper vitae.",
-                    tags: &vec![2_i64],
+                    tags: &[2_i64],
                     published_at: None,
                     last_modified: None,
                 }
@@ -260,7 +260,7 @@ mod test {
              enterprise which you have regarded with such evil forebodings.  I arrived here
              yesterday, and my first task is to assure my dear sister of my welfare and
              increasing confidence in the success of my undertaking.",
-             tags: &vec![1_i64],
+             tags: &[1_i64],
              published_at: None,
              last_modified: None
         }.to_document()).await

@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_pdf_metadata_extraction_from_pdf_with_metadata() {
         let path_with_metadata = Path::new("../../fixtures/pdf/pdf_with_metadata.pdf");
-        let metadata = super::PdfMetadata::parse(&path_with_metadata);
+        let metadata = super::PdfMetadata::parse(path_with_metadata);
         assert_eq!(metadata.title, Some("PDF title".to_string()));
         assert_eq!(metadata.author, Some("PDF author".to_string()));
     }
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_pdf_metadata_extraction_from_pdf_with_missing_metadata() {
         let path_with_metadata = Path::new("../../fixtures/pdf/pdf_without_metadata.pdf");
-        let metadata = super::PdfMetadata::parse(&path_with_metadata);
+        let metadata = super::PdfMetadata::parse(path_with_metadata);
         assert_eq!(metadata.title, None);
         assert_eq!(metadata.author, None);
     }
