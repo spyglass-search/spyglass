@@ -907,9 +907,9 @@ mod test {
 
         // Add resource rule to stop the crawl above
         let res = crawler.fetch_by_job(&state, model.id, true).await;
-        if let Err(error) = res {
+        if let Err(error) = &res {
             eprintln!("Error processing crawl {:?}", error);
-            assert!(false);
         }
+        assert!(res.is_ok());
     }
 }

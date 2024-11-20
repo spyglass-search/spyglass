@@ -169,7 +169,7 @@ mod test {
             .index
             .tokenizer_for_field(fields.content)
             .expect("Unable to get tokenizer for content field");
-        let desc = generate_highlight_preview(&tokenizer, "rust programming", &blurb);
+        let desc = generate_highlight_preview(&tokenizer, "rust programming", blurb);
         assert_eq!(desc, "<span><mark>Rust</mark> <mark>rust</mark> is a multi-paradigm, high-level, general-purpose <mark>programming</mark> ...</span>");
     }
 }

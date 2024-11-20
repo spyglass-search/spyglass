@@ -1,4 +1,4 @@
-use crate::constants::{TabLocation, SETTINGS_WIN_NAME};
+use crate::constants::{WindowLocation, SETTINGS_WIN_NAME};
 use crate::menu::get_app_menu;
 use crate::{constants, platform};
 use shared::config::Config;
@@ -150,7 +150,7 @@ fn show_window(window: &WebviewWindow) {
     let _ = window.center();
 }
 
-pub fn navigate_to_tab(app: &AppHandle, tab_url: &TabLocation) {
+pub fn navigate_to_tab(app: &AppHandle, tab_url: &WindowLocation) {
     let tab_url = tab_url.to_string();
 
     let window = if let Some(window) = app.get_webview_window(constants::SETTINGS_WIN_NAME) {
@@ -173,6 +173,24 @@ pub fn navigate_to_tab(app: &AppHandle, tab_url: &TabLocation) {
     show_window(&window);
 }
 
+pub fn show_bigmode(app: &AppHandle) {
+    let window = if let Some(window) = app.get_webview_window(constants::BIG_MODE_WIN_NAME) {
+        window
+    } else {
+        WebviewWindowBuilder::new(
+            app,
+            constants::BIG_MODE_WIN_NAME,
+            WebviewUrl::App(WindowLocation::BigMode.into()),
+        )
+        .title("Spyglass - Big Mode")
+        .min_inner_size(constants::MIN_WINDOW_WIDTH, constants::MIN_WINDOW_HEIGHT)
+        .build()
+        .expect("Unable to build window for bigmode")
+    };
+
+    show_window(&window);
+}
+
 pub fn show_update_window(app: &AppHandle) {
     let window = if let Some(window) = app.get_webview_window(constants::UPDATE_WIN_NAME) {
         window
@@ -180,7 +198,7 @@ pub fn show_update_window(app: &AppHandle) {
         WebviewWindowBuilder::new(
             app,
             constants::UPDATE_WIN_NAME,
-            WebviewUrl::App("/updater".into()),
+            WebviewUrl::App(WindowLocation::Updater.into()),
         )
         .title("Spyglass - Update Available!")
         .min_inner_size(450.0, 375.0)
@@ -199,7 +217,7 @@ pub fn show_startup_window(app: &AppHandle) -> WebviewWindow {
         WebviewWindowBuilder::new(
             app,
             constants::STARTUP_WIN_NAME,
-            WebviewUrl::App("/startup".into()),
+            WebviewUrl::App(WindowLocation::Startup.into()),
         )
         .title("Spyglass - Starting up")
         .decorations(false)
@@ -221,7 +239,7 @@ pub fn update_progress_window(app: &AppHandle, msg: &str, progress: u8) -> Webvi
         WebviewWindowBuilder::new(
             app,
             constants::PROGRESS_WIN_NAME,
-            WebviewUrl::App("/progress".into()),
+            WebviewUrl::App(WindowLocation::DownloadProgress.into()),
         )
         .title("Download Progress")
         .menu(Menu::new(app).expect("unable to create empty menu"))
@@ -250,7 +268,7 @@ pub fn show_wizard_window(app: &AppHandle) {
         let wizard_window = WebviewWindowBuilder::new(
             app,
             constants::WIZARD_WIN_NAME,
-            WebviewUrl::App("/wizard".into()),
+            WebviewUrl::App(WindowLocation::Wizard.into()),
         )
         .title("Getting Started")
         .menu(Menu::new(app).expect("Unable to create empty menu"))

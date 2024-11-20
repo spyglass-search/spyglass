@@ -44,7 +44,7 @@ mod test {
         let path = "../../fixtures/audio/jfk.wav".into();
         let res = transcribe_audio(path, MODEL_PATH.into()).expect("Unable to transcribe");
         let segments = res.segments;
-        assert!(segments.len() > 0);
+        assert!(!segments.is_empty());
 
         let combined = segments
             .iter()
@@ -60,7 +60,7 @@ mod test {
         let path = "../../fixtures/audio/armstrong.ogg".into();
         let res = transcribe_audio(path, MODEL_PATH.into()).expect("Unable to transcribe");
         let segments = res.segments;
-        assert!(segments.len() > 0);
+        assert!(!segments.is_empty());
         let combined = segments
             .iter()
             .map(|x| x.segment.to_string())
@@ -77,7 +77,7 @@ mod test {
         let path = "../../fixtures/audio/count_of_monte_cristo.mp3".into();
         let res = transcribe_audio(path, MODEL_PATH.into()).expect("Unable to transcribe");
         let segments = res.segments;
-        assert!(segments.len() > 0);
+        assert!(!segments.is_empty());
         let combined = segments
             .iter()
             .map(|x| x.segment.to_string())

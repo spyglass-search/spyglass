@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   enable-background="new 0 0 85.4 85.4"
+   viewBox="0 0 85.4 85.4"
+   version="1.1"
+   transform="matrix(6.123233995736766e-17,1,-1,6.123233995736766e-17,0,0)"
+   id="svg16"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs20" />
+  <g
+     clip-rule="evenodd"
+     fill-rule="evenodd"
+     id="g14"
+     transform="rotate(-90,42.75,42.65)">
+    <path
+       d="m 31.2,20.8 h 26.7 c 3.6,0 6.5,2.9 6.5,6.5 V 54 Z M 54.4,64.5 H 27.6 C 24,64.5 21.1,61.6 21.1,58 V 31.2 Z"
+       fill="#113107"
+       id="path12" />
+  </g>
+</svg>

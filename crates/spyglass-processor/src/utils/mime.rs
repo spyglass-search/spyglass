@@ -214,7 +214,7 @@ mod test {
 
     #[test]
     pub fn test_is_supported() {
-        assert_eq!(SupportedMime::is_supported("text/javascript"), true);
-        assert_eq!(SupportedMime::is_supported(GSLIDES), false);
+        assert!(SupportedMime::is_supported("text/javascript"));
+        assert!(!SupportedMime::is_supported(GSLIDES));
     }
 }
