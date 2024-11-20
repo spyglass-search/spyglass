@@ -11,9 +11,10 @@ use shared::metrics;
 use shared::request;
 use shared::response::{LensResult, SearchLensesResp, SearchMeta, SearchResult, SearchResults};
 use spyglass_model_interface::embedding_api::EmbeddingContentType;
+use spyglass_searcher::client::Searcher;
 use spyglass_searcher::schema::{DocFields, SearchDocument};
 use spyglass_searcher::{Boost, QueryBoost, SearchTrait};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use tracing::instrument;
 
@@ -72,6 +73,7 @@ pub async fn search_docs(
                     &state.db,
                     &lens_ids,
                     &embedding.embedding,
+                    10,
                 )
                 .await;
 
@@ -256,4 +258,179 @@ pub async fn search_lenses(
     }
 
     Ok(SearchLensesResp { results })
+}
+
+#[allow(dead_code)]
+pub async fn concat_context(distances: &[DocDistance], searcher: &Searcher) -> String {
+    let mut map = HashMap::<String, usize>::new();
+    let mut sorted: Vec<Vec<&DocDistance>> = Vec::new();
+    // documents are already ordered now we just want to group documents by
+    // uuid incase there are multiple results per document
+    for distance in distances {
+        match map.get(&distance.doc_id) {
+            Some(index) => {
+                if let Some(vec) = sorted.get_mut(*index) {
+                    vec.push(distance);
+                }
+            }
+            None => {
+                let index = sorted.len();
+                sorted.push(vec![distance]);
+                map.insert(distance.doc_id.clone(), index);
+            }
+        }
+    }
+
+    let mut context_text = "Context for all documents\n".to_string();
+    for grouped_results in sorted {
+        let first = grouped_results.first();
+        if let Some(first) = first {
+            context_text.push_str(
+                "\n\n-----------------------------------------------------------------\n\n",
+            );
+            context_text.push_str(&format!(
+                "Document UUID: {} URL: {} \n\n ",
+                first.doc_id, first.url,
+            ));
+        }
+
+        for (i, doc_distance) in grouped_results.iter().enumerate() {
+            if let Some(context) = pull_context(doc_distance, searcher).await {
+                context_text.push_str(&format!(
+                    "Context Segment -- #{} -- score #{}\n\n Context Text: {} \n\n",
+                    i, doc_distance.distance, context
+                ));
+            }
+        }
+    }
+    context_text
+}
+
+#[allow(dead_code)]
+async fn pull_context(distance: &DocDistance, searcher: &Searcher) -> Option<String> {
+    if let Some(document) = searcher.get(&distance.doc_id).await {
+        distance.segment_start;
+        distance.segment_end;
+
+        if distance.segment_start == 0
+            && distance.segment_end == ((document.content.len() - 1) as i64)
+        {
+            Some(document.content)
+        } else {
+            let segment = document
+                .content
+                .trim()
+                .char_indices()
+                .filter_map(|(i, c)| {
+                    let index = i as i64;
+                    if index >= distance.segment_start && index < distance.segment_end {
+                        Some(c)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<String>();
+
+            Some(segment)
+        }
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::api::handler::search::concat_context;
+    use entities::models::vec_documents::DocDistance;
+    use entities::test::setup_test_db;
+    use libspyglass::state::AppState;
+    use spyglass_searcher::schema::DocFields;
+    use spyglass_searcher::schema::SearchDocument;
+    use tantivy::Document;
+
+    #[tokio::test]
+    pub async fn test_concat_context() {
+        let expected_txt = "Context for all documents\n\n\n-----------------------------------------------------------------\n\nDocument UUID: 1234 URL: ahhh \n\n Context Segment -- #0 -- score #2\n\n Context Text: What is this that we \n\nContext Segment -- #1 -- score #4\n\n Context Text: are doing. Well not \n\n\n\n-----------------------------------------------------------------\n\nDocument UUID: 1234_abc URL: http://1234_abc \n\n Context Segment -- #0 -- score #3\n\n Context Text: Here is another docu \n\n\n\n-----------------------------------------------------------------\n\nDocument UUID: 1234_abc_567 URL: http://1234_abc_567 \n\n Context Segment -- #0 -- score #5\n\n Context Text: Got one last documen \n\n";
+
+        let doc_distance = vec![
+            DocDistance {
+                distance: 2.0,
+                doc_id: "1234".to_string(),
+                url: "ahhh".to_string(),
+                id: 1,
+                segment_end: 20,
+                segment_start: 0,
+            },
+            DocDistance {
+                distance: 3.0,
+                doc_id: "1234_abc".to_string(),
+                url: "http://1234_abc".to_string(),
+                id: 1,
+                segment_end: 20,
+                segment_start: 0,
+            },
+            DocDistance {
+                distance: 4.0,
+                doc_id: "1234".to_string(),
+                url: "ahhh".to_string(),
+                id: 1,
+                segment_end: 40,
+                segment_start: 21,
+            },
+            DocDistance {
+                distance: 5.0,
+                doc_id: "1234_abc_567".to_string(),
+                url: "http://1234_abc_567".to_string(),
+                id: 1,
+                segment_end: 20,
+                segment_start: 0,
+            },
+        ];
+
+        let db = setup_test_db().await;
+        let state = AppState::builder().with_db(db).build();
+
+        if let Ok(mut writer) = state.index.lock_writer() {
+            if let Err(error) = writer.add_document(create_document(
+                "1234",
+                "What is this that we are doing. Well not sure yet maybe something",
+            )) {
+                println!("Error creating doc {:?}", error);
+            }
+            let _ = writer.add_document(create_document(
+                "1234_abc",
+                "Here is another document that we have here so this is abc",
+            ));
+            let _ = writer.add_document(create_document(
+                "1234_abc_567",
+                "Got one last document for this test and we have at least 20 chars",
+            ));
+
+            match writer.commit() {
+                Ok(val) => {
+                    println!("updated {:?}", val);
+                }
+                Err(error) => {
+                    println!("Error committing {:?}", error);
+                    assert!(false);
+                }
+            }
+        }
+
+        if let Err(error) = state.index.reader.reload() {
+            println!("Error reloading {:?}", error);
+        }
+
+        let context = concat_context(&doc_distance, &state.index).await;
+
+        assert_eq!(expected_txt, context);
+    }
+
+    fn create_document(uuid: &str, content: &str) -> Document {
+        let schema = DocFields::as_schema();
+        let mut new_doc = Document::default();
+        new_doc.add_text(schema.get_field("id").unwrap(), uuid);
+        new_doc.add_text(schema.get_field("content").unwrap(), content);
+        new_doc
+    }
 }
