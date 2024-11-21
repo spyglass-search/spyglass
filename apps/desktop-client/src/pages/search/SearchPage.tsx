@@ -65,6 +65,7 @@ export function SearchPage() {
     setShowActions(false);
     setSelectedActionIdx(0);
     setSearchMeta(null);
+    setOffset(0);
     await requestResize();
   }, []);
 
