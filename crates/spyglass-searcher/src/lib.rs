@@ -102,6 +102,7 @@ pub trait SearchTrait {
         filters: &[QueryBoost],
         boosts: &[QueryBoost],
         num_results: usize,
+        offset: usize,
     ) -> SearchQueryResult;
 }
 
@@ -284,7 +285,7 @@ mod test {
 
         let query = "salinas";
         let filters = vec![QueryBoost::new(Boost::Tag(2_u64))];
-        let results = searcher.search(query, &filters, &[], 5).await;
+        let results = searcher.search(query, &filters, &[], 5, 0).await;
         assert_eq!(results.documents.len(), 1);
     }
 
@@ -297,7 +298,7 @@ mod test {
 
         let query = "salinas";
         let filters = vec![QueryBoost::new(Boost::Tag(2_u64))];
-        let results = searcher.search(query, &filters, &[], 5).await;
+        let results = searcher.search(query, &filters, &[], 5, 0).await;
         assert_eq!(results.documents.len(), 1);
     }
 
@@ -310,7 +311,7 @@ mod test {
 
         let query = "salinasd";
         let filters = vec![QueryBoost::new(Boost::Tag(2_u64))];
-        let results = searcher.search(query, &filters, &[], 5).await;
+        let results = searcher.search(query, &filters, &[], 5, 0).await;
         assert_eq!(results.documents.len(), 0);
     }
 }

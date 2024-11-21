@@ -6,6 +6,7 @@ use strum_macros::{Display, EnumString};
 pub struct SearchParam {
     pub lenses: Vec<String>,
     pub query: String,
+    pub offset: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -140,11 +140,13 @@ pub async fn search_docs<'r>(
     win: tauri::Window,
     lenses: Vec<String>,
     query: &str,
+    offset: u32,
 ) -> Result<SearchResults, String> {
     if let Some(rpc) = win.app_handle().try_state::<rpc::RpcMutex>() {
         let data = request::SearchParam {
             lenses,
             query: query.to_string(),
+            offset: Some(offset),
         };
 
         let rpc = rpc.lock().await;

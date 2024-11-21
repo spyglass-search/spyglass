@@ -45,6 +45,7 @@ export function SearchPage() {
 
   const [selectedActionIdx, setSelectedActionIdx] = useState<number>(0);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
+  const [offset, setOffset] = useState<number>(0);
 
   const [query, setQuery] = useState<string>("");
 
@@ -192,6 +193,35 @@ export function SearchPage() {
     setShowActions(false);
   };
 
+  useEffect(() => {
+    if (resultMode === ResultDisplayMode.Documents) {
+      const doc_count = docResults.length;
+      const max = doc_count - 1;
+      if (selectedIdx === max) {
+        let remainder = doc_count % 5;
+        if (remainder === 0) {
+          setOffset(doc_count);
+        }
+      }
+    }
+  }, [selectedIdx, resultMode]);
+
+  useEffect(() => {
+    invoke<SearchResults>("search_docs", {
+      query,
+      lenses: selectedLenses,
+      offset,
+    }).then((resp: SearchResults) => {
+      setDocResults((results: SearchResult[]) => {
+        const values = [...results];
+        for (const result of resp.results) {
+          values.push(result);
+        }
+        return values;
+      });
+    });
+  }, [offset]);
+
   // when the query changes shoot it over to the server.
   useEffect(() => {
     if (query.length === 0) {
@@ -218,6 +248,7 @@ export function SearchPage() {
         const resp = await invoke<SearchResults>("search_docs", {
           query,
           lenses: selectedLenses,
+          offset: 0,
         });
         setResultMode(ResultDisplayMode.Documents);
         setDocResults(resp.results);
