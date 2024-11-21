@@ -64,7 +64,7 @@ pub async fn search_docs(
     }
 
     if let Some(embedding_api) = state.embedding_api.load_full().as_ref() {
-        if query.trim().len() > 0 {
+        if !query.trim().is_empty() {
             match embedding_api
                 .embed(&query, EmbeddingContentType::Query)
                 .map(|embedding| embedding.first().map(|val| val.to_owned()))
