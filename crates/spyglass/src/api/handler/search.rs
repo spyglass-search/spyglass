@@ -64,63 +64,69 @@ pub async fn search_docs(
     }
 
     if let Some(embedding_api) = state.embedding_api.load_full().as_ref() {
-        match embedding_api
-            .embed(&query, EmbeddingContentType::Query)
-            .map(|embedding| embedding.first().map(|val| val.to_owned()))
-        {
-            Ok(Some(embedding)) => {
-                let mut distances = vec_documents::get_document_distance(
-                    &state.db,
-                    &lens_ids,
-                    &embedding.embedding,
-                    10,
-                )
-                .await;
+        if query.trim().len() > 0 {
+            match embedding_api
+                .embed(&query, EmbeddingContentType::Query)
+                .map(|embedding| embedding.first().map(|val| val.to_owned()))
+            {
+                Ok(Some(embedding)) => {
+                    let mut distances = vec_documents::get_document_distance(
+                        &state.db,
+                        &lens_ids,
+                        &embedding.embedding,
+                        10,
+                    )
+                    .await;
 
-                match distances.as_mut() {
-                    Ok(distances) => {
-                        let mut distances = distances
-                            .iter()
-                            .filter(|dist| dist.distance < 25.0)
-                            .collect::<Vec<&DocDistance>>();
-                        distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+                    match distances.as_mut() {
+                        Ok(distances) => {
+                            let mut distances = distances
+                                .iter()
+                                .filter(|dist| dist.distance < 25.0)
+                                .collect::<Vec<&DocDistance>>();
+                            distances.sort_by(|a, b| a.distance.total_cmp(&b.distance));
 
-                        let min_value = distances
-                            .iter()
-                            .map(|distance| distance.distance)
-                            .reduce(f64::min);
-                        let max_value = distances
-                            .iter()
-                            .map(|distance| distance.distance)
-                            .reduce(f64::max);
-                        if let (Some(min), Some(max)) = (min_value, max_value) {
-                            for distance in distances {
-                                let boost_normalized =
-                                    (distance.distance - min) / (max - min) * 3.0;
-                                let boost = 3.0 - boost_normalized;
+                            let min_value = distances
+                                .iter()
+                                .map(|distance| distance.distance)
+                                .reduce(f64::min);
+                            let max_value = distances
+                                .iter()
+                                .map(|distance| distance.distance)
+                                .reduce(f64::max);
+                            if let (Some(min), Some(max)) = (min_value, max_value) {
+                                for distance in distances {
+                                    let boost_normalized =
+                                        (distance.distance - min) / (max - min) * 3.0;
+                                    let boost = 3.0 - boost_normalized;
 
-                                boosts.push(QueryBoost::with_value(
-                                    Boost::DocId(distance.doc_id.clone()),
-                                    boost as f32,
-                                ));
+                                    boosts.push(QueryBoost::with_value(
+                                        Boost::DocId(distance.doc_id.clone()),
+                                        boost as f32,
+                                    ));
+                                }
                             }
                         }
-                    }
-                    Err(error) => {
-                        log::error!("Error accessing distances {:?}", error);
+                        Err(error) => {
+                            log::error!("Error accessing distances {:?}", error);
+                        }
                     }
                 }
-            }
-            Ok(None) => {
-                log::error!("No embedding could be generated");
-            }
-            Err(err) => {
-                log::error!("Error embedding query {:?}", err);
+                Ok(None) => {
+                    log::error!("No embedding could be generated");
+                }
+                Err(err) => {
+                    log::error!("Error embedding query {:?}", err);
+                }
             }
         }
     }
 
-    let search_result = state.index.search(&query, &filters, &boosts, 5).await;
+    let offset = search_req.offset.unwrap_or(0);
+    let search_result = state
+        .index
+        .search(&query, &filters, &boosts, 5, offset as usize)
+        .await;
     log::debug!(
         "query {}: {} results from {} docs in {}ms",
         query,
