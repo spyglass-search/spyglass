@@ -6,6 +6,7 @@ members = [
     "crates/shared",
     "crates/spyglass",
     "crates/spyglass-lens",
+    "crates/spyglass-llm",
     "crates/spyglass-processor",
     "crates/spyglass-rpc",
     "crates/spyglass-searcher",

@@ -4796,7 +4796,7 @@ dependencies = [
  "tantivy 0.18.1",
  "tantivy 0.19.2",
  "tar",
- "tokenizers",
+ "tokenizers 0.20.3",
  "url",
 ]
 
@@ -8263,6 +8263,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "spyglass-llm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
+ "tokenizers 0.19.1",
+ "tokio",
+]
+
+[[package]]
 name = "spyglass-model-interface"
 version = "23.11.1"
 dependencies = [
@@ -8285,7 +8297,7 @@ dependencies = [
  "simsimd",
  "symphonia",
  "thiserror 2.0.3",
- "tokenizers",
+ "tokenizers 0.20.3",
  "tracing",
 ]
 
@@ -9907,6 +9919,37 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "tokenizers"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e500fad1dd3af3d626327e6a3fe5050e664a6eaa4708b8ca92f1794aaf73e6fd"
+dependencies = [
+ "aho-corasick 1.1.3",
+ "derive_builder",
+ "esaxx-rs",
+ "getrandom 0.2.15",
+ "itertools 0.12.1",
+ "lazy_static",
+ "log",
+ "macro_rules_attribute",
+ "monostate",
+ "onig",
+ "paste",
+ "rand 0.8.5",
+ "rayon",
+ "rayon-cond",
+ "regex",
+ "regex-syntax 0.8.5",
+ "serde",
+ "serde_json",
+ "spm_precompiled",
+ "thiserror 1.0.69",
+ "unicode-normalization-alignments",
+ "unicode-segmentation",
+ "unicode_categories",
+]
 
 [[package]]
 name = "tokenizers"

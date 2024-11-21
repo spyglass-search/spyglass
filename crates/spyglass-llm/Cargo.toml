@@ -1,0 +1,13 @@
+[package]
+name = "spyglass-llm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { version = "1", features = ["full"] }
+candle = { version = "0.8", package = "candle-core", default-features = false }
+candle-nn = { version = "0.8" }
+candle-transformers = { version = "0.8" }
+# Match candle's version
+tokenizers = { version = "0.19", default-features = false, features = ["onig"] }
