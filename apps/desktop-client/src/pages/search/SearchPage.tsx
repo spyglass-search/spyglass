@@ -198,13 +198,13 @@ export function SearchPage() {
       const doc_count = docResults.length;
       const max = doc_count - 1;
       if (selectedIdx === max) {
-        let remainder = doc_count % 5;
+        const remainder = doc_count % 5;
         if (remainder === 0) {
           setOffset(doc_count);
         }
       }
     }
-  }, [selectedIdx, resultMode]);
+  }, [selectedIdx, resultMode, docResults.length]);
 
   useEffect(() => {
     invoke<SearchResults>("search_docs", {
