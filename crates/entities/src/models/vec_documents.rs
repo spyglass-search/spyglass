@@ -151,17 +151,16 @@ where
 
     let k_size = 3 * top_x;
     let statement = if !lens_ids.is_empty() {
-        Statement::from_sql_and_values(
-            db.get_database_backend(),
+        let query = format!(
             r#"
-                 WITH RankedScores AS (
+                WITH RankedScores AS (
                     SELECT
                         indexed_document.id AS score_id,
                         vd.distance,
                         indexed_document.doc_id,
+                        indexed_document.url,
                         vti.segment_start,
                         vti.segment_end,
-                        indexed_document.url
                         ROW_NUMBER() OVER (PARTITION BY indexed_document.doc_id ORDER BY vd.distance ASC) AS rank
                     FROM
                         vec_documents vd
@@ -170,17 +169,22 @@ where
                         ON vd.rowid = vti.id
                     left JOIN indexed_document
                         ON vti.indexed_id = indexed_document.id
-                    left join document_tag on document_tag.indexed_document_id = indexed_document.id
-                    WHERE document_tag.id in $1 AND vd.embedding MATCH $2 AND k = $3 ORDER BY vd.distance ASC
+                    left JOIN document_tag on document_tag.indexed_document_id = indexed_document.id
+                    WHERE document_tag.id in ({}) AND vd.embedding MATCH $1 AND k = $2 ORDER BY vd.distance ASC
                 )
-                SELECT score_id as id, distance, doc_id, url, segment_start, segment_end FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit $4;
+                SELECT score_id as id, distance, doc_id, url, segment_start, segment_end FROM RankedScores WHERE rank = 1 ORDER BY distance ASC limit $3;
             "#,
-            vec![
-                lens_ids.to_owned().into(),
-                embedding_string.into(),
-                k_size.into(),
-                top_x.into(),
-            ],
+            lens_ids
+                .iter()
+                .map(|val| val.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        );
+
+        Statement::from_sql_and_values(
+            db.get_database_backend(),
+            query,
+            vec![embedding_string.into(), k_size.into(), top_x.into()],
         )
     } else {
         Statement::from_sql_and_values(

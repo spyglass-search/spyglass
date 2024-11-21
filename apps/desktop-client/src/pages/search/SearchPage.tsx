@@ -147,7 +147,12 @@ export function SearchPage() {
         // Handle tab completion for len search/results
         if (resultMode === ResultDisplayMode.Lenses) {
           const selected = lensResults[selectedIdx];
-          setSelectedLenses((lenses) => [...lenses, selected.label]);
+          if (selected) {
+            setSelectedLenses((lenses) => [...lenses, selected.label]);
+          } else {
+            console.error("Unable to select lens.", selected, selectedIdx);
+          }
+
           clearQuery();
           // Jump to action menu
         } else if (resultMode === ResultDisplayMode.Documents) {
