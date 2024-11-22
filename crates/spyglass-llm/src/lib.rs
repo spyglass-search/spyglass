@@ -22,14 +22,31 @@ lazy_static! {
     };
 }
 
-#[derive(Default, Serialize)]
-pub struct LlmPrompt {
-    pub system_prompt: String,
-    pub user_prompt: String,
-    pub assistant_response_start: Option<String>,
+#[derive(Serialize)]
+pub enum ChatRole {
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "assistant")]
+    Assistant,
 }
 
-pub async fn run_model(gguf_path: PathBuf, prompt: &LlmPrompt) -> Result<()> {
+#[derive(Serialize)]
+pub struct ChatMessage {
+    pub role: ChatRole,
+    pub content: String,
+}
+
+#[derive(Serialize)]
+pub struct LlmSession {
+    pub messages: Vec<ChatMessage>,
+}
+
+pub async fn run_model(
+    gguf_path: PathBuf,
+    session: &LlmSession,
+) -> Result<()> {
     let mut llm = LLMModel::new(gguf_path)?;
 
     // Encode the prompt.
@@ -39,7 +56,7 @@ pub async fn run_model(gguf_path: PathBuf, prompt: &LlmPrompt) -> Result<()> {
 
     // process prompt
     let mut timer = std::time::Instant::now();
-    let prompt_contents = TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(prompt)?)?;
+    let prompt_contents = TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(session)?)?;
     let next_token = sampler.load_prompt(&prompt_contents)?;
     log::info!("processing prompt in {:.3}s", timer.elapsed().as_secs_f32());
 

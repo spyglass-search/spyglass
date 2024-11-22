@@ -1,8 +1,5 @@
-<|system|>
-{{ system_prompt }}<|end|>
-<|user|>
-{{ user_prompt }}<|end|>
+{% for msg in messages %}
+<|{{ msg.role }}|>
+{{ msg.content }}<|end|>
+{% endfor %}
 <|assistant|>
-{% if assitant_response_start %}
-{{ assitant_response_start }}
-{% endif %}
