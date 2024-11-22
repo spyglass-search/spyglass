@@ -50,79 +50,88 @@ pub struct LlmSession {
     pub messages: Vec<ChatMessage>,
 }
 
-pub async fn run_model(
-    gguf_path: PathBuf,
-    session: &LlmSession,
-    stream: Option<tokio::sync::mpsc::Sender<ChatStream>>,
-) -> Result<ChatMessage> {
-    let mut llm = LLMModel::new(gguf_path)?;
+pub struct LlmClient {
+    llm: LLMModel,
+}
 
-    // Encode the prompt.
-    println!("Encoding & loading prompt...");
-    let mut all_tokens = vec![];
-    let mut content_buffer = String::new();
-    let mut sampler = llm.sampler();
-
-    // process prompt
-    let mut timer = std::time::Instant::now();
-    if let Some(stream) = &stream {
-        let _ = stream.send(ChatStream::LoadingPrompt).await;
+impl LlmClient {
+    pub fn new(gguf_path: PathBuf) -> Result<Self> {
+        Ok(Self {
+            llm: LLMModel::new(gguf_path)?,
+        })
     }
 
-    let prompt_contents =
-        TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(session)?)?;
-    let next_token = sampler.load_prompt(&prompt_contents)?;
-    log::info!("processing prompt in {:.3}s", timer.elapsed().as_secs_f32());
+    pub async fn chat(
+        &mut self,
+        session: &LlmSession,
+        stream: Option<tokio::sync::mpsc::Sender<ChatStream>>,
+    ) -> Result<ChatMessage> {
+        // Encode the prompt.
+        let mut all_tokens = vec![];
+        let mut content_buffer = String::new();
+        let mut sampler = self.llm.sampler();
 
-    if let Some(stream) = &stream {
-        let _ = stream.send(ChatStream::ChatStart).await;
-    }
-
-    all_tokens.push(next_token);
-    if let Some(t) = llm.stream.next_token(next_token)? {
-        content_buffer.push_str(&t);
+        // process prompt
+        let mut timer = std::time::Instant::now();
         if let Some(stream) = &stream {
-            let _ = stream.send(ChatStream::Token(t)).await;
+            let _ = stream.send(ChatStream::LoadingPrompt).await;
         }
-    }
 
-    timer = std::time::Instant::now();
-    let mut sampled = 1;
-    let num_tokens_to_sample = 1024;
+        let prompt_contents =
+            TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(session)?)?;
+        let next_token = sampler.load_prompt(&prompt_contents)?;
+        log::info!("processing prompt in {:.3}s", timer.elapsed().as_secs_f32());
 
-    for _ in 0..num_tokens_to_sample {
-        let next_token = sampler.next_token()?;
+        if let Some(stream) = &stream {
+            let _ = stream.send(ChatStream::ChatStart).await;
+        }
+
         all_tokens.push(next_token);
-        if let Some(t) = llm.stream.next_token(next_token)? {
+        if let Some(t) = self.llm.stream.next_token(next_token)? {
             content_buffer.push_str(&t);
             if let Some(stream) = &stream {
                 let _ = stream.send(ChatStream::Token(t)).await;
             }
         }
 
-        sampled += 1;
-        if sampler.is_done() {
-            break;
-        };
-    }
+        timer = std::time::Instant::now();
+        let mut sampled = 1;
+        let num_tokens_to_sample = 1024;
 
-    if let Some(rest) = llm.stream.decode_rest().map_err(candle::Error::msg)? {
-        if let Some(stream) = &stream {
-            let _ = stream.send(ChatStream::Token(rest)).await;
+        for _ in 0..num_tokens_to_sample {
+            let next_token = sampler.next_token()?;
+            all_tokens.push(next_token);
+            if let Some(t) = self.llm.stream.next_token(next_token)? {
+                content_buffer.push_str(&t);
+                if let Some(stream) = &stream {
+                    let _ = stream.send(ChatStream::Token(t)).await;
+                }
+            }
+
+            sampled += 1;
+            if sampler.is_done() {
+                break;
+            };
         }
+
+        if let Some(rest) = self.llm.stream.decode_rest().map_err(candle::Error::msg)? {
+            if let Some(stream) = &stream {
+                let _ = stream.send(ChatStream::Token(rest)).await;
+            }
+        }
+
+        if let Some(stream) = &stream {
+            let _ = stream.send(ChatStream::ChatDone).await;
+        }
+
+        log::info!(
+            "{sampled:4} tokens generated: {:.2} token/s",
+            sampled as f64 / timer.elapsed().as_secs_f64(),
+        );
+
+        Ok(ChatMessage {
+            role: ChatRole::Assistant,
+            content: content_buffer,
+        })
     }
-
-    if let Some(stream) = &stream {
-        let _ = stream.send(ChatStream::ChatDone).await;
-    }
-
-    log::info!(
-        "{sampled:4} tokens generated: {:.2} token/s",
-        sampled as f64 / timer.elapsed().as_secs_f64(),
-    );
-
-    Ok(ChatMessage {
-        role: ChatRole::Assistant,
-        content: content_buffer,
-    })
 }

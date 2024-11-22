@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use spyglass_llm::{run_model, ChatMessage, ChatRole, ChatStream, LlmSession};
+use spyglass_llm::{ChatMessage, ChatRole, ChatStream, LlmClient, LlmSession};
 use tokio::sync::mpsc;
 
 #[tokio::main]
@@ -48,12 +48,9 @@ pub async fn main() -> Result<(), anyhow::Error> {
         }
     });
 
-    let _ = run_model(
-        "assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into(),
-        &prompt,
-        Some(tx),
-    )
-    .await?;
+    let mut client =
+        LlmClient::new("assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into())?;
+    client.chat(&prompt, Some(tx)).await?;
 
     Ok(())
 }
