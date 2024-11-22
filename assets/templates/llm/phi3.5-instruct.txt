@@ -1,0 +1,8 @@
+<|system|>
+{{ system_prompt }}<|end|>
+<|user|>
+{{ user_prompt }}<|end|>
+<|assistant|>
+{% if assitant_response_start %}
+{{ assitant_response_start }}
+{% endif %}

@@ -1,31 +1,46 @@
 use anyhow::Result;
 use model::LLMModel;
+use serde::Serialize;
 use std::{io::Write, path::PathBuf};
+use tera::{Context, Tera};
+use lazy_static::lazy_static;
 
 pub mod model;
 pub mod sampler;
 mod token_output_stream;
 
-pub async fn run_model(gguf_path: PathBuf) -> Result<()> {
+lazy_static! {
+    pub static ref TEMPLATES: Tera = {
+        let tera = match Tera::new("assets/templates/llm/*.txt") {
+            Ok(t) => t,
+            Err(err) => {
+                eprintln!("Parsing error: {err}");
+                ::std::process::exit(1);
+            }
+        };
+        tera
+    };
+}
+
+#[derive(Default, Serialize)]
+pub struct LlmPrompt {
+    pub system_prompt: String,
+    pub user_prompt: String,
+    pub assistant_response_start: Option<String>,
+}
+
+pub async fn run_model(gguf_path: PathBuf, prompt: &LlmPrompt) -> Result<()> {
     let mut llm = LLMModel::new(gguf_path)?;
 
     // Encode the prompt.
     println!("Encoding & loading prompt...");
-    let prompt = r#"
-        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-        You are a helpful AI assistant.<|eot_id|>
-        <|start_header_id|>user<|end_header_id|>
-
-        What is the airspeed velocity of an unladen swallow?<|eot_id|>
-        <|start_header_id|>assistant<|end_header_id|>
-    "#;
     let mut all_tokens = vec![];
     let mut sampler = llm.sampler();
 
     // process prompt
     let mut timer = std::time::Instant::now();
-    let next_token = sampler.load_prompt(&prompt)?;
+    let prompt_contents = TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(prompt)?)?;
+    let next_token = sampler.load_prompt(&prompt_contents)?;
     log::info!("processing prompt in {:.3}s", timer.elapsed().as_secs_f32());
 
     all_tokens.push(next_token);
