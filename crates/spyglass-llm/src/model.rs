@@ -87,7 +87,9 @@ impl LLMModel {
     }
 
     pub fn encode(&self, content: &str) -> Result<Vec<u32>> {
-        let tokens = self.stream.tokenizer()
+        let tokens = self
+            .stream
+            .tokenizer()
             .encode(content, true)
             .map_err(anyhow::Error::msg)?;
         Ok(tokens.get_ids().to_vec())

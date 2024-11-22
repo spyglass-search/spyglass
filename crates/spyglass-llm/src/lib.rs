@@ -1,9 +1,9 @@
 use anyhow::Result;
+use lazy_static::lazy_static;
 use model::LLMModel;
 use serde::Serialize;
-use std::{io::Write, path::PathBuf};
+use std::path::PathBuf;
 use tera::{Context, Tera};
-use lazy_static::lazy_static;
 
 pub mod model;
 pub mod sampler;
@@ -11,15 +11,22 @@ mod token_output_stream;
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
-        let tera = match Tera::new("assets/templates/llm/*.txt") {
+        match Tera::new("assets/templates/llm/*.txt") {
             Ok(t) => t,
             Err(err) => {
                 eprintln!("Parsing error: {err}");
                 ::std::process::exit(1);
             }
-        };
-        tera
+        }
     };
+}
+
+// Generation is roughly the order things happen.
+pub enum ChatStream {
+    LoadingPrompt,
+    ChatStart,
+    Token(String),
+    ChatDone,
 }
 
 #[derive(Serialize)]
@@ -46,24 +53,37 @@ pub struct LlmSession {
 pub async fn run_model(
     gguf_path: PathBuf,
     session: &LlmSession,
-) -> Result<()> {
+    stream: Option<tokio::sync::mpsc::Sender<ChatStream>>,
+) -> Result<ChatMessage> {
     let mut llm = LLMModel::new(gguf_path)?;
 
     // Encode the prompt.
     println!("Encoding & loading prompt...");
     let mut all_tokens = vec![];
+    let mut content_buffer = String::new();
     let mut sampler = llm.sampler();
 
     // process prompt
     let mut timer = std::time::Instant::now();
-    let prompt_contents = TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(session)?)?;
+    if let Some(stream) = &stream {
+        let _ = stream.send(ChatStream::LoadingPrompt).await;
+    }
+
+    let prompt_contents =
+        TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(session)?)?;
     let next_token = sampler.load_prompt(&prompt_contents)?;
     log::info!("processing prompt in {:.3}s", timer.elapsed().as_secs_f32());
 
+    if let Some(stream) = &stream {
+        let _ = stream.send(ChatStream::ChatStart).await;
+    }
+
     all_tokens.push(next_token);
     if let Some(t) = llm.stream.next_token(next_token)? {
-        print!("{t}");
-        std::io::stdout().flush()?;
+        content_buffer.push_str(&t);
+        if let Some(stream) = &stream {
+            let _ = stream.send(ChatStream::Token(t)).await;
+        }
     }
 
     timer = std::time::Instant::now();
@@ -71,29 +91,38 @@ pub async fn run_model(
     let num_tokens_to_sample = 1024;
 
     for _ in 0..num_tokens_to_sample {
-        let next_token = sampler.next()?;
+        let next_token = sampler.next_token()?;
         all_tokens.push(next_token);
         if let Some(t) = llm.stream.next_token(next_token)? {
-            print!("{t}");
-            std::io::stdout().flush()?;
+            content_buffer.push_str(&t);
+            if let Some(stream) = &stream {
+                let _ = stream.send(ChatStream::Token(t)).await;
+            }
         }
 
         sampled += 1;
         if sampler.is_done() {
-            println!("\n--------------------------------------------------");
-            println!("Got EOS after {sampled} tokens");
             break;
         };
     }
 
     if let Some(rest) = llm.stream.decode_rest().map_err(candle::Error::msg)? {
-        print!("{rest}");
+        if let Some(stream) = &stream {
+            let _ = stream.send(ChatStream::Token(rest)).await;
+        }
     }
-    std::io::stdout().flush()?;
+
+    if let Some(stream) = &stream {
+        let _ = stream.send(ChatStream::ChatDone).await;
+    }
+
     log::info!(
         "{sampled:4} tokens generated: {:.2} token/s",
         sampled as f64 / timer.elapsed().as_secs_f64(),
     );
 
-    Ok(())
+    Ok(ChatMessage {
+        role: ChatRole::Assistant,
+        content: content_buffer,
+    })
 }

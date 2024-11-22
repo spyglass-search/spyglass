@@ -30,7 +30,7 @@ impl Sampler {
     }
 
     pub fn load_prompt(&mut self, prompt: &str) -> Result<u32> {
-        let prompt_tokens = self.model.encode(&prompt)?;
+        let prompt_tokens = self.model.encode(prompt)?;
         let next_token: u32 = self.sample(&prompt_tokens, 0)?;
         self.last_token = Some(next_token);
         self.num_sampled += prompt_tokens.len();
@@ -38,7 +38,7 @@ impl Sampler {
         Ok(next_token)
     }
 
-    pub fn next(&mut self) -> Result<u32> {
+    pub fn next_token(&mut self) -> Result<u32> {
         let slice = if let Some(token) = self.last_token {
             vec![token]
         } else {
@@ -53,6 +53,8 @@ impl Sampler {
     }
 
     pub fn is_done(&self) -> bool {
-        self.last_token.map(|x| x == self.model.eos_token).unwrap_or_default()
+        self.last_token
+            .map(|x| x == self.model.eos_token)
+            .unwrap_or_default()
     }
 }
