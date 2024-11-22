@@ -9,6 +9,7 @@ use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
+use shared::llm::{ChatMessage, LlmSession};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::{server_error, RpcEventType, RpcServer};
@@ -48,6 +49,10 @@ impl RpcServer for SpyglassRpc {
 
     async fn app_status(&self) -> RpcResult<resp::AppStatus> {
         handler::app_status(self.state.clone()).await
+    }
+
+    async fn chat_completion(&self, session: LlmSession) -> RpcResult<ChatMessage> {
+        handler::chat_completion(self.state.clone(), &session).await
     }
 
     /// Default folders used in the local file indexer

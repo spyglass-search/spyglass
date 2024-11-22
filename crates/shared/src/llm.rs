@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // Generation is roughly the order things happen.
 pub enum ChatStream {
@@ -8,7 +8,7 @@ pub enum ChatStream {
     ChatDone,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ChatRole {
     #[serde(rename = "system")]
     System,
@@ -18,13 +18,13 @@ pub enum ChatRole {
     Assistant,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ChatMessage {
     pub role: ChatRole,
     pub content: String,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LlmSession {
     pub messages: Vec<ChatMessage>,
 }

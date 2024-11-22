@@ -3,6 +3,7 @@ use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::types::{ErrorObject, ErrorObjectOwned};
 use serde::Serialize;
 use shared::config::UserSettings;
+use shared::llm::{ChatMessage, LlmSession};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{
     AppStatus, DefaultIndices, LensResult, LibraryStats, ListConnectionResult, PluginResult,
@@ -55,6 +56,9 @@ pub trait Rpc {
 
     #[method(name = "app_status")]
     async fn app_status(&self) -> RpcResult<AppStatus>;
+
+    #[method(name = "chat_completion")]
+    async fn chat_completion(&self, session: LlmSession) -> RpcResult<ChatMessage>;
 
     #[method(name = "default_indices")]
     async fn default_indices(&self) -> RpcResult<DefaultIndices>;

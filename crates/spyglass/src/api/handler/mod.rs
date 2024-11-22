@@ -19,6 +19,7 @@ use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
 use shared::config::{self, Config, UserSettings};
+use shared::llm::{ChatMessage, LlmSession};
 use shared::metrics::Event;
 use shared::request::{BatchDocumentRequest, RawDocType, RawDocumentRequest};
 use shared::response::{
@@ -205,6 +206,11 @@ pub async fn delete_document(state: AppState, id: String) -> RpcResult<()> {
 
     let _ = indexed_document::delete_many_by_doc_id(&state.db, &[id]).await;
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn chat_completion(state: AppState, session: &LlmSession) -> RpcResult<ChatMessage> {
+    Ok(ChatMessage { role: shared::llm::ChatRole::Assistant, content: "hello".into() })
 }
 
 /// Remove a domain from crawl queue & index
