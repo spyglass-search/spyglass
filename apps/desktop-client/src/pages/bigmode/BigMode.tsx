@@ -111,6 +111,7 @@ export function BigMode() {
         const resp = await invoke<SearchResults>("search_docs", {
           query,
           lenses: selectedLenses,
+          offset: 0,
         });
         setResultMode(ResultDisplayMode.Documents);
         setDocResults(resp.results);

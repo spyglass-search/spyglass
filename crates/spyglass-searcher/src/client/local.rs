@@ -101,6 +101,7 @@ impl SearchTrait for Searcher {
         filters: &[QueryBoost],
         boosts: &[QueryBoost],
         num_results: usize,
+        offset: usize,
     ) -> SearchQueryResult {
         let start_timer = Instant::now();
 
@@ -116,7 +117,7 @@ impl SearchTrait for Searcher {
             QueryOptions::default(),
         );
 
-        let collector = TopDocs::with_limit(num_results);
+        let collector = TopDocs::with_limit(num_results).and_offset(offset);
 
         let top_docs = searcher
             .search(&query, &collector)
