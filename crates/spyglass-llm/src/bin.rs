@@ -1,6 +1,9 @@
+use shared::llm::{ChatMessage, ChatRole, ChatStream, LlmSession};
+use spyglass_llm::LlmClient;
+/// This is mainly for testing the llm client, should remove this after it's comfortably
+/// integrated with the other code.
+///
 use std::io::Write;
-
-use spyglass_llm::{ChatMessage, ChatRole, ChatStream, LlmClient, LlmSession};
 use tokio::sync::mpsc;
 
 #[tokio::main]

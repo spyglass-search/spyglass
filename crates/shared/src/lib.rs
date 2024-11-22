@@ -5,6 +5,7 @@ pub mod event;
 pub mod form;
 pub mod invoke;
 pub mod keyboard;
+pub mod llm;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 pub mod regex;
