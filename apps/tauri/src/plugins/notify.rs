@@ -32,6 +32,7 @@ async fn _subscribe(app: &AppHandle) -> anyhow::Result<Subscription<RpcEvent>> {
     let sub = rpc
         .client
         .subscribe_events(vec![
+            RpcEventType::ChatStream,
             RpcEventType::ConnectionSyncFinished,
             RpcEventType::LensInstalled,
             RpcEventType::LensUninstalled,
@@ -75,6 +76,10 @@ async fn setup_notification_handler(app: AppHandle) {
                     Some(Ok(event)) =>  {
                         log::debug!("received event: {:?}", event);
                         let notif: Option<(String, String)> = match &event.event_type {
+                            RpcEventType::ChatStream => {
+                                let _ = app.emit(ClientEvent::ChatEvent.as_ref(), event.payload);
+                                None
+                            },
                             RpcEventType::ConnectionSyncFinished => Some(("Sync Completed".into(), event.payload)),
                             RpcEventType::LensInstalled => {
                                 let _ = app.emit(ClientEvent::LensInstalled.as_ref(), event.payload.clone());

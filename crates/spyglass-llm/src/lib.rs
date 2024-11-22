@@ -21,6 +21,7 @@ lazy_static! {
     };
 }
 
+#[derive(Clone)]
 pub struct LlmClient {
     llm: LLMModel,
 }

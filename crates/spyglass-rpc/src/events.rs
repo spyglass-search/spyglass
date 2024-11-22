@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum RpcEventType {
+    ChatStream,
     ConnectionSyncFinished,
     LensUninstalled,
     LensInstalled,

@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 // Generation is roughly the order things happen.
+#[derive(Deserialize, Serialize, PartialEq, Eq, TS)]
+#[ts(export)]
 pub enum ChatStream {
     LoadingPrompt,
     ChatStart,
