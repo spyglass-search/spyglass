@@ -22,6 +22,9 @@ opt-level = "s"
 
 [workspace.dependencies]
 anyhow = "1.0"
+candle = { version = "0.8", package = "candle-core", default-features = false }
+candle-nn = { version = "0.8" }
+candle-transformers = { version = "0.8" }
 chrono = { version = "0.4", features = ["serde"] }
 jsonrpsee = "0.24"
 log = "0.4"
@@ -32,6 +35,9 @@ serde_json = "1.0"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 thiserror = "2.0.0"
+# NOTE: tokenizers version should match candle's version for
+tokenizers = { version = "0.19", default-features = false, features = ["onig"] }
+tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-log = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "std"]}
