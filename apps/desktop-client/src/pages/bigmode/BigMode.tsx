@@ -1,4 +1,4 @@
-import { KeyboardEvent, useCallback, useEffect, useState } from "react";
+import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { SearchInput } from "../search/SearchInput";
 import { ResultListView } from "../search/ResultListView";
 import {
@@ -9,10 +9,27 @@ import {
 } from "../search/constants";
 import { SearchResult } from "../../bindings/SearchResult";
 import { LensResult } from "../../bindings/LensResult";
-import { invoke } from "../../glue";
+import { invoke, listen } from "../../glue";
 import { SearchResults } from "../../bindings/SearchResults";
+import classNames from "classnames";
+import { ChatMessage } from "../../bindings/ChatMessage";
+import {
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/solid";
+import { Btn } from "../../components/Btn";
+import { BtnType } from "../../components/_constants";
+import { ChatStream } from "../../bindings/ChatStream";
+import { marked } from "marked";
+
+enum Tab {
+  Chat,
+  Search,
+}
 
 export function BigMode() {
+  const [activeTab, setActiveTab] = useState<Tab>(Tab.Search);
+
   const [selectedLenses, setSelectedLenses] = useState<string[]>([]);
   const [query, setQuery] = useState<string>("");
   const [docResults, setDocResults] = useState<SearchResult[]>([]);
@@ -123,22 +140,250 @@ export function BigMode() {
   }, [query, selectedLenses, clearQuery]);
 
   return (
+    <div className="h-screen flex flex-col">
+      <div role="tablist" className="tabs tabs-boxed">
+        <a
+          role="tab"
+          className={classNames("tab", {
+            "tab-active": activeTab === Tab.Search,
+          })}
+          onClick={() => setActiveTab(Tab.Search)}
+        >
+          Search
+        </a>
+        <a
+          role="tab"
+          className={classNames("tab", {
+            "tab-active": activeTab === Tab.Chat,
+          })}
+          onClick={() => setActiveTab(Tab.Chat)}
+        >
+          Chat
+        </a>
+      </div>
+      {activeTab == Tab.Search ? (
+        <div>
+          <SearchInput
+            selectedLenses={selectedLenses}
+            setSelectedLenses={setSelectedLenses}
+            query={query}
+            setQuery={setQuery}
+            onEnter={handleEnter}
+            onKeyEvent={handleKeyEvent}
+          />
+          <ResultListView
+            displayMode={resultMode}
+            docResults={docResults}
+            lensResults={lensResults}
+            selectedIdx={selectedIdx}
+          />
+          {isThinking ? (
+            <progress className="progress w-full"></progress>
+          ) : null}
+        </div>
+      ) : null}
+      {activeTab == Tab.Chat ? <AskClippy /> : null}
+    </div>
+  );
+}
+
+interface ChatLogProps {
+  history: ChatMessage[];
+}
+
+function ChatLogItem({
+  chat,
+  isStreaming = false,
+}: {
+  chat: ChatMessage;
+  isStreaming?: boolean;
+}) {
+  const isUser = chat.role === "user";
+
+  const icon = chat.role === "assistant" ? "🤖" : "🧙‍♂️";
+  return (
+    <div className="border-t border-t-neutral-700 p-4 text-sm text-white items-center flex flex-row gap-4 animate-fade-in">
+      <div
+        className={classNames(
+          "flex",
+          "flex-none",
+          "border",
+          "border-cyan-600",
+          "w-[48px]",
+          "h-[48px]",
+          "rounded-full",
+          "items-center",
+          { "order-1": isUser },
+        )}
+      >
+        <div className="text-lg mx-auto">
+          {isStreaming ? <ArrowPathIcon className="w-4 animate-spin" /> : icon}
+        </div>
+      </div>
+      <div
+        className={classNames("grow", {
+          "text-left": !isUser,
+          "text-right": isUser,
+        })}
+      >
+        <div
+          dangerouslySetInnerHTML={{
+            __html: marked.parse(chat.content, { async: false }),
+          }}
+          className="prose"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ChatLog({ history }: ChatLogProps) {
+  return (
     <div>
-      <SearchInput
-        selectedLenses={selectedLenses}
-        setSelectedLenses={setSelectedLenses}
-        query={query}
-        setQuery={setQuery}
-        onEnter={handleEnter}
-        onKeyEvent={handleKeyEvent}
-      />
-      <ResultListView
-        displayMode={resultMode}
-        docResults={docResults}
-        lensResults={lensResults}
-        selectedIdx={selectedIdx}
-      />
-      {isThinking ? <progress className="progress w-full"></progress> : null}
+      {history.map((chat, idx) => (
+        <ChatLogItem key={`chat-log-${idx}`} chat={chat} />
+      ))}
+    </div>
+  );
+}
+
+function AskClippy() {
+  const clippyInput = useRef<HTMLTextAreaElement>(null);
+
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [tokens, setTokens] = useState<string[]>([]);
+
+  const [history, setHistory] = useState<ChatMessage[]>([
+    { role: "user", content: "hi what's your name?" },
+    { role: "assistant", content: "My name is Clippy." },
+  ]);
+  const [status, setStatus] = useState<string>("");
+
+  const handleChatEvent = (event: ChatStream) => {
+    if (event.type === "LoadingPrompt") {
+      setStatus("Generating response...");
+    } else if (event.type === "Token") {
+      setTokens((toks) => [...toks, event.content]);
+    } else if (event.type === "ChatDone") {
+      setIsStreaming(false);
+      setStatus("");
+    }
+  };
+
+  const handleAskClippy = async (prompt: string) => {
+    setStatus("Asking clippy...");
+    const currentCtxt: ChatMessage[] = [
+      ...history,
+      {
+        role: "user",
+        content: prompt,
+      },
+    ];
+    setHistory(currentCtxt);
+    setIsStreaming(true);
+    await invoke("ask_clippy", { session: { messages: currentCtxt } });
+  };
+
+  const handleQuerySubmission = () => {
+    if (clippyInput.current) {
+      handleAskClippy(clippyInput.current.value.trim());
+      clippyInput.current.value = "";
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+  };
+
+  useEffect(() => {
+    if (isStreaming == false && tokens.length > 0) {
+      setHistory((hist) => [
+        ...hist,
+        {
+          role: "assistant",
+          content: tokens.join(""),
+        },
+      ]);
+      setTokens([]);
+    }
+  }, [isStreaming, tokens]);
+
+  useEffect(() => {
+    const init = async () => {
+      return await listen<ChatStream>("ChatEvent", (event) => {
+        handleChatEvent(event.payload);
+      });
+    };
+
+    const unlisten = init();
+    return () => {
+      (async () => {
+        await unlisten.then((fn) => fn());
+      })();
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col bg-neutral-800 text-white h-full">
+      <div className="flex flex-col grow place-content-end">
+        <div className="flex flex-col place-content-end overflow-y-scroll">
+          <ChatLog history={history} />
+          {isStreaming ? (
+            <ChatLogItem
+              chat={{
+                role: "assistant",
+                content: tokens.length > 0 ? tokens.join("") : status,
+              }}
+              isStreaming={isStreaming}
+            />
+          ) : null}
+        </div>
+      </div>
+      <div>
+        <div className="bg-neutral-700 px-4 py-2 text-sm text-neutral-400 flex flex-row items-center gap-4">
+          <ExclamationTriangleIcon className="w-6 text-yellow-400" />
+          <div>
+            <a
+              className="cursor-help underline font-semibold text-cyan-500"
+              onClick={() => handleAskClippy("what is a language model?")}
+            >
+              LLMs
+            </a>
+            (the tech behind this) are still experimental and responses may be
+            inaccurate.
+          </div>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-row gap-4 items-center">
+            <textarea
+              ref={clippyInput}
+              rows={2}
+              onSubmit={handleQuerySubmission}
+              placeholder="what is the difference between an alpaca & llama?"
+              className="text-base bg-neutral-800 text-white flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600 rounded"
+            />
+            <div className="flex flex-col gap-1">
+              <Btn
+                disabled={isStreaming}
+                className="btn-sm"
+                type={BtnType.Primary}
+                onClick={() => handleQuerySubmission()}
+              >
+                {isStreaming ? (
+                  <div>
+                    <ArrowPathIcon className="animate-spin w-4" />
+                  </div>
+                ) : (
+                  <div>Ask</div>
+                )}
+              </Btn>
+              <Btn onClick={clearHistory} className="btn-sm">
+                Clear
+              </Btn>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

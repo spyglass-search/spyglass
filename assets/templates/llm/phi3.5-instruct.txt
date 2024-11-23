@@ -1,0 +1,5 @@
+{% for msg in messages %}
+<|{{ msg.role }}|>
+{{ msg.content }}<|end|>
+{% endfor %}
+<|assistant|>

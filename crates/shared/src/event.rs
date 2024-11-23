@@ -11,6 +11,7 @@ pub struct ListenPayload<T> {
 #[ts(export)]
 pub enum ClientEvent {
     ClearSearch,
+    ChatEvent,
     FocusWindow,
     FolderChosen,
     LensInstalled,

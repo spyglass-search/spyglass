@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum RpcEventType {
+    ChatStream,
     ConnectionSyncFinished,
     LensUninstalled,
     LensInstalled,
@@ -13,7 +15,7 @@ pub struct RpcEvent {
     /// Event Type
     pub event_type: RpcEventType,
     /// Payload serialized as JSON if applicable.
-    pub payload: String,
+    pub payload: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

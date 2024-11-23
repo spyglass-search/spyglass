@@ -9,6 +9,7 @@ use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
 use libspyglass::state::AppState;
 use libspyglass::task::{CollectTask, ManagerCommand};
 use shared::config::{Config, UserSettings};
+use shared::llm::{ChatMessage, LlmSession};
 use shared::request::{BatchDocumentRequest, RawDocumentRequest, SearchLensesParam, SearchParam};
 use shared::response::{self as resp, DefaultIndices, LibraryStats};
 use spyglass_rpc::{server_error, RpcEventType, RpcServer};
@@ -48,6 +49,10 @@ impl RpcServer for SpyglassRpc {
 
     async fn app_status(&self) -> RpcResult<resp::AppStatus> {
         handler::app_status(self.state.clone()).await
+    }
+
+    async fn chat_completion(&self, session: LlmSession) -> RpcResult<ChatMessage> {
+        handler::chat_completion(self.state.clone(), &session).await
     }
 
     /// Default folders used in the local file indexer
@@ -218,31 +223,39 @@ impl RpcServer for SpyglassRpc {
 
         let events: HashSet<RpcEventType> = events.clone().into_iter().collect();
         log::debug!("SUBSCRIBED TO: {:?}", events);
-        loop {
-            tokio::select! {
-                _ = shutdown.recv() => {
-                    break;
-                }
-                res = receiver.recv() => {
-                    match res {
-                        Ok(event) => {
-                            if events.contains(&event.event_type) {
-                                if let Ok(msg) = SubscriptionMessage::from_json(&event) {
-                                    if let Err(err) = sink.send(msg).await {
-                                        log::warn!("unable to send to sub: {err}");
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown.recv() => {
+                        break;
+                    }
+                    res = receiver.recv() => {
+                        if sink.is_closed() {
+                            break;
+                        }
+
+                        match res {
+                            Ok(event) => {
+                                if events.contains(&event.event_type) {
+                                    if let Ok(msg) = SubscriptionMessage::from_json(&event) {
+                                        if let Err(err) = sink.send(msg).await {
+                                            log::warn!("unable to send to sub: {err}");
+                                        }
+                                    } else {
+                                        log::warn!("unable to serialize: {event:?}");
                                     }
-                                } else {
-                                    log::warn!("unable to serialize: {event:?}");
                                 }
+                            },
+                            Err(err) => {
+                                log::warn!("error recv: {err:?}");
                             }
-                        },
-                        Err(err) => {
-                            log::warn!("error recv: {err:?}");
                         }
                     }
                 }
             }
-        }
+
+            log::debug!("channel closed");
+        });
 
         Ok(())
     }

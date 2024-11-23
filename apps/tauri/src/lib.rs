@@ -157,6 +157,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             cmd::search_docs,
             cmd::search_lenses,
             cmd::update_and_restart,
+            cmd::llm::ask_clippy,
             cmd::window::escape,
             cmd::window::navigate,
             cmd::window::open_big_mode,

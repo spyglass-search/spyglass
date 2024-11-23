@@ -19,12 +19,14 @@ use libspyglass::state::AppState;
 use libspyglass::task::{AppPause, UserSettingsChange};
 use num_format::{Locale, ToFormattedString};
 use shared::config::{self, Config, UserSettings};
+use shared::llm::{ChatMessage, ChatStream, LlmSession};
 use shared::metrics::Event;
 use shared::request::{BatchDocumentRequest, RawDocType, RawDocumentRequest};
 use shared::response::{
     AppStatus, DefaultIndices, InstallStatus, LensResult, LibraryStats, ListConnectionResult,
     PluginResult, SupportedConnection, UserConnection,
 };
+use spyglass_llm::LlmClient;
 use spyglass_rpc::{server_error, RpcEvent, RpcEventType};
 use spyglass_searcher::WriteTrait;
 use std::collections::HashMap;
@@ -205,6 +207,48 @@ pub async fn delete_document(state: AppState, id: String) -> RpcResult<()> {
 
     let _ = indexed_document::delete_many_by_doc_id(&state.db, &[id]).await;
     Ok(())
+}
+
+#[instrument(skip(state))]
+pub async fn chat_completion(state: AppState, session: &LlmSession) -> RpcResult<ChatMessage> {
+    let mut llm = state.llm.lock().await;
+    let client = match llm.as_mut() {
+        Some(client) => client,
+        None => {
+            let client =
+                LlmClient::new("assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into())
+                    .map_err(|e| server_error(e.to_string(), None))?;
+            *llm = Some(client);
+            llm.as_mut().unwrap()
+        }
+    };
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<ChatStream>(10);
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            state_clone
+                .publish_event(&RpcEvent {
+                    event_type: RpcEventType::ChatStream,
+                    payload: Some(serde_json::to_value(&msg).unwrap()),
+                })
+                .await;
+
+            if msg == ChatStream::ChatDone {
+                log::info!("finished streaming");
+                break;
+            }
+        }
+    });
+
+    let _ = client
+        .chat(session, Some(tx))
+        .await
+        .map_err(|e| server_error(e.to_string(), None))?;
+    Ok(ChatMessage {
+        role: shared::llm::ChatRole::Assistant,
+        content: "hello".into(),
+    })
 }
 
 /// Remove a domain from crawl queue & index
@@ -579,7 +623,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Rpc
     state
         .publish_event(&RpcEvent {
             event_type: RpcEventType::LensUninstalled,
-            payload: name.to_string(),
+            payload: Some(serde_json::to_value(name.to_string()).unwrap()),
         })
         .await;
 

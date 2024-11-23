@@ -409,13 +409,13 @@ async fn download_model(
                     state
                         .publish_event(&RpcEvent {
                             event_type: RpcEventType::ModelDownloadStatus,
-                            payload: serde_json::to_string(
-                                &ModelDownloadStatusPayload::InProgress {
+                            payload: Some(
+                                serde_json::to_value(&ModelDownloadStatusPayload::InProgress {
                                     model_name: model_name.into(),
                                     percent,
-                                },
-                            )
-                            .unwrap_or_default(),
+                                })
+                                .unwrap(),
+                            ),
                         })
                         .await;
                     last_update = std::time::Instant::now();
@@ -426,10 +426,12 @@ async fn download_model(
             state
                 .publish_event(&RpcEvent {
                     event_type: RpcEventType::ModelDownloadStatus,
-                    payload: serde_json::to_string(&ModelDownloadStatusPayload::Finished {
-                        model_name: model_name.into(),
-                    })
-                    .unwrap_or_default(),
+                    payload: Some(
+                        serde_json::to_value(&ModelDownloadStatusPayload::Finished {
+                            model_name: model_name.into(),
+                        })
+                        .unwrap_or_default(),
+                    ),
                 })
                 .await;
             Ok(())
@@ -438,11 +440,13 @@ async fn download_model(
             state
                 .publish_event(&RpcEvent {
                     event_type: RpcEventType::ModelDownloadStatus,
-                    payload: serde_json::to_string(&ModelDownloadStatusPayload::Error {
-                        model_name: model_name.into(),
-                        msg: err.to_string(),
-                    })
-                    .unwrap_or_default(),
+                    payload: Some(
+                        serde_json::to_value(&ModelDownloadStatusPayload::Error {
+                            model_name: model_name.into(),
+                            msg: err.to_string(),
+                        })
+                        .unwrap(),
+                    ),
                 })
                 .await;
 
@@ -546,7 +550,7 @@ pub async fn worker_task(
 
                                                     state.publish_event(&RpcEvent {
                                                         event_type: RpcEventType::ConnectionSyncFinished,
-                                                        payload,
+                                                        payload: Some(serde_json::to_value(&payload).unwrap())
                                                     }).await;
                                                 }
                                                 Err(err) => log::warn!("Unable to sync w/ connection: {account}@{api_id} - {err}"),

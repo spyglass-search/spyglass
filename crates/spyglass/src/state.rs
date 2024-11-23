@@ -2,6 +2,7 @@ use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use entities::models::create_connection;
 use entities::sea_orm::DatabaseConnection;
+use spyglass_llm::LlmClient;
 use spyglass_model_interface::embedding_api::EmbeddingApi;
 use spyglass_rpc::RpcEvent;
 use spyglass_searcher::schema::DocFields;
@@ -63,6 +64,8 @@ pub struct AppState {
     pub pipelines: Arc<DashMap<String, PipelineConfiguration>>,
     pub user_settings: Arc<ArcSwap<UserSettings>>,
     pub index: Searcher,
+    // Language model client. lazy loaded.
+    pub llm: Arc<Mutex<Option<LlmClient>>>,
     pub metrics: Metrics,
     pub config: Config,
     // Task scheduler command/control
@@ -200,6 +203,7 @@ impl AppStateBuilder {
             db: self.db.as_ref().expect("Must set db").to_owned(),
             index,
             lenses: Arc::new(lenses),
+            llm: Arc::new(Mutex::new(None)),
             manager_cmd_tx: Arc::new(Mutex::new(None)),
             metrics: Metrics::new(
                 &Config::machine_identifier(),
