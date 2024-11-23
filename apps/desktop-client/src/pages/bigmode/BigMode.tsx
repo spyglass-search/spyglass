@@ -20,6 +20,7 @@ import {
 import { Btn } from "../../components/Btn";
 import { BtnType } from "../../components/_constants";
 import { ChatStream } from "../../bindings/ChatStream";
+import { marked } from "marked";
 
 enum Tab {
   Chat,
@@ -224,7 +225,12 @@ function ChatLogItem({
           "text-right": isUser,
         })}
       >
-        {chat.content}
+        <div
+          dangerouslySetInnerHTML={{
+            __html: marked.parse(chat.content, { async: false }),
+          }}
+          className="prose"
+        />
       </div>
     </div>
   );
@@ -254,7 +260,7 @@ function AskClippy() {
 
   const handleChatEvent = (event: ChatStream) => {
     if (event.type === "LoadingPrompt") {
-      setStatus("Loading prompt...");
+      setStatus("Generating response...");
     } else if (event.type === "Token") {
       setTokens((toks) => [...toks, event.content]);
     } else if (event.type === "ChatDone") {
@@ -264,6 +270,7 @@ function AskClippy() {
   };
 
   const handleAskClippy = async (prompt: string) => {
+    setStatus("Asking clippy...");
     const currentCtxt: ChatMessage[] = [
       ...history,
       {
@@ -350,6 +357,7 @@ function AskClippy() {
             <textarea
               ref={clippyInput}
               rows={2}
+              onSubmit={handleQuerySubmission}
               placeholder="what is the difference between an alpaca & llama?"
               className="text-base bg-neutral-800 text-white flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600 rounded"
             />
