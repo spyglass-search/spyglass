@@ -13,7 +13,8 @@
     "settings_window",
     "startup_window",
     "update_window",
-    "wizard_window"
+    "wizard_window",
+    "big_mode"
   ],
   "permissions": [
     "clipboard-manager:allow-read-text",

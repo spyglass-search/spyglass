@@ -181,7 +181,10 @@ interface ChatLogProps {
   history: ChatMessage[]
 }
 
-function ChatLogItem({ chat }: { chat: ChatMessage }) {
+function ChatLogItem({
+  chat,
+  isStreaming = false
+}: { chat: ChatMessage, isStreaming?: boolean }) {
   const isUser = chat.role === "user";
 
   const icon = chat.role === "assistant" ? "🤖" : "🧙‍♂️";
@@ -240,7 +243,7 @@ function AskClippy() {
       role: "user",
       content: prompt
     }];
-
+    setHistory(currentCtxt);
     setIsStreaming(true);
     await invoke("ask_clippy", { session: { messages: currentCtxt }});
   };
@@ -261,11 +264,11 @@ function AskClippy() {
 
   return (
     <div className="flex flex-col grow bg-neutral-800 text-white">
-      <div className="flex flex-col grow overflow-y-scroll place-content-end">
-        <div className="min-h-[128px] flex flex-col">
+      <div className="flex flex-col grow place-content-end min-h-[128px]">
+        <div className="flex flex-col overflow-y-scroll">
           <ChatLog history={history} />
           { isStreaming ? (
-            ''
+            <ChatLogItem chat={{ role: "assistant", content: stream ?? status }} isStreaming={isStreaming} />
           ) : null}
         </div>
       </div>

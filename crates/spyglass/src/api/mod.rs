@@ -223,31 +223,39 @@ impl RpcServer for SpyglassRpc {
 
         let events: HashSet<RpcEventType> = events.clone().into_iter().collect();
         log::debug!("SUBSCRIBED TO: {:?}", events);
-        loop {
-            tokio::select! {
-                _ = shutdown.recv() => {
-                    break;
-                }
-                res = receiver.recv() => {
-                    match res {
-                        Ok(event) => {
-                            if events.contains(&event.event_type) {
-                                if let Ok(msg) = SubscriptionMessage::from_json(&event) {
-                                    if let Err(err) = sink.send(msg).await {
-                                        log::warn!("unable to send to sub: {err}");
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown.recv() => {
+                        break;
+                    }
+                    res = receiver.recv() => {
+                        if sink.is_closed() {
+                            break;
+                        }
+
+                        match res {
+                            Ok(event) => {
+                                if events.contains(&event.event_type) {
+                                    if let Ok(msg) = SubscriptionMessage::from_json(&event) {
+                                        if let Err(err) = sink.send(msg).await {
+                                            log::warn!("unable to send to sub: {err}");
+                                        }
+                                    } else {
+                                        log::warn!("unable to serialize: {event:?}");
                                     }
-                                } else {
-                                    log::warn!("unable to serialize: {event:?}");
                                 }
+                            },
+                            Err(err) => {
+                                log::warn!("error recv: {err:?}");
                             }
-                        },
-                        Err(err) => {
-                            log::warn!("error recv: {err:?}");
                         }
                     }
                 }
             }
-        }
+
+            log::debug!("channel closed");
+        });
 
         Ok(())
     }
