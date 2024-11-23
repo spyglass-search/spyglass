@@ -194,7 +194,9 @@ function ChatLogItem({
           "flex", "flex-none", "border", "border-cyan-600", "w-[48px]", "h-[48px]", "rounded-full", "items-center",
           { "order-1": isUser }
       )}>
-        <div className="text-lg mx-auto">{icon}</div>
+        <div className="text-lg mx-auto">{isStreaming ? (
+          <ArrowPathIcon className="w-4 animate-spin" />
+        ) : icon}</div>
       </div>
       <div className={classNames("grow", { "text-left": !isUser, "text-right": isUser })}>
         {chat.content}
@@ -215,26 +217,22 @@ function AskClippy() {
   const clippyInput = useRef<HTMLTextAreaElement>(null);
 
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
-  const [stream, setStream] = useState<string>('');
+  const [tokens, setTokens] = useState<string[]>([]);
 
   const [history, setHistory] = useState<ChatMessage[]>([
     { role: "user", content: "hi what's your name?" },
-    { role: "assistant", content: "test" }
+    { role: "assistant", content: "My name is Clippy." }
   ]);
   const [status, setStatus] = useState<string>('');
 
   const handleChatEvent = (event: ChatStream) => {
-    if (event.type == "LoadingPrompt") {
+    if (event.type === "LoadingPrompt") {
       setStatus("Loading prompt...");
-    } else if (event.type == "Token") {
-      setStream(str => str + event.content);
-    } else if (event.type == "ChatDone") {
+    } else if (event.type === "Token") {
+      setTokens(toks => [...toks, event.content]);
+    } else if (event.type === "ChatDone") {
       setIsStreaming(false);
-      setHistory(hist => ([...hist, {
-        role: "assistant",
-        content: stream,
-      }]));
-      setStream('');
+      setStatus('');
     }
   };
 
@@ -248,27 +246,51 @@ function AskClippy() {
     await invoke("ask_clippy", { session: { messages: currentCtxt }});
   };
 
-  const handleQuerySubmission = () => {};
+  const handleQuerySubmission = () => {
+    if (clippyInput.current) {
+      handleAskClippy(clippyInput.current.value.trim());
+      clippyInput.current.value = '';
+    }
+  };
 
   const clearHistory = () => {
     setHistory([]);
   };
 
   useEffect(() => {
-    const init = async () => {
-      await listen<ChatStream>("ChatEvent", (event) => handleChatEvent(event.payload));
-    };
+    if (isStreaming == false && tokens.length > 0) {
+      setHistory(hist => ([...hist, {
+        role: "assistant",
+        content: tokens.join(''),
+      }]));
+      setTokens([]);
+    }
+  }, [isStreaming, tokens]);
 
-    init();
-  }, []);
+  useEffect(() => {
+    const init = async () => {
+      return await listen<ChatStream>(
+        "ChatEvent",
+        (event) => {
+          handleChatEvent(event.payload);
+        },
+      );
+    };
+    let unlisten = init();
+    return () => {
+      (async () => {
+        await unlisten.then(fn => fn());
+      })();
+    };
+  }, [])
 
   return (
-    <div className="flex flex-col grow bg-neutral-800 text-white">
-      <div className="flex flex-col grow place-content-end min-h-[128px]">
-        <div className="flex flex-col overflow-y-scroll">
+    <div className="flex flex-col bg-neutral-800 text-white h-full">
+      <div className="flex flex-col grow place-content-end">
+        <div className="flex flex-col place-content-end overflow-y-scroll">
           <ChatLog history={history} />
           { isStreaming ? (
-            <ChatLogItem chat={{ role: "assistant", content: stream ?? status }} isStreaming={isStreaming} />
+            <ChatLogItem chat={{ role: "assistant", content: tokens.length > 0 ? tokens.join('') : status }} isStreaming={isStreaming} />
           ) : null}
         </div>
       </div>

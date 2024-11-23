@@ -12,7 +12,8 @@ pub struct NotificationHandler(JoinHandle<()>);
 
 pub fn init(app: &AppHandle) {
     log::info!("starting notify plugin");
-    let handle = tauri::async_runtime::spawn(setup_notification_handler(app.clone()));
+    let handle: JoinHandle<()> =
+        tauri::async_runtime::spawn(setup_notification_handler(app.clone()));
     app.manage(NotificationHandler(handle));
 }
 
@@ -77,45 +78,58 @@ async fn setup_notification_handler(app: AppHandle) {
                         log::debug!("received event: {:?}", event);
                         let notif: Option<(String, String)> = match &event.event_type {
                             RpcEventType::ChatStream => {
-                                let _ = app.emit(ClientEvent::ChatEvent.as_ref(), event.payload);
+                                if let Some(payload) = event.payload {
+                                    let _ = app.emit(ClientEvent::ChatEvent.as_ref(), payload);
+                                }
                                 None
                             },
-                            RpcEventType::ConnectionSyncFinished => Some(("Sync Completed".into(), event.payload)),
+                            RpcEventType::ConnectionSyncFinished => Some((
+                                "Sync Completed".into(),
+                                event.payload.map(|p| p.to_string()).unwrap_or_default()
+                            )),
                             RpcEventType::LensInstalled => {
                                 let _ = app.emit(ClientEvent::LensInstalled.as_ref(), event.payload.clone());
-                                log::debug!("lens installed {}", &event.payload);
-                                Some(("Lens Installed".into(), format!("{} was installed in your library", event.payload)))
+                                log::debug!("lens installed {:?}", &event.payload);
+                                Some((
+                                    "Lens Installed".into(),
+                                    format!("{} was installed in your library",
+                                    event.payload.map(|p| p.to_string()).unwrap_or_default()
+                                )))
                             },
                             RpcEventType::LensUninstalled => {
                                 let _ = app.emit(ClientEvent::LensUninstalled.as_ref(), event.payload.clone());
-                                log::debug!("lens removed {}", &event.payload);
-                                Some(("Lens Uninstalled".into(), format!("{} was removed from your library", event.payload)))
+                                log::debug!("lens removed {:?}", &event.payload);
+                                Some(("Lens Uninstalled".into(), format!("{} was removed from your library", event.payload.map(|p| p.to_string()).unwrap_or_default())))
                             },
                             RpcEventType::ModelDownloadStatus => {
-                                if let Ok(status) = serde_json::de::from_str::<ModelDownloadStatusPayload>(&event.payload) {
-                                    match status {
-                                        ModelDownloadStatusPayload::Finished { model_name } => {
-                                            let window = crate::window::update_progress_window(&app, &model_name, 100);
-                                            let _ = window.close();
+                                if let Some(payload) = event.payload {
+                                    if let Ok(status) = serde_json::from_value::<ModelDownloadStatusPayload>(payload) {
+                                        match status {
+                                            ModelDownloadStatusPayload::Finished { model_name } => {
+                                                let window = crate::window::update_progress_window(&app, &model_name, 100);
+                                                let _ = window.close();
 
-                                            Some((
-                                                "Model Installed".into(),
-                                                format!("Finished downloading {}", model_name)
-                                            ))
-                                        },
-                                        ModelDownloadStatusPayload::Error { model_name, msg } => {
-                                            Some((
-                                                "Model Download Failed".into(),
-                                                format!("Unable to download {} model: {}", model_name, msg)
-                                            ))
-                                        },
-                                        ModelDownloadStatusPayload::InProgress { model_name, percent } => {
-                                            log::info!("downloading: {} - {}", model_name, percent);
-                                            crate::window::update_progress_window(&app, &model_name, percent);
-                                            None
+                                                Some((
+                                                    "Model Installed".into(),
+                                                    format!("Finished downloading {}", model_name)
+                                                ))
+                                            },
+                                            ModelDownloadStatusPayload::Error { model_name, msg } => {
+                                                Some((
+                                                    "Model Download Failed".into(),
+                                                    format!("Unable to download {} model: {}", model_name, msg)
+                                                ))
+                                            },
+                                            ModelDownloadStatusPayload::InProgress { model_name, percent } => {
+                                                log::info!("downloading: {} - {}", model_name, percent);
+                                                crate::window::update_progress_window(&app, &model_name, percent);
+                                                None
+                                            }
                                         }
+                                    } else {
+                                        None
                                     }
-                                } else {
+                                } else  {
                                     None
                                 }
                             }

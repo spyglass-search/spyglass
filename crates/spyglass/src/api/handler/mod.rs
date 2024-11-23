@@ -230,7 +230,7 @@ pub async fn chat_completion(state: AppState, session: &LlmSession) -> RpcResult
             state_clone
                 .publish_event(&RpcEvent {
                     event_type: RpcEventType::ChatStream,
-                    payload: serde_json::to_string(&msg).expect("Unable to serialize ChatStream"),
+                    payload: Some(serde_json::to_value(&msg).unwrap()),
                 })
                 .await;
 
@@ -623,7 +623,7 @@ pub async fn uninstall_lens(state: AppState, config: &Config, name: &str) -> Rpc
     state
         .publish_event(&RpcEvent {
             event_type: RpcEventType::LensUninstalled,
-            payload: name.to_string(),
+            payload: Some(serde_json::to_value(name.to_string()).unwrap()),
         })
         .await;
 
