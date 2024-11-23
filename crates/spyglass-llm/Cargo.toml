@@ -31,3 +31,8 @@ candle-transformers = {workspace =  true, features = ["metal"] }
 candle = { workspace = true, features = ["cuda"]}
 candle-nn = { workspace = true, features = ["cuda"] }
 candle-transformers = {workspace =  true, features = ["cuda"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+candle = { workspace = true }
+candle-nn = { workspace = true }
+candle-transformers = {workspace =  true }
