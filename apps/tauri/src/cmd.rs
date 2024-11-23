@@ -20,7 +20,8 @@ use spyglass_rpc::RpcClient;
 
 use super::platform::os_open;
 
-mod settings;
+pub mod llm;
+pub mod settings;
 pub mod window;
 pub use settings::*;
 

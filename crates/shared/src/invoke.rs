@@ -7,6 +7,8 @@ use ts_rs::TS;
 #[derive(AsRefStr, Display, Deserialize, Serialize, TS)]
 #[ts(export)]
 pub enum ClientInvoke {
+    #[serde(rename = "ask_clippy")]
+    AskClippy,
     #[serde(rename = "authorize_connection")]
     AuthorizeConnection,
     #[serde(rename = "choose_folder")]
