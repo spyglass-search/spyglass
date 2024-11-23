@@ -13,7 +13,10 @@ import { invoke, listen } from "../../glue";
 import { SearchResults } from "../../bindings/SearchResults";
 import classNames from "classnames";
 import { ChatMessage } from "../../bindings/ChatMessage";
-import { ArrowPathIcon, ExclamationTriangleIcon } from "@heroicons/react/24/solid";
+import {
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/solid";
 import { Btn } from "../../components/Btn";
 import { BtnType } from "../../components/_constants";
 import { ChatStream } from "../../bindings/ChatStream";
@@ -137,15 +140,20 @@ export function BigMode() {
   return (
     <div className="h-screen flex flex-col">
       <div role="tablist" className="tabs tabs-boxed">
-        <a role="tab"
-          className={classNames("tab", {"tab-active": activeTab === Tab.Search})}
+        <a
+          role="tab"
+          className={classNames("tab", {
+            "tab-active": activeTab === Tab.Search,
+          })}
           onClick={() => setActiveTab(Tab.Search)}
         >
           Search
         </a>
         <a
           role="tab"
-          className={classNames("tab", {"tab-active": activeTab === Tab.Chat})}
+          className={classNames("tab", {
+            "tab-active": activeTab === Tab.Chat,
+          })}
           onClick={() => setActiveTab(Tab.Chat)}
         >
           Chat
@@ -167,38 +175,55 @@ export function BigMode() {
             lensResults={lensResults}
             selectedIdx={selectedIdx}
           />
-          {isThinking ? <progress className="progress w-full"></progress> : null}
+          {isThinking ? (
+            <progress className="progress w-full"></progress>
+          ) : null}
         </div>
       ) : null}
-      {activeTab == Tab.Chat ? (
-        <AskClippy />
-      ) : null}
+      {activeTab == Tab.Chat ? <AskClippy /> : null}
     </div>
   );
 }
 
 interface ChatLogProps {
-  history: ChatMessage[]
+  history: ChatMessage[];
 }
 
 function ChatLogItem({
   chat,
-  isStreaming = false
-}: { chat: ChatMessage, isStreaming?: boolean }) {
+  isStreaming = false,
+}: {
+  chat: ChatMessage;
+  isStreaming?: boolean;
+}) {
   const isUser = chat.role === "user";
 
   const icon = chat.role === "assistant" ? "🤖" : "🧙‍♂️";
   return (
     <div className="border-t border-t-neutral-700 p-4 text-sm text-white items-center flex flex-row gap-4 animate-fade-in">
-      <div className={classNames(
-          "flex", "flex-none", "border", "border-cyan-600", "w-[48px]", "h-[48px]", "rounded-full", "items-center",
-          { "order-1": isUser }
-      )}>
-        <div className="text-lg mx-auto">{isStreaming ? (
-          <ArrowPathIcon className="w-4 animate-spin" />
-        ) : icon}</div>
+      <div
+        className={classNames(
+          "flex",
+          "flex-none",
+          "border",
+          "border-cyan-600",
+          "w-[48px]",
+          "h-[48px]",
+          "rounded-full",
+          "items-center",
+          { "order-1": isUser },
+        )}
+      >
+        <div className="text-lg mx-auto">
+          {isStreaming ? <ArrowPathIcon className="w-4 animate-spin" /> : icon}
+        </div>
       </div>
-      <div className={classNames("grow", { "text-left": !isUser, "text-right": isUser })}>
+      <div
+        className={classNames("grow", {
+          "text-left": !isUser,
+          "text-right": isUser,
+        })}
+      >
         {chat.content}
       </div>
     </div>
@@ -208,7 +233,9 @@ function ChatLogItem({
 function ChatLog({ history }: ChatLogProps) {
   return (
     <div>
-      {history.map((chat, idx) => <ChatLogItem key={`chat-log-${idx}`} chat={chat} />)}
+      {history.map((chat, idx) => (
+        <ChatLogItem key={`chat-log-${idx}`} chat={chat} />
+      ))}
     </div>
   );
 }
@@ -221,35 +248,38 @@ function AskClippy() {
 
   const [history, setHistory] = useState<ChatMessage[]>([
     { role: "user", content: "hi what's your name?" },
-    { role: "assistant", content: "My name is Clippy." }
+    { role: "assistant", content: "My name is Clippy." },
   ]);
-  const [status, setStatus] = useState<string>('');
+  const [status, setStatus] = useState<string>("");
 
   const handleChatEvent = (event: ChatStream) => {
     if (event.type === "LoadingPrompt") {
       setStatus("Loading prompt...");
     } else if (event.type === "Token") {
-      setTokens(toks => [...toks, event.content]);
+      setTokens((toks) => [...toks, event.content]);
     } else if (event.type === "ChatDone") {
       setIsStreaming(false);
-      setStatus('');
+      setStatus("");
     }
   };
 
   const handleAskClippy = async (prompt: string) => {
-    let currentCtxt: ChatMessage[] = [...history, {
-      role: "user",
-      content: prompt
-    }];
+    let currentCtxt: ChatMessage[] = [
+      ...history,
+      {
+        role: "user",
+        content: prompt,
+      },
+    ];
     setHistory(currentCtxt);
     setIsStreaming(true);
-    await invoke("ask_clippy", { session: { messages: currentCtxt }});
+    await invoke("ask_clippy", { session: { messages: currentCtxt } });
   };
 
   const handleQuerySubmission = () => {
     if (clippyInput.current) {
       handleAskClippy(clippyInput.current.value.trim());
-      clippyInput.current.value = '';
+      clippyInput.current.value = "";
     }
   };
 
@@ -259,38 +289,44 @@ function AskClippy() {
 
   useEffect(() => {
     if (isStreaming == false && tokens.length > 0) {
-      setHistory(hist => ([...hist, {
-        role: "assistant",
-        content: tokens.join(''),
-      }]));
+      setHistory((hist) => [
+        ...hist,
+        {
+          role: "assistant",
+          content: tokens.join(""),
+        },
+      ]);
       setTokens([]);
     }
   }, [isStreaming, tokens]);
 
   useEffect(() => {
     const init = async () => {
-      return await listen<ChatStream>(
-        "ChatEvent",
-        (event) => {
-          handleChatEvent(event.payload);
-        },
-      );
+      return await listen<ChatStream>("ChatEvent", (event) => {
+        handleChatEvent(event.payload);
+      });
     };
     let unlisten = init();
     return () => {
       (async () => {
-        await unlisten.then(fn => fn());
+        await unlisten.then((fn) => fn());
       })();
     };
-  }, [])
+  }, []);
 
   return (
     <div className="flex flex-col bg-neutral-800 text-white h-full">
       <div className="flex flex-col grow place-content-end">
         <div className="flex flex-col place-content-end overflow-y-scroll">
           <ChatLog history={history} />
-          { isStreaming ? (
-            <ChatLogItem chat={{ role: "assistant", content: tokens.length > 0 ? tokens.join('') : status }} isStreaming={isStreaming} />
+          {isStreaming ? (
+            <ChatLogItem
+              chat={{
+                role: "assistant",
+                content: tokens.length > 0 ? tokens.join("") : status,
+              }}
+              isStreaming={isStreaming}
+            />
           ) : null}
         </div>
       </div>
@@ -304,7 +340,8 @@ function AskClippy() {
             >
               LLMs
             </a>
-            (the tech behind this) are still experimental and responses may be inaccurate.
+            (the tech behind this) are still experimental and responses may be
+            inaccurate.
           </div>
         </div>
         <div className="p-4">
@@ -316,14 +353,23 @@ function AskClippy() {
               className="text-base bg-neutral-800 text-white flex-1 outline-none active:outline-none focus:outline-none caret-white border-b-2 border-neutral-600 rounded"
             />
             <div className="flex flex-col gap-1">
-              <Btn disabled={isStreaming} className="btn-sm" type={BtnType.Primary} onClick={() => handleQuerySubmission()}>
-              {isStreaming ? (
-                <div><ArrowPathIcon className="animate-spin w-4" /></div>
-              ) : (
-                <div>Ask</div>
-              )}
+              <Btn
+                disabled={isStreaming}
+                className="btn-sm"
+                type={BtnType.Primary}
+                onClick={() => handleQuerySubmission()}
+              >
+                {isStreaming ? (
+                  <div>
+                    <ArrowPathIcon className="animate-spin w-4" />
+                  </div>
+                ) : (
+                  <div>Ask</div>
+                )}
               </Btn>
-              <Btn onClick={clearHistory} className="btn-sm">Clear</Btn>
+              <Btn onClick={clearHistory} className="btn-sm">
+                Clear
+              </Btn>
             </div>
           </div>
         </div>
