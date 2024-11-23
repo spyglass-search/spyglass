@@ -264,7 +264,7 @@ function AskClippy() {
   };
 
   const handleAskClippy = async (prompt: string) => {
-    let currentCtxt: ChatMessage[] = [
+    const currentCtxt: ChatMessage[] = [
       ...history,
       {
         role: "user",
@@ -306,7 +306,8 @@ function AskClippy() {
         handleChatEvent(event.payload);
       });
     };
-    let unlisten = init();
+
+    const unlisten = init();
     return () => {
       (async () => {
         await unlisten.then((fn) => fn());
