@@ -47,21 +47,18 @@ test-with-ignored:
 	cargo test --all -- --ignored
 
 setup-dev:
-	rustup target add wasm32-unknown-unknown
-# Required for plugin development
-	rustup target add wasm32-wasi
-# install tauri-cli and node dependencies
-	cargo install --locked tauri-cli
+# setup frontend development environment
 	cd ./apps/desktop-client && npm i
+	cd ./apps/tauri && npm i
+# Download lLM model used in development
+	mkdir -p assets/models/llm/llama3
+	cd assets/models/llm/llama3 && curl -L --remote-name "https://huggingface.co/QuantFactory/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct.Q5_K_M.gguf?download=true"
 # Download whisper model used in development
 	mkdir -p assets/models/embeddings
 	mkdir -p assets/models/whisper
-	curl -L --output model.safetensors https://huggingface.co/openai/whisper-base.en/resolve/main/model.safetensors?download=true
-	mv model.safetensors assets/models/whisper
-	curl -L --output config.json https://huggingface.co/openai/whisper-base.en/resolve/main/config.json?download=true
-	mv config.json assets/models/whisper
-	curl -L --output tokenizer.json https://huggingface.co/openai/whisper-base.en/resolve/main/tokenizer.json?download=true
-	mv tokenizer.json assets/models/whisper
+	cd assets/models/whisper && curl -L --output model.safetensors "https://huggingface.co/openai/whisper-base.en/resolve/main/model.safetensors?download=true"
+	cd assets/models/whisper && curl -L --output config.json "https://huggingface.co/openai/whisper-base.en/resolve/main/config.json?download=true"
+	cd assets/models/whisper && curl -L --output tokenizer.json "https://huggingface.co/openai/whisper-base.en/resolve/main/tokenizer.json?download=true"
 # Check if .env exists and if not create it
 	test -f .env || cp .env.template .env
 # Build backend to copy binaries for Tauri
