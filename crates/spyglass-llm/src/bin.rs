@@ -51,9 +51,14 @@ pub async fn main() -> Result<(), anyhow::Error> {
         }
     });
 
-    let mut client =
-        LlmClient::new("assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into())?;
-    client.chat(&prompt, Some(tx)).await?;
+    match LlmClient::new("assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into()) {
+        Ok(mut client) => {
+            client.chat(&prompt, Some(tx)).await?;
+        }
+        Err(error) => {
+            log::error!("Error loading model {error}");
+        }
+    }
 
     Ok(())
 }
