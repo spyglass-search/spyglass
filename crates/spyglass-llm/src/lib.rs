@@ -9,6 +9,10 @@ pub mod model;
 pub mod sampler;
 mod token_output_stream;
 
+// Templates packaged w/ spyglass.
+pub const LLAMA3_INSTRUCT: &str = "llama3-instruct.txt";
+pub const PHI35_INSTRUCT: &str = "phi3.5-instruct.txt";
+
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
         match Tera::new("assets/templates/llm/*.txt") {
@@ -24,12 +28,17 @@ lazy_static! {
 #[derive(Clone)]
 pub struct LlmClient {
     llm: LLMModel,
+    template: String,
 }
 
 impl LlmClient {
-    pub fn new(gguf_path: PathBuf) -> Result<Self> {
+    pub fn new(
+        gguf_path: PathBuf,
+        template_name: &str,
+    ) -> Result<Self> {
         Ok(Self {
             llm: LLMModel::new(gguf_path)?,
+            template: template_name.to_string(),
         })
     }
 
@@ -50,7 +59,7 @@ impl LlmClient {
         }
 
         let prompt_contents =
-            TEMPLATES.render("llama3-instruct.txt", &Context::from_serialize(session)?)?;
+            TEMPLATES.render(&self.template, &Context::from_serialize(session)?)?;
         let next_token = sampler.load_prompt(&prompt_contents)?;
         log::info!("processing prompt in {:.3}s", timer.elapsed().as_secs_f32());
 

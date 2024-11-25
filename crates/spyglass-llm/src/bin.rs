@@ -52,7 +52,10 @@ pub async fn main() -> Result<(), anyhow::Error> {
     });
 
     let mut client =
-        LlmClient::new("assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into())?;
+        LlmClient::new(
+            "assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into(),
+            "llama3-instruct.txt"
+        )?;
     client.chat(&prompt, Some(tx)).await?;
 
     Ok(())

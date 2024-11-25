@@ -216,7 +216,10 @@ pub async fn chat_completion(state: AppState, session: &LlmSession) -> RpcResult
         Some(client) => client,
         None => {
             let client =
-                LlmClient::new("assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into())
+                LlmClient::new(
+                    "assets/models/llm/llama3/Llama-3.2-3B-Instruct.Q5_K_M.gguf".into(),
+                    spyglass_llm::LLAMA3_INSTRUCT,
+                )
                     .map_err(|e| server_error(e.to_string(), None))?;
             *llm = Some(client);
             llm.as_mut().unwrap()
