@@ -270,7 +270,7 @@ where
             db.get_database_backend(),
             r#"
                 SELECT
-                    indexed_document.id AS score_id,
+                    indexed_document.id AS id,
                     vd.distance,
                     indexed_document.doc_id,
                     indexed_document.url,
