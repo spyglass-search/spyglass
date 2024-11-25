@@ -39,6 +39,14 @@ impl LLMModel {
                     candle::Device::Cpu
                 }
             }
+        } else if candle::utils::cuda_is_available() {
+            match Device::new_cuda(0) {
+                Ok(dev) => dev,
+                Err(err) => {
+                    log::warn!("Using CPU fallback. Unable to create CudaDevice: {err}");
+                    candle::Device::Cpu
+                }
+            }
         } else {
             candle::Device::Cpu
         };
