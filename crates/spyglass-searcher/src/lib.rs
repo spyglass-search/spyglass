@@ -127,7 +127,7 @@ pub trait WriteTrait {
 
 type SearcherResult<T> = Result<T, SearchError>;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Debug)]
 pub struct RetrievedDocument {
     pub doc_id: String,
     pub domain: String,
