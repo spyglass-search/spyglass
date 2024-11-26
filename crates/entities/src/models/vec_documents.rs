@@ -1,6 +1,6 @@
 use sea_orm::{
-    sea_query::index, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ExecResult,
-    FromQueryResult, QueryFilter, Statement,
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ExecResult, FromQueryResult, QueryFilter,
+    Statement,
 };
 
 use super::vec_to_indexed;
