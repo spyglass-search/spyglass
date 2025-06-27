@@ -1,4 +1,5 @@
 <p align="center">
+  <h3 align="center">⚠️ NO LONGER IN ACTIVE DEVELOPMENT ⚠️</b></h1>
   <h1 align="center"><b>Spyglass</b></h1>
   <p align="center">
     A personal search engine that indexes what you want, exposing it to you in a simple & fast interface
